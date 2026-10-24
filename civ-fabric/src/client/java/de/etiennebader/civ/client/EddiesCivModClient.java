@@ -1,4 +1,4 @@
-package de.etiennebader.client;
+package de.etiennebader.civ.client;
 
 import net.fabricmc.api.ClientModInitializer;
 

@@ -3,26 +3,26 @@
 	"id": "eddies-civ-mod",
 	"version": "${version}",
 	"name": "Eddies Civ Mod",
-	"description": "This is an example description! Tell everyone what your mod is about!",
+	"description": "This mod tries to implement some realistic civilization features, e.g. nations, claims, economy and more!",
 	"authors": [
-		"Me!"
+		"_eddie_ljb"
 	],
 	"contact": {
-		"homepage": "https://fabricmc.net/",
-		"sources": "https://github.com/FabricMC/fabric-example-mod"
+		"homepage": "TBD",
+		"sources": "TBD"
 	},
 	"license": "CC0-1.0",
 	"icon": "assets/eddies-civ-mod/icon.png",
 	"environment": "*",
 	"entrypoints": {
 		"main": [
-			"de.etiennebader.EddiesCivMod"
+          "de.etiennebader.civ.EddiesCivMod"
 		],
 		"client": [
-			"de.etiennebader.client.EddiesCivModClient"
+          "de.etiennebader.civ.client.EddiesCivModClient"
 		],
 		"fabric-datagen": [
-			"de.etiennebader.client.EddiesCivModDataGenerator"
+          "de.etiennebader.civ.client.EddiesCivModDataGenerator"
 		]
 	},
 	"mixins": [

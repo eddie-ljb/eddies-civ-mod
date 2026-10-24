@@ -1,4 +1,4 @@
-package de.etiennebader;
+package de.etiennebader.civ;
 
 import net.fabricmc.api.ModInitializer;
 

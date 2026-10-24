@@ -1,4 +1,4 @@
-package de.etiennebader.client;
+package de.etiennebader.civ.client;
 
 import net.fabricmc.fabric.api.datagen.v1.DataGeneratorEntrypoint;
 import net.fabricmc.fabric.api.datagen.v1.FabricDataGenerator;
