@@ -1,5 +1,6 @@
 package de.etiennebader.civ;
 
+import de.etiennebader.civ.domain.CivDomain;
 import net.fabricmc.api.ModInitializer;
 
 import net.minecraft.resources.Identifier;
@@ -22,6 +23,7 @@ public class EddiesCivMod implements ModInitializer {
 		// Proceed with mild caution.
 
 		LOGGER.info("Hello Fabric world!");
+        LOGGER.info(CivDomain.status());
 	}
 
 	public static Identifier id(String path) {
