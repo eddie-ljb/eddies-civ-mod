@@ -1,6 +1,6 @@
 {
 	"required": true,
-	"package": "de.etiennebader.client.mixin",
+	"package": "de.etiennebader.civ.client.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"client": [
 

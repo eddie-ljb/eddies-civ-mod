@@ -1,6 +1,6 @@
 {
 	"required": true,
-	"package": "de.etiennebader.mixin",
+	"package": "de.etiennebader.civ.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
 
