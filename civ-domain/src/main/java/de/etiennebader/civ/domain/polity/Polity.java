@@ -2,6 +2,7 @@ package de.etiennebader.civ.domain.polity;
 
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PolityRef;
+import de.etiennebader.civ.domain.law.EnactedStatute;
 import de.etiennebader.civ.domain.law.LawBook;
 import de.etiennebader.civ.domain.law.LawView;
 import de.etiennebader.civ.domain.law.Statute;
@@ -58,6 +59,32 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
         Polity polity = new Polity(id, name, PolityKind.TERRITORIAL, SettlementTier.MUNICIPALITY, currency, day);
         polity.members.put(founder, new Membership(founder, MembershipType.CITIZEN, day));
         polity.raise(new PolityFounded(id, name, founder, day));
+        return polity;
+    }
+
+    /**
+     * Stellt eine gespeicherte Polity wieder her, ohne Events auszulösen. Mitglieder und Gesetze
+     * werden in der übergebenen Reihenfolge übernommen; Gesetze in der Reihenfolge ihres Erlasses.
+     *
+     * @throws IllegalArgumentException wenn die Daten keine gültige Polity ergeben
+     */
+    public static Polity restore(PolityId id, PolityName name, PolityKind kind, SettlementTier tier, CurrencyId currency,
+                                 Day foundedOn, List<Membership> members, List<EnactedStatute> statutes) {
+        Objects.requireNonNull(members, "members");
+        Objects.requireNonNull(statutes, "statutes");
+        Polity polity = new Polity(id, name, kind, tier, currency, foundedOn);
+        if (members.isEmpty()) {
+            throw new IllegalArgumentException("Gespeicherte Polity ohne Mitglieder: " + id);
+        }
+        for (Membership membership : members) {
+            if (membership.member().equals(polity.asActor())) {
+                throw new IllegalArgumentException("Polity ist Mitglied ihrer selbst: " + id);
+            }
+            if (polity.members.putIfAbsent(membership.member(), membership) != null) {
+                throw new IllegalArgumentException("Doppelte Mitgliedschaft in " + id + ": " + membership.member());
+            }
+        }
+        statutes.forEach(enacted -> polity.lawBook.enact(enacted.statute(), enacted.enactedOn()));
         return polity;
     }
 

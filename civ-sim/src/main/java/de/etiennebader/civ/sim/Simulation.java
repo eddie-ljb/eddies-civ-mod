@@ -1,6 +1,9 @@
 package de.etiennebader.civ.sim;
 
 import de.etiennebader.civ.application.day.DayReport;
+import de.etiennebader.civ.application.persistence.ChangeTracker;
+import de.etiennebader.civ.application.persistence.FlushReport;
+import de.etiennebader.civ.application.persistence.WorldPersistence;
 import de.etiennebader.civ.application.port.DomainEventPublisher;
 import de.etiennebader.civ.domain.fiscal.LandTaxReport;
 import de.etiennebader.civ.domain.shared.Day;
@@ -39,6 +42,9 @@ import java.util.function.Consumer;
  *     <li>Zufriedenheit fortschreiben, Kennzahlen erheben, Invarianten prüfen</li>
  * </ol>
  * Gleiches Szenario mit gleichem Seed ergibt exakt dieselben Kennzahlen und Events.
+ *
+ * <p>Mit {@link Autosave} wird der Zustand wie im Spiel regelmäßig gespeichert; das Speichern
+ * beeinflusst den Verlauf nicht.
  */
 public final class Simulation {
 
@@ -50,13 +56,28 @@ public final class Simulation {
     private final MetricsCollector metrics;
     private final InvariantChecker invariants;
     private final Map<PolityId, LandTaxReport> lastTaxReports = new HashMap<>();
+    private final Optional<Autosave> autosave;
+    private final Optional<WorldPersistence> persistence;
+    private SaveStatistics saveStatistics = SaveStatistics.NONE;
 
     /**
      * @param additionalPublisher erhält alle Domain Events zusätzlich, z. B. ein Event-Log
      */
     public Simulation(Scenario scenario, DomainEventPublisher additionalPublisher) {
+        this(scenario, additionalPublisher, Optional.empty());
+    }
+
+    /**
+     * @param additionalPublisher erhält alle Domain Events zusätzlich, z. B. ein Event-Log
+     * @param autosave            speichert den Zustand regelmäßig und am Ende, falls angegeben
+     */
+    public Simulation(Scenario scenario, DomainEventPublisher additionalPublisher, Optional<Autosave> autosave) {
         Objects.requireNonNull(additionalPublisher, "additionalPublisher");
-        this.world = SimulationWorld.create(scenario, eventCounter.andThen(additionalPublisher));
+        this.autosave = Objects.requireNonNull(autosave, "autosave");
+        ChangeTracker tracker = new ChangeTracker();
+        DomainEventPublisher publisher = eventCounter.andThen(additionalPublisher);
+        this.world = SimulationWorld.create(scenario, autosave.isPresent() ? publisher.andThen(tracker) : publisher);
+        this.persistence = autosave.map(save -> new WorldPersistence(world.repositories(), save.store(), tracker));
         this.brain = new AgentBrain(scenario.behavior().decisionNoise());
         this.routine = new AgentRoutine(world);
         this.satisfaction = new SatisfactionModel(world);
@@ -74,11 +95,15 @@ public final class Simulation {
     public SimulationResult run(Consumer<DailyMetrics> metricsSink) {
         Objects.requireNonNull(metricsSink, "metricsSink");
         DailyMetrics last = null;
-        for (long dayNumber = 1; dayNumber <= world.scenario().days(); dayNumber++) {
+        int days = world.scenario().days();
+        for (long dayNumber = 1; dayNumber <= days; dayNumber++) {
             last = runDay(Day.of(dayNumber));
             metricsSink.accept(last);
+            if (isSaveDay(dayNumber, days)) {
+                save();
+            }
         }
-        return new SimulationResult(world.scenario(), last, world.rejections().total(), eventCounter.total());
+        return new SimulationResult(world.scenario(), last, world.rejections().total(), eventCounter.total(), saveStatistics);
     }
 
     private DailyMetrics runDay(Day day) {
@@ -99,6 +124,16 @@ public final class Simulation {
         DailyMetrics dailyMetrics = metrics.collect(report, world.rejections().takeToday(), eventCounter.takeToday());
         invariants.verify(day);
         return dailyMetrics;
+    }
+
+    private boolean isSaveDay(long day, int lastDay) {
+        return autosave.map(save -> day % save.intervalDays() == 0 || day == lastDay).orElse(false);
+    }
+
+    private void save() {
+        long start = System.nanoTime();
+        FlushReport report = persistence.orElseThrow().flush();
+        saveStatistics = saveStatistics.plus(System.nanoTime() - start, report.events());
     }
 
     /** Für Tests: Zugriff auf den Zustand. */

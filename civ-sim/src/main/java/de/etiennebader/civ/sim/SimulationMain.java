@@ -84,11 +84,14 @@ public final class SimulationMain {
             try (Writer metricsFile = writer(outputDirectory.resolve(METRICS_FILE));
                  Writer eventFile = options.eventLog() ? writer(outputDirectory.resolve(EVENT_LOG_FILE)) : Writer.nullWriter()) {
                 DomainEventPublisher eventLog = options.eventLog() ? new EventLogWriter(eventFile) : DomainEventPublisher.NONE;
-                long start = System.nanoTime();
-                SimulationResult result = new Simulation(scenario, eventLog).run(new MetricsCsvWriter(metricsFile));
-                long millis = (System.nanoTime() - start) / 1_000_000;
-                printSummary(result, millis, outputDirectory, options.eventLog(), out);
-                return SUCCESS;
+                try (SaveTarget saveTarget = SaveTarget.open(options)) {
+                    long start = System.nanoTime();
+                    SimulationResult result = new Simulation(scenario, eventLog, saveTarget.autosave())
+                            .run(new MetricsCsvWriter(metricsFile));
+                    long millis = (System.nanoTime() - start) / 1_000_000;
+                    printSummary(result, millis, outputDirectory, options, out);
+                    return SUCCESS;
+                }
             }
         } catch (InvariantViolationException e) {
             err.println(e.getMessage());
@@ -103,8 +106,8 @@ public final class SimulationMain {
         return new BufferedWriter(Files.newBufferedWriter(file, StandardCharsets.UTF_8));
     }
 
-    private static void printSummary(SimulationResult result, long millis, Path outputDirectory, boolean eventLog,
-                                     PrintStream out) {
+    private static void printSummary(SimulationResult result, long millis, Path outputDirectory,
+                                     CommandLineOptions options, PrintStream out) {
         DailyMetrics last = result.finalDay();
         double daysPerSecond = millis == 0 ? 0 : result.scenario().days() * 1000.0 / millis;
         out.printf(Locale.ROOT, "Fertig in %d ms (%.0f Tage/s), alle Invarianten erfüllt.%n", millis, daysPerSecond);
@@ -123,8 +126,10 @@ public final class SimulationMain {
                     .forEach(entry -> out.printf(Locale.ROOT, "  %-24s %d%n", entry.getKey(), entry.getValue()));
         }
         out.println("Kennzahlen: " + outputDirectory.resolve(METRICS_FILE));
-        if (eventLog) {
+        if (options.eventLog()) {
             out.println("Event-Log:  " + outputDirectory.resolve(EVENT_LOG_FILE));
         }
+        options.save().ifPresent(file -> out.printf(Locale.ROOT, "Gespeichert: %s (%d Speichervorgänge, %d ms, %d Events im Audit-Log)%n",
+                file.toAbsolutePath(), result.saves().saves(), result.saves().totalMillis(), result.saves().events()));
     }
 }

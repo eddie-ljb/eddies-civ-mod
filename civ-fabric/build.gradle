@@ -40,6 +40,10 @@ dependencies {
     include project(':civ-domain')
     implementation project(':civ-application')
     include project(':civ-application')
+    implementation project(':civ-persistence')
+    include project(':civ-persistence')
+    // Der SQLite-Treiber ist keine Mod; include bettet ihn trotzdem ein. slf4j bringt Minecraft selbst mit.
+    include "org.xerial:sqlite-jdbc:${project.sqlite_jdbc_version}"
 
     testImplementation platform('org.junit:junit-bom:5.13.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'

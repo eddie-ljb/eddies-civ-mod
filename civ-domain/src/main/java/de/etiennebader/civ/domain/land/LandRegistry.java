@@ -42,6 +42,35 @@ public final class LandRegistry extends AggregateRoot<LandEvent> implements Land
     }
 
     /**
+     * Stellt ein gespeichertes Grundbuch wieder her, ohne Events auszulösen. Geprüft werden
+     * eindeutige IDs, Überlappungsfreiheit und die Botschaftsregel; das Gebiet prüft der Aufrufer.
+     *
+     * @throws IllegalArgumentException wenn die Daten kein gültiges Grundbuch ergeben
+     */
+    public static LandRegistry restore(PolityId owner, List<PlotSnapshot> plots) {
+        Objects.requireNonNull(plots, "plots");
+        LandRegistry registry = new LandRegistry(owner);
+        for (PlotSnapshot snapshot : plots) {
+            if (registry.plots.containsKey(snapshot.id())) {
+                throw new IllegalArgumentException("Doppelte Grundstücks-ID: " + snapshot.id());
+            }
+            registry.plots.values().stream()
+                    .filter(existing -> existing.area().overlaps(snapshot.area()))
+                    .findFirst()
+                    .ifPresent(existing -> {
+                        throw new IllegalArgumentException("Grundstücke überlappen: " + existing.id() + ", " + snapshot.id());
+                    });
+            Plot plot = new Plot(snapshot.id(), snapshot.area(), snapshot.type(), snapshot.holder(), snapshot.holderSince());
+            if (!snapshot.holder().equals(registry.ownerAsActor())) {
+                registry.requireValidHolder(plot, snapshot.holder());
+            }
+            registry.plots.put(plot.id(), plot);
+            registry.index(plot.holder(), plot.id());
+        }
+        return registry;
+    }
+
+    /**
      * Legt ein neues Grundstück an. Es gehört zunächst der Polity selbst (Gemeindeland).
      *
      * @throws PlotOutsideTerritoryException wenn ein Teil außerhalb des eigenen Gebiets liegt

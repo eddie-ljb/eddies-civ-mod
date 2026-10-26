@@ -2,6 +2,7 @@ package de.etiennebader.civ.sim.cli;
 
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 
@@ -13,13 +14,16 @@ import java.util.OptionalLong;
  * @param days      überschreibt die Anzahl der Tage
  * @param output    Verzeichnis für {@code metrics.csv} und {@code events.log}
  * @param eventLog  ob alle Domain Events protokolliert werden
+ * @param save      SQLite-Datei, in die der Zustand gespeichert wird; wird überschrieben
+ * @param saveEvery alle wie viele Tage gespeichert wird
  * @param help      ob nur die Hilfe gezeigt wird
  */
 public record CommandLineOptions(String scenario, OptionalLong seed, OptionalInt days, Path output,
-                                 boolean eventLog, boolean help) {
+                                 boolean eventLog, Optional<Path> save, int saveEvery, boolean help) {
 
     public static final String DEFAULT_SCENARIO = "medium";
     public static final Path DEFAULT_OUTPUT = Path.of("build", "simulation");
+    public static final int DEFAULT_SAVE_EVERY = 30;
 
     public static final String USAGE = """
             Aufruf: civ-sim [Optionen]
@@ -29,9 +33,11 @@ public record CommandLineOptions(String scenario, OptionalLong seed, OptionalInt
               --days <zahl>            Anzahl Tage überschreiben
               --out <verzeichnis>      Ausgabeverzeichnis (Standard: build/simulation)
               --event-log              zusätzlich alle Domain Events nach events.log schreiben
+              --save <datei>           Zustand in eine SQLite-Datei speichern (wird überschrieben)
+              --save-every <tage>      Autosave-Abstand in Tagen (Standard: 30), zusätzlich am letzten Tag
               --help                   diese Hilfe
 
-            Beispiel: ./gradlew :civ-sim:run --args="--scenario small --seed 7 --event-log"
+            Beispiel: ./gradlew :civ-sim:run --args="--scenario small --seed 7 --event-log --save build/simulation/civ.sqlite"
             """;
 
     public CommandLineOptions {
@@ -39,6 +45,10 @@ public record CommandLineOptions(String scenario, OptionalLong seed, OptionalInt
         Objects.requireNonNull(seed, "seed");
         Objects.requireNonNull(days, "days");
         Objects.requireNonNull(output, "output");
+        Objects.requireNonNull(save, "save");
+        if (saveEvery < 1) {
+            throw new UsageException("--save-every muss mindestens 1 sein");
+        }
     }
 
     /**
@@ -50,6 +60,8 @@ public record CommandLineOptions(String scenario, OptionalLong seed, OptionalInt
         OptionalInt days = OptionalInt.empty();
         Path output = DEFAULT_OUTPUT;
         boolean eventLog = false;
+        Optional<Path> save = Optional.empty();
+        int saveEvery = DEFAULT_SAVE_EVERY;
         boolean help = false;
         for (int i = 0; i < args.length; i++) {
             String option = args[i];
@@ -59,11 +71,13 @@ public record CommandLineOptions(String scenario, OptionalLong seed, OptionalInt
                 case "--days" -> days = OptionalInt.of(parsePositiveInt(option, valueAfter(args, i++)));
                 case "--out" -> output = Path.of(valueAfter(args, i++));
                 case "--event-log" -> eventLog = true;
+                case "--save" -> save = Optional.of(Path.of(valueAfter(args, i++)));
+                case "--save-every" -> saveEvery = parsePositiveInt(option, valueAfter(args, i++));
                 case "--help", "-h" -> help = true;
                 default -> throw new UsageException("Unbekannte Option: " + option);
             }
         }
-        return new CommandLineOptions(scenario, seed, days, output, eventLog, help);
+        return new CommandLineOptions(scenario, seed, days, output, eventLog, save, saveEvery, help);
     }
 
     private static String valueAfter(String[] args, int index) {

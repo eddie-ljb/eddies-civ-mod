@@ -12,16 +12,17 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Die Application-Schicht kennt weder Minecraft noch die Simulation.
+ * Die Application-Schicht kennt weder Minecraft noch die Simulation noch eine Speichertechnik.
  */
 class ApplicationArchitectureTest {
 
     private static final Path SOURCE_ROOT = Path.of("src/main/java");
     private static final List<String> FORBIDDEN = List.of(
-            "import net.minecraft.", "import net.fabricmc.", "import com.mojang.", "import de.etiennebader.civ.sim.");
+            "import net.minecraft.", "import net.fabricmc.", "import com.mojang.", "import de.etiennebader.civ.sim.",
+            "import de.etiennebader.civ.persistence.", "import java.sql.");
 
     @Test
-    @DisplayName("Keine Imports aus Minecraft, Fabric oder der Simulation")
+    @DisplayName("Keine Imports aus Minecraft, Fabric, Simulation, Persistenz oder JDBC")
     void hasNoForbiddenImports() throws IOException {
         List<String> violations;
         try (Stream<Path> files = Files.walk(SOURCE_ROOT)) {

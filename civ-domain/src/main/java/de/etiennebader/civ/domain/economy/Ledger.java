@@ -6,7 +6,9 @@ import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.Money;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -33,6 +35,44 @@ public final class Ledger extends AggregateRoot<LedgerEvent> implements LedgerVi
 
     public static Ledger empty() {
         return new Ledger();
+    }
+
+    /**
+     * Stellt ein gespeichertes Hauptbuch wieder her, ohne Events auszulösen.
+     *
+     * @throws IllegalArgumentException wenn ein Konto doppelt vorkommt, eine Währung ohne Summen
+     *                                  auftaucht oder die Geldmengenerhaltung verletzt ist
+     */
+    public static Ledger restore(List<AccountBalance> balances, List<CurrencyTotals> totals) {
+        Objects.requireNonNull(balances, "balances");
+        Objects.requireNonNull(totals, "totals");
+        Ledger ledger = new Ledger();
+        for (CurrencyTotals currencyTotals : totals) {
+            CurrencyId currency = currencyTotals.currency();
+            if (ledger.supply.putIfAbsent(currency, currencyTotals.supply().amount()) != null) {
+                throw new IllegalArgumentException("Doppelte Währungssumme: " + currency);
+            }
+            ledger.cashInCirculation.put(currency, currencyTotals.cashInCirculation().amount());
+        }
+        for (AccountBalance balance : balances) {
+            CurrencyId currency = balance.balance().currency();
+            if (!ledger.supply.containsKey(currency)) {
+                throw new IllegalArgumentException("Kontostand in Währung ohne Summen: " + currency);
+            }
+            Map<CurrencyId, Long> accounts = ledger.balances.computeIfAbsent(balance.account(), ignored -> new HashMap<>());
+            if (accounts.putIfAbsent(currency, balance.balance().amount()) != null) {
+                throw new IllegalArgumentException("Doppelter Kontostand: " + balance.account() + " " + currency);
+            }
+        }
+        for (CurrencyId currency : ledger.supply.keySet()) {
+            Money accounts = ledger.totalDeposits(currency);
+            Money cash = ledger.cashInCirculation(currency);
+            if (accounts.plus(cash).compareTo(ledger.totalSupply(currency)) != 0) {
+                throw new IllegalArgumentException("Geldmengenerhaltung verletzt für %s: Konten %s + Bargeld %s ≠ Geldmenge %s"
+                        .formatted(currency, accounts, cash, ledger.totalSupply(currency)));
+            }
+        }
+        return ledger;
     }
 
     /** Kontostand eines Akteurs; 0, wenn er noch kein Konto in dieser Währung hat. */
@@ -164,6 +204,24 @@ public final class Ledger extends AggregateRoot<LedgerEvent> implements LedgerVi
             total = Math.addExact(total, accounts.getOrDefault(currency, 0L));
         }
         return Money.of(total, currency);
+    }
+
+    @Override
+    public List<AccountBalance> accountBalances() {
+        List<AccountBalance> result = new ArrayList<>();
+        balances.forEach((account, amounts) -> amounts.forEach((currency, amount) -> {
+            if (amount != 0) {
+                result.add(new AccountBalance(account, Money.of(amount, currency)));
+            }
+        }));
+        return List.copyOf(result);
+    }
+
+    @Override
+    public List<CurrencyTotals> currencyTotals() {
+        return supply.keySet().stream()
+                .map(currency -> new CurrencyTotals(currency, totalSupply(currency), cashInCirculation(currency)))
+                .toList();
     }
 
     private void requireBalance(ActorRef account, Money amount) {

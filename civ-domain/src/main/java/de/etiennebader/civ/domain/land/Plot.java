@@ -51,6 +51,10 @@ public final class Plot {
         return holderSince;
     }
 
+    public PlotSnapshot snapshot() {
+        return new PlotSnapshot(id, area, type, holder, holderSince);
+    }
+
     public boolean isHeldBy(ActorRef actor) {
         return holder.equals(actor);
     }

@@ -28,6 +28,20 @@ public final class TerritoryRegistry extends AggregateRoot<TerritoryEvent> imple
         return new TerritoryRegistry();
     }
 
+    /** Stellt ein gespeichertes Register wieder her, ohne Events auszulösen. */
+    public static TerritoryRegistry restore(Map<ChunkCoord, Claim> claims) {
+        Objects.requireNonNull(claims, "claims");
+        TerritoryRegistry registry = new TerritoryRegistry();
+        claims.forEach((chunk, claim) -> registry.claims.put(
+                Objects.requireNonNull(chunk, "chunk"), Objects.requireNonNull(claim, "claim")));
+        return registry;
+    }
+
+    /** Alle Claims als unveränderliche Kopie, z. B. zum Speichern. */
+    public Map<ChunkCoord, Claim> claims() {
+        return Map.copyOf(claims);
+    }
+
     /**
      * Übernimmt die Hoheit über einen Chunk.
      *

@@ -14,13 +14,15 @@ import java.util.Objects;
  * @param finalDay     die Kennzahlen des letzten Tages
  * @param rejections   abgelehnte Vorhaben nach Fehlercode, über den gesamten Lauf
  * @param totalEvents  Anzahl aller veröffentlichten Domain Events
+ * @param saves        Statistik der Speichervorgänge, {@link SaveStatistics#NONE} ohne Autosave
  */
 public record SimulationResult(Scenario scenario, DailyMetrics finalDay, Map<ErrorCode, Long> rejections,
-                               long totalEvents) {
+                               long totalEvents, SaveStatistics saves) {
 
     public SimulationResult {
         Objects.requireNonNull(scenario, "scenario");
         Objects.requireNonNull(finalDay, "finalDay");
         rejections = Map.copyOf(rejections);
+        Objects.requireNonNull(saves, "saves");
     }
 }

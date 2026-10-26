@@ -12,6 +12,7 @@ Application-Schicht von Eddies Civ Mod: Use Cases über dem Domänenkern, ohne M
 | `economy` | `DepositEmeralds`, `WithdrawEmeralds`, `WithdrawCash`, `DepositCash`, `TransferFunds` |
 | `day` | `EndOfDay`: Grundsteuer aller Gemeinden, `DayReport` |
 | `query` | `WorldQueries`: lesender Zugriff über Lese-Schnittstellen (`PolityView`, `LandView`, `TerritoryView`, `LedgerView`) |
+| `persistence` | `ChangeTracker` (Änderungen aus Events), `WorldPersistence` (`restore()` beim Start, `flush()` beim Speichern), Port `StateStore`, `StateDump` (kanonischer Zustand für Vergleiche) |
 | `port` | `DomainEventPublisher` |
 | `inmemory` | In-Memory-Repositories und `RecordingEventPublisher` für Tests und die Simulation |
 

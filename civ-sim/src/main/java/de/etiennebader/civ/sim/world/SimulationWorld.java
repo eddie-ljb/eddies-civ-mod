@@ -1,6 +1,7 @@
 package de.etiennebader.civ.sim.world;
 
 import de.etiennebader.civ.application.CivApplication;
+import de.etiennebader.civ.application.Repositories;
 import de.etiennebader.civ.application.inmemory.InMemoryRepositories;
 import de.etiennebader.civ.application.port.DomainEventPublisher;
 import de.etiennebader.civ.domain.actor.ActorRef;
@@ -45,6 +46,7 @@ public final class SimulationWorld {
     public static final CurrencyId CURRENCY = CurrencyId.EMERALD;
 
     private final Scenario scenario;
+    private final Repositories repositories;
     private final CivApplication app;
     private final RandomGenerator random;
     private final List<Agent> agents;
@@ -53,8 +55,10 @@ public final class SimulationWorld {
     private final RejectionCounter rejections = new RejectionCounter();
     private final PolityNames polityNames;
 
-    private SimulationWorld(Scenario scenario, CivApplication app, RandomGenerator random, List<Agent> agents) {
+    private SimulationWorld(Scenario scenario, Repositories repositories, CivApplication app, RandomGenerator random,
+                            List<Agent> agents) {
         this.scenario = scenario;
+        this.repositories = repositories;
         this.app = app;
         this.random = random;
         this.agents = List.copyOf(agents);
@@ -67,7 +71,8 @@ public final class SimulationWorld {
         SplittableRandom root = new SplittableRandom(scenario.seed());
         RandomGenerator random = root.split();
         IdGenerator ids = new SeededIdGenerator(root.nextLong());
-        CivApplication app = new CivApplication(InMemoryRepositories.create(), ids, claimPolicyOf(scenario), publisher);
+        Repositories repositories = InMemoryRepositories.create();
+        CivApplication app = new CivApplication(repositories, ids, claimPolicyOf(scenario), publisher);
 
         List<Agent> agents = new ArrayList<>();
         for (int i = 0; i < scenario.population().players(); i++) {
@@ -78,7 +83,7 @@ public final class SimulationWorld {
             agents.add(new Agent(new PersonRef(PersonId.generate(ids)), AgentKind.VILLAGER,
                     Personality.random(AgentKind.VILLAGER, random, scenario.economy().incomeSpread())));
         }
-        return new SimulationWorld(scenario, app, random, agents);
+        return new SimulationWorld(scenario, repositories, app, random, agents);
     }
 
     /** Die Claim-Regeln des simulierten Servers. */
@@ -94,6 +99,11 @@ public final class SimulationWorld {
 
     public Scenario scenario() {
         return scenario;
+    }
+
+    /** Der Arbeitsstand im Speicher, z. B. zum Speichern über {@code WorldPersistence}. */
+    public Repositories repositories() {
+        return repositories;
     }
 
     public CivApplication app() {

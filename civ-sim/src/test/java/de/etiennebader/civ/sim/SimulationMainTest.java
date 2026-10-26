@@ -24,7 +24,9 @@ class SimulationMainTest {
     void writesOutputFiles() throws IOException {
         Path directory = Files.createTempDirectory("civ-sim");
 
-        int exitCode = run("--scenario", "small", "--days", "30", "--out", directory.toString(), "--event-log");
+        Path save = directory.resolve("welt.sqlite");
+        int exitCode = run("--scenario", "small", "--days", "30", "--out", directory.toString(), "--event-log",
+                "--save", save.toString());
 
         assertEquals(SimulationMain.SUCCESS, exitCode, err.toString(StandardCharsets.UTF_8));
         List<String> metrics = Files.readAllLines(directory.resolve(SimulationMain.METRICS_FILE));
@@ -32,6 +34,8 @@ class SimulationMainTest {
         assertTrue(metrics.get(30).startsWith("30,"));
         assertTrue(Files.size(directory.resolve(SimulationMain.EVENT_LOG_FILE)) > 0);
         assertTrue(out.toString(StandardCharsets.UTF_8).contains("alle Invarianten erfüllt"));
+        assertTrue(Files.size(save) > 0);
+        assertTrue(out.toString(StandardCharsets.UTF_8).contains("Speichervorgänge"));
     }
 
     @Test
