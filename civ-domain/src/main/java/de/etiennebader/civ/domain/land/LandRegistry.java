@@ -10,11 +10,14 @@ import de.etiennebader.civ.domain.territory.DimensionId;
 import de.etiennebader.civ.domain.territory.TerritoryView;
 
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Aggregat Grundbuch einer Polity.
@@ -26,6 +29,8 @@ public final class LandRegistry extends AggregateRoot<LandEvent> implements Land
 
     private final PolityId owner;
     private final Map<PlotId, Plot> plots = new LinkedHashMap<>();
+    /** Index für schnelle Abfragen nach Inhaber; wird bei jeder Änderung mitgeführt. */
+    private final Map<ActorRef, Set<PlotId>> plotsByHolder = new HashMap<>();
 
     private LandRegistry(PolityId owner) {
         this.owner = Objects.requireNonNull(owner, "owner");
@@ -54,6 +59,7 @@ public final class LandRegistry extends AggregateRoot<LandEvent> implements Land
         requireWithinTerritory(area, territory);
         requireNoOverlap(area);
         plots.put(id, new Plot(id, area, type, ownerAsActor(), day));
+        index(ownerAsActor(), id);
         raise(new PlotCreated(owner, id, area, type, day));
     }
 
@@ -73,7 +79,7 @@ public final class LandRegistry extends AggregateRoot<LandEvent> implements Land
             throw new NotPlotHolderException(polity, plotId);
         }
         requireValidHolder(plot, holder);
-        plot.changeHolder(holder, day);
+        changeHolder(plot, holder, day);
         raise(new PlotAssigned(owner, plotId, holder, day));
     }
 
@@ -96,7 +102,7 @@ public final class LandRegistry extends AggregateRoot<LandEvent> implements Land
             throw new IllegalArgumentException("Absender und Empfänger sind identisch: " + from);
         }
         requireValidHolder(plot, to);
-        plot.changeHolder(to, day);
+        changeHolder(plot, to, day);
         raise(new PlotTransferred(owner, plotId, from, to, day));
     }
 
@@ -109,6 +115,7 @@ public final class LandRegistry extends AggregateRoot<LandEvent> implements Land
         Objects.requireNonNull(day, "day");
         Plot plot = require(plotId);
         plots.remove(plotId);
+        unindex(plot.holder(), plotId);
         raise(new PlotDissolved(owner, plotId, plot.holder(), day));
     }
 
@@ -133,8 +140,8 @@ public final class LandRegistry extends AggregateRoot<LandEvent> implements Land
     @Override
     public Collection<Plot> plotsHeldBy(ActorRef holder) {
         Objects.requireNonNull(holder, "holder");
-        return plots.values().stream()
-                .filter(plot -> plot.isHeldBy(holder))
+        return plotsByHolder.getOrDefault(holder, Set.of()).stream()
+                .map(plots::get)
                 .toList();
     }
 
@@ -145,8 +152,27 @@ public final class LandRegistry extends AggregateRoot<LandEvent> implements Land
                 .anyMatch(plot -> plot.area().touches(chunk));
     }
 
+    @Override
     public Optional<Plot> plot(PlotId plotId) {
         return Optional.ofNullable(plots.get(Objects.requireNonNull(plotId, "plotId")));
+    }
+
+    private void changeHolder(Plot plot, ActorRef newHolder, Day day) {
+        unindex(plot.holder(), plot.id());
+        plot.changeHolder(newHolder, day);
+        index(newHolder, plot.id());
+    }
+
+    private void index(ActorRef holder, PlotId plotId) {
+        plotsByHolder.computeIfAbsent(holder, ignored -> new LinkedHashSet<>()).add(plotId);
+    }
+
+    private void unindex(ActorRef holder, PlotId plotId) {
+        Set<PlotId> held = plotsByHolder.get(holder);
+        held.remove(plotId);
+        if (held.isEmpty()) {
+            plotsByHolder.remove(holder);
+        }
     }
 
     private Plot require(PlotId plotId) {

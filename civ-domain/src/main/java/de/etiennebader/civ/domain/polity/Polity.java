@@ -24,7 +24,7 @@ import java.util.Optional;
  * <p>Invarianten: Eine Polity hat immer mindestens ein Mitglied, jeder Akteur ist höchstens
  * einmal Mitglied, und eine Polity kann nicht von einer anderen Polity gegründet werden.
  */
-public final class Polity extends AggregateRoot<PolityEvent> {
+public final class Polity extends AggregateRoot<PolityEvent> implements PolityView {
 
     private final PolityId id;
     private final PolityName name;
@@ -116,53 +116,65 @@ public final class Polity extends AggregateRoot<PolityEvent> {
         raise(new StatuteRepealed(id, statuteId, day));
     }
 
+    @Override
     public boolean isMember(ActorRef actor) {
         return members.containsKey(Objects.requireNonNull(actor, "actor"));
     }
 
+    @Override
     public Optional<Membership> membershipOf(ActorRef actor) {
         return Optional.ofNullable(members.get(Objects.requireNonNull(actor, "actor")));
     }
 
     /** Alle Mitgliedschaften in Beitrittsreihenfolge, nur lesend. */
+    @Override
     public Collection<Membership> members() {
         return List.copyOf(members.values());
     }
 
+    @Override
     public int memberCount() {
         return members.size();
     }
 
     /** Das geltende Recht, nur lesend. Änderungen laufen über {@link #enact} und {@link #repeal}. */
+    @Override
     public LawView laws() {
         return lawBook;
     }
 
     /** Die Polity als handelnder Akteur, z. B. als Kontoinhaberin oder Grundbesitzerin. */
+    @Override
     public PolityRef asActor() {
         return new PolityRef(id);
     }
 
+    @Override
     public PolityId id() {
         return id;
     }
 
+    @Override
     public PolityName name() {
         return name;
     }
 
+    @Override
     public PolityKind kind() {
         return kind;
     }
 
+    @Override
     public SettlementTier tier() {
         return tier;
     }
 
+    @Override
     public CurrencyId currency() {
         return currency;
     }
 
+    @Override
     public Day foundedOn() {
         return foundedOn;
     }

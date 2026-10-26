@@ -23,5 +23,8 @@
   "eddies-civ-mod.error.not_plot_holder": "%s does not hold this plot.",
   "eddies-civ-mod.error.unknown_plot": "This plot does not exist.",
   "eddies-civ-mod.error.insufficient_funds": "You are missing %1$s. You have %2$s, but %3$s are required.",
-  "eddies-civ-mod.error.cash_integrity": "The deposit of %1$s was rejected because only %2$s in cash is in circulation."
+  "eddies-civ-mod.error.cash_integrity": "The deposit of %1$s was rejected because only %2$s in cash is in circulation.",
+  "eddies-civ-mod.error.unknown_polity": "This town does not exist.",
+  "eddies-civ-mod.error.member_of_other_polity": "%1$s is already a member of %2$s. Leave that town first.",
+  "eddies-civ-mod.error.chunk_has_plots": "Chunk %s, %s still contains plots. Dissolve them first."
 }

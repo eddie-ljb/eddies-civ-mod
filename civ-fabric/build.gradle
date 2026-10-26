@@ -38,6 +38,8 @@ dependencies {
     // Eigene Module: implementation zum Kompilieren, include zum Einbetten ins Mod-JAR
     implementation project(':civ-domain')
     include project(':civ-domain')
+    implementation project(':civ-application')
+    include project(':civ-application')
 
     testImplementation platform('org.junit:junit-bom:5.13.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'

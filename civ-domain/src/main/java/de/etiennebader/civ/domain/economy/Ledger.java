@@ -22,7 +22,7 @@ import java.util.Objects;
  * Geld entsteht und verschwindet nur durch {@link #mint} und {@link #burn}; Überweisungen,
  * Ein- und Auszahlungen verschieben es nur.
  */
-public final class Ledger extends AggregateRoot<LedgerEvent> {
+public final class Ledger extends AggregateRoot<LedgerEvent> implements LedgerView {
 
     private final Map<ActorRef, Map<CurrencyId, Long>> balances = new HashMap<>();
     private final Map<CurrencyId, Long> cashInCirculation = new HashMap<>();
@@ -36,6 +36,7 @@ public final class Ledger extends AggregateRoot<LedgerEvent> {
     }
 
     /** Kontostand eines Akteurs; 0, wenn er noch kein Konto in dieser Währung hat. */
+    @Override
     public Money balanceOf(ActorRef account, CurrencyId currency) {
         Objects.requireNonNull(account, "account");
         Objects.requireNonNull(currency, "currency");
@@ -143,16 +144,19 @@ public final class Ledger extends AggregateRoot<LedgerEvent> {
     }
 
     /** Bargeld dieser Währung, das sich gerade als Items im Umlauf befindet. */
+    @Override
     public Money cashInCirculation(CurrencyId currency) {
         return Money.of(cashInCirculation.getOrDefault(Objects.requireNonNull(currency, "currency"), 0L), currency);
     }
 
     /** Gesamte Geldmenge dieser Währung, also Buchgeld und Bargeld. */
+    @Override
     public Money totalSupply(CurrencyId currency) {
         return Money.of(supply.getOrDefault(Objects.requireNonNull(currency, "currency"), 0L), currency);
     }
 
     /** Summe aller Kontostände dieser Währung, also das gesamte Buchgeld. */
+    @Override
     public Money totalDeposits(CurrencyId currency) {
         Objects.requireNonNull(currency, "currency");
         long total = 0;

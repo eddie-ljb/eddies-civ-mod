@@ -16,6 +16,8 @@ public interface LandView {
     /** Die Polity, deren Grundbuch dies ist. */
     PolityId owner();
 
+    Optional<Plot> plot(PlotId plotId);
+
     Optional<Plot> plotAt(DimensionId dimension, int x, int z);
 
     /** Alle Grundstücke in Anlagereihenfolge. */

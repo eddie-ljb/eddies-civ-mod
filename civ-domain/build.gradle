@@ -1,30 +1,4 @@
 plugins {
+    id 'civ.java-conventions'
     id 'java-library'
-}
-
-repositories {
-    mavenCentral()
-}
-
-java {
-    sourceCompatibility = JavaVersion.VERSION_25
-    targetCompatibility = JavaVersion.VERSION_25
-}
-
-tasks.withType(JavaCompile).configureEach {
-    it.options.release = 25
-}
-
-dependencies {
-    testImplementation platform('org.junit:junit-bom:5.13.4')
-    testImplementation 'org.junit.jupiter:junit-jupiter'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-}
-
-test {
-    useJUnitPlatform()
-    testLogging {
-        events 'failed', 'skipped'
-        exceptionFormat 'full'
-    }
 }

@@ -1,0 +1,18 @@
+// Entwicklungswerkzeug: simuliert den Kern ohne Minecraft. Gehört nicht ins Mod-JAR.
+plugins {
+    id 'civ.java-conventions'
+    id 'application'
+}
+
+dependencies {
+    implementation project(':civ-application')
+}
+
+application {
+    mainClass = 'de.etiennebader.civ.sim.SimulationMain'
+}
+
+tasks.named('run', JavaExec) {
+    // Relative Pfade wie --out beziehen sich auf das Wurzelverzeichnis des Projekts.
+    workingDir = rootProject.projectDir
+}

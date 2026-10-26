@@ -72,7 +72,15 @@ public enum ErrorCode {
     /** Argumente: fehlender Betrag, verfügbarer Betrag, benötigter Betrag. */
     INSUFFICIENT_FUNDS,
     /** Argumente: einzuzahlender Betrag, umlaufendes Bargeld. */
-    CASH_INTEGRITY;
+    CASH_INTEGRITY,
+
+    // application: Regeln, die mehrere Aggregate betreffen
+    /** Argumente: Polity-ID. */
+    UNKNOWN_POLITY,
+    /** Argumente: Akteur, Name der anderen Gemeinde. */
+    MEMBER_OF_OTHER_POLITY,
+    /** Argumente: Chunk-X, Chunk-Z. */
+    CHUNK_HAS_PLOTS;
 
     private static final String TRANSLATION_PREFIX = "eddies-civ-mod.error.";
 

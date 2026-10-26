@@ -23,5 +23,8 @@
   "eddies-civ-mod.error.not_plot_holder": "%s ist nicht Inhaber dieses Grundstücks.",
   "eddies-civ-mod.error.unknown_plot": "Dieses Grundstück existiert nicht.",
   "eddies-civ-mod.error.insufficient_funds": "Dir fehlen %1$s. Du hast %2$s, benötigt werden %3$s.",
-  "eddies-civ-mod.error.cash_integrity": "Die Einzahlung von %1$s wurde abgelehnt, weil nur %2$s Bargeld im Umlauf ist."
+  "eddies-civ-mod.error.cash_integrity": "Die Einzahlung von %1$s wurde abgelehnt, weil nur %2$s Bargeld im Umlauf ist.",
+  "eddies-civ-mod.error.unknown_polity": "Diese Gemeinde existiert nicht.",
+  "eddies-civ-mod.error.member_of_other_polity": "%1$s ist bereits Mitglied von %2$s. Tritt zuerst dort aus.",
+  "eddies-civ-mod.error.chunk_has_plots": "Der Chunk %s, %s enthält noch Grundstücke. Löse sie zuerst auf."
 }

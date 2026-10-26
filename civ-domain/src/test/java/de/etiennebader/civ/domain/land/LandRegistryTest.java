@@ -1,5 +1,6 @@
 package de.etiennebader.civ.domain.land;
 
+import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PlayerRef;
 import de.etiennebader.civ.domain.actor.PolityRef;
 import de.etiennebader.civ.domain.shared.Day;
@@ -173,6 +174,24 @@ class LandRegistryTest {
     }
 
     @Test
+    @DisplayName("plotsHeldBy folgt Vergabe, Verkauf und Auflösung")
+    void holderIndexFollowsChanges() {
+        PlotId first = newPlot(new Area(OVERWORLD, 0, 0, 3, 3), PlotType.RESIDENTIAL);
+        PlotId second = newPlot(new Area(OVERWORLD, 4, 0, 7, 3), PlotType.RESIDENTIAL);
+        assertEquals(List.of(first, second), idsHeldBy(nordhainActor));
+
+        land.assign(first, alice, Day.of(2));
+        land.assign(second, alice, Day.of(2));
+        land.transfer(first, alice, bob, Day.of(3));
+        assertEquals(List.of(second), idsHeldBy(alice));
+        assertEquals(List.of(first), idsHeldBy(bob));
+        assertTrue(idsHeldBy(nordhainActor).isEmpty());
+
+        land.dissolve(first, Day.of(4));
+        assertTrue(idsHeldBy(bob).isEmpty());
+    }
+
+    @Test
     @DisplayName("Unbekanntes Grundstück → UNKNOWN_PLOT")
     void rejectsUnknownPlot() {
         PlotId unknown = PlotId.generate(actors.ids());
@@ -180,6 +199,10 @@ class LandRegistryTest {
         assertDomainError(ErrorCode.UNKNOWN_PLOT, () -> land.dissolve(unknown, DAY));
         assertDomainError(ErrorCode.UNKNOWN_PLOT, () -> land.assign(unknown, alice, DAY));
         assertDomainError(ErrorCode.UNKNOWN_PLOT, () -> land.transfer(unknown, alice, bob, DAY));
+    }
+
+    private List<PlotId> idsHeldBy(ActorRef holder) {
+        return land.plotsHeldBy(holder).stream().map(Plot::id).toList();
     }
 
     private void claim(ChunkCoord chunk) {
