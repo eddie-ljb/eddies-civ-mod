@@ -38,6 +38,18 @@ dependencies {
     // Eigene Module: implementation zum Kompilieren, include zum Einbetten ins Mod-JAR
     implementation project(':civ-domain')
     include project(':civ-domain')
+
+    testImplementation platform('org.junit:junit-bom:5.13.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events 'failed', 'skipped'
+        exceptionFormat 'full'
+    }
 }
 
 processResources {
