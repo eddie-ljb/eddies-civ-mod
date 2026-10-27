@@ -10,6 +10,7 @@ import de.etiennebader.civ.domain.law.EnactedStatute;
 import de.etiennebader.civ.domain.law.ParameterCatalog;
 import de.etiennebader.civ.domain.polity.Membership;
 import de.etiennebader.civ.domain.polity.PolityView;
+import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.domain.territory.ChunkCoord;
 import de.etiennebader.civ.domain.territory.Claim;
 import de.etiennebader.civ.domain.territory.TerritoryView;
@@ -37,7 +38,8 @@ public final class StateDump {
         TerritoryView territory = world.territory();
         for (PolityView polity : world.polities()) {
             lines.add(String.join("|", "polity", polity.id().value().toString(), polity.name().value(),
-                    polity.kind().name(), polity.tier().name(), polity.currency().code(), day(polity.foundedOn().value())));
+                    polity.kind().name(), polity.tier().name(), polity.currency().code(), day(polity.foundedOn().value()),
+                    polity.seat().map(BlockPosition::toString).orElse("-")));
             for (Membership membership : polity.members()) {
                 lines.add(String.join("|", "  member", actor(membership.member()), membership.type().name(),
                         day(membership.since().value())));

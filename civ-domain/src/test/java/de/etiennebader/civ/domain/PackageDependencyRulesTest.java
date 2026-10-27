@@ -39,8 +39,9 @@ class PackageDependencyRulesTest {
             "territory", Set.of("shared", "actor"),
             "land", Set.of("shared", "actor", "territory"),
             "economy", Set.of("shared", "actor"),
-            "polity", Set.of("shared", "actor", "law"),
-            "fiscal", Set.of("shared", "actor", "law", "territory", "land", "economy", "polity"));
+            "polity", Set.of("shared", "actor", "law", "territory"),
+            "fiscal", Set.of("shared", "actor", "law", "territory", "land", "economy", "polity"),
+            "protection", Set.of("shared", "actor", "law", "territory", "land", "polity"));
 
     @Test
     @DisplayName("Pakete verwenden nur erlaubte Pakete")

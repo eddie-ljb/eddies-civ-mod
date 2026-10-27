@@ -9,23 +9,27 @@ import de.etiennebader.civ.domain.polity.MembershipType;
 import de.etiennebader.civ.domain.polity.Polity;
 import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.polity.PolityName;
-import de.etiennebader.civ.domain.polity.PolityView;
+import de.etiennebader.civ.domain.polity.PolitySnapshot;
 import de.etiennebader.civ.domain.polity.SettlementTier;
 import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.shared.StatuteId;
+import de.etiennebader.civ.domain.territory.BlockPosition;
+import de.etiennebader.civ.domain.territory.DimensionId;
 import de.etiennebader.civ.persistence.ActorCodec;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -36,10 +40,12 @@ import java.util.UUID;
 final class PolityTable {
 
     private static final String UPSERT_POLITY = """
-            INSERT INTO polity (id, seq, name, kind, tier, currency, founded_on)
-            VALUES (?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM polity), ?, ?, ?, ?, ?)
+            INSERT INTO polity (id, seq, name, kind, tier, currency, founded_on, seat_dimension, seat_x, seat_y, seat_z)
+            VALUES (?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM polity), ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (id) DO UPDATE SET name = excluded.name, kind = excluded.kind, tier = excluded.tier,
-                currency = excluded.currency, founded_on = excluded.founded_on""";
+                currency = excluded.currency, founded_on = excluded.founded_on,
+                seat_dimension = excluded.seat_dimension, seat_x = excluded.seat_x, seat_y = excluded.seat_y,
+                seat_z = excluded.seat_z""";
 
     private final ParameterCatalog catalog;
 
@@ -47,7 +53,7 @@ final class PolityTable {
         this.catalog = Objects.requireNonNull(catalog, "catalog");
     }
 
-    void write(Connection connection, PolityView polity) throws SQLException {
+    void write(Connection connection, PolitySnapshot polity) throws SQLException {
         String id = polity.id().value().toString();
         try (PreparedStatement upsert = connection.prepareStatement(UPSERT_POLITY)) {
             upsert.setString(1, id);
@@ -56,11 +62,36 @@ final class PolityTable {
             upsert.setString(4, polity.tier().name());
             upsert.setString(5, polity.currency().code());
             upsert.setLong(6, polity.foundedOn().value());
+            bindSeat(upsert, 7, polity.seat());
             upsert.executeUpdate();
         }
         deleteChildren(connection, id);
         insertMembers(connection, id, polity.members());
-        insertStatutes(connection, id, polity.laws().inForce());
+        insertStatutes(connection, id, polity.statutes());
+    }
+
+    private static void bindSeat(PreparedStatement statement, int firstIndex, Optional<BlockPosition> seat)
+            throws SQLException {
+        if (seat.isEmpty()) {
+            statement.setNull(firstIndex, Types.VARCHAR);
+            for (int offset = 1; offset <= 3; offset++) {
+                statement.setNull(firstIndex + offset, Types.INTEGER);
+            }
+            return;
+        }
+        statement.setString(firstIndex, seat.get().dimension().value());
+        statement.setInt(firstIndex + 1, seat.get().x());
+        statement.setInt(firstIndex + 2, seat.get().y());
+        statement.setInt(firstIndex + 3, seat.get().z());
+    }
+
+    private static Optional<BlockPosition> seatOf(ResultSet row) throws SQLException {
+        String dimension = row.getString("seat_dimension");
+        if (dimension == null) {
+            return Optional.empty();
+        }
+        return Optional.of(new BlockPosition(new DimensionId(dimension), row.getInt("seat_x"), row.getInt("seat_y"),
+                row.getInt("seat_z")));
     }
 
     void delete(Connection connection, PolityId polity) throws SQLException {
@@ -130,13 +161,15 @@ final class PolityTable {
         Map<String, List<EnactedStatute>> statutes = loadStatutes(connection);
         List<Polity> polities = new ArrayList<>();
         try (PreparedStatement select = connection.prepareStatement(
-                "SELECT id, name, kind, tier, currency, founded_on FROM polity ORDER BY seq");
+                """
+                SELECT id, name, kind, tier, currency, founded_on, seat_dimension, seat_x, seat_y, seat_z
+                FROM polity ORDER BY seq""");
              ResultSet rows = select.executeQuery()) {
             while (rows.next()) {
                 String id = rows.getString("id");
                 polities.add(Polity.restore(new PolityId(UUID.fromString(id)), new PolityName(rows.getString("name")),
                         PolityKind.valueOf(rows.getString("kind")), SettlementTier.valueOf(rows.getString("tier")),
-                        new CurrencyId(rows.getString("currency")), Day.of(rows.getLong("founded_on")),
+                        new CurrencyId(rows.getString("currency")), Day.of(rows.getLong("founded_on")), seatOf(rows),
                         members.getOrDefault(id, List.of()), statutes.getOrDefault(id, List.of())));
             }
         }

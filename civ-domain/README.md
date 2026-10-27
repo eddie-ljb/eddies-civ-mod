@@ -12,7 +12,7 @@ Basis-Package: `de.etiennebader.civ.domain`.
 | `LandRegistry` | `land` | Grundstücke einer Polity |
 | `Ledger` | `economy` | Konten und Bargeldumlauf, weltweit |
 
-`LandTaxCollector` (`fiscal`) verbindet sie als zustandsloser Domain Service.
+`LandTaxCollector` (`fiscal`) und `ProtectionRules` (`protection`, Gebietsschutz) verbinden sie als zustandslose Domain Services.
 
 ## Paketregeln
 
@@ -24,8 +24,9 @@ Basis-Package: `de.etiennebader.civ.domain`.
 | `territory` | `shared`, `actor` |
 | `land` | `shared`, `actor`, `territory` |
 | `economy` | `shared`, `actor` |
-| `polity` | `shared`, `actor`, `law` |
+| `polity` | `shared`, `actor`, `law`, `territory` (Sitz) |
 | `fiscal` | alle anderen |
+| `protection` | `shared`, `actor`, `law`, `territory`, `land`, `polity` |
 
 `PackageDependencyRulesTest` bricht den Build bei Verstößen und bei Imports aus `net.minecraft`, `net.fabricmc` oder `com.mojang`.
 

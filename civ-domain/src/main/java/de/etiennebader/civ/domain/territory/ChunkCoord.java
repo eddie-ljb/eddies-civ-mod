@@ -36,6 +36,11 @@ public record ChunkCoord(DimensionId dimension, int x, int z) {
                 && Math.abs((long) x - other.x) + Math.abs((long) z - other.z) == 1;
     }
 
+    /** Ein Block in der Mitte des Chunks auf der angegebenen Höhe. */
+    public BlockPosition center(int y) {
+        return new BlockPosition(dimension, minBlockX() + SIZE / 2, y, minBlockZ() + SIZE / 2);
+    }
+
     public int minBlockX() {
         return x * SIZE;
     }

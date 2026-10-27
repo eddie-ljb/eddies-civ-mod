@@ -1,5 +1,6 @@
 package de.etiennebader.civ.application.polity;
 
+import de.etiennebader.civ.application.query.WorldQueries;
 import de.etiennebader.civ.application.support.Aggregates;
 import de.etiennebader.civ.application.support.ClaimContexts;
 import de.etiennebader.civ.domain.actor.ActorRef;
@@ -10,6 +11,7 @@ import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.IdGenerator;
 import de.etiennebader.civ.domain.shared.PolityId;
+import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.domain.territory.ChunkCoord;
 import de.etiennebader.civ.domain.territory.ClaimPolicy;
 import de.etiennebader.civ.domain.territory.ClaimType;
@@ -18,19 +20,24 @@ import de.etiennebader.civ.domain.territory.TerritoryRegistry;
 import java.util.Objects;
 
 /**
- * Gründet eine Gemeinde mitsamt erstem Kern-Chunk (dort steht das Gemeindehaus) und leerem Grundbuch.
- * Schlägt der Claim fehl, entsteht keine Gemeinde.
+ * Gründet eine Gemeinde mit ihrem Sitz (Standort des Gemeindehauses). Der Chunk des Sitzes wird
+ * erstes Kerngebiet; dazu kommt ein leeres Grundbuch. Schlägt der Claim fehl, entsteht keine Gemeinde.
  */
 public final class FoundPolity {
 
-    public record Command(PolityName name, ActorRef founder, CurrencyId currency, ChunkCoord firstChunk, Day day) {
+    public record Command(PolityName name, ActorRef founder, CurrencyId currency, BlockPosition seat, Day day) {
 
         public Command {
             Objects.requireNonNull(name, "name");
             Objects.requireNonNull(founder, "founder");
             Objects.requireNonNull(currency, "currency");
-            Objects.requireNonNull(firstChunk, "firstChunk");
+            Objects.requireNonNull(seat, "seat");
             Objects.requireNonNull(day, "day");
+        }
+
+        /** Der Chunk, in dem das Gemeindehaus steht. */
+        public ChunkCoord firstChunk() {
+            return seat.chunk();
         }
     }
 
@@ -48,13 +55,16 @@ public final class FoundPolity {
 
     /**
      * @return die ID der neuen Gemeinde
+     * @throws PolityNameTakenException wenn es den Namen schon gibt
      * @throws MemberOfOtherPolityException wenn der Gründer bereits einer Gemeinde angehört
      * @throws de.etiennebader.civ.domain.territory.ClaimRejectedException wenn der Chunk nicht beansprucht werden kann
      */
     public PolityId execute(Command command) {
+        requireUniqueName(command.name());
         membershipRule.requireNoMunicipality(command.founder());
         PolityId id = PolityId.generate(ids);
-        Polity polity = Polity.found(id, command.name(), command.founder(), command.currency(), command.day());
+        Polity polity = Polity.found(id, command.name(), command.founder(), command.currency(), command.seat(),
+                command.day());
         TerritoryRegistry territory = aggregates.territory();
         territory.claim(ClaimContexts.forPolity(polity, command.firstChunk(), ClaimType.CORE), claimPolicy, command.day());
 
@@ -62,5 +72,11 @@ public final class FoundPolity {
         aggregates.commit(territory);
         aggregates.commit(LandRegistry.open(id));
         return id;
+    }
+
+    private void requireUniqueName(PolityName name) {
+        if (new WorldQueries(aggregates.repositories()).polityNamed(name.value()).isPresent()) {
+            throw new PolityNameTakenException(name);
+        }
     }
 }

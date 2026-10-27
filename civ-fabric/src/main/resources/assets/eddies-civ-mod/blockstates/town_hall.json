@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "eddies-civ-mod:block/town_hall"
+    }
+  }
+}

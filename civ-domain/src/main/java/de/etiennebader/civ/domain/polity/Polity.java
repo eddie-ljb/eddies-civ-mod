@@ -11,6 +11,7 @@ import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.shared.StatuteId;
+import de.etiennebader.civ.domain.territory.BlockPosition;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -33,32 +34,37 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
     private final SettlementTier tier;
     private final CurrencyId currency;
     private final Day foundedOn;
+    private final Optional<BlockPosition> seat;
     private final Map<ActorRef, Membership> members = new LinkedHashMap<>();
     private final LawBook lawBook = new LawBook();
 
     private Polity(PolityId id, PolityName name, PolityKind kind, SettlementTier tier,
-                   CurrencyId currency, Day foundedOn) {
+                   CurrencyId currency, Day foundedOn, Optional<BlockPosition> seat) {
         this.id = Objects.requireNonNull(id, "id");
         this.name = Objects.requireNonNull(name, "name");
         this.kind = Objects.requireNonNull(kind, "kind");
         this.tier = Objects.requireNonNull(tier, "tier");
         this.currency = Objects.requireNonNull(currency, "currency");
         this.foundedOn = Objects.requireNonNull(foundedOn, "foundedOn");
+        this.seat = Objects.requireNonNull(seat, "seat");
     }
 
     /**
-     * Gründet eine Gemeinde. Der Gründer wird erster Bürger.
+     * Gründet eine Gemeinde mit ihrem Sitz, dem Standort des Gemeindehauses. Der Gründer wird erster Bürger.
      *
      * @throws IllegalFounderException wenn der Gründer selbst eine Polity ist
      */
-    public static Polity found(PolityId id, PolityName name, ActorRef founder, CurrencyId currency, Day day) {
+    public static Polity found(PolityId id, PolityName name, ActorRef founder, CurrencyId currency, BlockPosition seat,
+                               Day day) {
         Objects.requireNonNull(founder, "founder");
+        Objects.requireNonNull(seat, "seat");
         if (founder instanceof PolityRef) {
             throw new IllegalFounderException(founder);
         }
-        Polity polity = new Polity(id, name, PolityKind.TERRITORIAL, SettlementTier.MUNICIPALITY, currency, day);
+        Polity polity = new Polity(id, name, PolityKind.TERRITORIAL, SettlementTier.MUNICIPALITY, currency, day,
+                Optional.of(seat));
         polity.members.put(founder, new Membership(founder, MembershipType.CITIZEN, day));
-        polity.raise(new PolityFounded(id, name, founder, day));
+        polity.raise(new PolityFounded(id, name, founder, seat, day));
         return polity;
     }
 
@@ -66,13 +72,15 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
      * Stellt eine gespeicherte Polity wieder her, ohne Events auszulösen. Mitglieder und Gesetze
      * werden in der übergebenen Reihenfolge übernommen; Gesetze in der Reihenfolge ihres Erlasses.
      *
+     * @param seat leer bei Polities aus der Zeit, bevor es Gemeindehäuser gab
      * @throws IllegalArgumentException wenn die Daten keine gültige Polity ergeben
      */
     public static Polity restore(PolityId id, PolityName name, PolityKind kind, SettlementTier tier, CurrencyId currency,
-                                 Day foundedOn, List<Membership> members, List<EnactedStatute> statutes) {
+                                 Day foundedOn, Optional<BlockPosition> seat, List<Membership> members,
+                                 List<EnactedStatute> statutes) {
         Objects.requireNonNull(members, "members");
         Objects.requireNonNull(statutes, "statutes");
-        Polity polity = new Polity(id, name, kind, tier, currency, foundedOn);
+        Polity polity = new Polity(id, name, kind, tier, currency, foundedOn, seat);
         if (members.isEmpty()) {
             throw new IllegalArgumentException("Gespeicherte Polity ohne Mitglieder: " + id);
         }
@@ -168,6 +176,11 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
     @Override
     public LawView laws() {
         return lawBook;
+    }
+
+    @Override
+    public Optional<BlockPosition> seat() {
+        return seat;
     }
 
     /** Die Polity als handelnder Akteur, z. B. als Kontoinhaberin oder Grundbesitzerin. */

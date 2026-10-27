@@ -6,7 +6,12 @@ import de.etiennebader.civ.domain.economy.LedgerView;
 import de.etiennebader.civ.domain.land.LandView;
 import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.polity.PolityView;
+import de.etiennebader.civ.domain.protection.Denial;
+import de.etiennebader.civ.domain.protection.ProtectedAction;
+import de.etiennebader.civ.domain.protection.ProtectionContext;
+import de.etiennebader.civ.domain.protection.ProtectionRules;
 import de.etiennebader.civ.domain.shared.PolityId;
+import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.domain.territory.TerritoryView;
 
 import java.util.List;
@@ -18,7 +23,25 @@ import java.util.Optional;
  */
 public final class WorldQueries {
 
+    private static final ProtectionRules PROTECTION_RULES = new ProtectionRules();
+
     private final Repositories repositories;
+    private final ProtectionContext protectionContext = new ProtectionContext() {
+        @Override
+        public TerritoryView territory() {
+            return WorldQueries.this.territory();
+        }
+
+        @Override
+        public Optional<? extends PolityView> polity(PolityId id) {
+            return WorldQueries.this.polity(id);
+        }
+
+        @Override
+        public Optional<? extends LandView> land(PolityId polity) {
+            return repositories.land().findByPolity(polity);
+        }
+    };
 
     public WorldQueries(Repositories repositories) {
         this.repositories = Objects.requireNonNull(repositories, "repositories");
@@ -33,6 +56,16 @@ public final class WorldQueries {
         return repositories.polities().findById(id).map(PolityView.class::cast);
     }
 
+    /** Sucht eine Polity nach ihrem Namen, ohne Groß- und Kleinschreibung zu beachten. */
+    public Optional<PolityView> polityNamed(String name) {
+        Objects.requireNonNull(name, "name");
+        String wanted = name.strip();
+        return repositories.polities().findAll().stream()
+                .filter(polity -> polity.name().value().equalsIgnoreCase(wanted))
+                .map(PolityView.class::cast)
+                .findFirst();
+    }
+
     /** Die Gemeinde, der ein Akteur angehört, falls es eine gibt. */
     public Optional<PolityView> municipalityOf(ActorRef actor) {
         Objects.requireNonNull(actor, "actor");
@@ -40,6 +73,24 @@ public final class WorldQueries {
                 .filter(polity -> polity.kind() == PolityKind.TERRITORIAL && polity.isMember(actor))
                 .map(PolityView.class::cast)
                 .findFirst();
+    }
+
+    /** Die Gemeinde, deren Gemeindehaus an dieser Stelle steht. */
+    public Optional<PolityView> polityWithSeat(BlockPosition position) {
+        Objects.requireNonNull(position, "position");
+        return repositories.polities().findAll().stream()
+                .filter(polity -> polity.seat().filter(position::equals).isPresent())
+                .map(PolityView.class::cast)
+                .findFirst();
+    }
+
+    /**
+     * Ob ein Akteur an einem Block handeln darf (Gebietsschutz).
+     *
+     * @return die Verweigerung samt Grund; leer, wenn die Handlung erlaubt ist
+     */
+    public Optional<Denial> access(ActorRef actor, ProtectedAction action, BlockPosition position) {
+        return PROTECTION_RULES.check(actor, action, position, protectionContext);
     }
 
     public TerritoryView territory() {

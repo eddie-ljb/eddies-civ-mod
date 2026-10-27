@@ -2,6 +2,9 @@ package de.etiennebader.civ.persistence.store;
 
 import de.etiennebader.civ.application.CivApplication;
 import de.etiennebader.civ.application.Repositories;
+import de.etiennebader.civ.application.day.Calendar;
+import de.etiennebader.civ.application.day.CalendarState;
+import de.etiennebader.civ.application.directory.PlayerDirectory;
 import de.etiennebader.civ.application.economy.DepositEmeralds;
 import de.etiennebader.civ.application.economy.TransferFunds;
 import de.etiennebader.civ.application.economy.WithdrawCash;
@@ -12,6 +15,7 @@ import de.etiennebader.civ.application.land.DissolvePlot;
 import de.etiennebader.civ.application.land.SellPlot;
 import de.etiennebader.civ.application.persistence.ChangeTracker;
 import de.etiennebader.civ.application.persistence.FlushReport;
+import de.etiennebader.civ.application.persistence.PendingSave;
 import de.etiennebader.civ.application.persistence.StateDump;
 import de.etiennebader.civ.application.persistence.WorldPersistence;
 import de.etiennebader.civ.application.polity.EnactStatute;
@@ -31,6 +35,7 @@ import de.etiennebader.civ.domain.law.ParameterValue;
 import de.etiennebader.civ.domain.law.StandardParameters;
 import de.etiennebader.civ.domain.polity.MembershipType;
 import de.etiennebader.civ.domain.polity.PolityName;
+import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.Money;
@@ -44,6 +49,8 @@ import de.etiennebader.civ.domain.territory.ClaimType;
 import de.etiennebader.civ.domain.territory.CompositeClaimPolicy;
 import de.etiennebader.civ.domain.territory.DimensionId;
 import de.etiennebader.civ.persistence.PersistenceException;
+import de.etiennebader.civ.persistence.migration.Migration;
+import de.etiennebader.civ.persistence.migration.SchemaMigrator;
 import de.etiennebader.civ.persistence.sqlite.SqliteDatabase;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -54,8 +61,10 @@ import java.nio.file.Path;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -141,6 +150,83 @@ class SqliteStateStoreTest {
         }
     }
 
+    @Test
+    @DisplayName("Kalender und Spielernamen werden mitgespeichert, Umbenennungen überschreiben den alten Namen")
+    void roundTripsCalendarAndPlayerNames() {
+        CalendarState savedCalendar;
+        try (Session session = Session.open(file)) {
+            session.players.record(session.alice, "Alice");
+            session.players.record(session.carla, "Carla");
+            session.calendar.completeDay();
+            session.calendar.tick();
+            session.persistence.flush();
+            session.players.record(session.alice, "Alicia");
+            session.calendar.tick();
+            session.persistence.flush();
+            savedCalendar = session.calendar.state();
+        }
+
+        try (Session reloaded = Session.open(file)) {
+            reloaded.persistence.restore();
+
+            assertEquals(savedCalendar, reloaded.calendar.state());
+            assertEquals(new CalendarState(Day.of(2), 2), savedCalendar);
+            assertEquals(Optional.of("Alicia"), reloaded.players.nameOf(reloaded.alice));
+            assertEquals(Optional.of("Carla"), reloaded.players.nameOf(reloaded.carla));
+            assertFalse(reloaded.persistence.hasChanges());
+        }
+    }
+
+    @Test
+    @DisplayName("Ein Speicherstand lässt sich in einem anderen Thread schreiben")
+    void writesPreparedSaveFromOtherThread() throws Exception {
+        String saved;
+        try (Session session = Session.open(file)) {
+            session.buildWorld();
+            PendingSave save = session.persistence.prepareSave();
+            saved = session.dump();
+            session.changeWorld();
+
+            Thread writer = Thread.ofPlatform().start(() -> session.persistence.write(save));
+            writer.join();
+        }
+
+        try (Session reloaded = Session.open(file)) {
+            reloaded.persistence.restore();
+
+            assertEquals(saved, reloaded.dump());
+        }
+    }
+
+    @Test
+    @DisplayName("Gemeinden aus Etappe 1 ohne Gemeindehaus lassen sich nach der Migration laden")
+    void loadsPolitiesWithoutSeatAfterMigration() {
+        try (SqliteDatabase database = SqliteDatabase.open(file)) {
+            new SchemaMigrator(List.of(Migration.fromResource("V001__initial_schema.sql"),
+                    Migration.fromResource("V002__calendar_and_players.sql"))).migrate(database);
+            database.inTransaction(connection -> {
+                try (Statement statement = connection.createStatement()) {
+                    statement.executeUpdate("""
+                            INSERT INTO polity (id, seq, name, kind, tier, currency, founded_on)
+                            VALUES ('00000000-0000-0000-0000-000000000001', 1, 'Altdorf', 'TERRITORIAL', 'MUNICIPALITY',
+                                    'EMERALD', 1)""");
+                    return statement.executeUpdate("""
+                            INSERT INTO membership (polity_id, position, actor_kind, actor_id, type, since)
+                            VALUES ('00000000-0000-0000-0000-000000000001', 0, 'PLAYER',
+                                    '00000000-0000-0000-0000-000000000002', 'CITIZEN', 1)""");
+                }
+            });
+        }
+
+        try (Session reloaded = Session.open(file)) {
+            reloaded.persistence.restore();
+
+            PolityView altdorf = reloaded.app.queries().polities().getFirst();
+            assertEquals("Altdorf", altdorf.name().value());
+            assertTrue(altdorf.seat().isEmpty());
+        }
+    }
+
     /** Zählt über eine eigene Verbindung, wie ein externes Werkzeug. */
     private int count(String sql) {
         try (SqliteDatabase database = SqliteDatabase.open(file)) {
@@ -170,6 +256,8 @@ class SqliteStateStoreTest {
         private final ChangeTracker tracker = new ChangeTracker();
         private final Repositories repositories = InMemoryRepositories.create();
         private final CivApplication app = new CivApplication(repositories, ids, CompositeClaimPolicy.standard(4, 1), tracker);
+        private final Calendar calendar = new Calendar(100, CalendarState.START);
+        private final PlayerDirectory players = new PlayerDirectory();
         private final SqliteStateStore store;
         private final WorldPersistence persistence;
 
@@ -184,7 +272,7 @@ class SqliteStateStoreTest {
 
         private Session(Path file) {
             this.store = SqliteStateStore.open(file);
-            this.persistence = new WorldPersistence(repositories, store, tracker);
+            this.persistence = new WorldPersistence(repositories, store, tracker, calendar, players);
         }
 
         static Session open(Path file) {
@@ -192,8 +280,8 @@ class SqliteStateStoreTest {
         }
 
         void buildWorld() {
-            nordhain = app.foundPolity().execute(new FoundPolity.Command(PolityName.of("Nordhain"), alice, EMERALD, chunk(0, 0), DAY));
-            eichenfurt = app.foundPolity().execute(new FoundPolity.Command(PolityName.of("Eichenfurt"), carla, EMERALD, chunk(20, 20), DAY));
+            nordhain = app.foundPolity().execute(new FoundPolity.Command(PolityName.of("Nordhain"), alice, EMERALD, chunk(0, 0).center(64), DAY));
+            eichenfurt = app.foundPolity().execute(new FoundPolity.Command(PolityName.of("Eichenfurt"), carla, EMERALD, chunk(20, 20).center(64), DAY));
             app.joinPolity().execute(new JoinPolity.Command(nordhain, bertram, MembershipType.RESIDENT, DAY));
             app.claimChunk().execute(new ClaimChunk.Command(nordhain, chunk(1, 0), ClaimType.CORE, DAY));
             outpostLaw = app.enactStatute().execute(new EnactStatute.Command(nordhain, "Außenpostengesetz",

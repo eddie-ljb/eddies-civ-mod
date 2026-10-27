@@ -6,6 +6,7 @@ import de.etiennebader.civ.domain.law.LawView;
 import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.PolityId;
+import de.etiennebader.civ.domain.territory.BlockPosition;
 
 import java.util.Collection;
 import java.util.Optional;
@@ -26,6 +27,9 @@ public interface PolityView {
     CurrencyId currency();
 
     Day foundedOn();
+
+    /** Standort des Gemeindehauses; leer bei Polities ohne Sitz. */
+    Optional<BlockPosition> seat();
 
     boolean isMember(ActorRef actor);
 

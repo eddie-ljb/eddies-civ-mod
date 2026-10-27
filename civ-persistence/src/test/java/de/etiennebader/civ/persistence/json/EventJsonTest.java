@@ -10,6 +10,8 @@ import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.Money;
 import de.etiennebader.civ.domain.shared.PolityId;
+import de.etiennebader.civ.domain.territory.BlockPosition;
+import de.etiennebader.civ.domain.territory.DimensionId;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -26,9 +28,10 @@ class EventJsonTest {
     @DisplayName("Akteure, IDs, Tage, Namen und Beträge werden kompakt dargestellt")
     void encodesEvents() {
         assertEquals("{\"polity\":\"" + POLITY + "\",\"name\":\"Nord\\\"hain\",\"founder\":{\"kind\":\"PLAYER\",\"id\":\""
-                        + PLAYER + "\"},\"occurredOn\":3}",
+                        + PLAYER + "\"},\"seat\":{\"dimension\":\"minecraft:overworld\",\"x\":8,\"y\":64,\"z\":-8},"
+                        + "\"occurredOn\":3}",
                 EventJson.toJson(new PolityFounded(new PolityId(POLITY), PolityName.of("Nord\"hain"),
-                        PlayerRef.of(PLAYER), Day.of(3))));
+                        PlayerRef.of(PLAYER), new BlockPosition(DimensionId.OVERWORLD, 8, 64, -8), Day.of(3))));
 
         assertEquals("{\"from\":{\"kind\":\"PLAYER\",\"id\":\"" + PLAYER + "\"},\"to\":{\"kind\":\"POLITY\",\"id\":\""
                         + POLITY + "\"},\"amount\":{\"amount\":250,\"currency\":\"EMERALD\"},\"reason\":\"LAND_TAX\",\"occurredOn\":9}",

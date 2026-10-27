@@ -21,6 +21,7 @@ import de.etiennebader.civ.domain.polity.MembershipType;
 import de.etiennebader.civ.domain.polity.Polity;
 import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.polity.PolityName;
+import de.etiennebader.civ.domain.polity.PolitySnapshot;
 import de.etiennebader.civ.domain.polity.SettlementTier;
 import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.Day;
@@ -40,7 +41,9 @@ import org.junit.jupiter.api.Test;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
+import static de.etiennebader.civ.domain.testsupport.Places.seatIn;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -73,11 +76,27 @@ class RestoreTest {
                     new Membership(alice, MembershipType.CITIZEN, Day.of(1)));
 
             Polity polity = Polity.restore(id, PolityName.of("Nordhain"), PolityKind.TERRITORIAL, SettlementTier.MUNICIPALITY,
-                    EMERALD, Day.of(1), members, List.of(new EnactedStatute(tax, Day.of(2))));
+                    EMERALD, Day.of(1), Optional.of(seatIn(0, 0)), members, List.of(new EnactedStatute(tax, Day.of(2))));
 
             assertEquals(members, List.copyOf(polity.members()));
+            assertEquals(Optional.of(seatIn(0, 0)), polity.seat());
             assertEquals(4L, polity.laws().valueOf(StandardParameters.LAND_TAX_PER_BLOCK));
             assertTrue(polity.pullEvents().isEmpty());
+        }
+
+        @Test
+        @DisplayName("Ein Snapshot ist eine unabhängige Kopie und ergibt wieder dieselbe Polity")
+        void snapshotIsDetachedCopy() {
+            Polity polity = Polity.found(id, PolityName.of("Nordhain"), alice, EMERALD, seatIn(0, 0), Day.of(1));
+            PolitySnapshot snapshot = PolitySnapshot.of(polity);
+
+            polity.admit(bertram, MembershipType.RESIDENT, Day.of(2));
+
+            assertEquals(1, snapshot.members().size());
+            Polity restored = snapshot.restore();
+            assertEquals(polity.name(), restored.name());
+            assertEquals(List.copyOf(snapshot.members()), List.copyOf(restored.members()));
+            assertEquals(Optional.of(seatIn(0, 0)), restored.seat());
         }
 
         @Test
@@ -90,7 +109,7 @@ class RestoreTest {
 
         private Polity restoreWith(List<Membership> members) {
             return Polity.restore(id, PolityName.of("Nordhain"), PolityKind.TERRITORIAL, SettlementTier.MUNICIPALITY,
-                    EMERALD, Day.ZERO, members, List.of());
+                    EMERALD, Day.ZERO, Optional.empty(), members, List.of());
         }
     }
 

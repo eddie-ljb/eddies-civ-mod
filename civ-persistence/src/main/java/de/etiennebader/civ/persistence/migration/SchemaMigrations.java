@@ -9,7 +9,9 @@ import java.util.List;
 public final class SchemaMigrations {
 
     private static final List<String> FILES = List.of(
-            "V001__initial_schema.sql");
+            "V001__initial_schema.sql",
+            "V002__calendar_and_players.sql",
+            "V003__polity_seat.sql");
 
     private SchemaMigrations() {
     }

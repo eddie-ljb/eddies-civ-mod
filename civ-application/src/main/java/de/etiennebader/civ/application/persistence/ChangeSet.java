@@ -14,8 +14,8 @@ import java.util.Set;
 /**
  * Alles, was seit dem letzten Speichern geändert wurde, plus die Events dieser Zeit für das Audit-Log.
  *
- * <p>Ein Schlüssel sagt nur „hier hat sich etwas geändert“. Den aktuellen Stand liest der
- * {@link StateStore} beim Schreiben aus dem Arbeitsstand; fehlt der Eintrag dort, wird er gelöscht.
+ * <p>Ein Schlüssel sagt nur „hier hat sich etwas geändert“. Den aktuellen Stand liest
+ * {@link StateDelta#capture} aus dem Arbeitsstand; fehlt der Eintrag dort, wird er gelöscht.
  * Die Mengen behalten die Reihenfolge der ersten Änderung.
  */
 public record ChangeSet(Set<PolityId> polities, Set<ChunkCoord> chunks, Set<PlotKey> plots,

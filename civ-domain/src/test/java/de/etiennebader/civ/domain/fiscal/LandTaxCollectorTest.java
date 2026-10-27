@@ -36,6 +36,7 @@ import static de.etiennebader.civ.domain.law.StandardParameters.LAND_TAX_PER_BLO
 import static de.etiennebader.civ.domain.law.StandardParameters.MAX_OUTPOSTS;
 import static de.etiennebader.civ.domain.law.StandardParameters.TAX_EMBASSIES;
 import static de.etiennebader.civ.domain.territory.DimensionId.OVERWORLD;
+import static de.etiennebader.civ.domain.testsupport.Places.seatIn;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -61,9 +62,10 @@ class LandTaxCollectorTest {
     void foundNordhainWithFourChunks() {
         alice = actors.player();
         bertram = actors.villager();
-        nordhain = Polity.found(actors.polityId(), PolityName.of("Nordhain"), alice, EMERALD, FOUNDING);
+        nordhain = Polity.found(actors.polityId(), PolityName.of("Nordhain"), alice, EMERALD, seatIn(0, 0), FOUNDING);
         nordhain.admit(bertram, MembershipType.CITIZEN, FOUNDING);
-        eichenfurt = Polity.found(actors.polityId(), PolityName.of("Eichenfurt"), actors.player(), EMERALD, FOUNDING);
+        eichenfurt = Polity.found(actors.polityId(), PolityName.of("Eichenfurt"), actors.player(), EMERALD, seatIn(20, 20),
+                FOUNDING);
 
         CompositeClaimPolicy rules = CompositeClaimPolicy.standard(4, 2);
         for (ChunkCoord chunk : List.of(chunk(0, 0), chunk(1, 0), chunk(0, 1), chunk(1, 1))) {

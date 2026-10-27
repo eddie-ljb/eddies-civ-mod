@@ -1,9 +1,8 @@
 package de.etiennebader.civ.persistence.store;
 
 import de.etiennebader.civ.application.persistence.PlotKey;
-import de.etiennebader.civ.application.query.WorldQueries;
+import de.etiennebader.civ.application.persistence.StateDelta.PlotChange;
 import de.etiennebader.civ.domain.land.Area;
-import de.etiennebader.civ.domain.land.Plot;
 import de.etiennebader.civ.domain.land.PlotId;
 import de.etiennebader.civ.domain.land.PlotSnapshot;
 import de.etiennebader.civ.domain.land.PlotType;
@@ -41,13 +40,14 @@ final class PlotTable {
      * Schreibt die Grundstücke in der Reihenfolge der Änderungen; aufgelöste werden gelöscht.
      * Einzeln statt im Batch, damit jedes neue Grundstück die nächste {@code seq} sieht.
      */
-    void write(Connection connection, Iterable<PlotKey> plots, WorldQueries world) throws SQLException {
+    void write(Connection connection, Iterable<PlotChange> changes) throws SQLException {
         try (PreparedStatement upsert = connection.prepareStatement(UPSERT);
              PreparedStatement delete = connection.prepareStatement("DELETE FROM plot WHERE id = ?")) {
-            for (PlotKey key : plots) {
-                Optional<Plot> plot = world.land(key.polity()).plot(key.plot());
+            for (PlotChange change : changes) {
+                PlotKey key = change.key();
+                Optional<PlotSnapshot> plot = change.plot();
                 if (plot.isPresent()) {
-                    bind(upsert, key, plot.get().snapshot());
+                    bind(upsert, key, plot.get());
                     upsert.executeUpdate();
                 } else {
                     delete.setString(1, key.plot().value().toString());

@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "ESE",
+    "SBS",
+    "ESE"
+  ],
+  "key": {
+    "E": "minecraft:emerald",
+    "S": "minecraft:stone_bricks",
+    "B": "minecraft:bell"
+  },
+  "result": {
+    "id": "eddies-civ-mod:town_hall",
+    "count": 1
+  }
+}

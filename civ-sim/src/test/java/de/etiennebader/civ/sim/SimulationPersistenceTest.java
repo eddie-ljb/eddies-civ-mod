@@ -1,6 +1,8 @@
 package de.etiennebader.civ.sim;
 
 import de.etiennebader.civ.application.Repositories;
+import de.etiennebader.civ.application.day.Calendar;
+import de.etiennebader.civ.application.directory.PlayerDirectory;
 import de.etiennebader.civ.application.inmemory.InMemoryRepositories;
 import de.etiennebader.civ.application.persistence.ChangeTracker;
 import de.etiennebader.civ.application.persistence.StateDump;
@@ -45,7 +47,7 @@ class SimulationPersistenceTest {
 
         Repositories fresh = InMemoryRepositories.create();
         try (SqliteStateStore store = SqliteStateStore.open(file)) {
-            new WorldPersistence(fresh, store, new ChangeTracker()).restore();
+            new WorldPersistence(fresh, store, new ChangeTracker(), Calendar.standard(), new PlayerDirectory()).restore();
         }
 
         assertEquals(expected, StateDump.of(new WorldQueries(fresh)));

@@ -11,4 +11,4 @@ pluginManagement {
 
 rootProject.name = 'eddies-civ-mod'
 
-include 'civ-domain', 'civ-application', 'civ-persistence', 'civ-sim', 'civ-fabric'
+include 'civ-domain', 'civ-application', 'civ-persistence', 'civ-server', 'civ-sim', 'civ-fabric'

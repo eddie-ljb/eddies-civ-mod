@@ -44,6 +44,8 @@ public final class AgentRoutine {
     private static final int FOUNDING_LOCATION_ATTEMPTS = 30;
     private static final double RESIDENT_SHARE_OF_VILLAGERS = 0.3;
     private static final double MISSED_LIVING_COST_PENALTY = 0.02;
+    /** Höhe, auf der simulierte Gemeindehäuser stehen; für die Simulation ohne Bedeutung. */
+    private static final int SEAT_HEIGHT = 64;
 
     private final SimulationWorld world;
     private final CivApplication app;
@@ -139,7 +141,8 @@ public final class AgentRoutine {
             return;
         }
         PolityId polity = app.foundPolity().execute(new FoundPolity.Command(
-                PolityName.of(world.nextPolityName()), agent.actor(), SimulationWorld.CURRENCY, location.get(), day));
+                PolityName.of(world.nextPolityName()), agent.actor(), SimulationWorld.CURRENCY,
+                location.get().center(SEAT_HEIGHT), day));
         world.establishGovernment(polity);
         agent.moveTo(polity);
         app.transferFunds().execute(new TransferFunds.Command(agent.actor(), new PolityRef(polity),

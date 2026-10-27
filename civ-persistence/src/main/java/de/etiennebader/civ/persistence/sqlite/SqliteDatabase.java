@@ -23,7 +23,8 @@ import java.util.Objects;
  * {@code DriverManager}. Das funktioniert auch in Fabrics eingebetteten JARs, wo die
  * Service-Suche des {@code DriverManager} den Treiber nicht immer findet.
  *
- * <p>Nicht threadsicher; alle Zugriffe kommen aus demselben Thread.
+ * <p>Threadsicher: Transaktionen laufen nacheinander, auch wenn Laden und Speichern aus
+ * verschiedenen Threads kommen.
  */
 public final class SqliteDatabase implements AutoCloseable {
 
@@ -69,7 +70,7 @@ public final class SqliteDatabase implements AutoCloseable {
      *
      * @throws PersistenceException bei SQL-Fehlern; andere Laufzeitfehler werden nach dem Rollback weitergereicht
      */
-    public <T> T inTransaction(SqlWork<T> work) {
+    public synchronized <T> T inTransaction(SqlWork<T> work) {
         Objects.requireNonNull(work, "work");
         try {
             connection.setAutoCommit(false);
@@ -89,7 +90,7 @@ public final class SqliteDatabase implements AutoCloseable {
     }
 
     @Override
-    public void close() {
+    public synchronized void close() {
         try {
             connection.close();
         } catch (SQLException e) {

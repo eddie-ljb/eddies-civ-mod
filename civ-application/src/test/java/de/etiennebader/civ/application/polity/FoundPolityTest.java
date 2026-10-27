@@ -74,4 +74,25 @@ class FoundPolityTest {
         assertEquals(List.of(alice, "Nordhain"), exception.arguments());
         assertEquals(DAY, fixture.app.queries().polities().getFirst().foundedOn());
     }
+
+    @Test
+    @DisplayName("Name schon vergeben, auch in anderer Schreibweise → POLITY_NAME_TAKEN")
+    void rejectsTakenName() {
+        fixture.found("Nordhain", alice, 0, 0);
+
+        var exception = assertThrows(PolityNameTakenException.class,
+                () -> fixture.found("  NORDHAIN ", fixture.player(), 10, 10));
+
+        assertEquals(ErrorCode.POLITY_NAME_TAKEN, exception.code());
+        assertEquals(1, fixture.app.queries().polities().size());
+    }
+
+    @Test
+    @DisplayName("Gemeinden lassen sich unabhängig von der Schreibweise über den Namen finden")
+    void findsPolityByName() {
+        fixture.found("Nordhain", alice, 0, 0);
+
+        assertEquals("Nordhain", fixture.app.queries().polityNamed("nordhain").orElseThrow().name().value());
+        assertTrue(fixture.app.queries().polityNamed("Südhain").isEmpty());
+    }
 }

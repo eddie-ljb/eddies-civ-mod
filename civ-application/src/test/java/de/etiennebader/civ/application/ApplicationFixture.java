@@ -1,5 +1,6 @@
 package de.etiennebader.civ.application;
 
+import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.application.inmemory.InMemoryRepositories;
 import de.etiennebader.civ.application.inmemory.RecordingEventPublisher;
 import de.etiennebader.civ.application.polity.FoundPolity;
@@ -42,11 +43,16 @@ public final class ApplicationFixture {
 
     public PolityId found(String name, ActorRef founder, int chunkX, int chunkZ) {
         return app.foundPolity().execute(new FoundPolity.Command(
-                PolityName.of(name), founder, EMERALD, chunk(chunkX, chunkZ), DAY));
+                PolityName.of(name), founder, EMERALD, seat(chunkX, chunkZ), DAY));
     }
 
     public static ChunkCoord chunk(int x, int z) {
         return new ChunkCoord(DimensionId.OVERWORLD, x, z);
+    }
+
+    /** Ein Gemeindehaus-Standort in der Mitte des Chunks. */
+    public static BlockPosition seat(int chunkX, int chunkZ) {
+        return chunk(chunkX, chunkZ).center(64);
     }
 
     public static Money emeralds(long amount) {

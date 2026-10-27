@@ -79,6 +79,8 @@ public enum ErrorCode {
     UNKNOWN_POLITY,
     /** Argumente: Akteur, Name der anderen Gemeinde. */
     MEMBER_OF_OTHER_POLITY,
+    POLITY_NAME_TAKEN,
+    NOT_A_CITIZEN,
     /** Argumente: Chunk-X, Chunk-Z. */
     CHUNK_HAS_PLOTS;
 

@@ -1,12 +1,12 @@
 package de.etiennebader.civ.persistence.store;
 
+import de.etiennebader.civ.application.persistence.StateDelta.ClaimChange;
 import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.territory.ChunkCoord;
 import de.etiennebader.civ.domain.territory.Claim;
 import de.etiennebader.civ.domain.territory.ClaimType;
 import de.etiennebader.civ.domain.territory.DimensionId;
-import de.etiennebader.civ.domain.territory.TerritoryView;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -29,11 +29,12 @@ final class TerritoryTable {
     private static final String DELETE = "DELETE FROM claim WHERE dimension = ? AND chunk_x = ? AND chunk_z = ?";
 
     /** Schreibt den aktuellen Stand der Chunks; nicht mehr beanspruchte werden gelöscht. */
-    void write(Connection connection, Iterable<ChunkCoord> chunks, TerritoryView territory) throws SQLException {
+    void write(Connection connection, Iterable<ClaimChange> changes) throws SQLException {
         try (PreparedStatement upsert = connection.prepareStatement(UPSERT);
              PreparedStatement delete = connection.prepareStatement(DELETE)) {
-            for (ChunkCoord chunk : chunks) {
-                Optional<Claim> claim = territory.claimAt(chunk);
+            for (ClaimChange change : changes) {
+                ChunkCoord chunk = change.chunk();
+                Optional<Claim> claim = change.claim();
                 if (claim.isPresent()) {
                     bindChunk(upsert, chunk);
                     upsert.setString(4, claim.get().polity().value().toString());

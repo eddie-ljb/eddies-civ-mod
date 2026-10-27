@@ -19,6 +19,7 @@ import java.util.Optional;
 
 import static de.etiennebader.civ.domain.law.StandardParameters.LAND_TAX_PER_BLOCK;
 import static de.etiennebader.civ.domain.testsupport.DomainAssertions.assertDomainError;
+import static de.etiennebader.civ.domain.testsupport.Places.seatIn;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -36,7 +37,8 @@ class PolityTest {
     void foundPolity() {
         founder = actors.player();
         villager = actors.villager();
-        polity = Polity.found(actors.polityId(), PolityName.of("Nordhain"), founder, CurrencyId.EMERALD, FOUNDING_DAY);
+        polity = Polity.found(actors.polityId(), PolityName.of("Nordhain"), founder, CurrencyId.EMERALD, seatIn(0, 0),
+                FOUNDING_DAY);
     }
 
     @Test
@@ -46,7 +48,7 @@ class PolityTest {
         assertEquals(1, polity.memberCount());
         assertEquals(PolityKind.TERRITORIAL, polity.kind());
         assertEquals(SettlementTier.MUNICIPALITY, polity.tier());
-        assertEquals(List.of(new PolityFounded(polity.id(), PolityName.of("Nordhain"), founder, FOUNDING_DAY)),
+        assertEquals(List.of(new PolityFounded(polity.id(), PolityName.of("Nordhain"), founder, seatIn(0, 0), FOUNDING_DAY)),
                 polity.pullEvents());
     }
 
@@ -54,7 +56,7 @@ class PolityTest {
     @DisplayName("Gründer ist eine Polity → ILLEGAL_FOUNDER")
     void rejectsPolityAsFounder() {
         assertDomainError(ErrorCode.ILLEGAL_FOUNDER, () -> Polity.found(
-                actors.polityId(), PolityName.of("Tochterstadt"), actors.polity(), CurrencyId.EMERALD, FOUNDING_DAY));
+                actors.polityId(), PolityName.of("Tochterstadt"), actors.polity(), CurrencyId.EMERALD, seatIn(0, 0), FOUNDING_DAY));
     }
 
     @Test

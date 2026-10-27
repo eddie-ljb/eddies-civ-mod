@@ -1,6 +1,8 @@
 package de.etiennebader.civ.sim;
 
+import de.etiennebader.civ.application.day.Calendar;
 import de.etiennebader.civ.application.day.DayReport;
+import de.etiennebader.civ.application.directory.PlayerDirectory;
 import de.etiennebader.civ.application.persistence.ChangeTracker;
 import de.etiennebader.civ.application.persistence.FlushReport;
 import de.etiennebader.civ.application.persistence.WorldPersistence;
@@ -58,6 +60,8 @@ public final class Simulation {
     private final Map<PolityId, LandTaxReport> lastTaxReports = new HashMap<>();
     private final Optional<Autosave> autosave;
     private final Optional<WorldPersistence> persistence;
+    /** Läuft im Gleichschritt mit den simulierten Tagen mit, damit ein Speicherstand den richtigen Tag enthält. */
+    private final Calendar calendar = Calendar.standard();
     private SaveStatistics saveStatistics = SaveStatistics.NONE;
 
     /**
@@ -77,7 +81,8 @@ public final class Simulation {
         ChangeTracker tracker = new ChangeTracker();
         DomainEventPublisher publisher = eventCounter.andThen(additionalPublisher);
         this.world = SimulationWorld.create(scenario, autosave.isPresent() ? publisher.andThen(tracker) : publisher);
-        this.persistence = autosave.map(save -> new WorldPersistence(world.repositories(), save.store(), tracker));
+        this.persistence = autosave.map(save ->
+                new WorldPersistence(world.repositories(), save.store(), tracker, calendar, new PlayerDirectory()));
         this.brain = new AgentBrain(scenario.behavior().decisionNoise());
         this.routine = new AgentRoutine(world);
         this.satisfaction = new SatisfactionModel(world);
@@ -118,6 +123,7 @@ public final class Simulation {
             government.govern(day, Optional.ofNullable(lastTaxReports.get(government.polity())));
         }
         DayReport report = world.app().endOfDay().execute(day);
+        calendar.completeDay();
         report.landTaxReports().forEach(taxReport -> lastTaxReports.put(taxReport.polity(), taxReport));
         satisfaction.apply(report);
 

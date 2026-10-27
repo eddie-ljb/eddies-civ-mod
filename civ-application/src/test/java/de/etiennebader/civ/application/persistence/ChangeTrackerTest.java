@@ -28,6 +28,7 @@ import java.util.Set;
 import static de.etiennebader.civ.application.ApplicationFixture.DAY;
 import static de.etiennebader.civ.application.ApplicationFixture.EMERALD;
 import static de.etiennebader.civ.application.ApplicationFixture.chunk;
+import static de.etiennebader.civ.application.ApplicationFixture.seat;
 import static de.etiennebader.civ.application.ApplicationFixture.emeralds;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -44,7 +45,7 @@ class ChangeTrackerTest {
     @Test
     @DisplayName("Gründung, Grundstück und Geldbewegungen werden als Änderungen erkannt")
     void tracksChangesFromEvents() {
-        PolityId polity = app.foundPolity().execute(new FoundPolity.Command(PolityName.of("Nordhain"), alice, EMERALD, chunk(0, 0), DAY));
+        PolityId polity = app.foundPolity().execute(new FoundPolity.Command(PolityName.of("Nordhain"), alice, EMERALD, seat(0, 0), DAY));
         PlotId plot = app.createPlot().execute(new CreatePlot.Command(polity,
                 new Area(DimensionId.OVERWORLD, 0, 0, 3, 3), PlotType.RESIDENTIAL, DAY));
         app.depositEmeralds().execute(new DepositEmeralds.Command(alice, emeralds(100), DAY));

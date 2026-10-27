@@ -10,6 +10,7 @@ import de.etiennebader.civ.application.land.AssignPlot;
 import de.etiennebader.civ.application.land.CreatePlot;
 import de.etiennebader.civ.application.land.DissolvePlot;
 import de.etiennebader.civ.application.land.SellPlot;
+import de.etiennebader.civ.application.polity.AmendLaw;
 import de.etiennebader.civ.application.polity.EnactStatute;
 import de.etiennebader.civ.application.polity.FoundPolity;
 import de.etiennebader.civ.application.polity.JoinPolity;
@@ -37,6 +38,7 @@ public final class CivApplication {
     private final LeavePolity leavePolity;
     private final EnactStatute enactStatute;
     private final RepealStatute repealStatute;
+    private final AmendLaw amendLaw;
     private final ClaimChunk claimChunk;
     private final ReleaseChunk releaseChunk;
     private final CreatePlot createPlot;
@@ -61,6 +63,7 @@ public final class CivApplication {
         this.leavePolity = new LeavePolity(aggregates);
         this.enactStatute = new EnactStatute(aggregates, ids);
         this.repealStatute = new RepealStatute(aggregates);
+        this.amendLaw = new AmendLaw(aggregates, ids);
         this.claimChunk = new ClaimChunk(aggregates, claimPolicy);
         this.releaseChunk = new ReleaseChunk(aggregates);
         this.createPlot = new CreatePlot(aggregates, ids);
@@ -94,6 +97,10 @@ public final class CivApplication {
 
     public RepealStatute repealStatute() {
         return repealStatute;
+    }
+
+    public AmendLaw amendLaw() {
+        return amendLaw;
     }
 
     public ClaimChunk claimChunk() {

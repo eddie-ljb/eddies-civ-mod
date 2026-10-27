@@ -1,9 +1,9 @@
 package de.etiennebader.civ.persistence.store;
 
 import de.etiennebader.civ.application.persistence.AccountKey;
+import de.etiennebader.civ.application.persistence.StateDelta.BalanceChange;
 import de.etiennebader.civ.domain.economy.AccountBalance;
 import de.etiennebader.civ.domain.economy.CurrencyTotals;
-import de.etiennebader.civ.domain.economy.LedgerView;
 import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.Money;
 import de.etiennebader.civ.persistence.ActorCodec;
@@ -29,11 +29,13 @@ final class LedgerTable {
             INSERT INTO currency_circulation (currency, supply, cash) VALUES (?, ?, ?)
             ON CONFLICT (currency) DO UPDATE SET supply = excluded.supply, cash = excluded.cash""";
 
-    void writeAccounts(Connection connection, Iterable<AccountKey> accounts, LedgerView ledger) throws SQLException {
+    /** Schreibt neue Kontostände; leere Konten werden gelöscht. */
+    void writeBalances(Connection connection, Iterable<BalanceChange> changes) throws SQLException {
         try (PreparedStatement upsert = connection.prepareStatement(UPSERT_BALANCE);
              PreparedStatement delete = connection.prepareStatement(DELETE_BALANCE)) {
-            for (AccountKey key : accounts) {
-                Money balance = ledger.balanceOf(key.account(), key.currency());
+            for (BalanceChange change : changes) {
+                AccountKey key = change.account();
+                Money balance = change.balance();
                 PreparedStatement statement = balance.isZero() ? delete : upsert;
                 statement.setString(1, ActorCodec.kindOf(key.account()));
                 statement.setString(2, key.account().uuid().toString());
@@ -48,12 +50,12 @@ final class LedgerTable {
         }
     }
 
-    void writeTotals(Connection connection, Iterable<CurrencyId> currencies, LedgerView ledger) throws SQLException {
+    void writeTotals(Connection connection, Iterable<CurrencyTotals> totals) throws SQLException {
         try (PreparedStatement upsert = connection.prepareStatement(UPSERT_TOTALS)) {
-            for (CurrencyId currency : currencies) {
-                upsert.setString(1, currency.code());
-                upsert.setLong(2, ledger.totalSupply(currency).amount());
-                upsert.setLong(3, ledger.cashInCirculation(currency).amount());
+            for (CurrencyTotals currency : totals) {
+                upsert.setString(1, currency.currency().code());
+                upsert.setLong(2, currency.supply().amount());
+                upsert.setLong(3, currency.cashInCirculation().amount());
                 upsert.addBatch();
             }
             upsert.executeBatch();

@@ -4,6 +4,6 @@
  * <p>Kasse und Gebiet gehören bewusst nicht dazu, sie liegen in {@code economy.Ledger} und
  * {@code territory.TerritoryRegistry}, weil ihre Invarianten mehrere Polities betreffen.
  *
- * <p>Darf verwenden: {@code shared}, {@code actor}, {@code law}.
+ * <p>Darf verwenden: {@code shared}, {@code actor}, {@code law}, {@code territory} (Standort des Sitzes).
  */
 package de.etiennebader.civ.domain.polity;
