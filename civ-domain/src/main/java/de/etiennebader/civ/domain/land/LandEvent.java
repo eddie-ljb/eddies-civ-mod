@@ -6,7 +6,8 @@ import de.etiennebader.civ.domain.shared.PolityId;
 /**
  * Alle Events des {@link LandRegistry}-Aggregats.
  */
-public sealed interface LandEvent extends DomainEvent permits PlotCreated, PlotAssigned, PlotTransferred, PlotDissolved {
+public sealed interface LandEvent extends DomainEvent permits PlotCreated, PlotAssigned, PlotTransferred, PlotDissolved,
+        PlotOffered, PlotOfferWithdrawn {
 
     /** Die Polity, deren Grundbuch sich geändert hat. */
     PolityId polity();

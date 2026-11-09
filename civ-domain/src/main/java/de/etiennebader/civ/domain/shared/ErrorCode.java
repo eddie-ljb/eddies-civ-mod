@@ -43,6 +43,10 @@ public enum ErrorCode {
     NOT_A_MEMBER,
     /** Argumente: Akteur. */
     LAST_MEMBER,
+    /** Argumente: Abstimmungs-ID. */
+    UNKNOWN_PROPOSAL,
+    /** Argumente: Parameter-ID. */
+    PROPOSAL_ALREADY_OPEN,
 
     // territory
     /** Argumente: Chunk-X, Chunk-Z. */
@@ -67,6 +71,12 @@ public enum ErrorCode {
     NOT_PLOT_HOLDER,
     /** Argumente: Grundstück-ID. */
     UNKNOWN_PLOT,
+    /** Argumente: Grundstück-ID. */
+    PLOT_NOT_FOR_SALE,
+    /** Argumente: Akteur. */
+    NOT_SHOP_OWNER,
+    /** Argumente: Position. */
+    UNKNOWN_SHOP,
 
     // economy
     /** Argumente: fehlender Betrag, verfügbarer Betrag, benötigter Betrag. */
@@ -82,7 +92,13 @@ public enum ErrorCode {
     POLITY_NAME_TAKEN,
     NOT_A_CITIZEN,
     /** Argumente: Chunk-X, Chunk-Z. */
-    CHUNK_HAS_PLOTS;
+    CHUNK_HAS_PLOTS,
+
+    // Markt
+    INVALID_COMMODITY,
+    INVALID_QUANTITY,
+    OUT_OF_STOCK,
+    WORTHLESS_GOODS;
 
     private static final String TRANSLATION_PREFIX = "eddies-civ-mod.error.";
 

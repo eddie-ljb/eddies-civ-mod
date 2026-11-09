@@ -7,17 +7,25 @@ import de.etiennebader.civ.domain.economy.CurrencyTotals;
 import de.etiennebader.civ.domain.economy.LedgerView;
 import de.etiennebader.civ.domain.land.Plot;
 import de.etiennebader.civ.domain.land.PlotSnapshot;
+import de.etiennebader.civ.domain.market.Commodity;
+import de.etiennebader.civ.domain.market.CommodityStock;
+import de.etiennebader.civ.domain.market.MarketView;
 import de.etiennebader.civ.domain.polity.PolitySnapshot;
 import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.DomainEvent;
 import de.etiennebader.civ.domain.shared.Money;
 import de.etiennebader.civ.domain.shared.PolityId;
+import de.etiennebader.civ.domain.shop.Shop;
+import de.etiennebader.civ.domain.shop.ShopRegistryView;
+import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.domain.territory.ChunkCoord;
 import de.etiennebader.civ.domain.territory.Claim;
 import de.etiennebader.civ.domain.territory.TerritoryView;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -29,8 +37,8 @@ import java.util.Optional;
  * die Reihenfolge der ersten Änderung.
  */
 public record StateDelta(List<PolityChange> polities, List<ClaimChange> claims, List<PlotChange> plots,
-                         List<BalanceChange> balances, List<CurrencyTotals> currencies, List<DomainEvent> events,
-                         List<KnownPlayer> players, CalendarState calendar) {
+                         List<BalanceChange> balances, List<CurrencyTotals> currencies, List<CommodityStock> commodities,
+                         List<ShopChange> shops, List<DomainEvent> events, List<KnownPlayer> players, CalendarState calendar) {
 
     public StateDelta {
         polities = List.copyOf(Objects.requireNonNull(polities, "polities"));
@@ -38,6 +46,8 @@ public record StateDelta(List<PolityChange> polities, List<ClaimChange> claims, 
         plots = List.copyOf(Objects.requireNonNull(plots, "plots"));
         balances = List.copyOf(Objects.requireNonNull(balances, "balances"));
         currencies = List.copyOf(Objects.requireNonNull(currencies, "currencies"));
+        commodities = List.copyOf(Objects.requireNonNull(commodities, "commodities"));
+        shops = List.copyOf(Objects.requireNonNull(shops, "shops"));
         events = List.copyOf(Objects.requireNonNull(events, "events"));
         players = List.copyOf(Objects.requireNonNull(players, "players"));
         Objects.requireNonNull(calendar, "calendar");
@@ -67,6 +77,15 @@ public record StateDelta(List<PolityChange> polities, List<ClaimChange> claims, 
         public PlotChange {
             Objects.requireNonNull(key, "key");
             Objects.requireNonNull(plot, "plot");
+        }
+    }
+
+    /** Aktueller Laden an einer Kistenposition; leer, wenn er geschlossen wurde. */
+    public record ShopChange(BlockPosition position, Optional<Shop> shop) {
+
+        public ShopChange {
+            Objects.requireNonNull(position, "position");
+            Objects.requireNonNull(shop, "shop");
         }
     }
 
@@ -117,6 +136,24 @@ public record StateDelta(List<PolityChange> polities, List<ClaimChange> claims, 
             currencies.add(new CurrencyTotals(currency, ledger.totalSupply(currency), ledger.cashInCirculation(currency)));
         }
 
-        return new StateDelta(polities, claims, plots, balances, currencies, changes.events(), players, calendar);
+        MarketView market = current.market();
+        List<CommodityStock> commodities = new ArrayList<>();
+        Map<Commodity, CommodityStock> stored = new HashMap<>();
+        market.stocks().forEach(stock -> stored.put(stock.commodity(), stock));
+        for (Commodity commodity : changes.commodities()) {
+            CommodityStock stock = stored.get(commodity);
+            if (stock != null) {
+                commodities.add(stock);
+            }
+        }
+
+        ShopRegistryView shopRegistry = current.shops();
+        List<ShopChange> shops = new ArrayList<>();
+        for (BlockPosition position : changes.shops()) {
+            shops.add(new ShopChange(position, shopRegistry.shopAt(position)));
+        }
+
+        return new StateDelta(polities, claims, plots, balances, currencies, commodities, shops, changes.events(),
+                players, calendar);
     }
 }

@@ -15,8 +15,8 @@ public final class ClaimContexts {
     private ClaimContexts() {
     }
 
-    public static ClaimContext forPolity(Polity polity, ChunkCoord target, ClaimType type) {
-        return new ClaimContext(polity.id(), type, target, polity.memberCount(),
+    public static ClaimContext forPolity(Polity polity, ChunkCoord target, ClaimType type, ClaimWeighting weighting) {
+        return new ClaimContext(polity.id(), type, target, weighting.weightOf(polity),
                 polity.laws().valueOf(StandardParameters.MAX_OUTPOSTS));
     }
 }

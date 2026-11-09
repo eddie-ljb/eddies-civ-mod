@@ -32,6 +32,8 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static de.etiennebader.civ.domain.law.StandardParameters.LAND_TAX_FREE_BLOCKS;
+import static de.etiennebader.civ.domain.law.StandardParameters.LAND_TAX_GRACE_DAYS;
 import static de.etiennebader.civ.domain.law.StandardParameters.LAND_TAX_PER_BLOCK;
 import static de.etiennebader.civ.domain.law.StandardParameters.MAX_OUTPOSTS;
 import static de.etiennebader.civ.domain.law.StandardParameters.TAX_EMBASSIES;
@@ -181,6 +183,37 @@ class LandTaxCollectorTest {
 
         assertEquals(emeralds(70), report.collected());
         assertEquals(1, ledger.pullEvents().size());
+    }
+
+    @Test
+    @DisplayName("Steuerfreie Fläche je Inhaber wird abgezogen; wer darunter bleibt, zahlt nichts")
+    void deductsTaxFreeBlocks() {
+        land.assign(createPlot(new Area(OVERWORLD, 0, 0, 9, 9), PlotType.RESIDENTIAL), alice, FOUNDING);
+        land.assign(createPlot(new Area(OVERWORLD, 10, 0, 14, 9), PlotType.RESIDENTIAL), bertram, FOUNDING);
+        enactTax(1);
+        nordhain.enact(Statute.of(StatuteId.generate(actors.ids()), "Freibetrag",
+                ParameterValue.of(LAND_TAX_FREE_BLOCKS, 60L)), FOUNDING);
+        ledger.mint(alice, emeralds(1_000), SupplyChange.ADMIN, FOUNDING);
+        ledger.mint(bertram, emeralds(1_000), SupplyChange.ADMIN, FOUNDING);
+        ledger.pullEvents();
+
+        LandTaxReport report = collector.collect(nordhain, land, ledger, TAX_DAY);
+
+        assertEquals(emeralds(40), report.collected());
+        assertEquals(emeralds(1_000), ledger.balanceOf(bertram, EMERALD));
+    }
+
+    @Test
+    @DisplayName("In der Schonfrist nach dem Erwerb ist ein Grundstück steuerfrei")
+    void exemptsPlotsInGracePeriod() {
+        land.assign(createPlot(new Area(OVERWORLD, 0, 0, 9, 9), PlotType.RESIDENTIAL), alice, Day.of(5));
+        enactTax(1);
+        nordhain.enact(Statute.of(StatuteId.generate(actors.ids()), "Schonfrist",
+                ParameterValue.of(LAND_TAX_GRACE_DAYS, 7L)), FOUNDING);
+        ledger.mint(alice, emeralds(1_000), SupplyChange.ADMIN, FOUNDING);
+
+        assertEquals(Money.zero(EMERALD), collector.collect(nordhain, land, ledger, Day.of(11)).collected());
+        assertEquals(emeralds(100), collector.collect(nordhain, land, ledger, Day.of(12)).collected());
     }
 
     @Test

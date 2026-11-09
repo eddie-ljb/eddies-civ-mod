@@ -53,8 +53,11 @@ public final class Texts {
         return queries.polity(polity).map(found -> found.name().value()).orElseGet(() -> shortId(polity.value()));
     }
 
+    /** Ein Geldbetrag wie „12,05 Smaragde“; das Dezimalzeichen kommt aus der Sprachdatei. */
     public Message money(Money money) {
-        return Message.of(TranslationKeys.MONEY, money.amount(), Message.of(TranslationKeys.currency(money.currency())));
+        long units = money.amount();
+        Message amount = Message.of(TranslationKeys.MONEY_AMOUNT, MoneyFormat.whole(units), MoneyFormat.cents(units));
+        return Message.of(TranslationKeys.MONEY, amount, Message.of(TranslationKeys.currency(money.currency())));
     }
 
     /** Der Wert einer Regelung: Wahrheitswerte als „ja“/„nein“, sonst als Zahl oder Text. */

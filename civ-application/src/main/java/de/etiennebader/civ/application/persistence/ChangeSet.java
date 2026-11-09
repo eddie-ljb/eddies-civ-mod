@@ -1,8 +1,10 @@
 package de.etiennebader.civ.application.persistence;
 
+import de.etiennebader.civ.domain.market.Commodity;
 import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.DomainEvent;
 import de.etiennebader.civ.domain.shared.PolityId;
+import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.domain.territory.ChunkCoord;
 
 import java.util.Collections;
@@ -19,7 +21,8 @@ import java.util.Set;
  * Die Mengen behalten die Reihenfolge der ersten Änderung.
  */
 public record ChangeSet(Set<PolityId> polities, Set<ChunkCoord> chunks, Set<PlotKey> plots,
-                        Set<AccountKey> accounts, Set<CurrencyId> currencies, List<DomainEvent> events) {
+                        Set<AccountKey> accounts, Set<CurrencyId> currencies, Set<Commodity> commodities,
+                        Set<BlockPosition> shops, List<DomainEvent> events) {
 
     public ChangeSet {
         polities = ordered(polities, "polities");
@@ -27,6 +30,8 @@ public record ChangeSet(Set<PolityId> polities, Set<ChunkCoord> chunks, Set<Plot
         plots = ordered(plots, "plots");
         accounts = ordered(accounts, "accounts");
         currencies = ordered(currencies, "currencies");
+        commodities = ordered(commodities, "commodities");
+        shops = ordered(shops, "shops");
         events = List.copyOf(Objects.requireNonNull(events, "events"));
     }
 
@@ -35,11 +40,11 @@ public record ChangeSet(Set<PolityId> polities, Set<ChunkCoord> chunks, Set<Plot
     }
 
     public static ChangeSet empty() {
-        return new ChangeSet(Set.of(), Set.of(), Set.of(), Set.of(), Set.of(), List.of());
+        return new ChangeSet(Set.of(), Set.of(), Set.of(), Set.of(), Set.of(), Set.of(), Set.of(), List.of());
     }
 
     public boolean isEmpty() {
         return polities.isEmpty() && chunks.isEmpty() && plots.isEmpty() && accounts.isEmpty()
-                && currencies.isEmpty() && events.isEmpty();
+                && currencies.isEmpty() && commodities.isEmpty() && shops.isEmpty() && events.isEmpty();
     }
 }

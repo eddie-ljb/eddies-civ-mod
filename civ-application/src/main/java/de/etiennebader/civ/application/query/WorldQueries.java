@@ -4,13 +4,18 @@ import de.etiennebader.civ.application.Repositories;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.economy.LedgerView;
 import de.etiennebader.civ.domain.land.LandView;
+import de.etiennebader.civ.domain.market.MarketView;
+import de.etiennebader.civ.domain.market.PriceLevel;
 import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.protection.Denial;
+import de.etiennebader.civ.domain.protection.Hazard;
 import de.etiennebader.civ.domain.protection.ProtectedAction;
 import de.etiennebader.civ.domain.protection.ProtectionContext;
 import de.etiennebader.civ.domain.protection.ProtectionRules;
+import de.etiennebader.civ.domain.shared.Money;
 import de.etiennebader.civ.domain.shared.PolityId;
+import de.etiennebader.civ.domain.shop.ShopRegistryView;
 import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.domain.territory.TerritoryView;
 
@@ -93,8 +98,31 @@ public final class WorldQueries {
         return PROTECTION_RULES.check(actor, action, position, protectionContext);
     }
 
+    /** Ob eine Naturgewalt wie eine Explosion an diesem Block wirken darf. */
+    public boolean allows(Hazard hazard, BlockPosition position) {
+        return PROTECTION_RULES.allows(hazard, position, protectionContext);
+    }
+
     public TerritoryView territory() {
         return repositories.territory().load();
+    }
+
+    public ShopRegistryView shops() {
+        return repositories.shops().load();
+    }
+
+    public MarketView market() {
+        return repositories.market().load();
+    }
+
+    /**
+     * Das Preisniveau aus Geldmenge und Bevölkerung.
+     *
+     * @param population Zahl der Wirtschaftsteilnehmer, z. B. bekannte Spieler
+     * @param reference  Geldmenge je Kopf, bei der Preise ihrem Grundpreis entsprechen
+     */
+    public PriceLevel priceLevel(int population, Money reference) {
+        return PriceLevel.of(ledger().totalSupply(reference.currency()), population, reference);
     }
 
     /**

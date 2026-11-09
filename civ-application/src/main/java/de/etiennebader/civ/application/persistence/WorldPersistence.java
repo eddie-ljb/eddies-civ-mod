@@ -55,6 +55,8 @@ public final class WorldPersistence {
         world.land().forEach(land -> repositories.land().save(land));
         repositories.territory().save(world.territory());
         repositories.ledger().save(world.ledger());
+        repositories.market().save(world.market());
+        repositories.shops().save(world.shops());
         for (Polity polity : world.polities()) {
             if (repositories.land().findByPolity(polity.id()).isEmpty()) {
                 repositories.land().save(LandRegistry.open(polity.id()));

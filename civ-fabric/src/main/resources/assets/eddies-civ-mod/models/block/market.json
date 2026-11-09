@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/cube_bottom_top",
+  "textures": {
+    "top": "eddies-civ-mod:block/market_top",
+    "side": "eddies-civ-mod:block/market_side",
+    "bottom": "eddies-civ-mod:block/market_bottom"
+  }
+}

@@ -15,4 +15,7 @@ public interface PolityRepository {
     Collection<Polity> findAll();
 
     void save(Polity polity);
+
+    /** Entfernt eine aufgelöste Polity. */
+    void remove(PolityId id);
 }

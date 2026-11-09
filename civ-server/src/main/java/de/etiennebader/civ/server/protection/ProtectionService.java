@@ -3,6 +3,7 @@ package de.etiennebader.civ.server.protection;
 import de.etiennebader.civ.application.query.WorldQueries;
 import de.etiennebader.civ.domain.actor.PlayerRef;
 import de.etiennebader.civ.domain.protection.Denial;
+import de.etiennebader.civ.domain.protection.Hazard;
 import de.etiennebader.civ.domain.protection.ProtectedAction;
 import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.server.command.Message;
@@ -39,6 +40,11 @@ public final class ProtectionService {
             return Optional.empty();
         }
         return queries.access(player, action, position).map(this::describe);
+    }
+
+    /** Ob eine Naturgewalt an diesem Block wirken darf, z. B. ob eine Explosion ihn zerstört. */
+    public boolean allows(Hazard hazard, BlockPosition position) {
+        return queries.allows(hazard, position);
     }
 
     /**

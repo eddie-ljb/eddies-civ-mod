@@ -2,6 +2,7 @@ package de.etiennebader.civ.application.territory;
 
 import de.etiennebader.civ.application.support.Aggregates;
 import de.etiennebader.civ.application.support.ClaimContexts;
+import de.etiennebader.civ.application.support.ClaimWeighting;
 import de.etiennebader.civ.domain.polity.Polity;
 import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.PolityId;
@@ -30,8 +31,14 @@ public final class ClaimChunk {
 
     private final Aggregates aggregates;
     private final ClaimPolicy claimPolicy;
+    private final ClaimWeighting weighting;
 
     public ClaimChunk(Aggregates aggregates, ClaimPolicy claimPolicy) {
+        this(aggregates, claimPolicy, ClaimWeighting.ALL_MEMBERS);
+    }
+
+    public ClaimChunk(Aggregates aggregates, ClaimPolicy claimPolicy, ClaimWeighting weighting) {
+        this.weighting = Objects.requireNonNull(weighting, "weighting");
         this.aggregates = Objects.requireNonNull(aggregates, "aggregates");
         this.claimPolicy = Objects.requireNonNull(claimPolicy, "claimPolicy");
     }
@@ -42,7 +49,7 @@ public final class ClaimChunk {
     public void execute(Command command) {
         Polity polity = aggregates.polity(command.polity());
         TerritoryRegistry territory = aggregates.territory();
-        territory.claim(ClaimContexts.forPolity(polity, command.chunk(), command.type()), claimPolicy, command.day());
+        territory.claim(ClaimContexts.forPolity(polity, command.chunk(), command.type(), weighting), claimPolicy, command.day());
         aggregates.commit(territory);
     }
 }

@@ -4,6 +4,7 @@ import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PolityRef;
 import de.etiennebader.civ.domain.shared.AggregateRoot;
 import de.etiennebader.civ.domain.shared.Day;
+import de.etiennebader.civ.domain.shared.Money;
 import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.territory.ChunkCoord;
 import de.etiennebader.civ.domain.territory.DimensionId;
@@ -60,7 +61,8 @@ public final class LandRegistry extends AggregateRoot<LandEvent> implements Land
                     .ifPresent(existing -> {
                         throw new IllegalArgumentException("Grundstücke überlappen: " + existing.id() + ", " + snapshot.id());
                     });
-            Plot plot = new Plot(snapshot.id(), snapshot.area(), snapshot.type(), snapshot.holder(), snapshot.holderSince());
+            Plot plot = new Plot(snapshot.id(), snapshot.area(), snapshot.type(), snapshot.holder(), snapshot.holderSince(),
+                    snapshot.askingPrice());
             if (!snapshot.holder().equals(registry.ownerAsActor())) {
                 registry.requireValidHolder(plot, snapshot.holder());
             }
@@ -87,7 +89,7 @@ public final class LandRegistry extends AggregateRoot<LandEvent> implements Land
         }
         requireWithinTerritory(area, territory);
         requireNoOverlap(area);
-        plots.put(id, new Plot(id, area, type, ownerAsActor(), day));
+        plots.put(id, new Plot(id, area, type, ownerAsActor(), day, Optional.empty()));
         index(ownerAsActor(), id);
         raise(new PlotCreated(owner, id, area, type, day));
     }
@@ -133,6 +135,46 @@ public final class LandRegistry extends AggregateRoot<LandEvent> implements Land
         requireValidHolder(plot, to);
         changeHolder(plot, to, day);
         raise(new PlotTransferred(owner, plotId, from, to, day));
+    }
+
+    /**
+     * Der Inhaber bietet das Grundstück zum Verkauf an oder ändert den Preis. Ein Inhaberwechsel beendet das Angebot.
+     *
+     * @throws UnknownPlotException wenn es das Grundstück nicht gibt
+     * @throws NotPlotHolderException wenn {@code seller} nicht Inhaber ist
+     */
+    public void offerForSale(PlotId plotId, ActorRef seller, Money price, Day day) {
+        Objects.requireNonNull(seller, "seller");
+        Objects.requireNonNull(price, "price");
+        Objects.requireNonNull(day, "day");
+        if (price.isNegative()) {
+            throw new IllegalArgumentException("Preis darf nicht negativ sein: " + price);
+        }
+        Plot plot = require(plotId);
+        if (!plot.isHeldBy(seller)) {
+            throw new NotPlotHolderException(seller, plotId);
+        }
+        plot.offer(Optional.of(price));
+        raise(new PlotOffered(owner, plotId, seller, price, day));
+    }
+
+    /**
+     * Zieht ein Verkaufsangebot zurück.
+     *
+     * @throws PlotNotForSaleException wenn das Grundstück nicht angeboten wird
+     */
+    public void withdrawOffer(PlotId plotId, ActorRef holder, Day day) {
+        Objects.requireNonNull(holder, "holder");
+        Objects.requireNonNull(day, "day");
+        Plot plot = require(plotId);
+        if (!plot.isHeldBy(holder)) {
+            throw new NotPlotHolderException(holder, plotId);
+        }
+        if (!plot.isForSale()) {
+            throw new PlotNotForSaleException(plotId);
+        }
+        plot.offer(Optional.empty());
+        raise(new PlotOfferWithdrawn(owner, plotId, holder, day));
     }
 
     /**

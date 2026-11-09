@@ -5,6 +5,9 @@ import de.etiennebader.civ.application.persistence.StateDelta;
 import de.etiennebader.civ.application.persistence.StateStore;
 import de.etiennebader.civ.application.persistence.StoredWorld;
 import de.etiennebader.civ.domain.economy.Ledger;
+import de.etiennebader.civ.domain.market.Market;
+import de.etiennebader.civ.domain.shared.CurrencyId;
+import de.etiennebader.civ.domain.shop.ShopRegistry;
 import de.etiennebader.civ.domain.territory.TerritoryRegistry;
 
 import java.util.List;
@@ -24,7 +27,9 @@ public final class MemoryStateStore implements StateStore {
 
     @Override
     public StoredWorld load() {
-        return new StoredWorld(List.of(), TerritoryRegistry.empty(), List.of(), Ledger.empty(), List.of(),
+        return new StoredWorld(List.of(), TerritoryRegistry.empty(), List.of(), Ledger.empty(), Market.open(CurrencyId.EMERALD),
+                ShopRegistry.empty(),
+                List.of(),
                 CalendarState.START);
     }
 

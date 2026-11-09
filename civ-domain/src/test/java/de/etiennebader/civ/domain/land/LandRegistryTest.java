@@ -3,8 +3,10 @@ package de.etiennebader.civ.domain.land;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PlayerRef;
 import de.etiennebader.civ.domain.actor.PolityRef;
+import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.ErrorCode;
+import de.etiennebader.civ.domain.shared.Money;
 import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.territory.ChunkCoord;
 import de.etiennebader.civ.domain.territory.ClaimContext;
@@ -199,6 +201,38 @@ class LandRegistryTest {
         assertDomainError(ErrorCode.UNKNOWN_PLOT, () -> land.dissolve(unknown, DAY));
         assertDomainError(ErrorCode.UNKNOWN_PLOT, () -> land.assign(unknown, alice, DAY));
         assertDomainError(ErrorCode.UNKNOWN_PLOT, () -> land.transfer(unknown, alice, bob, DAY));
+    }
+
+    @Test
+    @DisplayName("Verkaufsangebot: nur der Inhaber bietet an, ein Inhaberwechsel beendet das Angebot")
+    void offersPlotForSale() {
+        PlotId plotId = newPlot(new Area(OVERWORLD, 0, 0, 7, 7), PlotType.RESIDENTIAL);
+        land.pullEvents();
+        Money price = Money.of(500, CurrencyId.EMERALD);
+
+        assertDomainError(ErrorCode.NOT_PLOT_HOLDER, () -> land.offerForSale(plotId, alice, price, DAY));
+        land.offerForSale(plotId, nordhainActor, price, DAY);
+
+        assertEquals(Optional.of(price), land.plot(plotId).orElseThrow().askingPrice());
+        assertEquals(List.of(new PlotOffered(nordhain, plotId, nordhainActor, price, DAY)), land.pullEvents());
+        assertEquals(Optional.of(price), land.plot(plotId).orElseThrow().snapshot().askingPrice());
+
+        land.transfer(plotId, nordhainActor, alice, Day.of(2));
+        assertTrue(land.plot(plotId).orElseThrow().askingPrice().isEmpty());
+    }
+
+    @Test
+    @DisplayName("Angebot zurückziehen; ohne Angebot → PLOT_NOT_FOR_SALE")
+    void withdrawsOffer() {
+        PlotId plotId = newPlot(new Area(OVERWORLD, 0, 0, 7, 7), PlotType.RESIDENTIAL);
+
+        assertDomainError(ErrorCode.PLOT_NOT_FOR_SALE, () -> land.withdrawOffer(plotId, nordhainActor, DAY));
+        land.offerForSale(plotId, nordhainActor, Money.of(100, CurrencyId.EMERALD), DAY);
+        land.pullEvents();
+        land.withdrawOffer(plotId, nordhainActor, DAY);
+
+        assertTrue(land.plot(plotId).orElseThrow().askingPrice().isEmpty());
+        assertEquals(List.of(new PlotOfferWithdrawn(nordhain, plotId, nordhainActor, DAY)), land.pullEvents());
     }
 
     private List<PlotId> idsHeldBy(ActorRef holder) {

@@ -1,8 +1,8 @@
 package de.etiennebader.civ.domain.land;
 
-import de.etiennebader.civ.domain.territory.ChunkCoord;
 import de.etiennebader.civ.domain.shared.DomainException;
 import de.etiennebader.civ.domain.shared.ErrorCode;
+import de.etiennebader.civ.domain.territory.ChunkCoord;
 
 /**
  * Ein Grundstück ragt über das Gebiet der Polity hinaus.

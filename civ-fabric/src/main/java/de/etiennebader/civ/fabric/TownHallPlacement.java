@@ -1,10 +1,12 @@
 package de.etiennebader.civ.fabric;
 
+import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.fabric.content.TownHallBlock;
 import de.etiennebader.civ.server.CivServer;
 import de.etiennebader.civ.server.command.Message;
 import de.etiennebader.civ.server.command.MessageKey;
 import de.etiennebader.civ.server.command.Reply;
+import de.etiennebader.civ.server.town.TownHallService;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
@@ -32,10 +34,19 @@ public final class TownHallPlacement implements TownHallBlock.PlacementHandler {
             Components.send(player, Reply.failure(Message.of(MessageKey.INTERNAL_ERROR)));
             return false;
         }
+        BlockPosition position = Players.position(player.level(), pos);
+        if (civ.get().townHalls().townOfMayor(Players.ref(player)).isPresent()) {
+            // Ein Bürgermeister, der ein neues Gemeindehaus setzt, verlegt den Sitz seiner Gemeinde.
+            TownHallService.SeatChange change = civ.get().townHalls().moveSeat(Players.caller(player), position);
+            TownHalls.apply(player, change);
+            return change.reply().success();
+        }
         Optional<String> name = Optional.ofNullable(stack.get(DataComponents.CUSTOM_NAME)).map(Component::getString);
-        Reply reply = civ.get().commands().foundWithTownHall(Players.caller(player), name,
-                Players.position(player.level(), pos));
+        Reply reply = civ.get().commands().foundWithTownHall(Players.caller(player), name, position);
         Components.send(player, reply);
+        if (reply.success()) {
+            Feedback.fanfare(player);
+        }
         return reply.success();
     }
 }

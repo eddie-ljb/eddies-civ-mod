@@ -49,18 +49,29 @@ public final class AmendLaw {
      */
     public StatuteId execute(Command command) {
         Polity polity = aggregates.polity(command.polity());
-        boolean citizen = polity.membershipOf(command.citizen())
+        requireCitizen(polity, command.citizen());
+        StatuteId statute = apply(polity, command.value(), ids, command.day());
+        aggregates.commit(polity);
+        return statute;
+    }
+
+    /** @throws NotACitizenException wenn der Akteur kein Bürger der Polity ist */
+    static void requireCitizen(Polity polity, ActorRef actor) {
+        boolean citizen = polity.membershipOf(actor)
                 .map(membership -> membership.type() == MembershipType.CITIZEN)
                 .orElse(false);
         if (!citizen) {
-            throw new NotACitizenException(command.citizen(), polity.name().value());
+            throw new NotACitizenException(actor, polity.name().value());
         }
-        for (EnactedStatute superseded : supersededBy(polity, command.value())) {
-            polity.repeal(superseded.statute().id(), command.day());
+    }
+
+    /** Setzt die Regelung in Kraft und hebt ältere Einzelgesetze zur selben Regelung auf. */
+    static StatuteId apply(Polity polity, ParameterValue<?> value, IdGenerator ids, Day day) {
+        for (EnactedStatute superseded : supersededBy(polity, value)) {
+            polity.repeal(superseded.statute().id(), day);
         }
-        Statute statute = Statute.of(StatuteId.generate(ids), command.value().key().id(), command.value());
-        polity.enact(statute, command.day());
-        aggregates.commit(polity);
+        Statute statute = Statute.of(StatuteId.generate(ids), value.key().id(), value);
+        polity.enact(statute, day);
         return statute.id();
     }
 

@@ -15,7 +15,7 @@ import java.util.Optional;
 public final class CivServerFixture {
 
     /** Eine Minute Echtzeit pro Tag. */
-    public static final ServerSettings SETTINGS = new ServerSettings(1_200, 9, 4, CurrencyId.EMERALD);
+    public static final ServerSettings SETTINGS = ServerSettings.withDayLength(1_200);
 
     private final CivServer server;
 
@@ -29,6 +29,46 @@ public final class CivServerFixture {
 
     public CivCommands commands() {
         return server.commands();
+    }
+
+    public de.etiennebader.civ.server.bank.BankService bank() {
+        return server.bank();
+    }
+
+    public de.etiennebader.civ.server.market.MarketService market() {
+        return server.market();
+    }
+
+    public de.etiennebader.civ.server.town.TownService towns() {
+        return server.towns();
+    }
+
+    public de.etiennebader.civ.server.territory.TerritoryWatcher territory() {
+        return server.territory();
+    }
+
+    public de.etiennebader.civ.server.plot.PlotService plots() {
+        return server.plots();
+    }
+
+    public de.etiennebader.civ.server.villager.VillagerService villagers() {
+        return server.villagers();
+    }
+
+    public de.etiennebader.civ.server.vote.VotingService voting() {
+        return server.voting();
+    }
+
+    public java.util.List<Announcement> takeAnnouncements() {
+        return server.takeAnnouncements();
+    }
+
+    public de.etiennebader.civ.server.town.TownHallService townHalls() {
+        return server.townHalls();
+    }
+
+    public de.etiennebader.civ.server.shop.ShopService shops() {
+        return server.shops();
     }
 
     public ProtectionService protection() {

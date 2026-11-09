@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CivServerTest {
 
-    private static final ServerSettings SHORT_DAYS = new ServerSettings(5, 9, 4, CurrencyId.EMERALD);
+    private static final ServerSettings SHORT_DAYS = ServerSettings.withDayLength(5);
 
     private final SeededIdGenerator ids = new SeededIdGenerator(11);
     private final PlayerRef alice = new PlayerRef(PlayerId.generate(ids));
@@ -48,6 +48,22 @@ class CivServerTest {
         assertTrue(reports.subList(0, 4).stream().allMatch(Optional::isEmpty));
         assertEquals(Day.of(1), reports.get(4).orElseThrow().day());
         assertEquals(Day.of(2), server.calendar().today());
+    }
+
+    @Test
+    @DisplayName("Ein Admin kann den Tag sofort beenden; der nächste Tag beginnt wieder bei null Ticks")
+    void endDayNowClosesDayImmediately() {
+        CivServer server = CivServer.start(new MemoryStateStore(), SHORT_DAYS, ids, SaveListener.NONE);
+        server.tick();
+        server.tick();
+
+        DayReport report = server.endDayNow();
+
+        assertEquals(Day.of(1), report.day());
+        assertEquals(Day.of(2), server.calendar().today());
+        List<Optional<DayReport>> next = List.of(server.tick(), server.tick(), server.tick(), server.tick(), server.tick());
+        assertTrue(next.subList(0, 4).stream().allMatch(Optional::isEmpty));
+        assertEquals(Day.of(2), next.get(4).orElseThrow().day());
     }
 
     @Test

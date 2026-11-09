@@ -12,16 +12,22 @@ import de.etiennebader.civ.application.inmemory.InMemoryRepositories;
 import de.etiennebader.civ.application.land.AssignPlot;
 import de.etiennebader.civ.application.land.CreatePlot;
 import de.etiennebader.civ.application.land.DissolvePlot;
+import de.etiennebader.civ.application.land.OfferPlot;
 import de.etiennebader.civ.application.land.SellPlot;
+import de.etiennebader.civ.application.market.BuyFromMarket;
+import de.etiennebader.civ.application.market.SellToMarket;
 import de.etiennebader.civ.application.persistence.ChangeTracker;
 import de.etiennebader.civ.application.persistence.FlushReport;
 import de.etiennebader.civ.application.persistence.PendingSave;
 import de.etiennebader.civ.application.persistence.StateDump;
 import de.etiennebader.civ.application.persistence.WorldPersistence;
+import de.etiennebader.civ.application.polity.DissolvePolity;
 import de.etiennebader.civ.application.polity.EnactStatute;
 import de.etiennebader.civ.application.polity.FoundPolity;
 import de.etiennebader.civ.application.polity.JoinPolity;
+import de.etiennebader.civ.application.polity.ProposeLawChange;
 import de.etiennebader.civ.application.polity.RepealStatute;
+import de.etiennebader.civ.application.shop.OpenShop;
 import de.etiennebader.civ.application.territory.ClaimChunk;
 import de.etiennebader.civ.application.territory.ReleaseChunk;
 import de.etiennebader.civ.domain.actor.PersonRef;
@@ -33,6 +39,8 @@ import de.etiennebader.civ.domain.land.PlotId;
 import de.etiennebader.civ.domain.land.PlotType;
 import de.etiennebader.civ.domain.law.ParameterValue;
 import de.etiennebader.civ.domain.law.StandardParameters;
+import de.etiennebader.civ.domain.market.Commodity;
+import de.etiennebader.civ.domain.market.PriceLevel;
 import de.etiennebader.civ.domain.polity.MembershipType;
 import de.etiennebader.civ.domain.polity.PolityName;
 import de.etiennebader.civ.domain.polity.PolityView;
@@ -44,6 +52,7 @@ import de.etiennebader.civ.domain.shared.PlayerId;
 import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.shared.SeededIdGenerator;
 import de.etiennebader.civ.domain.shared.StatuteId;
+import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.domain.territory.ChunkCoord;
 import de.etiennebader.civ.domain.territory.ClaimType;
 import de.etiennebader.civ.domain.territory.CompositeClaimPolicy;
@@ -90,6 +99,29 @@ class SqliteStateStoreTest {
             reloaded.persistence.restore();
 
             assertEquals(saved, reloaded.dump());
+        }
+    }
+
+    @Test
+    @DisplayName("Eine aufgelöste Gemeinde verschwindet samt Gebiet und Botschaft aus der Datenbank")
+    void removesDissolvedPolity() {
+        String saved;
+        try (Session session = Session.open(file)) {
+            session.buildWorld();
+            session.persistence.flush();
+
+            session.dissolveEichenfurt();
+            session.persistence.flush();
+            saved = session.dump();
+        }
+
+        try (Session reloaded = Session.open(file)) {
+            reloaded.persistence.restore();
+
+            assertEquals(saved, reloaded.dump());
+            assertEquals(1, count("SELECT COUNT(*) FROM polity"));
+            assertEquals(0, count("SELECT COUNT(*) FROM plot WHERE type = 'EMBASSY'"));
+            assertEquals(1, count("SELECT COUNT(*) FROM shop"));
         }
     }
 
@@ -264,6 +296,7 @@ class SqliteStateStoreTest {
         private final PlayerRef alice = new PlayerRef(PlayerId.generate(ids));
         private final PersonRef bertram = new PersonRef(PersonId.generate(ids));
         private final PlayerRef carla = new PlayerRef(PlayerId.generate(ids));
+        private final PlayerRef dora = new PlayerRef(PlayerId.generate(ids));
         private PolityId nordhain;
         private PolityId eichenfurt;
         private PlotId embassy;
@@ -283,6 +316,11 @@ class SqliteStateStoreTest {
             nordhain = app.foundPolity().execute(new FoundPolity.Command(PolityName.of("Nordhain"), alice, EMERALD, chunk(0, 0).center(64), DAY));
             eichenfurt = app.foundPolity().execute(new FoundPolity.Command(PolityName.of("Eichenfurt"), carla, EMERALD, chunk(20, 20).center(64), DAY));
             app.joinPolity().execute(new JoinPolity.Command(nordhain, bertram, MembershipType.RESIDENT, DAY));
+            app.joinPolity().execute(new JoinPolity.Command(nordhain, dora, MembershipType.CITIZEN, DAY));
+            app.openShop().execute(new OpenShop.Command(new BlockPosition(DimensionId.OVERWORLD, 3, 64, 3), bertram,
+                    Commodity.of("minecraft:bread"), money(15), DAY));
+            app.proposeLawChange().execute(new ProposeLawChange.Command(nordhain, alice,
+                    ParameterValue.of(StandardParameters.EXPLOSIONS_ALLOWED, true), DAY));
             app.claimChunk().execute(new ClaimChunk.Command(nordhain, chunk(1, 0), ClaimType.CORE, DAY));
             outpostLaw = app.enactStatute().execute(new EnactStatute.Command(nordhain, "Außenpostengesetz",
                     List.of(ParameterValue.of(StandardParameters.MAX_OUTPOSTS, 1)), DAY));
@@ -300,7 +338,14 @@ class SqliteStateStoreTest {
             app.depositEmeralds().execute(new DepositEmeralds.Command(bertram, money(800), DAY));
             app.sellPlot().execute(new SellPlot.Command(nordhain, home, new PolityRef(nordhain), alice, money(1_000), DAY));
             app.sellPlot().execute(new SellPlot.Command(nordhain, shop, new PolityRef(nordhain), bertram, money(300), DAY));
+            app.offerPlot().execute(new OfferPlot.Command(nordhain, shop, bertram, Optional.of(money(450)), DAY));
             app.withdrawCash().execute(new WithdrawCash.Command(bertram, money(200), DAY));
+            app.sellToMarket().execute(new SellToMarket.Command(alice, new Commodity("minecraft:diamond"), 5, 800,
+                    PriceLevel.NEUTRAL, DAY));
+            app.sellToMarket().execute(new SellToMarket.Command(bertram, new Commodity("minecraft:oak_log"), 64, 10,
+                    PriceLevel.NEUTRAL, DAY));
+            app.buyFromMarket().execute(new BuyFromMarket.Command(alice, new Commodity("minecraft:oak_log"), 4, 10,
+                    PriceLevel.NEUTRAL, DAY));
             app.endOfDay().execute(DAY);
         }
 
@@ -312,6 +357,10 @@ class SqliteStateStoreTest {
             app.sellPlot().execute(new SellPlot.Command(nordhain, home, alice, bertram, money(0), later));
             long all = app.queries().ledger().balanceOf(bertram, EMERALD).amount();
             app.transferFunds().execute(new TransferFunds.Command(bertram, alice, money(all), TransferReason.TRADE, later));
+        }
+
+        void dissolveEichenfurt() {
+            app.dissolvePolity().execute(new DissolvePolity.Command(eichenfurt, carla, Day.of(6)));
         }
 
         String dump() {

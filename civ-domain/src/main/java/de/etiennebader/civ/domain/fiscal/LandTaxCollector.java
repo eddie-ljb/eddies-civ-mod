@@ -27,7 +27,10 @@ import java.util.TreeMap;
  *     <li>Satz {@link StandardParameters#LAND_TAX_PER_BLOCK} lesen; bei 0 endet der Einzug sofort.</li>
  *     <li>Steuerfrei sind Grundstücke der Polity selbst (Gemeindeland) und Botschaften,
  *         solange {@link StandardParameters#TAX_EMBASSIES} nicht gesetzt ist.</li>
- *     <li>Je Inhaber: Betrag = Satz × Fläche aller seiner Grundstücke, in der Währung der Polity.</li>
+ *     <li>Steuerfrei sind außerdem Grundstücke in den ersten {@link StandardParameters#LAND_TAX_GRACE_DAYS}
+ *         Tagen nach ihrem Erwerb.</li>
+ *     <li>Je Inhaber: Betrag = Satz × (Fläche aller seiner Grundstücke − {@link StandardParameters#LAND_TAX_FREE_BLOCKS}),
+ *         in der Währung der Polity; ohne steuerpflichtige Fläche wird nichts eingezogen.</li>
  *     <li>Einzug immer vom Konto per {@link Ledger#tryTransfer}; fehlende Deckung wird zur
  *         {@link TaxArrear}. Bargeld zählt nicht.</li>
  * </ol>
@@ -51,12 +54,18 @@ public final class LandTaxCollector {
             return LandTaxReport.empty(polity.id(), polity.currency(), day);
         }
         boolean taxEmbassies = laws.valueOf(StandardParameters.TAX_EMBASSIES);
+        long freeBlocks = laws.valueOf(StandardParameters.LAND_TAX_FREE_BLOCKS);
+        long graceDays = laws.valueOf(StandardParameters.LAND_TAX_GRACE_DAYS);
 
         Money collected = Money.zero(polity.currency());
         List<TaxArrear> arrears = new ArrayList<>();
-        for (Map.Entry<ActorRef, Long> entry : taxableAreaByHolder(polity, land, taxEmbassies).entrySet()) {
+        for (Map.Entry<ActorRef, Long> entry : taxableAreaByHolder(polity, land, taxEmbassies, graceDays, day).entrySet()) {
             ActorRef holder = entry.getKey();
-            Money due = Money.of(Math.multiplyExact(ratePerBlock, entry.getValue()), polity.currency());
+            long taxedBlocks = Math.max(0, entry.getValue() - freeBlocks);
+            if (taxedBlocks == 0) {
+                continue;
+            }
+            Money due = Money.of(Math.multiplyExact(ratePerBlock, taxedBlocks), polity.currency());
             TransferResult result = ledger.tryTransfer(holder, polity.asActor(), due, TransferReason.LAND_TAX, day);
             switch (result) {
                 case TransferResult.Completed completed -> collected = collected.plus(completed.event().amount());
@@ -66,14 +75,20 @@ public final class LandTaxCollector {
         return new LandTaxReport(polity.id(), day, collected, arrears);
     }
 
-    private static Map<ActorRef, Long> taxableAreaByHolder(Polity polity, LandView land, boolean taxEmbassies) {
+    private static Map<ActorRef, Long> taxableAreaByHolder(Polity polity, LandView land, boolean taxEmbassies,
+                                                           long graceDays, Day day) {
         Map<ActorRef, Long> areaByHolder = new TreeMap<>(ActorRef.CANONICAL_ORDER);
         for (Plot plot : land.plots()) {
-            if (isTaxable(plot, polity, taxEmbassies)) {
+            if (isTaxable(plot, polity, taxEmbassies) && !inGracePeriod(plot, graceDays, day)) {
                 areaByHolder.merge(plot.holder(), plot.area().size(), Math::addExact);
             }
         }
         return areaByHolder;
+    }
+
+    /** Ein Grundstück ist in den ersten {@code graceDays} Tagen nach dem Erwerb steuerfrei. */
+    private static boolean inGracePeriod(Plot plot, long graceDays, Day day) {
+        return graceDays > 0 && day.isBefore(plot.holderSince().plus(graceDays));
     }
 
     private static boolean isTaxable(Plot plot, Polity polity, boolean taxEmbassies) {

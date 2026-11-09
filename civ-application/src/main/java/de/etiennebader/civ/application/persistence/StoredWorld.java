@@ -4,7 +4,9 @@ import de.etiennebader.civ.application.day.CalendarState;
 import de.etiennebader.civ.application.directory.KnownPlayer;
 import de.etiennebader.civ.domain.economy.Ledger;
 import de.etiennebader.civ.domain.land.LandRegistry;
+import de.etiennebader.civ.domain.market.Market;
 import de.etiennebader.civ.domain.polity.Polity;
+import de.etiennebader.civ.domain.shop.ShopRegistry;
 import de.etiennebader.civ.domain.territory.TerritoryRegistry;
 
 import java.util.List;
@@ -18,13 +20,15 @@ import java.util.Objects;
  * @param land     ein Grundbuch je Polity
  */
 public record StoredWorld(List<Polity> polities, TerritoryRegistry territory, List<LandRegistry> land, Ledger ledger,
-                          List<KnownPlayer> players, CalendarState calendar) {
+                          Market market, ShopRegistry shops, List<KnownPlayer> players, CalendarState calendar) {
 
     public StoredWorld {
         polities = List.copyOf(Objects.requireNonNull(polities, "polities"));
         Objects.requireNonNull(territory, "territory");
         land = List.copyOf(Objects.requireNonNull(land, "land"));
         Objects.requireNonNull(ledger, "ledger");
+        Objects.requireNonNull(market, "market");
+        Objects.requireNonNull(shops, "shops");
         players = List.copyOf(Objects.requireNonNull(players, "players"));
         Objects.requireNonNull(calendar, "calendar");
     }

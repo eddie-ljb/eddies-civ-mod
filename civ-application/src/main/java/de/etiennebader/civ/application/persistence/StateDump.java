@@ -10,6 +10,7 @@ import de.etiennebader.civ.domain.law.EnactedStatute;
 import de.etiennebader.civ.domain.law.ParameterCatalog;
 import de.etiennebader.civ.domain.polity.Membership;
 import de.etiennebader.civ.domain.polity.PolityView;
+import de.etiennebader.civ.domain.polity.Proposal;
 import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.domain.territory.ChunkCoord;
 import de.etiennebader.civ.domain.territory.Claim;
@@ -51,6 +52,14 @@ public final class StateDump {
                 lines.add(String.join("|", "  statute", enacted.statute().id().value().toString(),
                         enacted.statute().title(), day(enacted.enactedOn().value()), values));
             }
+            for (Proposal proposal : polity.proposals()) {
+                String votes = proposal.votes().stream()
+                        .map(vote -> actor(vote.voter()) + (vote.inFavour() ? "+" : "-"))
+                        .collect(Collectors.joining(","));
+                lines.add(String.join("|", "  proposal", proposal.id().value().toString(),
+                        proposal.change().key().id() + "=" + ParameterCatalog.encode(proposal.change()),
+                        actor(proposal.proposer()), day(proposal.openedOn().value()), votes));
+            }
             territory.territoryOf(polity.id()).stream()
                     .sorted(Comparator.comparing((ChunkCoord chunk) -> chunk.dimension().value())
                             .thenComparingInt(ChunkCoord::x).thenComparingInt(ChunkCoord::z))
@@ -68,6 +77,15 @@ public final class StateDump {
                 .sorted(Comparator.comparing((CurrencyTotals totals) -> totals.currency().code()))
                 .forEach(totals -> lines.add("currency|" + totals.currency().code() + "|supply=" + totals.supply().amount()
                         + "|cash=" + totals.cashInCirculation().amount()));
+        world.shops().shops().stream()
+                .map(shop -> "shop|" + shop.position() + "|" + actor(shop.owner()) + "|" + shop.commodity().id() + "|"
+                        + shop.price().amount() + shop.price().currency().code() + "|" + day(shop.openedOn().value()))
+                .sorted()
+                .forEach(lines::add);
+        world.market().stocks().stream()
+                .map(stock -> "stock|" + stock.commodity().id() + "|" + stock.quantity() + "|" + day(stock.asOf().value()))
+                .sorted()
+                .forEach(lines::add);
         return String.join("\n", lines) + "\n";
     }
 
@@ -80,7 +98,8 @@ public final class StateDump {
         Area area = plot.area();
         return String.join("|", "  plot", plot.id().value().toString(), plot.type().name(),
                 area.dimension().value() + "[" + area.minX() + "," + area.minZ() + ".." + area.maxX() + "," + area.maxZ() + "]",
-                actor(plot.holder()), day(plot.holderSince().value()));
+                actor(plot.holder()), day(plot.holderSince().value()))
+                + plot.askingPrice().map(price -> "|offer=" + price.amount() + price.currency().code()).orElse("");
     }
 
     private static String actor(ActorRef actor) {

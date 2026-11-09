@@ -12,4 +12,7 @@ public interface LandRepository {
     Optional<LandRegistry> findByPolity(PolityId polity);
 
     void save(LandRegistry registry);
+
+    /** Entfernt das Grundbuch einer aufgelösten Polity. */
+    void remove(PolityId polity);
 }

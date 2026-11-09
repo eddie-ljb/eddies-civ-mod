@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eddies Civ – Weltatlas</title>
+<style>
+:root {
+  --bg: #15130f; --panel: #1f1b15; --panel2: #29241c; --line: #3a3328; --text: #ece4d4; --muted: #a89c86;
+  --gold: #e0b04a; --green: #7bd88f; --red: #ff6b5e; --blue: #7fb2e5;
+  --radius: 10px; font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); }
+header { display: flex; align-items: center; gap: 16px; padding: 14px 24px; border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, #221d15, var(--bg)); position: sticky; top: 0; z-index: 5; flex-wrap: wrap; }
+header h1 { font-size: 20px; margin: 0; letter-spacing: .5px; }
+header h1 span { color: var(--gold); }
+nav { display: flex; gap: 4px; margin-left: auto; flex-wrap: wrap; }
+nav button { background: none; border: 1px solid transparent; color: var(--muted); padding: 8px 14px; border-radius: 8px;
+  cursor: pointer; font-size: 14px; }
+nav button.active, nav button:hover { color: var(--text); border-color: var(--line); background: var(--panel); }
+main { max-width: 1200px; margin: 0 auto; padding: 24px 16px 60px; }
+section { display: none; } section.active { display: block; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.stat { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+.stat .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .8px; }
+.stat .value { font-size: 26px; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.towns { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.town { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; border-top: 4px solid var(--c); }
+.town h3 { margin: 0 0 2px; font-size: 18px; } .town .tier { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 14px; }
+.kv dt { color: var(--muted); } .kv dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.members { margin-top: 10px; font-size: 13px; color: var(--muted); }
+.mapwrap { position: relative; background: #0f0d0a; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; height: 70vh; }
+canvas { display: block; width: 100%; height: 100%; cursor: grab; } canvas:active { cursor: grabbing; }
+.maptools { position: absolute; top: 12px; left: 12px; display: flex; gap: 8px; }
+.maptools select, .maptools button { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+.legend { position: absolute; bottom: 12px; left: 12px; background: rgba(31,27,21,.92); border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px 12px; font-size: 13px; max-height: 40%; overflow: auto; }
+.legend div { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
+.swatch { width: 12px; height: 12px; border-radius: 3px; background: var(--c); }
+.tooltip { position: absolute; pointer-events: none; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px;
+  padding: 6px 10px; font-size: 13px; display: none; white-space: nowrap; }
+.toolbar { display: flex; gap: 12px; margin-bottom: 14px; align-items: center; flex-wrap: wrap; }
+input, select { background: var(--panel); border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 9px 12px; font-size: 14px; }
+input:focus { outline: 2px solid var(--gold); outline-offset: -1px; }
+table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); font-size: 14px; }
+th { color: var(--muted); font-weight: 600; cursor: pointer; user-select: none; background: var(--panel2); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr:last-child td { border-bottom: none; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+.card h2 { margin: 0 0 12px; font-size: 18px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+button.primary { background: var(--gold); color: #1b1610; border: none; border-radius: 8px; padding: 10px 16px; font-weight: 600; cursor: pointer; }
+button.ghost { background: none; color: var(--muted); border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+button.yes { background: #23402b; color: var(--green); border: 1px solid #2f5a3a; border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+button.no { background: #4a2420; color: var(--red); border: 1px solid #6a312b; border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+.balance { font-size: 34px; color: var(--gold); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); } .msg { margin-top: 10px; font-size: 14px; white-space: pre-line; } .msg.ok { color: var(--green); } .msg.err { color: var(--red); }
+.proposal { border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-top: 10px; background: var(--panel2); }
+.bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; margin: 8px 0; display: flex; }
+.bar .y { background: var(--green); } .bar .n { background: var(--red); }
+.empty { color: var(--muted); padding: 30px; text-align: center; border: 1px dashed var(--line); border-radius: var(--radius); }
+code { background: var(--panel2); padding: 2px 6px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚑ Eddies <span>Civ</span></h1>
+  <span class="muted" id="day"></span>
+  <nav>
+    <button data-tab="overview" class="active">Übersicht</button>
+    <button data-tab="map">Karte</button>
+    <button data-tab="market">Markt</button>
+    <button data-tab="me">Mein Bereich</button>
+  </nav>
+</header>
+<main>
+  <section id="overview" class="active">
+    <div class="stats" id="stats"></div>
+    <div class="towns" id="towns"></div>
+  </section>
+  <section id="map">
+    <div class="mapwrap">
+      <canvas id="canvas"></canvas>
+      <div class="maptools">
+        <select id="dim">
+          <option value="minecraft:overworld">Oberwelt</option>
+          <option value="minecraft:the_nether">Nether</option>
+          <option value="minecraft:the_end">Ende</option>
+        </select>
+        <button id="recenter">Zentrieren</button>
+      </div>
+      <div class="legend" id="legend"></div>
+      <div class="tooltip" id="tooltip"></div>
+    </div>
+    <p class="muted">Ziehen zum Verschieben, Mausrad zum Zoomen. Jedes Feld ist ein Chunk (16 × 16 Blöcke); Außenposten sind gestreift, ★ markiert das Gemeindehaus.</p>
+  </section>
+  <section id="market">
+    <div class="toolbar">
+      <input id="search" placeholder="Ware suchen …" size="28">
+      <span class="muted" id="level"></span>
+    </div>
+    <table>
+      <thead><tr><th data-sort="name">Ware</th><th class="num" data-sort="stock">Lager</th><th class="num" data-sort="buyUnits">Kaufen</th><th class="num" data-sort="sell">Verkaufen</th></tr></thead>
+      <tbody id="offers"></tbody>
+    </table>
+    <p class="muted">Preise in Smaragden. Verkaufen und kaufen kannst du am Markt-Block im Spiel. Viel Lager drückt den Preis; das Lager schrumpft jeden Tag.</p>
+    <h2 style="margin-top:32px">Läden der Spieler</h2>
+    <table>
+      <thead><tr><th>Ware</th><th class="num">Preis je Stück</th><th>Inhaber</th><th>Ort</th></tr></thead>
+      <tbody id="shops"></tbody>
+    </table>
+  </section>
+  <section id="me">
+    <div id="login" class="card">
+      <h2>Anmelden</h2>
+      <p class="muted">Tippe im Spiel <code>/civ web</code> und gib den Code hier ein. Er gilt 10 Minuten.</p>
+      <div class="row"><input id="code" placeholder="Code, z. B. K7M2QX" maxlength="6" autocomplete="off"><button class="primary" id="loginbtn">Anmelden</button></div>
+      <div class="msg" id="loginmsg"></div>
+    </div>
+    <div id="account" style="display:none">
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <div><div class="muted" id="who"></div><div class="balance" id="balance"></div></div>
+          <button class="ghost" id="logout">Abmelden</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Überweisen</h2>
+        <div class="row">
+          <input id="to" placeholder="Spieler oder Gemeinde">
+          <input id="amount" placeholder="Betrag, z. B. 2,5" size="12">
+          <button class="primary" id="send">Überweisen</button>
+        </div>
+        <div class="msg" id="sendmsg"></div>
+      </div>
+      <div class="card">
+        <h2>Abstimmungen in deiner Gemeinde</h2>
+        <div id="proposals"></div>
+        <div class="msg" id="votemsg"></div>
+      </div>
+    </div>
+  </section>
+</main>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const el = (tag, props = {}, ...children) => {
+  const node = Object.assign(document.createElement(tag), props);
+  for (const child of children) node.append(child);
+  return node;
+};
+const palette = ["#e0b04a", "#7bd88f", "#7fb2e5", "#ff8f6b", "#c792ea", "#5fd3c6", "#f07178", "#c3e88d", "#ffcb6b", "#89ddff"];
+const colorOf = id => {
+  const index = world.towns.findIndex(t => t.id === id);
+  if (index >= 0) return palette[index % palette.length];
+  let h = 0; for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0; return palette[h % palette.length];
+};
+async function api(path, body) {
+  const options = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+  const response = await fetch(path, options);
+  const data = await response.json().catch(() => ({}));
+  return { ok: response.ok, status: response.status, data };
+}
+let world = { towns: [] };
+
+document.querySelectorAll("nav button").forEach(button => button.addEventListener("click", () => {
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("active", b === button));
+  document.querySelectorAll("section").forEach(s => s.classList.toggle("active", s.id === button.dataset.tab));
+  if (button.dataset.tab === "map") { resize(); loadMap().then(() => { if (!centered) { centered = true; recenter(); } }); }
+  if (button.dataset.tab === "market") loadMarket();
+  if (button.dataset.tab === "me") loadMe();
+}));
+
+async function loadWorld() {
+  const { ok, data } = await api("/api/world");
+  if (!ok) return;
+  world = data;
+  $("day").textContent = "Tag " + data.day;
+  const residents = data.towns.reduce((sum, t) => sum + t.members.length + t.villagers, 0);
+  const chunks = data.towns.reduce((sum, t) => sum + t.chunks, 0);
+  $("stats").replaceChildren(...[["Gemeinden", data.towns.length], ["Einwohner", residents], ["Beanspruchte Chunks", chunks],
+    ["Spieler bekannt", data.players], ["Preisniveau", data.priceLevel + " %"]].map(([label, value]) =>
+    el("div", { className: "stat" }, el("div", { className: "label", textContent: label }), el("div", { className: "value", textContent: value }))));
+  if (!data.towns.length) {
+    $("towns").replaceChildren(el("div", { className: "empty", textContent: "Noch keine Gemeinden. Stelle im Spiel ein Gemeindehaus auf!" }));
+    return;
+  }
+  $("towns").replaceChildren(...data.towns.map(t => {
+    const card = el("div", { className: "town" });
+    card.style.setProperty("--c", colorOf(t.id));
+    const kv = el("dl", { className: "kv" });
+    for (const [k, v] of [["Bürgermeister", t.mayor], ["Spieler", t.members.length], ["Dorfbewohner", t.villagers],
+      ["Gebiet", t.chunks + " / " + t.claimLimit + " Chunks"], ["Grundstücke", t.plots + (t.plotsForSale ? " (" + t.plotsForSale + " zu verkaufen)" : "")],
+      ["Kasse", t.treasury + " Smaragde"], ["Abstimmungen", t.votes], ["Gegründet", "Tag " + t.founded]]) {
+      kv.append(el("dt", { textContent: k }), el("dd", { textContent: v }));
+    }
+    card.append(el("h3", { textContent: t.name }), el("div", { className: "tier", textContent: t.tier }), kv,
+      el("div", { className: "members", textContent: t.members.join(", ") }));
+    return card;
+  }));
+}
+
+// Karte
+const canvas = $("canvas"), ctx = canvas.getContext("2d");
+let view = { x: 0, z: 0, scale: 12 }, mapData = { chunks: [], seats: [] }, drag = null, centered = false;
+function resize() {
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * devicePixelRatio; canvas.height = rect.height * devicePixelRatio;
+  draw();
+}
+window.addEventListener("resize", resize);
+async function loadMap() {
+  const { ok, data } = await api("/api/map?dim=" + encodeURIComponent($("dim").value));
+  if (!ok) return;
+  mapData = data;
+  const names = Object.fromEntries(world.towns.map(t => [t.id, t.name]));
+  const present = [...new Set(data.chunks.map(c => c.town))];
+  $("legend").replaceChildren(...(present.length ? present.map(id => {
+    const swatch = el("span", { className: "swatch" }); swatch.style.setProperty("--c", colorOf(id));
+    return el("div", {}, swatch, names[id] || "?");
+  }) : [el("div", { textContent: "Hier ist noch kein Land beansprucht." })]));
+  draw();
+}
+function recenter() {
+  if (!mapData.chunks.length) { view.x = 0; view.z = 0; draw(); return; }
+  view.x = mapData.chunks.reduce((s, c) => s + c.x, 0) / mapData.chunks.length;
+  view.z = mapData.chunks.reduce((s, c) => s + c.z, 0) / mapData.chunks.length;
+  const xs = mapData.chunks.map(c => c.x), zs = mapData.chunks.map(c => c.z);
+  const span = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs)) + 4;
+  const rect = canvas.getBoundingClientRect();
+  view.scale = Math.min(48, Math.max(2, Math.min(rect.width, rect.height) / span));
+  draw();
+}
+function toScreen(cx, cz) {
+  const s = view.scale * devicePixelRatio;
+  return [canvas.width / 2 + (cx - view.x) * s, canvas.height / 2 + (cz - view.z) * s, s];
+}
+function draw() {
+  ctx.fillStyle = "#0f0d0a"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const s = view.scale * devicePixelRatio;
+  if (view.scale >= 6) {
+    ctx.strokeStyle = "#1d1912"; ctx.lineWidth = 1; ctx.beginPath();
+    const startX = Math.floor(view.x - canvas.width / 2 / s), startZ = Math.floor(view.z - canvas.height / 2 / s);
+    for (let x = startX; x < startX + canvas.width / s + 2; x++) { const [px] = toScreen(x, 0); ctx.moveTo(px, 0); ctx.lineTo(px, canvas.height); }
+    for (let z = startZ; z < startZ + canvas.height / s + 2; z++) { const [, pz] = toScreen(0, z); ctx.moveTo(0, pz); ctx.lineTo(canvas.width, pz); }
+    ctx.stroke();
+  }
+  for (const c of mapData.chunks) {
+    const [px, pz] = toScreen(c.x, c.z);
+    ctx.fillStyle = colorOf(c.town);
+    ctx.globalAlpha = c.outpost ? .45 : .8;
+    ctx.fillRect(px, pz, s + .5, s + .5);
+    if (c.outpost && s > 8) {
+      ctx.globalAlpha = .9; ctx.strokeStyle = colorOf(c.town); ctx.beginPath();
+      ctx.moveTo(px, pz + s); ctx.lineTo(px + s, pz); ctx.stroke();
+    }
+  }
+  ctx.globalAlpha = 1;
+  const [ox, oz] = toScreen(0, 0);
+  ctx.fillStyle = "#a89c86"; ctx.fillRect(ox - 2, oz - 2, 4, 4);
+  ctx.font = (12 * devicePixelRatio) + "px system-ui"; ctx.textAlign = "center";
+  for (const seat of mapData.seats) {
+    const [px, pz] = toScreen(seat.x / 16, seat.z / 16);
+    ctx.fillStyle = "#fff"; ctx.fillText("★", px, pz + 4 * devicePixelRatio);
+    if (view.scale >= 5) { ctx.fillStyle = "#ece4d4"; ctx.fillText(seat.name, px, pz - 8 * devicePixelRatio); }
+  }
+}
+canvas.addEventListener("mousedown", e => drag = { x: e.clientX, y: e.clientY, vx: view.x, vz: view.z });
+window.addEventListener("mouseup", () => drag = null);
+canvas.addEventListener("mousemove", e => {
+  if (drag) {
+    view.x = drag.vx - (e.clientX - drag.x) / view.scale; view.z = drag.vz - (e.clientY - drag.y) / view.scale; draw();
+  }
+  const rect = canvas.getBoundingClientRect();
+  const cx = Math.floor(view.x + (e.clientX - rect.left - rect.width / 2) / view.scale);
+  const cz = Math.floor(view.z + (e.clientY - rect.top - rect.height / 2) / view.scale);
+  const hit = mapData.chunks.find(c => c.x === cx && c.z === cz);
+  const name = hit ? (world.towns.find(t => t.id === hit.town) || {}).name : "Wildnis";
+  const tip = $("tooltip");
+  tip.textContent = name + (hit && hit.outpost ? " (Außenposten)" : "") + " · Chunk " + cx + ", " + cz + " · Blöcke " + cx * 16 + ", " + cz * 16;
+  tip.style.display = "block"; tip.style.left = (e.clientX - rect.left + 14) + "px"; tip.style.top = (e.clientY - rect.top + 14) + "px";
+});
+canvas.addEventListener("mouseleave", () => $("tooltip").style.display = "none");
+canvas.addEventListener("wheel", e => { e.preventDefault(); view.scale = Math.min(48, Math.max(1, view.scale * (e.deltaY < 0 ? 1.15 : 1 / 1.15))); draw(); }, { passive: false });
+$("dim").addEventListener("change", () => loadMap().then(recenter));
+$("recenter").addEventListener("click", recenter);
+
+// Markt
+let offers = [], sortKey = "name", sortDir = 1;
+async function loadMarket() {
+  const { ok, data } = await api("/api/market");
+  if (!ok) return;
+  offers = data.offers; $("level").textContent = "Preisniveau " + data.priceLevel + " %"; renderOffers();
+  const shops = await api("/api/shops");
+  if (shops.ok) shopList = shops.data.shops;
+  renderOffers();
+}
+let shopList = [];
+function renderOffers() {
+  const q = $("search").value.toLowerCase();
+  const rows = offers.filter(o => o.name.toLowerCase().includes(q) || o.id.includes(q))
+    .sort((a, b) => (a[sortKey] > b[sortKey] ? 1 : a[sortKey] < b[sortKey] ? -1 : 0) * sortDir);
+  $("offers").replaceChildren(...(rows.length ? rows.map(o => el("tr", {},
+    el("td", { textContent: o.name, title: o.id }), el("td", { className: "num", textContent: o.stock }),
+    el("td", { className: "num", textContent: o.buy }), el("td", { className: "num", textContent: o.sell })))
+    : [el("tr", {}, el("td", { colSpan: 4, className: "muted", textContent: offers.length ? "Nichts gefunden." : "Das Lager ist leer. Verkaufe Waren am Markt-Block, um es zu füllen." }))]));
+  const shopRows = shopList.filter(s => s.name.toLowerCase().includes(q) || s.id.includes(q)).sort((a, b) => a.priceUnits - b.priceUnits);
+  $("shops").replaceChildren(...(shopRows.length ? shopRows.map(s => el("tr", {},
+    el("td", { textContent: s.name, title: s.id }), el("td", { className: "num", textContent: s.price }),
+    el("td", { textContent: s.owner }), el("td", { textContent: (s.town ? s.town + " · " : "") + s.x + ", " + s.y + ", " + s.z })))
+    : [el("tr", {}, el("td", { colSpan: 4, className: "muted", textContent: "Keine Läden gefunden. Eröffne einen mit /civ laden eroeffnen <Preis>." }))]));
+}
+$("search").addEventListener("input", renderOffers);
+document.querySelectorAll("th[data-sort]").forEach(th => th.addEventListener("click", () => {
+  sortDir = sortKey === th.dataset.sort ? -sortDir : 1; sortKey = th.dataset.sort; renderOffers();
+}));
+
+// Mein Bereich
+function message(id, text, ok) { const m = $(id); m.textContent = text; m.className = "msg " + (ok ? "ok" : "err"); }
+async function loadMe() {
+  const { ok, data } = await api("/api/me");
+  $("login").style.display = ok ? "none" : "block";
+  $("account").style.display = ok ? "block" : "none";
+  if (!ok) return;
+  $("who").textContent = data.name + (data.town ? " · " + data.town : " · ohne Gemeinde");
+  $("balance").textContent = data.balance + " Smaragde";
+  const list = $("proposals");
+  if (!data.town) { list.replaceChildren(el("div", { className: "empty", textContent: "Tritt einer Gemeinde bei, um abzustimmen." })); return; }
+  if (!data.proposals.length) { list.replaceChildren(el("div", { className: "empty", textContent: "Gerade läuft keine Abstimmung." })); return; }
+  list.replaceChildren(...data.proposals.map(p => {
+    const bar = el("div", { className: "bar" });
+    const y = el("div", { className: "y" }), n = el("div", { className: "n" });
+    y.style.width = (100 * p.inFavour / Math.max(1, p.electorate)) + "%"; n.style.width = (100 * p.against / Math.max(1, p.electorate)) + "%";
+    bar.append(y, n);
+    const vote = yes => async () => {
+      const r = await api("/api/vote", { number: p.number, yes });
+      message("votemsg", r.data.message || r.data.error, r.ok); loadMe();
+    };
+    return el("div", { className: "proposal" },
+      el("strong", { textContent: "Nr. " + p.number + ": " + p.law + " → " + p.value }),
+      el("div", { className: "muted", textContent: "Beantragt von " + p.proposer + " · Auszählung an Tag " + p.decidedOn
+        + (p.ownVote ? " · deine Stimme: " + (p.ownVote === "yes" ? "dafür" : "dagegen") : "") }),
+      bar,
+      el("div", { className: "muted", textContent: p.inFavour + " dafür, " + p.against + " dagegen von " + p.electorate + " Bürgern" }),
+      el("div", { className: "row", style: "margin-top:8px" }, el("button", { className: "yes", textContent: "Dafür", onclick: vote(true) }),
+        el("button", { className: "no", textContent: "Dagegen", onclick: vote(false) })));
+  }));
+}
+$("loginbtn").addEventListener("click", async () => {
+  const r = await api("/api/login", { code: $("code").value });
+  if (r.ok) { $("code").value = ""; message("loginmsg", "", true); loadMe(); } else message("loginmsg", r.data.error, false);
+});
+$("code").addEventListener("keydown", e => { if (e.key === "Enter") $("loginbtn").click(); });
+$("logout").addEventListener("click", async () => { await api("/api/logout", {}); loadMe(); });
+$("send").addEventListener("click", async () => {
+  const r = await api("/api/transfer", { to: $("to").value, amount: $("amount").value });
+  message("sendmsg", r.data.message || r.data.error, r.ok); if (r.ok) { $("amount").value = ""; loadMe(); }
+});
+
+loadWorld();
+setInterval(loadWorld, 30000);
+</script>
+</body>
+</html>

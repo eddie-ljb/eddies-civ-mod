@@ -12,6 +12,7 @@ public final class InMemoryRepositories {
 
     public static Repositories create() {
         return new Repositories(new InMemoryPolityRepository(), new InMemoryTerritoryRepository(),
-                new InMemoryLandRepository(), new InMemoryLedgerRepository());
+                new InMemoryLandRepository(), new InMemoryLedgerRepository(),
+                new InMemoryMarketRepository(), new InMemoryShopRepository());
     }
 }

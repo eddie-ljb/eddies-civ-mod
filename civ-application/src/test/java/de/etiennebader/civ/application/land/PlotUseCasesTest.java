@@ -18,6 +18,8 @@ import de.etiennebader.civ.domain.territory.DimensionId;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.Optional;
+
 import static de.etiennebader.civ.application.ApplicationFixture.DAY;
 import static de.etiennebader.civ.application.ApplicationFixture.EMERALD;
 import static de.etiennebader.civ.application.ApplicationFixture.emeralds;
@@ -73,6 +75,37 @@ class PlotUseCasesTest {
         assertEquals(ErrorCode.INVALID_EMBASSY_HOLDER,
                 assertThrows(DomainException.class, () -> sell(embassy, nordhainActor, bob, 100)).code());
         assertEquals(emeralds(500), fixture.app.queries().ledger().balanceOf(bob, EMERALD));
+    }
+
+    @Test
+    @DisplayName("Angebot und Kauf: Käufer zahlt den geforderten Preis an den Inhaber")
+    void buysOfferedPlot() {
+        PlotId plot = createPlot(PlotType.RESIDENTIAL);
+        deposit(bob, 500);
+        fixture.app.offerPlot().execute(new OfferPlot.Command(nordhain, plot, nordhainActor,
+                Optional.of(emeralds(120)), DAY));
+
+        assertEquals(emeralds(120), fixture.app.buyPlot().execute(new BuyPlot.Command(nordhain, plot, bob, DAY)));
+
+        assertTrue(land().plot(plot).orElseThrow().isHeldBy(bob));
+        assertTrue(land().plot(plot).orElseThrow().askingPrice().isEmpty());
+        assertEquals(emeralds(380), fixture.app.queries().ledger().balanceOf(bob, EMERALD));
+        assertEquals(emeralds(120), fixture.app.queries().ledger().balanceOf(nordhainActor, EMERALD));
+    }
+
+    @Test
+    @DisplayName("Kauf ohne Angebot → PLOT_NOT_FOR_SALE; zu wenig Geld → INSUFFICIENT_FUNDS")
+    void rejectsInvalidPurchase() {
+        PlotId plot = createPlot(PlotType.RESIDENTIAL);
+        deposit(bob, 50);
+
+        assertEquals(ErrorCode.PLOT_NOT_FOR_SALE, assertThrows(DomainException.class,
+                () -> fixture.app.buyPlot().execute(new BuyPlot.Command(nordhain, plot, bob, DAY))).code());
+        fixture.app.offerPlot().execute(new OfferPlot.Command(nordhain, plot, nordhainActor,
+                Optional.of(emeralds(120)), DAY));
+        assertEquals(ErrorCode.INSUFFICIENT_FUNDS, assertThrows(DomainException.class,
+                () -> fixture.app.buyPlot().execute(new BuyPlot.Command(nordhain, plot, bob, DAY))).code());
+        assertTrue(land().plot(plot).orElseThrow().isHeldBy(nordhainActor));
     }
 
     @Test

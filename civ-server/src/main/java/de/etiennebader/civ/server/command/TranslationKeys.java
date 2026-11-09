@@ -1,5 +1,6 @@
 package de.etiennebader.civ.server.command;
 
+import de.etiennebader.civ.domain.land.PlotType;
 import de.etiennebader.civ.domain.law.ParameterKey;
 import de.etiennebader.civ.domain.law.StandardParameters;
 import de.etiennebader.civ.domain.polity.SettlementTier;
@@ -21,6 +22,8 @@ public final class TranslationKeys {
     private static final String PREFIX = "eddies-civ-mod.";
     /** Format eines Geldbetrags, z. B. „5 Smaragde“. */
     public static final String MONEY = PREFIX + "money";
+    /** Zahl mit zwei Nachkommastellen, z. B. „12,05“; das Dezimalzeichen hängt von der Sprache ab. */
+    public static final String MONEY_AMOUNT = PREFIX + "money_amount";
 
     private TranslationKeys() {
     }
@@ -47,16 +50,22 @@ public final class TranslationKeys {
         return PREFIX + "currency." + currency.code().toLowerCase(Locale.ROOT);
     }
 
+    public static String plotType(PlotType type) {
+        return PREFIX + "plot_type." + type.name().toLowerCase(Locale.ROOT);
+    }
+
     /** Alle Schlüssel, die jede Sprachdatei übersetzen muss. */
     public static List<String> all() {
         return Stream.of(
                         Arrays.stream(ErrorCode.values()).map(ErrorCode::translationKey),
                         Arrays.stream(MessageKey.values()).map(MessageKey::key),
+                        Arrays.stream(GuiKeys.values()).map(GuiKeys::key),
                         Arrays.stream(SettlementTier.values()).map(TranslationKeys::tier),
                         Arrays.stream(ClaimType.values()).map(TranslationKeys::claimType),
+                        Arrays.stream(PlotType.values()).map(TranslationKeys::plotType),
                         StandardParameters.all().stream().map(TranslationKeys::law),
                         Stream.of(yesNo(true), yesNo(false)),
-                        Stream.of(currency(CurrencyId.EMERALD), MONEY))
+                        Stream.of(currency(CurrencyId.EMERALD), MONEY, MONEY_AMOUNT))
                 .flatMap(keys -> keys)
                 .sorted()
                 .toList();

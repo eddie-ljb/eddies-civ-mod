@@ -8,10 +8,14 @@ import de.etiennebader.civ.domain.economy.LedgerEvent;
 import de.etiennebader.civ.domain.economy.MoneyBurned;
 import de.etiennebader.civ.domain.economy.MoneyMinted;
 import de.etiennebader.civ.domain.land.LandEvent;
+import de.etiennebader.civ.domain.market.Commodity;
+import de.etiennebader.civ.domain.market.MarketEvent;
 import de.etiennebader.civ.domain.polity.PolityEvent;
 import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.DomainEvent;
 import de.etiennebader.civ.domain.shared.PolityId;
+import de.etiennebader.civ.domain.shop.ShopEvent;
+import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.domain.territory.ChunkCoord;
 import de.etiennebader.civ.domain.territory.TerritoryEvent;
 
@@ -34,6 +38,8 @@ public final class ChangeTracker implements DomainEventPublisher {
     private final Set<PlotKey> plots = new LinkedHashSet<>();
     private final Set<AccountKey> accounts = new LinkedHashSet<>();
     private final Set<CurrencyId> currencies = new LinkedHashSet<>();
+    private final Set<Commodity> commodities = new LinkedHashSet<>();
+    private final Set<BlockPosition> shops = new LinkedHashSet<>();
     private final List<DomainEvent> events = new ArrayList<>();
 
     @Override
@@ -50,6 +56,8 @@ public final class ChangeTracker implements DomainEventPublisher {
             case TerritoryEvent territoryEvent -> chunks.add(territoryEvent.chunk());
             case LandEvent landEvent -> plots.add(new PlotKey(landEvent.polity(), landEvent.plot()));
             case LedgerEvent ledgerEvent -> trackLedger(ledgerEvent);
+            case MarketEvent marketEvent -> commodities.add(marketEvent.commodity());
+            case ShopEvent shopEvent -> shops.add(shopEvent.position());
             default -> {
                 // Events anderer Bereiche ändern keinen gespeicherten Zustand, landen aber im Audit-Log.
             }
@@ -89,12 +97,14 @@ public final class ChangeTracker implements DomainEventPublisher {
 
     /** Liefert alle Änderungen seit dem letzten Aufruf und beginnt von vorn. */
     public ChangeSet takeChanges() {
-        ChangeSet changes = new ChangeSet(polities, chunks, plots, accounts, currencies, events);
+        ChangeSet changes = new ChangeSet(polities, chunks, plots, accounts, currencies, commodities, shops, events);
         polities.clear();
         chunks.clear();
         plots.clear();
         accounts.clear();
         currencies.clear();
+        commodities.clear();
+        shops.clear();
         events.clear();
         return changes;
     }
@@ -109,6 +119,8 @@ public final class ChangeTracker implements DomainEventPublisher {
         plots.addAll(failed.plots());
         accounts.addAll(failed.accounts());
         currencies.addAll(failed.currencies());
+        commodities.addAll(failed.commodities());
+        shops.addAll(failed.shops());
         events.addAll(0, failed.events());
     }
 }

@@ -5,11 +5,13 @@ import de.etiennebader.civ.domain.actor.PolityRef;
 import de.etiennebader.civ.domain.law.EnactedStatute;
 import de.etiennebader.civ.domain.law.LawBook;
 import de.etiennebader.civ.domain.law.LawView;
+import de.etiennebader.civ.domain.law.ParameterValue;
 import de.etiennebader.civ.domain.law.Statute;
 import de.etiennebader.civ.domain.shared.AggregateRoot;
 import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.PolityId;
+import de.etiennebader.civ.domain.shared.ProposalId;
 import de.etiennebader.civ.domain.shared.StatuteId;
 import de.etiennebader.civ.domain.territory.BlockPosition;
 
@@ -31,11 +33,12 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
     private final PolityId id;
     private final PolityName name;
     private final PolityKind kind;
-    private final SettlementTier tier;
+    private SettlementTier tier;
     private final CurrencyId currency;
     private final Day foundedOn;
-    private final Optional<BlockPosition> seat;
+    private Optional<BlockPosition> seat;
     private final Map<ActorRef, Membership> members = new LinkedHashMap<>();
+    private final Map<ProposalId, Proposal> proposals = new LinkedHashMap<>();
     private final LawBook lawBook = new LawBook();
 
     private Polity(PolityId id, PolityName name, PolityKind kind, SettlementTier tier,
@@ -78,7 +81,19 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
     public static Polity restore(PolityId id, PolityName name, PolityKind kind, SettlementTier tier, CurrencyId currency,
                                  Day foundedOn, Optional<BlockPosition> seat, List<Membership> members,
                                  List<EnactedStatute> statutes) {
+        return restore(id, name, kind, tier, currency, foundedOn, seat, members, statutes, List.of());
+    }
+
+    /**
+     * Wie oben, zusätzlich mit offenen Abstimmungen.
+     *
+     * @throws IllegalArgumentException wenn die Daten keine gültige Polity ergeben
+     */
+    public static Polity restore(PolityId id, PolityName name, PolityKind kind, SettlementTier tier, CurrencyId currency,
+                                 Day foundedOn, Optional<BlockPosition> seat, List<Membership> members,
+                                 List<EnactedStatute> statutes, List<Proposal> proposals) {
         Objects.requireNonNull(members, "members");
+        Objects.requireNonNull(proposals, "proposals");
         Objects.requireNonNull(statutes, "statutes");
         Polity polity = new Polity(id, name, kind, tier, currency, foundedOn, seat);
         if (members.isEmpty()) {
@@ -93,6 +108,7 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
             }
         }
         statutes.forEach(enacted -> polity.lawBook.enact(enacted.statute(), enacted.enactedOn()));
+        proposals.forEach(proposal -> polity.proposals.put(proposal.id(), proposal));
         return polity;
     }
 
@@ -129,6 +145,106 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
         }
         members.remove(member);
         raise(new MemberLeft(id, member, day));
+    }
+
+    /**
+     * Eröffnet eine Abstimmung über eine Regelung.
+     *
+     * @throws NotAMemberException         wenn der Antragsteller kein Mitglied ist
+     * @throws ProposalAlreadyOpenException wenn über diese Regelung schon abgestimmt wird
+     */
+    public void openProposal(ProposalId proposalId, ParameterValue<?> change, ActorRef proposer, Day day) {
+        Objects.requireNonNull(proposalId, "proposalId");
+        Objects.requireNonNull(change, "change");
+        Objects.requireNonNull(day, "day");
+        if (!isMember(proposer)) {
+            throw new NotAMemberException(proposer);
+        }
+        if (proposals.containsKey(proposalId)) {
+            throw new IllegalArgumentException("Abstimmung existiert bereits: " + proposalId);
+        }
+        String parameter = change.key().id();
+        if (proposals.values().stream().anyMatch(open -> open.change().key().id().equals(parameter))) {
+            throw new ProposalAlreadyOpenException(parameter);
+        }
+        proposals.put(proposalId, new Proposal(proposalId, change, proposer, day, List.of()));
+        raise(new ProposalOpened(id, proposalId, parameter, proposer, day));
+    }
+
+    /**
+     * Gibt eine Stimme ab oder ändert sie.
+     *
+     * @throws UnknownProposalException wenn es die Abstimmung nicht gibt
+     * @throws NotAMemberException      wenn der Wähler kein Mitglied ist
+     */
+    public void vote(ProposalId proposalId, ActorRef voter, boolean inFavour, Day day) {
+        Objects.requireNonNull(day, "day");
+        Proposal proposal = requireProposal(proposalId);
+        if (!isMember(voter)) {
+            throw new NotAMemberException(voter);
+        }
+        proposals.put(proposalId, proposal.with(new Vote(voter, inFavour)));
+        raise(new VoteCast(id, proposalId, voter, inFavour, day));
+    }
+
+    /**
+     * Beendet eine Abstimmung. Ob die Änderung dann gilt, entscheidet der Aufrufer.
+     *
+     * @return die beendete Abstimmung
+     * @throws UnknownProposalException wenn es die Abstimmung nicht gibt
+     */
+    public Proposal closeProposal(ProposalId proposalId, boolean accepted, Day day) {
+        Objects.requireNonNull(day, "day");
+        Proposal proposal = requireProposal(proposalId);
+        proposals.remove(proposalId);
+        raise(new ProposalClosed(id, proposalId, accepted, day));
+        return proposal;
+    }
+
+    @Override
+    public Collection<Proposal> proposals() {
+        return List.copyOf(proposals.values());
+    }
+
+    private Proposal requireProposal(ProposalId proposalId) {
+        Objects.requireNonNull(proposalId, "proposalId");
+        Proposal proposal = proposals.get(proposalId);
+        if (proposal == null) {
+            throw new UnknownProposalException(proposalId);
+        }
+        return proposal;
+    }
+
+    /** Verlegt den Sitz, z. B. weil das Gemeindehaus an anderer Stelle neu errichtet wurde. */
+    public void moveSeat(BlockPosition newSeat, Day day) {
+        Objects.requireNonNull(newSeat, "newSeat");
+        Objects.requireNonNull(day, "day");
+        BlockPosition previous = seat.orElse(null);
+        seat = Optional.of(newSeat);
+        raise(new SeatMoved(id, Optional.ofNullable(previous), newSeat, day));
+    }
+
+    /** Löst die Polity auf. Gebiet, Grundstücke und Kasse räumt der Aufrufer vorher ab. */
+    public void dissolve(Day day) {
+        Objects.requireNonNull(day, "day");
+        raise(new PolityDissolved(id, name, day));
+    }
+
+    /**
+     * Stuft die Siedlung auf- oder ab, z. B. nach ihrer Einwohnerzahl.
+     *
+     * @return ob sich die Stufe geändert hat
+     */
+    public boolean changeTier(SettlementTier newTier, Day day) {
+        Objects.requireNonNull(newTier, "newTier");
+        Objects.requireNonNull(day, "day");
+        if (newTier == tier) {
+            return false;
+        }
+        SettlementTier previous = tier;
+        tier = newTier;
+        raise(new TierChanged(id, previous, newTier, day));
+        return true;
     }
 
     /**

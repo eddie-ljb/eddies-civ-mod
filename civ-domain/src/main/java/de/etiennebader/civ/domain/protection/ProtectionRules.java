@@ -59,6 +59,23 @@ public final class ProtectionRules {
         return deny(DenialReason.FOREIGN_TERRITORY, polity, polity.asActor());
     }
 
+    /**
+     * Ob eine Naturgewalt an einem Block wirken darf: in der Wildnis immer, im Gemeindegebiet nur, wenn das
+     * Recht der Gemeinde es erlaubt.
+     */
+    public boolean allows(Hazard hazard, BlockPosition position, ProtectionContext context) {
+        Objects.requireNonNull(hazard, "hazard");
+        Objects.requireNonNull(position, "position");
+        Objects.requireNonNull(context, "context");
+        Optional<Claim> claim = context.territory().claimAt(position.chunk());
+        if (claim.isEmpty()) {
+            return true;
+        }
+        return context.polity(claim.get().polity())
+                .map(polity -> polity.laws().valueOf(hazard.permission()))
+                .orElse(true);
+    }
+
     private static Optional<Denial> checkForeignPlot(ActorRef actor, ProtectedAction action, PolityView polity,
                                                      ActorRef holder, ProtectionContext context) {
         if (isHolder(actor, holder, context)) {

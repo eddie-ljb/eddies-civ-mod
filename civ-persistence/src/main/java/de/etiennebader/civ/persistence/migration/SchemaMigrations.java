@@ -11,7 +11,11 @@ public final class SchemaMigrations {
     private static final List<String> FILES = List.of(
             "V001__initial_schema.sql",
             "V002__calendar_and_players.sql",
-            "V003__polity_seat.sql");
+            "V003__polity_seat.sql",
+            "V004__market.sql",
+            "V005__plot_offer.sql",
+            "V006__proposals.sql",
+            "V007__shops.sql");
 
     private SchemaMigrations() {
     }

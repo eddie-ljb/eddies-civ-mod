@@ -3,6 +3,7 @@ package de.etiennebader.civ.application.polity;
 import de.etiennebader.civ.application.query.WorldQueries;
 import de.etiennebader.civ.application.support.Aggregates;
 import de.etiennebader.civ.application.support.ClaimContexts;
+import de.etiennebader.civ.application.support.ClaimWeighting;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.land.LandRegistry;
 import de.etiennebader.civ.domain.polity.Polity;
@@ -44,9 +45,15 @@ public final class FoundPolity {
     private final Aggregates aggregates;
     private final IdGenerator ids;
     private final ClaimPolicy claimPolicy;
+    private final ClaimWeighting weighting;
     private final MunicipalMembershipRule membershipRule;
 
     public FoundPolity(Aggregates aggregates, IdGenerator ids, ClaimPolicy claimPolicy) {
+        this(aggregates, ids, claimPolicy, ClaimWeighting.ALL_MEMBERS);
+    }
+
+    public FoundPolity(Aggregates aggregates, IdGenerator ids, ClaimPolicy claimPolicy, ClaimWeighting weighting) {
+        this.weighting = Objects.requireNonNull(weighting, "weighting");
         this.aggregates = Objects.requireNonNull(aggregates, "aggregates");
         this.ids = Objects.requireNonNull(ids, "ids");
         this.claimPolicy = Objects.requireNonNull(claimPolicy, "claimPolicy");
@@ -66,7 +73,7 @@ public final class FoundPolity {
         Polity polity = Polity.found(id, command.name(), command.founder(), command.currency(), command.seat(),
                 command.day());
         TerritoryRegistry territory = aggregates.territory();
-        territory.claim(ClaimContexts.forPolity(polity, command.firstChunk(), ClaimType.CORE), claimPolicy, command.day());
+        territory.claim(ClaimContexts.forPolity(polity, command.firstChunk(), ClaimType.CORE, weighting), claimPolicy, command.day());
 
         aggregates.commit(polity);
         aggregates.commit(territory);

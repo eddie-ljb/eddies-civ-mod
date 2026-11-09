@@ -1,6 +1,7 @@
 package de.etiennebader.civ.domain.polity;
 
 import de.etiennebader.civ.domain.actor.ActorRef;
+import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.actor.PolityRef;
 import de.etiennebader.civ.domain.law.LawView;
 import de.etiennebader.civ.domain.shared.CurrencyId;
@@ -43,4 +44,16 @@ public interface PolityView {
     LawView laws();
 
     PolityRef asActor();
+
+    /** Offene Abstimmungen in Reihenfolge ihrer Eröffnung. */
+    Collection<Proposal> proposals();
+
+    /**
+     * Wie viele Mitglieder für die Größe des Gebiets zählen: Spieler und Gemeinden voll, Personen wie Dorfbewohner
+     * zu einem Viertel (abgerundet). So lässt sich Gebiet nicht allein durch Dorfbewohner-Zucht vergrößern.
+     */
+    default int claimWeight() {
+        int persons = (int) members().stream().filter(membership -> membership.member() instanceof PersonRef).count();
+        return members().size() - persons + persons / 4;
+    }
 }

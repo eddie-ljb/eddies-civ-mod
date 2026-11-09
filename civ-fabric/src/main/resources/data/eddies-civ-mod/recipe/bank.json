@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "GIG",
+    "IEI",
+    "SSS"
+  ],
+  "key": {
+    "G": "minecraft:gold_ingot",
+    "I": "minecraft:iron_ingot",
+    "E": "minecraft:emerald",
+    "S": "minecraft:stone_bricks"
+  },
+  "result": {
+    "id": "eddies-civ-mod:bank",
+    "count": 1
+  }
+}

@@ -25,4 +25,9 @@ public final class InMemoryLandRepository implements LandRepository {
     public void save(LandRegistry registry) {
         registries.put(registry.owner(), registry);
     }
+
+    @Override
+    public void remove(PolityId polity) {
+        registries.remove(Objects.requireNonNull(polity, "polity"));
+    }
 }

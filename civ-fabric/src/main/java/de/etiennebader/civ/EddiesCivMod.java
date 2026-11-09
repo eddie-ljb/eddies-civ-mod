@@ -2,8 +2,10 @@ package de.etiennebader.civ;
 
 import de.etiennebader.civ.fabric.CivCommandTree;
 import de.etiennebader.civ.fabric.CivServerHost;
+import de.etiennebader.civ.fabric.PlotWand;
 import de.etiennebader.civ.fabric.ProtectionListener;
 import de.etiennebader.civ.fabric.TownHallPlacement;
+import de.etiennebader.civ.fabric.WorldHooks;
 import de.etiennebader.civ.fabric.content.CivContent;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -26,8 +28,10 @@ public class EddiesCivMod implements ModInitializer {
     public void onInitialize() {
         CivServerHost host = new CivServerHost();
         host.register();
+        WorldHooks.install(host);
         CivContent content = CivContent.register(new TownHallPlacement(host));
-        new ProtectionListener(host, content.townHall()).register();
+        new PlotWand(host, content).register();
+        new ProtectionListener(host, content).register();
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
                 new CivCommandTree(host).register(dispatcher));
         LOGGER.info("Eddies Civ Mod initialisiert");

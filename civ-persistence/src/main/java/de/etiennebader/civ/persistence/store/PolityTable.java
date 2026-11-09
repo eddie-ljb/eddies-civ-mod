@@ -10,10 +10,13 @@ import de.etiennebader.civ.domain.polity.Polity;
 import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.polity.PolityName;
 import de.etiennebader.civ.domain.polity.PolitySnapshot;
+import de.etiennebader.civ.domain.polity.Proposal;
 import de.etiennebader.civ.domain.polity.SettlementTier;
+import de.etiennebader.civ.domain.polity.Vote;
 import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.PolityId;
+import de.etiennebader.civ.domain.shared.ProposalId;
 import de.etiennebader.civ.domain.shared.StatuteId;
 import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.domain.territory.DimensionId;
@@ -68,6 +71,7 @@ final class PolityTable {
         deleteChildren(connection, id);
         insertMembers(connection, id, polity.members());
         insertStatutes(connection, id, polity.statutes());
+        insertProposals(connection, id, polity.proposals());
     }
 
     private static void bindSeat(PreparedStatement statement, int firstIndex, Optional<BlockPosition> seat)
@@ -102,7 +106,7 @@ final class PolityTable {
     }
 
     private static void deleteChildren(Connection connection, String polityId) throws SQLException {
-        for (String table : List.of("membership", "statute")) {
+        for (String table : List.of("membership", "statute", "proposal")) {
             try (PreparedStatement delete = connection.prepareStatement("DELETE FROM " + table + " WHERE polity_id = ?")) {
                 delete.setString(1, polityId);
                 delete.executeUpdate();
@@ -155,10 +159,72 @@ final class PolityTable {
         }
     }
 
+    private static void insertProposals(Connection connection, String polityId, List<Proposal> proposals)
+            throws SQLException {
+        try (PreparedStatement insertProposal = connection.prepareStatement("""
+                INSERT INTO proposal (id, polity_id, position, parameter, value, proposer_kind, proposer_id, opened_on)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""");
+             PreparedStatement insertVote = connection.prepareStatement(
+                     "INSERT INTO proposal_vote (proposal_id, position, voter_kind, voter_id, in_favour) VALUES (?, ?, ?, ?, ?)")) {
+            int position = 0;
+            for (Proposal proposal : proposals) {
+                String proposalId = proposal.id().value().toString();
+                insertProposal.setString(1, proposalId);
+                insertProposal.setString(2, polityId);
+                insertProposal.setInt(3, position++);
+                insertProposal.setString(4, proposal.change().key().id());
+                insertProposal.setString(5, ParameterCatalog.encode(proposal.change()));
+                insertProposal.setString(6, ActorCodec.kindOf(proposal.proposer()));
+                insertProposal.setString(7, proposal.proposer().uuid().toString());
+                insertProposal.setLong(8, proposal.openedOn().value());
+                insertProposal.addBatch();
+                int votePosition = 0;
+                for (Vote vote : proposal.votes()) {
+                    insertVote.setString(1, proposalId);
+                    insertVote.setInt(2, votePosition++);
+                    insertVote.setString(3, ActorCodec.kindOf(vote.voter()));
+                    insertVote.setString(4, vote.voter().uuid().toString());
+                    insertVote.setInt(5, vote.inFavour() ? 1 : 0);
+                    insertVote.addBatch();
+                }
+            }
+            insertProposal.executeBatch();
+            insertVote.executeBatch();
+        }
+    }
+
+    private Map<String, List<Proposal>> loadProposals(Connection connection) throws SQLException {
+        Map<String, List<Vote>> votes = new HashMap<>();
+        try (PreparedStatement select = connection.prepareStatement(
+                "SELECT proposal_id, voter_kind, voter_id, in_favour FROM proposal_vote ORDER BY proposal_id, position");
+             ResultSet rows = select.executeQuery()) {
+            while (rows.next()) {
+                votes.computeIfAbsent(rows.getString("proposal_id"), ignored -> new ArrayList<>())
+                        .add(new Vote(ActorCodec.decode(rows.getString("voter_kind"), rows.getString("voter_id")),
+                                rows.getInt("in_favour") == 1));
+            }
+        }
+        Map<String, List<Proposal>> proposals = new HashMap<>();
+        try (PreparedStatement select = connection.prepareStatement("""
+                SELECT id, polity_id, parameter, value, proposer_kind, proposer_id, opened_on
+                FROM proposal ORDER BY polity_id, position""");
+             ResultSet rows = select.executeQuery()) {
+            while (rows.next()) {
+                String id = rows.getString("id");
+                proposals.computeIfAbsent(rows.getString("polity_id"), ignored -> new ArrayList<>()).add(new Proposal(
+                        new ProposalId(UUID.fromString(id)), catalog.decode(rows.getString("parameter"), rows.getString("value")),
+                        ActorCodec.decode(rows.getString("proposer_kind"), rows.getString("proposer_id")),
+                        Day.of(rows.getLong("opened_on")), votes.getOrDefault(id, List.of())));
+            }
+        }
+        return proposals;
+    }
+
     /** Alle Polities in Gründungsreihenfolge. */
     List<Polity> loadAll(Connection connection) throws SQLException {
         Map<String, List<Membership>> members = loadMembers(connection);
         Map<String, List<EnactedStatute>> statutes = loadStatutes(connection);
+        Map<String, List<Proposal>> proposals = loadProposals(connection);
         List<Polity> polities = new ArrayList<>();
         try (PreparedStatement select = connection.prepareStatement(
                 """
@@ -170,7 +236,8 @@ final class PolityTable {
                 polities.add(Polity.restore(new PolityId(UUID.fromString(id)), new PolityName(rows.getString("name")),
                         PolityKind.valueOf(rows.getString("kind")), SettlementTier.valueOf(rows.getString("tier")),
                         new CurrencyId(rows.getString("currency")), Day.of(rows.getLong("founded_on")), seatOf(rows),
-                        members.getOrDefault(id, List.of()), statutes.getOrDefault(id, List.of())));
+                        members.getOrDefault(id, List.of()), statutes.getOrDefault(id, List.of()),
+                        proposals.getOrDefault(id, List.of())));
             }
         }
         return polities;

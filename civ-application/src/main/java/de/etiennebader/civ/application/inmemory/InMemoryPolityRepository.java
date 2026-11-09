@@ -32,4 +32,9 @@ public final class InMemoryPolityRepository implements PolityRepository {
     public void save(Polity polity) {
         polities.put(polity.id(), polity);
     }
+
+    @Override
+    public void remove(PolityId id) {
+        polities.remove(Objects.requireNonNull(id, "id"));
+    }
 }

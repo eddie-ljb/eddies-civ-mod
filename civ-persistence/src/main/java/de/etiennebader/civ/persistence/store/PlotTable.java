@@ -6,7 +6,9 @@ import de.etiennebader.civ.domain.land.Area;
 import de.etiennebader.civ.domain.land.PlotId;
 import de.etiennebader.civ.domain.land.PlotSnapshot;
 import de.etiennebader.civ.domain.land.PlotType;
+import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.Day;
+import de.etiennebader.civ.domain.shared.Money;
 import de.etiennebader.civ.domain.territory.DimensionId;
 import de.etiennebader.civ.persistence.ActorCodec;
 
@@ -14,6 +16,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -29,12 +32,13 @@ final class PlotTable {
 
     private static final String UPSERT = """
             INSERT INTO plot (id, polity_id, seq, type, dimension, min_x, min_z, max_x, max_z,
-                              holder_kind, holder_id, holder_since)
-            VALUES (?, ?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM plot), ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                              holder_kind, holder_id, holder_since, asking_price, asking_currency)
+            VALUES (?, ?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM plot), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (id) DO UPDATE SET polity_id = excluded.polity_id, type = excluded.type,
                 dimension = excluded.dimension, min_x = excluded.min_x, min_z = excluded.min_z,
                 max_x = excluded.max_x, max_z = excluded.max_z, holder_kind = excluded.holder_kind,
-                holder_id = excluded.holder_id, holder_since = excluded.holder_since""";
+                holder_id = excluded.holder_id, holder_since = excluded.holder_since,
+                asking_price = excluded.asking_price, asking_currency = excluded.asking_currency""";
 
     /**
      * Schreibt die Grundstücke in der Reihenfolge der Änderungen; aufgelöste werden gelöscht.
@@ -70,13 +74,21 @@ final class PlotTable {
         upsert.setString(9, ActorCodec.kindOf(plot.holder()));
         upsert.setString(10, plot.holder().uuid().toString());
         upsert.setLong(11, plot.holderSince().value());
+        if (plot.askingPrice().isPresent()) {
+            upsert.setLong(12, plot.askingPrice().get().amount());
+            upsert.setString(13, plot.askingPrice().get().currency().code());
+        } else {
+            upsert.setNull(12, Types.INTEGER);
+            upsert.setNull(13, Types.VARCHAR);
+        }
     }
 
     /** Alle Grundstücke je Polity-ID in Anlagereihenfolge. */
     Map<String, List<PlotSnapshot>> loadAll(Connection connection) throws SQLException {
         Map<String, List<PlotSnapshot>> plots = new HashMap<>();
         try (PreparedStatement select = connection.prepareStatement("""
-                SELECT id, polity_id, type, dimension, min_x, min_z, max_x, max_z, holder_kind, holder_id, holder_since
+                SELECT id, polity_id, type, dimension, min_x, min_z, max_x, max_z, holder_kind, holder_id, holder_since,
+                       asking_price, asking_currency
                 FROM plot ORDER BY seq""");
              ResultSet rows = select.executeQuery()) {
             while (rows.next()) {
@@ -85,9 +97,17 @@ final class PlotTable {
                 plots.computeIfAbsent(rows.getString("polity_id"), ignored -> new ArrayList<>()).add(new PlotSnapshot(
                         new PlotId(UUID.fromString(rows.getString("id"))), area, PlotType.valueOf(rows.getString("type")),
                         ActorCodec.decode(rows.getString("holder_kind"), rows.getString("holder_id")),
-                        Day.of(rows.getLong("holder_since"))));
+                        Day.of(rows.getLong("holder_since")), askingPrice(rows)));
             }
         }
         return plots;
+    }
+
+    private static Optional<Money> askingPrice(ResultSet rows) throws SQLException {
+        long amount = rows.getLong("asking_price");
+        if (rows.wasNull()) {
+            return Optional.empty();
+        }
+        return Optional.of(Money.of(amount, new CurrencyId(rows.getString("asking_currency"))));
     }
 }

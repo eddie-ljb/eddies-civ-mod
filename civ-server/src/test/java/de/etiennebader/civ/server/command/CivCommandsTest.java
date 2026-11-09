@@ -285,7 +285,9 @@ class CivCommandsTest {
     }
 
     private static Message money(long amount) {
-        return Message.of(TranslationKeys.MONEY, amount, Message.of("eddies-civ-mod.currency.emerald"));
+        return Message.of(TranslationKeys.MONEY,
+                Message.of(TranslationKeys.MONEY_AMOUNT, amount / 100, String.format("%02d", amount % 100)),
+                Message.of("eddies-civ-mod.currency.emerald"));
     }
 
     private static Caller at(PlayerRef player, int chunkX, int chunkZ) {

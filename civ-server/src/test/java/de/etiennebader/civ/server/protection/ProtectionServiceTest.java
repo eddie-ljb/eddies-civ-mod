@@ -1,6 +1,7 @@
 package de.etiennebader.civ.server.protection;
 
 import de.etiennebader.civ.domain.actor.PlayerRef;
+import de.etiennebader.civ.domain.protection.Hazard;
 import de.etiennebader.civ.domain.protection.ProtectedAction;
 import de.etiennebader.civ.domain.shared.PlayerId;
 import de.etiennebader.civ.domain.shared.SeededIdGenerator;
@@ -42,6 +43,20 @@ class ProtectionServiceTest {
         assertEquals(Optional.of(Message.of(MessageKey.PROTECTED_TERRITORY, "Nordhain")),
                 protection.check(dave, ProtectedAction.BUILD, inTown));
         assertTrue(protection.check(alice, ProtectedAction.BUILD, inTown).isEmpty());
+    }
+
+    @Test
+    @DisplayName("Explosionen und Feuer wirken nur in der Wildnis, bis ein Gesetz sie erlaubt")
+    void hazardsNeedLaw() {
+        BlockPosition wilderness = new BlockPosition(DimensionId.OVERWORLD, 500, 64, 500);
+
+        assertTrue(protection.allows(Hazard.EXPLOSION, wilderness));
+        assertFalse(protection.allows(Hazard.EXPLOSION, inTown));
+        assertFalse(protection.allows(Hazard.FIRE, inTown));
+
+        server.commands().amendLaw(new Caller(alice, "Alice", inTown), "explosions_allowed", "ja");
+        assertTrue(protection.allows(Hazard.EXPLOSION, inTown));
+        assertFalse(protection.allows(Hazard.FIRE, inTown));
     }
 
     @Test

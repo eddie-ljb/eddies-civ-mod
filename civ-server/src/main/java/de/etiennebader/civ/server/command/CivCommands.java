@@ -25,6 +25,7 @@ import de.etiennebader.civ.domain.territory.Claim;
 import de.etiennebader.civ.domain.territory.ClaimType;
 import de.etiennebader.civ.domain.territory.TerritoryView;
 import de.etiennebader.civ.server.protection.ProtectionService;
+import de.etiennebader.civ.server.vote.VotingService;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -52,16 +53,18 @@ public final class CivCommands {
     private final CurrencyId currency;
     private final Texts texts;
     private final ProtectionService protection;
+    private final VotingService voting;
     private final ParameterCatalog laws = ParameterCatalog.standard();
 
     public CivCommands(CivApplication app, Calendar calendar, CurrencyId currency, Texts texts,
-                       ProtectionService protection) {
+                       ProtectionService protection, VotingService voting) {
         this.app = Objects.requireNonNull(app, "app");
         this.queries = app.queries();
         this.calendar = Objects.requireNonNull(calendar, "calendar");
         this.currency = Objects.requireNonNull(currency, "currency");
         this.texts = Objects.requireNonNull(texts, "texts");
         this.protection = Objects.requireNonNull(protection, "protection");
+        this.voting = Objects.requireNonNull(voting, "voting");
     }
 
     /**
@@ -189,6 +192,9 @@ public final class CivCommands {
             } catch (IllegalArgumentException e) {
                 return Reply.failure(Message.of(MessageKey.INVALID_LAW_VALUE, value.strip(), key.get().id()));
             }
+            if (VotingService.votingRequired(polity)) {
+                return voting.propose(caller, polity, parsed);
+            }
             app.amendLaw().execute(new AmendLaw.Command(polity.id(), caller.player(), parsed, calendar.today()));
             return Reply.success(Message.of(MessageKey.LAW_AMENDED, polity.name().value(),
                     Message.of(TranslationKeys.law(key.get())), texts.lawValue(parsed.value())));
@@ -220,6 +226,21 @@ public final class CivCommands {
                     territory.territoryOf(polity.id()).size()));
         }
         return Reply.success(lines);
+    }
+
+    /** {@code /civ hilfe}: Überblick über alle Befehle und Blöcke. */
+    public Reply help() {
+        return Reply.success(Message.of(MessageKey.HELP_HEADER), Message.of(MessageKey.HELP_TOWN),
+                Message.of(MessageKey.HELP_JOIN), Message.of(MessageKey.HELP_LAND), Message.of(MessageKey.HELP_LAWS),
+                Message.of(MessageKey.HELP_VOTES), Message.of(MessageKey.HELP_PLOTS), Message.of(MessageKey.HELP_SHOPS),
+                Message.of(MessageKey.HELP_BANK), Message.of(MessageKey.HELP_MARKET), Message.of(MessageKey.HELP_INFO));
+    }
+
+    /** Begrüßung beim Betreten des Servers. */
+    public Message welcome(Caller caller) {
+        return queries.municipalityOf(caller.player())
+                .map(polity -> Message.of(MessageKey.WELCOME, caller.name(), polity.name().value()))
+                .orElseGet(() -> Message.of(MessageKey.WELCOME, caller.name(), Message.of(MessageKey.TERRITORY_WILDERNESS)));
     }
 
     /** Die Ankündigung an alle Spieler, wenn ein neuer Tag beginnt. */

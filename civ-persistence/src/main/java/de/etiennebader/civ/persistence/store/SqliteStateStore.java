@@ -1,7 +1,7 @@
 package de.etiennebader.civ.persistence.store;
 
-import de.etiennebader.civ.application.persistence.StateDelta;
 import de.etiennebader.civ.application.persistence.StateDelta.PolityChange;
+import de.etiennebader.civ.application.persistence.StateDelta;
 import de.etiennebader.civ.application.persistence.StateStore;
 import de.etiennebader.civ.application.persistence.StoredWorld;
 import de.etiennebader.civ.domain.economy.Ledger;
@@ -9,6 +9,7 @@ import de.etiennebader.civ.domain.land.LandRegistry;
 import de.etiennebader.civ.domain.land.PlotSnapshot;
 import de.etiennebader.civ.domain.law.ParameterCatalog;
 import de.etiennebader.civ.domain.polity.Polity;
+import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.territory.TerritoryRegistry;
 import de.etiennebader.civ.persistence.PersistenceException;
 import de.etiennebader.civ.persistence.migration.SchemaMigrator;
@@ -32,6 +33,9 @@ import java.util.Objects;
  */
 public final class SqliteStateStore implements StateStore, AutoCloseable {
 
+    /** Es gibt vorerst einen Servermarkt in Smaragden. */
+    private static final CurrencyId MARKET_CURRENCY = CurrencyId.EMERALD;
+
     private final SqliteDatabase database;
     private final PolityTable polityTable;
     private final TerritoryTable territoryTable = new TerritoryTable();
@@ -40,6 +44,8 @@ public final class SqliteStateStore implements StateStore, AutoCloseable {
     private final EventTable eventTable = new EventTable();
     private final PlayerTable playerTable = new PlayerTable();
     private final CalendarTable calendarTable = new CalendarTable();
+    private final MarketTable marketTable = new MarketTable();
+    private final ShopTable shopTable = new ShopTable();
 
     public SqliteStateStore(SqliteDatabase database, ParameterCatalog catalog) {
         this.database = Objects.requireNonNull(database, "database");
@@ -77,7 +83,8 @@ public final class SqliteStateStore implements StateStore, AutoCloseable {
             }
             TerritoryRegistry territory = TerritoryRegistry.restore(territoryTable.loadAll(connection));
             Ledger ledger = Ledger.restore(ledgerTable.loadBalances(connection), ledgerTable.loadTotals(connection));
-            return new StoredWorld(polities, territory, land, ledger, playerTable.loadAll(connection),
+            return new StoredWorld(polities, territory, land, ledger,
+                    marketTable.load(connection, MARKET_CURRENCY), shopTable.load(connection), playerTable.loadAll(connection),
                     calendarTable.load(connection));
         } catch (IllegalArgumentException e) {
             throw new PersistenceException("Gespeicherter Zustand ist ungültig: " + e.getMessage(), e);
@@ -91,14 +98,20 @@ public final class SqliteStateStore implements StateStore, AutoCloseable {
             for (PolityChange change : delta.polities()) {
                 if (change.polity().isPresent()) {
                     polityTable.write(connection, change.polity().get());
-                } else {
-                    polityTable.delete(connection, change.id());
                 }
             }
             territoryTable.write(connection, delta.claims());
             plotTable.write(connection, delta.plots());
+            // Aufgelöste Polities erst nach ihren Claims und Grundstücken löschen (Fremdschlüssel).
+            for (PolityChange change : delta.polities()) {
+                if (change.polity().isEmpty()) {
+                    polityTable.delete(connection, change.id());
+                }
+            }
             ledgerTable.writeBalances(connection, delta.balances());
             ledgerTable.writeTotals(connection, delta.currencies());
+            marketTable.write(connection, MARKET_CURRENCY, delta.commodities());
+            shopTable.write(connection, delta.shops());
             eventTable.append(connection, delta.events());
             playerTable.write(connection, delta.players());
             calendarTable.write(connection, delta.calendar());

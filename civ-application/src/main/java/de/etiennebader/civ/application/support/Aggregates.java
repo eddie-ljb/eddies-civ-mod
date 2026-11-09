@@ -4,8 +4,10 @@ import de.etiennebader.civ.application.Repositories;
 import de.etiennebader.civ.application.port.DomainEventPublisher;
 import de.etiennebader.civ.domain.economy.Ledger;
 import de.etiennebader.civ.domain.land.LandRegistry;
+import de.etiennebader.civ.domain.market.Market;
 import de.etiennebader.civ.domain.polity.Polity;
 import de.etiennebader.civ.domain.shared.PolityId;
+import de.etiennebader.civ.domain.shop.ShopRegistry;
 import de.etiennebader.civ.domain.territory.TerritoryRegistry;
 
 import java.util.Objects;
@@ -45,6 +47,10 @@ public final class Aggregates {
         return repositories.ledger().load();
     }
 
+    public Market market() {
+        return repositories.market().load();
+    }
+
     public Repositories repositories() {
         return repositories;
     }
@@ -68,5 +74,19 @@ public final class Aggregates {
     public void commit(Ledger ledger) {
         repositories.ledger().save(ledger);
         publisher.publish(ledger.pullEvents());
+    }
+
+    public ShopRegistry shops() {
+        return repositories.shops().load();
+    }
+
+    public void commit(ShopRegistry shops) {
+        repositories.shops().save(shops);
+        publisher.publish(shops.pullEvents());
+    }
+
+    public void commit(Market market) {
+        repositories.market().save(market);
+        publisher.publish(market.pullEvents());
     }
 }

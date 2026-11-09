@@ -15,11 +15,12 @@ import java.util.Optional;
  *
  * @param seat     Standort des Gemeindehauses, falls vorhanden
  * @param members  in Beitrittsreihenfolge
- * @param statutes in Kraft befindliche Gesetze in Reihenfolge ihres Erlasses
+ * @param statutes  in Kraft befindliche Gesetze in Reihenfolge ihres Erlasses
+ * @param proposals offene Abstimmungen in Reihenfolge ihrer Eröffnung
  */
 public record PolitySnapshot(PolityId id, PolityName name, PolityKind kind, SettlementTier tier, CurrencyId currency,
                              Day foundedOn, Optional<BlockPosition> seat, List<Membership> members,
-                             List<EnactedStatute> statutes) {
+                             List<EnactedStatute> statutes, List<Proposal> proposals) {
 
     public PolitySnapshot {
         Objects.requireNonNull(id, "id");
@@ -31,12 +32,14 @@ public record PolitySnapshot(PolityId id, PolityName name, PolityKind kind, Sett
         Objects.requireNonNull(seat, "seat");
         members = List.copyOf(Objects.requireNonNull(members, "members"));
         statutes = List.copyOf(Objects.requireNonNull(statutes, "statutes"));
+        proposals = List.copyOf(Objects.requireNonNull(proposals, "proposals"));
     }
 
     public static PolitySnapshot of(PolityView polity) {
         Objects.requireNonNull(polity, "polity");
         return new PolitySnapshot(polity.id(), polity.name(), polity.kind(), polity.tier(), polity.currency(),
-                polity.foundedOn(), polity.seat(), List.copyOf(polity.members()), polity.laws().inForce());
+                polity.foundedOn(), polity.seat(), List.copyOf(polity.members()), polity.laws().inForce(),
+                List.copyOf(polity.proposals()));
     }
 
     /**
@@ -45,6 +48,6 @@ public record PolitySnapshot(PolityId id, PolityName name, PolityKind kind, Sett
      * @throws IllegalArgumentException wenn die Daten keine gültige Polity ergeben
      */
     public Polity restore() {
-        return Polity.restore(id, name, kind, tier, currency, foundedOn, seat, members, statutes);
+        return Polity.restore(id, name, kind, tier, currency, foundedOn, seat, members, statutes, proposals);
     }
 }

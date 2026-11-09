@@ -32,16 +32,18 @@ class PackageDependencyRulesTest {
     private static final Set<String> FORBIDDEN_PREFIXES = Set.of("net.minecraft.", "net.fabricmc.", "com.mojang.");
 
     /** Welche Pakete ein Paket verwenden darf; das eigene Paket ist immer erlaubt. */
-    private static final Map<String, Set<String>> ALLOWED_DEPENDENCIES = Map.of(
-            "shared", Set.of(),
-            "actor", Set.of("shared"),
-            "law", Set.of("shared"),
-            "territory", Set.of("shared", "actor"),
-            "land", Set.of("shared", "actor", "territory"),
-            "economy", Set.of("shared", "actor"),
-            "polity", Set.of("shared", "actor", "law", "territory"),
-            "fiscal", Set.of("shared", "actor", "law", "territory", "land", "economy", "polity"),
-            "protection", Set.of("shared", "actor", "law", "territory", "land", "polity"));
+    private static final Map<String, Set<String>> ALLOWED_DEPENDENCIES = Map.ofEntries(
+            Map.entry("shared", Set.of()),
+            Map.entry("actor", Set.of("shared")),
+            Map.entry("law", Set.of("shared")),
+            Map.entry("territory", Set.of("shared", "actor")),
+            Map.entry("land", Set.of("shared", "actor", "territory")),
+            Map.entry("economy", Set.of("shared", "actor")),
+            Map.entry("polity", Set.of("shared", "actor", "law", "territory")),
+            Map.entry("fiscal", Set.of("shared", "actor", "law", "territory", "land", "economy", "polity")),
+            Map.entry("protection", Set.of("shared", "actor", "law", "territory", "land", "polity")),
+            Map.entry("market", Set.of("shared", "actor")),
+            Map.entry("shop", Set.of("shared", "actor", "market", "territory")));
 
     @Test
     @DisplayName("Pakete verwenden nur erlaubte Pakete")

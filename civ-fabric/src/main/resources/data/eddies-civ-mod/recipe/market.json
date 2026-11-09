@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "WRW",
+    "PEP",
+    "PCP"
+  ],
+  "key": {
+    "W": "minecraft:white_wool",
+    "R": "minecraft:red_wool",
+    "P": "#minecraft:planks",
+    "E": "minecraft:emerald",
+    "C": "minecraft:chest"
+  },
+  "result": {
+    "id": "eddies-civ-mod:market",
+    "count": 1
+  }
+}
