@@ -1,7 +1,13 @@
 package de.etiennebader.civ.server.web;
 
+import de.etiennebader.civ.server.command.TranslationKeys;
+
+import de.etiennebader.civ.domain.polity.Platform;
+
+import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PlayerRef;
 import de.etiennebader.civ.domain.market.Quote;
+import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.shared.Money;
@@ -17,6 +23,8 @@ import de.etiennebader.civ.server.command.MoneyFormat;
 import de.etiennebader.civ.server.command.Reply;
 import de.etiennebader.civ.server.market.ItemTraits;
 import de.etiennebader.civ.server.market.MarketOffer;
+import de.etiennebader.civ.server.office.ElectionView;
+import de.etiennebader.civ.server.office.OfficeView;
 import de.etiennebader.civ.server.town.TownOverview;
 import de.etiennebader.civ.server.vote.ProposalView;
 
@@ -40,7 +48,8 @@ import java.util.function.Function;
  *     <li>{@code GET /api/map?dim=minecraft:overworld} beanspruchte Chunks einer Dimension</li>
  *     <li>{@code GET /api/market} Lager und Preise des Servermarkts</li>
  *     <li>{@code POST /api/login} mit {@code {"code": "..."}} aus {@code /civ web}</li>
- *     <li>{@code GET /api/me}, {@code POST /api/transfer}, {@code POST /api/vote}, {@code POST /api/logout}
+ *     <li>{@code GET /api/me}, {@code POST /api/transfer}, {@code POST /api/vote}, {@code POST /api/stand},
+ *         {@code POST /api/elect}, {@code POST /api/logout}
  *         nur angemeldet</li>
  * </ul>
  */
@@ -99,6 +108,16 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                     boolean yes = Boolean.parseBoolean(body.getOrDefault("yes", "false"));
                     return game.call(() -> civ.voting().vote(caller(login), number, yes));
                 }, texts));
+                case "POST /api/stand" -> withLogin(request, login -> action(request, body -> {
+                    Office office = Office.valueOf(body.getOrDefault("office", ""));
+                    Platform platform = Platform.valueOf(body.getOrDefault("platform", "NONE"));
+                    return game.call(() -> civ.offices().stand(caller(login), office, platform));
+                }, texts));
+                case "POST /api/elect" -> withLogin(request, login -> action(request, body -> {
+                    Office office = Office.valueOf(body.getOrDefault("office", ""));
+                    UUID candidate = UUID.fromString(body.getOrDefault("candidate", ""));
+                    return game.call(() -> civ.offices().vote(caller(login), office, candidateOf(login, office, candidate)));
+                }, texts));
                 default -> request.path().startsWith("/api/")
                         ? HttpResponse.error(404, "Unbekannter Endpunkt")
                         : HttpResponse.error(404, "Nicht gefunden");
@@ -125,6 +144,8 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                     .put("mayor", town.mayor())
                     .raw("members", Json.array(town.members(), Json::string))
                     .put("villagers", town.villagers())
+                    .put("mood", civ.villagers().moodOf(polity).averageScore())
+                    .put("atRisk", civ.villagers().moodOf(polity).atRisk())
                     .put("chunks", town.chunks())
                     .put("claimLimit", town.claimLimit())
                     .put("treasury", money(town.treasury()))
@@ -232,10 +253,51 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                             .put("decidedOn", proposal.decidedOn())
                             .put("ownVote", proposal.ownVote().map(yes -> yes ? "yes" : "no").orElse(null))
                             .build()));
+            out.raw("offices", Json.array(civ.offices().officesOf(town.get(), login.player()),
+                    office -> office(office, texts)));
+            out.raw("platforms", Json.array(List.of(Platform.values()), platform -> Json.object()
+                    .put("id", platform.name())
+                    .put("name", texts.translate(Message.of(TranslationKeys.platform(platform))))
+                    .build()));
         } else {
-            out.put("town", null).raw("proposals", "[]");
+            out.put("town", null).raw("proposals", "[]").raw("offices", "[]").raw("platforms", "[]");
         }
         return out.build();
+    }
+
+    private static String office(OfficeView office, Translator texts) {
+        Json.ObjectBuilder out = Json.object()
+                .put("office", office.office().name())
+                .put("title", texts.translate(office.name()))
+                .put("holder", office.holder().orElse(null))
+                .put("implicit", office.implicit())
+                .raw("until", office.until().map(String::valueOf).orElse("null"));
+        if (office.election().isEmpty()) {
+            return out.raw("election", "null").build();
+        }
+        ElectionView election = office.election().get();
+        return out.raw("election", Json.object()
+                .put("closesOn", election.closesOn())
+                .put("ballots", election.ballots())
+                .put("electorate", election.electorate())
+                .put("ownCandidacy", election.ownCandidacy())
+                .put("ownChoice", election.ownChoice().map(actor -> actor.uuid().toString()).orElse(null))
+                .raw("candidates", Json.array(election.candidates(), candidate -> Json.object()
+                        .put("id", candidate.actor().uuid().toString())
+                        .put("name", candidate.name())
+                        .put("platform", candidate.platform().name())
+                        .put("platformName", texts.translate(Message.of(TranslationKeys.platform(candidate.platform()))))
+                        .build()))
+                .build()).build();
+    }
+
+    /** Der Kandidat mit dieser UUID in der laufenden Wahl; sonst ein Spieler mit dieser UUID, was abgelehnt wird. */
+    private ActorRef candidateOf(WebSessions.Login login, Office office, UUID id) {
+        return civ.queries().municipalityOf(login.player())
+                .flatMap(town -> town.electionFor(office))
+                .flatMap(election -> election.candidates().stream()
+                        .filter(candidate -> candidate.uuid().equals(id)).findFirst())
+                .orElseGet(() -> new PlayerRef(new PlayerId(id)));
     }
 
     private HttpResponse login(HttpRequest request) {

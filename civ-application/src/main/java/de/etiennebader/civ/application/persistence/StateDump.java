@@ -8,7 +8,9 @@ import de.etiennebader.civ.domain.land.Area;
 import de.etiennebader.civ.domain.land.Plot;
 import de.etiennebader.civ.domain.law.EnactedStatute;
 import de.etiennebader.civ.domain.law.ParameterCatalog;
+import de.etiennebader.civ.domain.polity.Election;
 import de.etiennebader.civ.domain.polity.Membership;
+import de.etiennebader.civ.domain.polity.OfficeTerm;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.polity.Proposal;
 import de.etiennebader.civ.domain.territory.BlockPosition;
@@ -59,6 +61,20 @@ public final class StateDump {
                 lines.add(String.join("|", "  proposal", proposal.id().value().toString(),
                         proposal.change().key().id() + "=" + ParameterCatalog.encode(proposal.change()),
                         actor(proposal.proposer()), day(proposal.openedOn().value()), votes));
+            }
+            for (OfficeTerm term : polity.offices()) {
+                lines.add(String.join("|", "  office", term.office().name(), actor(term.holder()),
+                        day(term.since().value()), term.until().map(until -> day(until.value())).orElse("-")));
+            }
+            for (Election election : polity.elections()) {
+                String candidates = election.candidates().stream()
+                        .map(candidate -> actor(candidate) + ":" + election.platformOf(candidate).name())
+                        .collect(Collectors.joining(","));
+                String ballots = election.ballots().stream()
+                        .map(ballot -> actor(ballot.voter()) + ">" + actor(ballot.candidate()))
+                        .collect(Collectors.joining(","));
+                lines.add(String.join("|", "  election", election.id().value().toString(), election.office().name(),
+                        day(election.calledOn().value()), day(election.closesOn().value()), candidates, ballots));
             }
             territory.territoryOf(polity.id()).stream()
                     .sorted(Comparator.comparing((ChunkCoord chunk) -> chunk.dimension().value())

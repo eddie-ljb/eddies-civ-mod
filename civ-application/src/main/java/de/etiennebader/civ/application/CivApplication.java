@@ -15,6 +15,11 @@ import de.etiennebader.civ.application.land.OfferPlot;
 import de.etiennebader.civ.application.land.SellPlot;
 import de.etiennebader.civ.application.market.BuyFromMarket;
 import de.etiennebader.civ.application.market.SellToMarket;
+import de.etiennebader.civ.application.office.AppointOfficer;
+import de.etiennebader.civ.application.office.CallElection;
+import de.etiennebader.civ.application.office.CastBallot;
+import de.etiennebader.civ.application.office.RunElections;
+import de.etiennebader.civ.application.office.StandForElection;
 import de.etiennebader.civ.application.polity.AmendLaw;
 import de.etiennebader.civ.application.polity.CastVote;
 import de.etiennebader.civ.application.polity.ChangeTier;
@@ -27,6 +32,7 @@ import de.etiennebader.civ.application.polity.MoveSeat;
 import de.etiennebader.civ.application.polity.ProposeLawChange;
 import de.etiennebader.civ.application.polity.RepealStatute;
 import de.etiennebader.civ.application.polity.TallyProposals;
+import de.etiennebader.civ.application.population.PersonalityVoter;
 import de.etiennebader.civ.application.port.DomainEventPublisher;
 import de.etiennebader.civ.application.query.WorldQueries;
 import de.etiennebader.civ.application.shop.BuyFromShop;
@@ -80,6 +86,11 @@ public final class CivApplication {
     private final SellToMarket sellToMarket;
     private final BuyFromMarket buyFromMarket;
     private final EndOfDay endOfDay;
+    private final CallElection callElection;
+    private final StandForElection standForElection;
+    private final CastBallot castBallot;
+    private final AppointOfficer appointOfficer;
+    private final RunElections runElections;
     private final WorldQueries queries;
 
     public CivApplication(Repositories repositories, IdGenerator ids, ClaimPolicy claimPolicy,
@@ -112,6 +123,11 @@ public final class CivApplication {
         this.proposeLawChange = new ProposeLawChange(aggregates, ids);
         this.castVote = new CastVote(aggregates, ids);
         this.tallyProposals = new TallyProposals(aggregates, ids);
+        this.callElection = new CallElection(aggregates, ids);
+        this.standForElection = new StandForElection(aggregates);
+        this.castBallot = new CastBallot(aggregates);
+        this.appointOfficer = new AppointOfficer(aggregates);
+        this.runElections = new RunElections(aggregates, ids, new PersonalityVoter());
         this.dissolvePolity = new DissolvePolity(aggregates);
         this.moveSeat = new MoveSeat(aggregates);
         this.openShop = new OpenShop(aggregates);
@@ -196,6 +212,26 @@ public final class CivApplication {
 
     public TallyProposals tallyProposals() {
         return tallyProposals;
+    }
+
+    public CallElection callElection() {
+        return callElection;
+    }
+
+    public StandForElection standForElection() {
+        return standForElection;
+    }
+
+    public CastBallot castBallot() {
+        return castBallot;
+    }
+
+    public AppointOfficer appointOfficer() {
+        return appointOfficer;
+    }
+
+    public RunElections runElections() {
+        return runElections;
     }
 
     public DissolvePolity dissolvePolity() {

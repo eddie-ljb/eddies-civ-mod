@@ -23,9 +23,17 @@ import java.util.Objects;
  * @param villagerIncome tägliche Wirtschaftsleistung je Dorfbewohner für die Gemeindekasse
  * @param tiers          ab wie vielen Einwohnern eine Gemeinde welche Stufe erreicht
  * @param web            die eingebettete Webseite
+ * @param emigration     ob sehr unzufriedene Dorfbewohner ihre Gemeinde verlassen
  */
 public record ServerSettings(long ticksPerDay, int claimBase, int claimPerMember, CurrencyId currency,
-                             Money priceReference, Money villagerIncome, TierThresholds tiers, WebSettings web) {
+                             Money priceReference, Money villagerIncome, TierThresholds tiers, WebSettings web,
+                             boolean emigration) {
+
+    /** Mit Abwanderung. */
+    public ServerSettings(long ticksPerDay, int claimBase, int claimPerMember, CurrencyId currency,
+                          Money priceReference, Money villagerIncome, TierThresholds tiers, WebSettings web) {
+        this(ticksPerDay, claimBase, claimPerMember, currency, priceReference, villagerIncome, tiers, web, true);
+    }
 
     /**
      * Die eingebettete Webseite.
@@ -97,7 +105,8 @@ public record ServerSettings(long ticksPerDay, int claimBase, int claimPerMember
     public static ServerSettings withDayLength(long ticksPerDay) {
         ServerSettings defaults = defaults();
         return new ServerSettings(ticksPerDay, defaults.claimBase(), defaults.claimPerMember(), defaults.currency(),
-                defaults.priceReference(), defaults.villagerIncome(), defaults.tiers(), defaults.web().disabled());
+                defaults.priceReference(), defaults.villagerIncome(), defaults.tiers(), defaults.web().disabled(),
+                defaults.emigration());
     }
 
     /**

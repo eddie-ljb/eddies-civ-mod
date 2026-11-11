@@ -3,7 +3,7 @@
 	"id": "eddies-civ-mod",
 	"version": "${version}",
 	"name": "Eddies Civ Mod",
-	"description": "This mod tries to implement some realistic civilization features, e.g. nations, claims, economy and more!",
+	"description": "Found towns around a town hall, claim land, pass laws by vote and grow your settlement with villagers as citizens. A server-side economy with banks, dynamic market prices, player shops and taxes, plus a web map, ties it all together.",
 	"authors": [
 		"_eddie_ljb"
 	],

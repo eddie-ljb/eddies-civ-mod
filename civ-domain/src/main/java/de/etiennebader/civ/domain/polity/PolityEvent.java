@@ -8,7 +8,8 @@ import de.etiennebader.civ.domain.shared.PolityId;
  */
 public sealed interface PolityEvent extends DomainEvent
         permits PolityFounded, MemberAdmitted, MemberLeft, StatuteEnacted, StatuteRepealed,
-        TierChanged, ProposalOpened, VoteCast, ProposalClosed, SeatMoved, PolityDissolved {
+        TierChanged, ProposalOpened, VoteCast, ProposalClosed, SeatMoved, PolityDissolved, OfficeFilled,
+        OfficeVacated, ElectionCalled, CandidacyDeclared, BallotCast, ElectionClosed {
 
     PolityId polity();
 }

@@ -27,6 +27,7 @@ public final class ServerConfig {
     static final String MARKET_TOWN_AT = "market_town_inhabitants";
     static final String CITY_AT = "city_inhabitants";
     static final String METROPOLIS_AT = "metropolis_inhabitants";
+    static final String EMIGRATION = "villager_emigration";
     static final String WEB_ENABLED = "web_enabled";
     static final String WEB_BIND = "web_bind";
     static final String WEB_PORT = "web_port";
@@ -39,6 +40,7 @@ public final class ServerConfig {
             price_reference_emeralds_per_player: Geldmenge je Spieler, bei der Marktpreise ihrem Grundpreis entsprechen
             villager_income_hundredths_per_day: Einnahmen der Gemeindekasse je Dorfbewohner und Tag (100 = 1 Smaragd)
             market_town_inhabitants, city_inhabitants, metropolis_inhabitants: Einwohner fuer die Siedlungsstufen
+            villager_emigration: ob sehr unzufriedene Dorfbewohner ihre Gemeinde verlassen (true/false)
             web_enabled, web_bind, web_port: eingebettete Webseite; web_public_url: Adresse fuer Spieler (optional)""";
 
     private ServerConfig() {
@@ -83,7 +85,8 @@ public final class ServerConfig {
                 properties.getProperty(WEB_URL, defaults.web().publicUrl()).strip());
         return new ServerSettings(ticks, claimBase, claimPerMember, defaults.currency(),
                 Money.of(MoneyFormat.emeralds(reference), defaults.currency()), Money.of(income, defaults.currency()),
-                tiers, web);
+                tiers, web, Boolean.parseBoolean(properties.getProperty(EMIGRATION,
+                        Boolean.toString(defaults.emigration())).strip()));
     }
 
     static void write(Path file, ServerSettings settings) {
@@ -97,6 +100,7 @@ public final class ServerConfig {
         properties.setProperty(MARKET_TOWN_AT, Integer.toString(settings.tiers().marketTown()));
         properties.setProperty(CITY_AT, Integer.toString(settings.tiers().city()));
         properties.setProperty(METROPOLIS_AT, Integer.toString(settings.tiers().metropolis()));
+        properties.setProperty(EMIGRATION, Boolean.toString(settings.emigration()));
         properties.setProperty(WEB_ENABLED, Boolean.toString(settings.web().enabled()));
         properties.setProperty(WEB_BIND, settings.web().bind());
         properties.setProperty(WEB_PORT, Integer.toString(settings.web().port()));

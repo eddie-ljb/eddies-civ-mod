@@ -27,6 +27,7 @@ import de.etiennebader.civ.server.command.Reply;
 import de.etiennebader.civ.server.command.Texts;
 import de.etiennebader.civ.server.market.ItemTraits;
 import de.etiennebader.civ.server.market.MarketService;
+import de.etiennebader.civ.server.office.OfficeService;
 import de.etiennebader.civ.server.plot.PlotService;
 import de.etiennebader.civ.server.protection.ProtectionService;
 import de.etiennebader.civ.server.save.AsyncSaver;
@@ -49,6 +50,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.Executor;
 import java.util.function.Function;
 
 /**
@@ -83,6 +85,7 @@ public final class CivServer {
     private final VillagerService villagers;
     private final Announcements announcements = new Announcements();
     private final VotingService voting;
+    private final OfficeService offices;
     private final TownHallService townHalls;
     private final ShopService shops;
     private final ServerSettings settings;
@@ -108,6 +111,7 @@ public final class CivServer {
         this.texts = texts;
         this.protection = new ProtectionService(app.queries(), texts);
         this.voting = new VotingService(app, calendar, texts, announcements);
+        this.offices = new OfficeService(app, calendar, players, texts, announcements);
         this.commands = new CivCommands(app, calendar, settings.currency(), texts, protection, voting);
         this.bank = new BankService(app, calendar, settings.currency(), players, texts);
         this.market = new MarketService(app, calendar, settings, players, texts);
@@ -166,6 +170,7 @@ public final class CivServer {
     private DayReport closeDay(Day day) {
         DayReport report = app.endOfDay().execute(day);
         voting.endOfDay(day);
+        offices.endOfDay(day);
         villagers.endOfDay(day);
         return report;
     }
@@ -224,11 +229,14 @@ public final class CivServer {
      * Startet die Webseite, falls sie eingeschaltet ist.
      *
      * @param items Eigenschaften eines Items zu seiner ID, für Marktpreise; kommt aus {@code civ-fabric}
+     * @param mainThread führt Aufgaben auf dem Spielthread aus, auch wenn ein Einzelspieler-Spiel pausiert ist
      * @return der tatsächliche Port; leer, wenn die Webseite ausgeschaltet ist
      * @throws IOException wenn der Port belegt ist
      */
-    public Optional<Integer> startWeb(Function<String, Optional<ItemTraits>> items) throws IOException {
+    public Optional<Integer> startWeb(Function<String, Optional<ItemTraits>> items, Executor mainThread)
+            throws IOException {
         requireRunning();
+        gameThread.wakeVia(mainThread);
         ServerSettings.WebSettings config = settings.web();
         if (!config.enabled() || web != null) {
             return Optional.ofNullable(web).map(MiniHttpServer::port);
@@ -292,6 +300,10 @@ public final class CivServer {
 
     public VillagerService villagers() {
         return villagers;
+    }
+
+    public OfficeService offices() {
+        return offices;
     }
 
     public VotingService voting() {

@@ -64,6 +64,13 @@ button.no { background: #4a2420; color: var(--red); border: 1px solid #6a312b; b
 .bar .y { background: var(--green); } .bar .n { background: var(--red); }
 .empty { color: var(--muted); padding: 30px; text-align: center; border: 1px dashed var(--line); border-radius: var(--radius); }
 code { background: var(--panel2); padding: 2px 6px; border-radius: 4px; }
+.offices { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.office { border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: var(--panel2); }
+.office h3 { margin: 0 0 4px; font-size: 15px; color: var(--gold); }
+.office .holder { font-size: 17px; margin-bottom: 6px; }
+.office .election { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px; }
+.candidate { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 6px; }
+.candidate.chosen span { color: var(--green); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -138,6 +145,11 @@ code { background: var(--panel2); padding: 2px 6px; border-radius: 4px; }
         <div class="msg" id="sendmsg"></div>
       </div>
       <div class="card">
+        <h2>Ämter und Wahlen</h2>
+        <div id="offices" class="offices"></div>
+        <div class="msg" id="officemsg"></div>
+      </div>
+      <div class="card">
         <h2>Abstimmungen in deiner Gemeinde</h2>
         <div id="proposals"></div>
         <div class="msg" id="votemsg"></div>
@@ -153,6 +165,7 @@ const el = (tag, props = {}, ...children) => {
   for (const child of children) node.append(child);
   return node;
 };
+const moodText = m => (m >= 20 ? "zufrieden" : m < -20 ? "unzufrieden" : "gleichgültig") + " (" + (m > 0 ? "+" : "") + m + ")";
 const palette = ["#e0b04a", "#7bd88f", "#7fb2e5", "#ff8f6b", "#c792ea", "#5fd3c6", "#f07178", "#c3e88d", "#ffcb6b", "#89ddff"];
 const colorOf = id => {
   const index = world.towns.findIndex(t => t.id === id);
@@ -194,6 +207,7 @@ async function loadWorld() {
     card.style.setProperty("--c", colorOf(t.id));
     const kv = el("dl", { className: "kv" });
     for (const [k, v] of [["Bürgermeister", t.mayor], ["Spieler", t.members.length], ["Dorfbewohner", t.villagers],
+      ...(t.villagers ? [["Stimmung", moodText(t.mood) + (t.atRisk ? " · " + t.atRisk + " wollen weg" : "")]] : []),
       ["Gebiet", t.chunks + " / " + t.claimLimit + " Chunks"], ["Grundstücke", t.plots + (t.plotsForSale ? " (" + t.plotsForSale + " zu verkaufen)" : "")],
       ["Kasse", t.treasury + " Smaragde"], ["Abstimmungen", t.votes], ["Gegründet", "Tag " + t.founded]]) {
       kv.append(el("dt", { textContent: k }), el("dd", { textContent: v }));
@@ -328,6 +342,7 @@ async function loadMe() {
   if (!ok) return;
   $("who").textContent = data.name + (data.town ? " · " + data.town : " · ohne Gemeinde");
   $("balance").textContent = data.balance + " Smaragde";
+  renderOffices(data);
   const list = $("proposals");
   if (!data.town) { list.replaceChildren(el("div", { className: "empty", textContent: "Tritt einer Gemeinde bei, um abzustimmen." })); return; }
   if (!data.proposals.length) { list.replaceChildren(el("div", { className: "empty", textContent: "Gerade läuft keine Abstimmung." })); return; }
@@ -348,6 +363,47 @@ async function loadMe() {
       el("div", { className: "muted", textContent: p.inFavour + " dafür, " + p.against + " dagegen von " + p.electorate + " Bürgern" }),
       el("div", { className: "row", style: "margin-top:8px" }, el("button", { className: "yes", textContent: "Dafür", onclick: vote(true) }),
         el("button", { className: "no", textContent: "Dagegen", onclick: vote(false) })));
+  }));
+}
+function renderOffices(data) {
+  const box = $("offices");
+  if (!data.town) { box.replaceChildren(el("div", { className: "empty", textContent: "Tritt einer Gemeinde bei, um zu wählen." })); return; }
+  const send = async (path, body) => {
+    const r = await api(path, body);
+    message("officemsg", r.data.message || r.data.error, r.ok); loadMe();
+  };
+  box.replaceChildren(...data.offices.map(o => {
+    const card = el("div", { className: "office" },
+      el("h3", { textContent: o.title }),
+      el("div", { className: "holder", textContent: o.holder || "frei" }),
+      el("div", { className: "muted", textContent: o.implicit ? "kommissarisch, nie gewählt"
+        : o.until !== null ? "Amtszeit bis Tag " + o.until : o.holder ? "unbefristet" : "" }));
+    const e = o.election;
+    if (!e) {
+      card.append(el("div", { className: "muted", style: "margin-top:8px",
+        textContent: "Keine Wahl. Ausrufen im Spiel: /civ wahl ausrufen" }));
+      return card;
+    }
+    const election = el("div", { className: "election" },
+      el("strong", { textContent: "Wahl läuft bis Tag " + e.closesOn }),
+      el("div", { className: "muted", textContent: e.ballots + " von " + e.electorate + " Bürgern haben gewählt" }));
+    if (!e.candidates.length) election.append(el("div", { className: "muted", style: "margin-top:6px", textContent: "Noch keine Kandidaten." }));
+    e.candidates.forEach(c => {
+      const chosen = e.ownChoice === c.id;
+      election.append(el("div", { className: "candidate" + (chosen ? " chosen" : "") },
+        el("span", { textContent: c.name + (chosen ? " ✓" : ""), title: c.platformName },
+          el("div", { className: "muted", style: "font-size:12px;font-weight:400", textContent: c.platformName })),
+        el("button", { className: "yes", textContent: chosen ? "Gewählt" : "Wählen", disabled: chosen,
+          onclick: () => send("/api/elect", { office: o.office, candidate: c.id }) })));
+    });
+    if (!e.ownCandidacy) {
+      const programme = el("select", {}, ...data.platforms.map(p => el("option", { value: p.id, textContent: p.name })));
+      election.append(el("div", { className: "row", style: "margin-top:10px" }, programme,
+        el("button", { className: "ghost", textContent: "Kandidieren",
+          onclick: () => send("/api/stand", { office: o.office, platform: programme.value }) })));
+    }
+    card.append(election);
+    return card;
   }));
 }
 $("loginbtn").addEventListener("click", async () => {

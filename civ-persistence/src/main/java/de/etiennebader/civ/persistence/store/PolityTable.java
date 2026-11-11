@@ -1,11 +1,17 @@
 package de.etiennebader.civ.persistence.store;
 
+import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.law.EnactedStatute;
 import de.etiennebader.civ.domain.law.ParameterCatalog;
 import de.etiennebader.civ.domain.law.ParameterValue;
 import de.etiennebader.civ.domain.law.Statute;
+import de.etiennebader.civ.domain.polity.Ballot;
+import de.etiennebader.civ.domain.polity.Election;
 import de.etiennebader.civ.domain.polity.Membership;
 import de.etiennebader.civ.domain.polity.MembershipType;
+import de.etiennebader.civ.domain.polity.Office;
+import de.etiennebader.civ.domain.polity.OfficeTerm;
+import de.etiennebader.civ.domain.polity.Platform;
 import de.etiennebader.civ.domain.polity.Polity;
 import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.polity.PolityName;
@@ -15,6 +21,7 @@ import de.etiennebader.civ.domain.polity.SettlementTier;
 import de.etiennebader.civ.domain.polity.Vote;
 import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.Day;
+import de.etiennebader.civ.domain.shared.ElectionId;
 import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.shared.ProposalId;
 import de.etiennebader.civ.domain.shared.StatuteId;
@@ -36,7 +43,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Tabellen {@code polity}, {@code membership}, {@code statute} und {@code statute_value}.
+ * Tabellen {@code polity}, {@code membership}, {@code statute}, {@code statute_value}, {@code proposal},
+ * {@code office} und {@code election} samt Kindtabellen.
  * Eine geänderte Polity wird vollständig neu geschrieben; ihre Gründungsreihenfolge ({@code seq})
  * bleibt dabei erhalten.
  */
@@ -72,6 +80,8 @@ final class PolityTable {
         insertMembers(connection, id, polity.members());
         insertStatutes(connection, id, polity.statutes());
         insertProposals(connection, id, polity.proposals());
+        insertOffices(connection, id, polity.offices());
+        insertElections(connection, id, polity.elections());
     }
 
     private static void bindSeat(PreparedStatement statement, int firstIndex, Optional<BlockPosition> seat)
@@ -106,7 +116,7 @@ final class PolityTable {
     }
 
     private static void deleteChildren(Connection connection, String polityId) throws SQLException {
-        for (String table : List.of("membership", "statute", "proposal")) {
+        for (String table : List.of("membership", "statute", "proposal", "office", "election")) {
             try (PreparedStatement delete = connection.prepareStatement("DELETE FROM " + table + " WHERE polity_id = ?")) {
                 delete.setString(1, polityId);
                 delete.executeUpdate();
@@ -193,6 +203,132 @@ final class PolityTable {
         }
     }
 
+    private static void insertOffices(Connection connection, String polityId, List<OfficeTerm> offices)
+            throws SQLException {
+        try (PreparedStatement insert = connection.prepareStatement(
+                "INSERT INTO office (polity_id, office, holder_kind, holder_id, since, until) VALUES (?, ?, ?, ?, ?, ?)")) {
+            for (OfficeTerm term : offices) {
+                insert.setString(1, polityId);
+                insert.setString(2, term.office().name());
+                insert.setString(3, ActorCodec.kindOf(term.holder()));
+                insert.setString(4, term.holder().uuid().toString());
+                insert.setLong(5, term.since().value());
+                if (term.until().isPresent()) {
+                    insert.setLong(6, term.until().get().value());
+                } else {
+                    insert.setNull(6, Types.INTEGER);
+                }
+                insert.addBatch();
+            }
+            insert.executeBatch();
+        }
+    }
+
+    private static void insertElections(Connection connection, String polityId, List<Election> elections)
+            throws SQLException {
+        try (PreparedStatement insertElection = connection.prepareStatement(
+                "INSERT INTO election (id, polity_id, position, office, called_on, closes_on) VALUES (?, ?, ?, ?, ?, ?)");
+             PreparedStatement insertCandidate = connection.prepareStatement("""
+                     INSERT INTO election_candidate (election_id, position, candidate_kind, candidate_id, platform)
+                     VALUES (?, ?, ?, ?, ?)""");
+             PreparedStatement insertBallot = connection.prepareStatement("""
+                     INSERT INTO election_ballot (election_id, position, voter_kind, voter_id, candidate_kind, candidate_id)
+                     VALUES (?, ?, ?, ?, ?, ?)""")) {
+            int position = 0;
+            for (Election election : elections) {
+                String electionId = election.id().value().toString();
+                insertElection.setString(1, electionId);
+                insertElection.setString(2, polityId);
+                insertElection.setInt(3, position++);
+                insertElection.setString(4, election.office().name());
+                insertElection.setLong(5, election.calledOn().value());
+                insertElection.setLong(6, election.closesOn().value());
+                insertElection.addBatch();
+                int candidatePosition = 0;
+                for (ActorRef candidate : election.candidates()) {
+                    insertCandidate.setString(1, electionId);
+                    insertCandidate.setInt(2, candidatePosition++);
+                    insertCandidate.setString(3, ActorCodec.kindOf(candidate));
+                    insertCandidate.setString(4, candidate.uuid().toString());
+                    insertCandidate.setString(5, election.platformOf(candidate).name());
+                    insertCandidate.addBatch();
+                }
+                int ballotPosition = 0;
+                for (Ballot ballot : election.ballots()) {
+                    insertBallot.setString(1, electionId);
+                    insertBallot.setInt(2, ballotPosition++);
+                    insertBallot.setString(3, ActorCodec.kindOf(ballot.voter()));
+                    insertBallot.setString(4, ballot.voter().uuid().toString());
+                    insertBallot.setString(5, ActorCodec.kindOf(ballot.candidate()));
+                    insertBallot.setString(6, ballot.candidate().uuid().toString());
+                    insertBallot.addBatch();
+                }
+            }
+            insertElection.executeBatch();
+            insertCandidate.executeBatch();
+            insertBallot.executeBatch();
+        }
+    }
+
+    private static Map<String, List<OfficeTerm>> loadOffices(Connection connection) throws SQLException {
+        Map<String, List<OfficeTerm>> offices = new HashMap<>();
+        try (PreparedStatement select = connection.prepareStatement(
+                "SELECT polity_id, office, holder_kind, holder_id, since, until FROM office ORDER BY polity_id, office");
+             ResultSet rows = select.executeQuery()) {
+            while (rows.next()) {
+                long until = rows.getLong("until");
+                Optional<Day> end = rows.wasNull() ? Optional.empty() : Optional.of(Day.of(until));
+                offices.computeIfAbsent(rows.getString("polity_id"), ignored -> new ArrayList<>()).add(new OfficeTerm(
+                        Office.valueOf(rows.getString("office")),
+                        ActorCodec.decode(rows.getString("holder_kind"), rows.getString("holder_id")),
+                        Day.of(rows.getLong("since")), end));
+            }
+        }
+        return offices;
+    }
+
+    private static Map<String, List<Election>> loadElections(Connection connection) throws SQLException {
+        Map<String, List<ActorRef>> candidates = new HashMap<>();
+        Map<String, Map<ActorRef, Platform>> platforms = new HashMap<>();
+        try (PreparedStatement select = connection.prepareStatement("""
+                SELECT election_id, candidate_kind, candidate_id, platform
+                FROM election_candidate ORDER BY election_id, position""");
+             ResultSet rows = select.executeQuery()) {
+            while (rows.next()) {
+                String electionId = rows.getString("election_id");
+                ActorRef candidate = ActorCodec.decode(rows.getString("candidate_kind"), rows.getString("candidate_id"));
+                candidates.computeIfAbsent(electionId, ignored -> new ArrayList<>()).add(candidate);
+                platforms.computeIfAbsent(electionId, ignored -> new HashMap<>())
+                        .put(candidate, Platform.valueOf(rows.getString("platform")));
+            }
+        }
+        Map<String, List<Ballot>> ballots = new HashMap<>();
+        try (PreparedStatement select = connection.prepareStatement("""
+                SELECT election_id, voter_kind, voter_id, candidate_kind, candidate_id
+                FROM election_ballot ORDER BY election_id, position""");
+             ResultSet rows = select.executeQuery()) {
+            while (rows.next()) {
+                ballots.computeIfAbsent(rows.getString("election_id"), ignored -> new ArrayList<>()).add(new Ballot(
+                        ActorCodec.decode(rows.getString("voter_kind"), rows.getString("voter_id")),
+                        ActorCodec.decode(rows.getString("candidate_kind"), rows.getString("candidate_id"))));
+            }
+        }
+        Map<String, List<Election>> elections = new HashMap<>();
+        try (PreparedStatement select = connection.prepareStatement(
+                "SELECT id, polity_id, office, called_on, closes_on FROM election ORDER BY polity_id, position");
+             ResultSet rows = select.executeQuery()) {
+            while (rows.next()) {
+                String id = rows.getString("id");
+                elections.computeIfAbsent(rows.getString("polity_id"), ignored -> new ArrayList<>()).add(new Election(
+                        new ElectionId(UUID.fromString(id)), Office.valueOf(rows.getString("office")),
+                        Day.of(rows.getLong("called_on")), Day.of(rows.getLong("closes_on")),
+                        candidates.getOrDefault(id, List.of()), ballots.getOrDefault(id, List.of()),
+                        platforms.getOrDefault(id, Map.of())));
+            }
+        }
+        return elections;
+    }
+
     private Map<String, List<Proposal>> loadProposals(Connection connection) throws SQLException {
         Map<String, List<Vote>> votes = new HashMap<>();
         try (PreparedStatement select = connection.prepareStatement(
@@ -225,6 +361,8 @@ final class PolityTable {
         Map<String, List<Membership>> members = loadMembers(connection);
         Map<String, List<EnactedStatute>> statutes = loadStatutes(connection);
         Map<String, List<Proposal>> proposals = loadProposals(connection);
+        Map<String, List<OfficeTerm>> offices = loadOffices(connection);
+        Map<String, List<Election>> elections = loadElections(connection);
         List<Polity> polities = new ArrayList<>();
         try (PreparedStatement select = connection.prepareStatement(
                 """
@@ -237,7 +375,8 @@ final class PolityTable {
                         PolityKind.valueOf(rows.getString("kind")), SettlementTier.valueOf(rows.getString("tier")),
                         new CurrencyId(rows.getString("currency")), Day.of(rows.getLong("founded_on")), seatOf(rows),
                         members.getOrDefault(id, List.of()), statutes.getOrDefault(id, List.of()),
-                        proposals.getOrDefault(id, List.of())));
+                        proposals.getOrDefault(id, List.of()), offices.getOrDefault(id, List.of()),
+                        elections.getOrDefault(id, List.of())));
             }
         }
         return polities;

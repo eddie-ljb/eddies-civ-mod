@@ -6,6 +6,7 @@ import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.actor.PlayerRef;
 import de.etiennebader.civ.domain.actor.PolityRef;
+import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.polity.SettlementTier;
 import de.etiennebader.civ.domain.shared.DomainException;
@@ -84,6 +85,7 @@ public final class Texts {
             case PolityView polity -> polity.name().value();
             case SettlementTier tier -> tier(tier);
             case ClaimType type -> claimType(type);
+            case Office office -> Message.of(TranslationKeys.office(office));
             default -> value.toString();
         };
     }

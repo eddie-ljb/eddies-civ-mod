@@ -43,6 +43,7 @@ class PackageDependencyRulesTest {
             Map.entry("fiscal", Set.of("shared", "actor", "law", "territory", "land", "economy", "polity")),
             Map.entry("protection", Set.of("shared", "actor", "law", "territory", "land", "polity")),
             Map.entry("market", Set.of("shared", "actor")),
+            Map.entry("population", Set.of("shared", "actor")),
             Map.entry("shop", Set.of("shared", "actor", "market", "territory")));
 
     @Test

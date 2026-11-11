@@ -15,6 +15,7 @@ import de.etiennebader.civ.domain.law.ParameterKey;
 import de.etiennebader.civ.domain.law.ParameterValue;
 import de.etiennebader.civ.domain.polity.Membership;
 import de.etiennebader.civ.domain.polity.MembershipType;
+import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.PolityName;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.shared.CurrencyId;
@@ -195,6 +196,9 @@ public final class CivCommands {
             if (VotingService.votingRequired(polity)) {
                 return voting.propose(caller, polity, parsed);
             }
+            if (!polity.holds(caller.player(), Office.MAYOR)) {
+                return Reply.failure(Message.of(MessageKey.ONLY_MAYOR_DECREES, caller.name()));
+            }
             app.amendLaw().execute(new AmendLaw.Command(polity.id(), caller.player(), parsed, calendar.today()));
             return Reply.success(Message.of(MessageKey.LAW_AMENDED, polity.name().value(),
                     Message.of(TranslationKeys.law(key.get())), texts.lawValue(parsed.value())));
@@ -232,7 +236,8 @@ public final class CivCommands {
     public Reply help() {
         return Reply.success(Message.of(MessageKey.HELP_HEADER), Message.of(MessageKey.HELP_TOWN),
                 Message.of(MessageKey.HELP_JOIN), Message.of(MessageKey.HELP_LAND), Message.of(MessageKey.HELP_LAWS),
-                Message.of(MessageKey.HELP_VOTES), Message.of(MessageKey.HELP_PLOTS), Message.of(MessageKey.HELP_SHOPS),
+                Message.of(MessageKey.HELP_VOTES), Message.of(MessageKey.HELP_OFFICES), Message.of(MessageKey.HELP_MOOD), Message.of(MessageKey.HELP_PLOTS),
+                Message.of(MessageKey.HELP_SHOPS),
                 Message.of(MessageKey.HELP_BANK), Message.of(MessageKey.HELP_MARKET), Message.of(MessageKey.HELP_INFO));
     }
 

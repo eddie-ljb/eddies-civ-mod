@@ -61,11 +61,24 @@ public final class StandardParameters {
     public static final ParameterKey<Long> SALES_TAX_PERCENT =
             ParameterKey.constrained("sales_tax_percent", Long.class, 0L, percent -> percent >= 0 && percent <= 50);
 
+    /** Amtszeit gewählter Ämter in Tagen; 0 heißt unbefristet, dann wird nur auf Antrag gewählt. */
+    public static final ParameterKey<Long> TERM_DAYS =
+            ParameterKey.constrained("term_days", Long.class, 0L, days -> days >= 0 && days <= 365);
+
+    /** Wie viele Tage eine Wahl läuft; ausgezählt wird am Ende des letzten Tages. */
+    public static final ParameterKey<Long> ELECTION_DAYS =
+            ParameterKey.constrained("election_days", Long.class, 2L, days -> days >= 1 && days <= 30);
+
+    /** Gewicht einer Dorfbewohner-Stimme bei Wahlen in Prozent einer Bürgerstimme; 0 heißt kein Wahlrecht. */
+    public static final ParameterKey<Long> VILLAGER_VOTE_PERCENT =
+            ParameterKey.constrained("villager_vote_percent", Long.class, 0L, percent -> percent >= 0 && percent <= 100);
+
     /** Alle Standardparameter in fester Reihenfolge. */
     public static List<ParameterKey<?>> all() {
         return List.of(LAND_TAX_PER_BLOCK, LAND_TAX_FREE_BLOCKS, LAND_TAX_GRACE_DAYS, TAX_EMBASSIES, MAX_OUTPOSTS,
                 OUTSIDERS_MAY_BUILD, OUTSIDERS_MAY_INTERACT, OUTSIDERS_MAY_OPEN_CONTAINERS, EXPLOSIONS_ALLOWED,
-                FIRE_SPREAD_ALLOWED, LAWS_BY_VOTE, VOTE_DAYS, SALES_TAX_PERCENT);
+                FIRE_SPREAD_ALLOWED, LAWS_BY_VOTE, VOTE_DAYS, SALES_TAX_PERCENT, TERM_DAYS, ELECTION_DAYS,
+                VILLAGER_VOTE_PERCENT);
     }
 
     private StandardParameters() {

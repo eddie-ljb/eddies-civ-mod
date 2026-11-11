@@ -10,12 +10,14 @@ import de.etiennebader.civ.domain.law.Statute;
 import de.etiennebader.civ.domain.shared.AggregateRoot;
 import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.Day;
+import de.etiennebader.civ.domain.shared.ElectionId;
 import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.shared.ProposalId;
 import de.etiennebader.civ.domain.shared.StatuteId;
 import de.etiennebader.civ.domain.territory.BlockPosition;
 
 import java.util.Collection;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +41,8 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
     private Optional<BlockPosition> seat;
     private final Map<ActorRef, Membership> members = new LinkedHashMap<>();
     private final Map<ProposalId, Proposal> proposals = new LinkedHashMap<>();
+    private final Map<Office, OfficeTerm> offices = new EnumMap<>(Office.class);
+    private final Map<ElectionId, Election> elections = new LinkedHashMap<>();
     private final LawBook lawBook = new LawBook();
 
     private Polity(PolityId id, PolityName name, PolityKind kind, SettlementTier tier,
@@ -92,6 +96,44 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
     public static Polity restore(PolityId id, PolityName name, PolityKind kind, SettlementTier tier, CurrencyId currency,
                                  Day foundedOn, Optional<BlockPosition> seat, List<Membership> members,
                                  List<EnactedStatute> statutes, List<Proposal> proposals) {
+        return restore(id, name, kind, tier, currency, foundedOn, seat, members, statutes, proposals, List.of(),
+                List.of());
+    }
+
+    /**
+     * Wie oben, zusätzlich mit Amtsinhabern und laufenden Wahlen.
+     *
+     * @throws IllegalArgumentException wenn die Daten keine gültige Polity ergeben, z. B. ein Amtsinhaber kein Mitglied
+     *                                  ist oder ein Amt doppelt besetzt
+     */
+    public static Polity restore(PolityId id, PolityName name, PolityKind kind, SettlementTier tier, CurrencyId currency,
+                                 Day foundedOn, Optional<BlockPosition> seat, List<Membership> members,
+                                 List<EnactedStatute> statutes, List<Proposal> proposals, List<OfficeTerm> offices,
+                                 List<Election> elections) {
+        Objects.requireNonNull(offices, "offices");
+        Objects.requireNonNull(elections, "elections");
+        Polity polity = restoreCore(id, name, kind, tier, currency, foundedOn, seat, members, statutes, proposals);
+        for (OfficeTerm term : offices) {
+            if (!polity.isMember(term.holder())) {
+                throw new IllegalArgumentException("Amtsinhaber ist kein Mitglied von " + id + ": " + term.holder());
+            }
+            if (polity.offices.putIfAbsent(term.office(), term) != null) {
+                throw new IllegalArgumentException("Amt doppelt besetzt in " + id + ": " + term.office());
+            }
+        }
+        for (Election election : elections) {
+            if (polity.elections.values().stream().anyMatch(open -> open.office() == election.office())) {
+                throw new IllegalArgumentException("Zwei Wahlen für dasselbe Amt in " + id + ": " + election.office());
+            }
+            polity.elections.put(election.id(), election);
+        }
+        return polity;
+    }
+
+    private static Polity restoreCore(PolityId id, PolityName name, PolityKind kind, SettlementTier tier,
+                                      CurrencyId currency, Day foundedOn, Optional<BlockPosition> seat,
+                                      List<Membership> members, List<EnactedStatute> statutes,
+                                      List<Proposal> proposals) {
         Objects.requireNonNull(members, "members");
         Objects.requireNonNull(proposals, "proposals");
         Objects.requireNonNull(statutes, "statutes");
@@ -145,6 +187,163 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
         }
         members.remove(member);
         raise(new MemberLeft(id, member, day));
+        for (OfficeTerm term : List.copyOf(offices.values())) {
+            if (term.holder().equals(member)) {
+                vacateOffice(term.office(), day);
+            }
+        }
+        elections.replaceAll((electionId, election) -> election.without(member));
+    }
+
+    /**
+     * Besetzt ein Amt, durch Wahl oder Ernennung. Ein bisheriger Inhaber verliert es.
+     *
+     * @param until letzter Tag der Amtszeit; leer für unbefristet
+     * @throws NotAMemberException wenn der neue Inhaber kein Mitglied ist
+     */
+    public void fillOffice(Office office, ActorRef holder, Optional<Day> until, Day day) {
+        Objects.requireNonNull(office, "office");
+        Objects.requireNonNull(day, "day");
+        if (!isMember(holder)) {
+            throw new NotAMemberException(holder);
+        }
+        offices.put(office, new OfficeTerm(office, holder, day, until));
+        raise(new OfficeFilled(id, office, holder, day));
+    }
+
+    /**
+     * Macht ein Amt frei.
+     *
+     * @return ob das Amt besetzt war
+     */
+    public boolean vacateOffice(Office office, Day day) {
+        Objects.requireNonNull(office, "office");
+        Objects.requireNonNull(day, "day");
+        OfficeTerm previous = offices.remove(office);
+        if (previous == null) {
+            return false;
+        }
+        raise(new OfficeVacated(id, office, previous.holder(), day));
+        return true;
+    }
+
+    /**
+     * Ruft eine Wahl für ein Amt aus.
+     *
+     * @param closesOn an dessen Ende wird ausgezählt
+     * @throws ElectionAlreadyOpenException wenn für das Amt schon gewählt wird
+     */
+    public void callElection(ElectionId electionId, Office office, Day closesOn, Day day) {
+        Objects.requireNonNull(electionId, "electionId");
+        Objects.requireNonNull(office, "office");
+        if (elections.containsKey(electionId)) {
+            throw new IllegalArgumentException("Wahl existiert bereits: " + electionId);
+        }
+        if (electionFor(office).isPresent()) {
+            throw new ElectionAlreadyOpenException(office);
+        }
+        elections.put(electionId, new Election(electionId, office, day, closesOn, List.of(), List.of()));
+        raise(new ElectionCalled(id, electionId, office, closesOn, day));
+    }
+
+    /**
+     * Ein Mitglied kandidiert. Ob es dafür Bürger sein muss, entscheidet der Aufrufer.
+     *
+     * @throws UnknownElectionException   wenn es die Wahl nicht gibt
+     * @throws NotAMemberException        wenn der Kandidat kein Mitglied ist
+     * @throws AlreadyCandidateException  wenn er schon kandidiert
+     */
+    public void standForElection(ElectionId electionId, ActorRef candidate, Day day) {
+        standForElection(electionId, candidate, Platform.NONE, day);
+    }
+
+    /**
+     * Wie oben, mit Wahlprogramm.
+     */
+    public void standForElection(ElectionId electionId, ActorRef candidate, Platform platform, Day day) {
+        Objects.requireNonNull(platform, "platform");
+        Objects.requireNonNull(day, "day");
+        Election election = requireElection(electionId);
+        if (!isMember(candidate)) {
+            throw new NotAMemberException(candidate);
+        }
+        if (election.isCandidate(candidate)) {
+            throw new AlreadyCandidateException(candidate);
+        }
+        elections.put(electionId, election.withCandidate(candidate, platform));
+        raise(new CandidacyDeclared(id, electionId, candidate, platform, day));
+    }
+
+    /**
+     * Gibt eine Stimme ab oder ändert sie.
+     *
+     * @throws UnknownElectionException wenn es die Wahl nicht gibt
+     * @throws NotAMemberException      wenn der Wähler kein Mitglied ist
+     * @throws NotACandidateException   wenn der Gewählte nicht kandidiert
+     */
+    public void castBallot(ElectionId electionId, ActorRef voter, ActorRef candidate, Day day) {
+        Objects.requireNonNull(day, "day");
+        Election election = requireElection(electionId);
+        if (!isMember(voter)) {
+            throw new NotAMemberException(voter);
+        }
+        if (!election.isCandidate(candidate)) {
+            throw new NotACandidateException(candidate);
+        }
+        elections.put(electionId, election.withBallot(new Ballot(voter, candidate)));
+        raise(new BallotCast(id, electionId, voter, day));
+    }
+
+    /**
+     * Beendet eine Wahl. Den Gewinner ermittelt der Aufrufer; er erhält das Amt.
+     *
+     * @param winner leer, wenn niemand kandidiert hat; das Amt bleibt dann, wie es ist
+     * @param until  letzter Tag der neuen Amtszeit; leer für unbefristet
+     * @return die beendete Wahl
+     * @throws UnknownElectionException wenn es die Wahl nicht gibt
+     * @throws NotACandidateException   wenn der Gewinner nicht kandidiert hat
+     */
+    public Election closeElection(ElectionId electionId, Optional<ActorRef> winner, Optional<Day> until, Day day) {
+        Objects.requireNonNull(winner, "winner");
+        Objects.requireNonNull(day, "day");
+        Election election = requireElection(electionId);
+        if (winner.isPresent() && !election.isCandidate(winner.get())) {
+            throw new NotACandidateException(winner.get());
+        }
+        elections.remove(electionId);
+        raise(new ElectionClosed(id, electionId, election.office(), winner.isPresent(), day));
+        winner.ifPresent(elected -> fillOffice(election.office(), elected, until, day));
+        return election;
+    }
+
+    @Override
+    public Optional<OfficeTerm> officeTerm(Office office) {
+        return Optional.ofNullable(offices.get(Objects.requireNonNull(office, "office")));
+    }
+
+    @Override
+    public Collection<OfficeTerm> offices() {
+        return List.copyOf(offices.values());
+    }
+
+    @Override
+    public Collection<Election> elections() {
+        return List.copyOf(elections.values());
+    }
+
+    @Override
+    public Optional<Election> electionFor(Office office) {
+        Objects.requireNonNull(office, "office");
+        return elections.values().stream().filter(election -> election.office() == office).findFirst();
+    }
+
+    private Election requireElection(ElectionId electionId) {
+        Objects.requireNonNull(electionId, "electionId");
+        Election election = elections.get(electionId);
+        if (election == null) {
+            throw new UnknownElectionException(electionId);
+        }
+        return election;
     }
 
     /**

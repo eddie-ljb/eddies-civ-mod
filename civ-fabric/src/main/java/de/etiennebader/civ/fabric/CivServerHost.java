@@ -68,7 +68,7 @@ public final class CivServerHost {
         LOGGER.info("Zivilisation geladen: {} Gemeinden, Tag {} ({})", civ.queries().polities().size(),
                 civ.calendar().today().value(), file);
         try {
-            civ.startWeb(id -> Goods.item(id).map(item -> Goods.traits(new ItemStack(item))))
+            civ.startWeb(id -> Goods.item(id).map(item -> Goods.traits(new ItemStack(item))), server::execute)
                     .ifPresent(port -> LOGGER.info("Webseite läuft auf Port {}", port));
         } catch (IOException e) {
             LOGGER.warn("Webseite konnte nicht starten (Port belegt?): {}", e.getMessage());

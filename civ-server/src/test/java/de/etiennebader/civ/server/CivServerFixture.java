@@ -24,7 +24,11 @@ public final class CivServerFixture {
     }
 
     public static CivServerFixture start(IdGenerator ids) {
-        return new CivServerFixture(CivServer.start(new MemoryStateStore(), SETTINGS, ids, SaveListener.NONE));
+        return start(ids, SETTINGS);
+    }
+
+    public static CivServerFixture start(IdGenerator ids, ServerSettings settings) {
+        return new CivServerFixture(CivServer.start(new MemoryStateStore(), settings, ids, SaveListener.NONE));
     }
 
     public CivCommands commands() {
@@ -69,6 +73,18 @@ public final class CivServerFixture {
 
     public de.etiennebader.civ.server.shop.ShopService shops() {
         return server.shops();
+    }
+
+    public de.etiennebader.civ.server.office.OfficeService offices() {
+        return server.offices();
+    }
+
+    public void playerJoined(de.etiennebader.civ.domain.actor.PlayerRef player, String name) {
+        server.playerJoined(player, name);
+    }
+
+    public DayReport endDayNow() {
+        return server.endDayNow();
     }
 
     public ProtectionService protection() {

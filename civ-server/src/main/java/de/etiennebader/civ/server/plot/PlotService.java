@@ -18,7 +18,6 @@ import de.etiennebader.civ.domain.land.PlotType;
 import de.etiennebader.civ.domain.law.StandardParameters;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.shared.DomainException;
-import de.etiennebader.civ.domain.shared.ErrorCode;
 import de.etiennebader.civ.domain.shared.Money;
 import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.territory.BlockPosition;
@@ -135,7 +134,7 @@ public final class PlotService {
         if (area.size() > MAX_AREA) {
             return Reply.failure(Message.of(MessageKey.PLOT_TOO_LARGE, area.size(), MAX_AREA));
         }
-        return asCitizen(caller, town -> attempt(() -> {
+        return asPlotManager(caller, town -> attempt(() -> {
             app.createPlot().execute(new CreatePlot.Command(town.id(), area, type.get(), calendar.today()));
             return Reply.success(Message.of(MessageKey.PLOT_CREATED, Message.of(TranslationKeys.plotType(type.get())),
                     area.width(), area.depth(), town.name().value()));
@@ -338,19 +337,23 @@ public final class PlotService {
         Reply apply(PlotView plot);
     }
 
-    private Reply asCitizen(Caller caller, TownAction action) {
+    /** Nur Bürgermeister und Bauamt verwalten die Grundstücke der Gemeinde. */
+    private Reply asPlotManager(Caller caller, TownAction action) {
         Optional<PolityView> town = queries.municipalityOf(caller.player());
         if (town.isEmpty()) {
             return Reply.failure(Message.of(MessageKey.NOT_IN_MUNICIPALITY));
         }
-        if (!TownRoles.isCitizen(town.get(), caller.player())) {
-            return Reply.failure(Message.of(ErrorCode.NOT_A_CITIZEN.translationKey(), caller.name(),
-                    town.get().name().value()));
+        if (!TownRoles.mayManagePlots(town.get(), caller.player())) {
+            return notPlanner(caller);
         }
         return action.apply(town.get());
     }
 
-    /** Für den Inhaber selbst oder, bei Gemeindeland, für einen Bürger der Gemeinde. */
+    private Reply notPlanner(Caller caller) {
+        return Reply.failure(Message.of(MessageKey.ONLY_PLOT_MANAGERS, caller.name()));
+    }
+
+    /** Für den Inhaber selbst oder, bei Gemeindeland, für Bürgermeister und Bauamt der Gemeinde. */
     private Reply withOwnPlot(Caller caller, HolderAction action) {
         Optional<PlotView> plot = plotAt(caller.player(), caller.position());
         if (plot.isEmpty()) {
@@ -361,13 +364,13 @@ public final class PlotService {
             return action.apply(view, caller.player());
         }
         PolityView town = queries.polity(view.town()).orElseThrow();
-        if (view.townLand() && TownRoles.isCitizen(town, caller.player())) {
+        if (view.townLand() && TownRoles.mayManagePlots(town, caller.player())) {
             return action.apply(view, town.asActor());
         }
         return Reply.failure(Message.of(MessageKey.PLOT_NOT_YOURS, view.holder()));
     }
 
-    /** Nur für Gemeindeland, nur für Bürger der Gemeinde. */
+    /** Nur für Gemeindeland, nur für Bürgermeister und Bauamt der Gemeinde. */
     private Reply withTownPlot(Caller caller, PlotAction action) {
         Optional<PlotView> plot = plotAt(caller.player(), caller.position());
         if (plot.isEmpty()) {
@@ -375,8 +378,8 @@ public final class PlotService {
         }
         PlotView view = plot.get();
         PolityView town = queries.polity(view.town()).orElseThrow();
-        if (!TownRoles.isCitizen(town, caller.player())) {
-            return Reply.failure(Message.of(ErrorCode.NOT_A_CITIZEN.translationKey(), caller.name(), town.name().value()));
+        if (!TownRoles.mayManagePlots(town, caller.player())) {
+            return notPlanner(caller);
         }
         if (!view.townLand()) {
             return Reply.failure(Message.of(MessageKey.PLOT_NOT_TOWN_LAND, view.holder()));

@@ -27,7 +27,11 @@ Wer eine Gemeinde betritt oder verlässt, sieht ihren Namen als Titel. Auf Grund
 
 ### Dorfbewohner
 - Dorfbewohner, die das Gebiet einer Gemeinde betreten, werden dort Einwohner. In der Wildnis bleiben sie in ihrer bisherigen Gemeinde gemeldet. Stirbt ein Dorfbewohner, tritt er aus.
-- Jeder Dorfbewohner erwirtschaftet täglich Geld für die Gemeindekasse; Standard ist ¼ Smaragd.
+- Jeder Dorfbewohner erwirtschaftet täglich Geld für die Gemeindekasse; Standard ist ¼ Smaragd. Zufriedene leisten bis zu 50 % mehr, Unzufriedene bis zu 50 % weniger.
+- **Persönlichkeit:** Jeder Dorfbewohner hat feste Ansichten auf drei Achsen: *Ordnung ↔ Freiheit*, *Sparsamkeit ↔ Großzügigkeit* und *Heimatverbundenheit*.
+- **Zufriedenheit** (-100 bis 100) setzt sich zusammen aus Grundstimmung, *Ordnung* (wie streng Explosionen, Feuer und Rechte von Fremden geregelt sind; Ordnungsliebende mögen es streng, Freigeister locker), *Steuern* (stören jeden, Sparsame am meisten), *Mitsprache* (gewählter Bürgermeister, Abstimmungen, Wahlrecht für Dorfbewohner) und *Wohlstand* (Siedlungsstufe).
+- **Abwanderung:** Wer unter -30 Zufriedenheit fällt, denkt ans Wegziehen; je unzufriedener und rastloser, desto eher geht er am Tagesende. Gibt es eine Gemeinde, in der er deutlich zufriedener wäre, zieht er dorthin und erscheint neben deren Gemeindehaus, sonst verschwindet er in die Wildnis. Höchstens ein Viertel der Dorfbewohner geht pro Tag. Abschaltbar mit `villager_emigration=false` in der Konfiguration.
+- Im Gemeindehaus zeigt ein Klick auf die Glocke die Stimmung im Detail, `/civ stimmung` fasst sie im Chat zusammen. Schleichen + Rechtsklick mit leerer Hand auf einen Dorfbewohner zeigt seine Persönlichkeit und Zufriedenheit. Zufriedene Dorfbewohner lassen ab und zu grüne Funken aufsteigen, unzufriedene kleine Gewitterwolken.
 - Die Siedlungsstufe richtet sich nach allen Einwohnern: ab 10 Marktgemeinde, ab 30 Stadt, ab 80 Metropole. Jede Stufe erlaubt 8 Chunks mehr Gebiet.
 - Für die Gebietsgröße zählen Dorfbewohner nur zu einem Viertel. So lässt sich Land nicht allein durch Zucht vergrößern.
 
@@ -43,7 +47,7 @@ Im Kreativmodus liegen alle Blöcke des Mods, der Grundstücksstab und nützlich
 
 ### Grundstücke
 Grundstücke teilen das Gemeindeland auf. Nur ihre Inhaber dürfen dort bauen, und nur für sie fällt Grundsteuer an.
-1. Ein Bürger stellt sich an eine Ecke und tippt `/civ grundstueck ecke1`, an der gegenüberliegenden Ecke `ecke2`. Bequemer geht es mit dem **Grundstücksstab** (Stock + Smaragd diagonal): Linksklick auf einen Block setzt Ecke 1, Rechtsklick Ecke 2. Partikel zeigen die Auswahl.
+1. Der Bürgermeister oder das Bauamt stellt sich an eine Ecke und tippt `/civ grundstueck ecke1`, an der gegenüberliegenden Ecke `ecke2`. Bequemer geht es mit dem **Grundstücksstab** (Stock + Smaragd diagonal): Linksklick auf einen Block setzt Ecke 1, Rechtsklick Ecke 2. Partikel zeigen die Auswahl.
 2. `/civ grundstueck erstellen wohnen` macht daraus ein Grundstück der Gemeinde. `/civ grundstueck chunk wohnen` nimmt stattdessen den ganzen Chunk.
    Mögliche Arten: `wohnen`, `gewerbe`, `industrie`, `landwirtschaft`, `oeffentlich`, `botschaft`.
 3. Danach gibt es zwei Möglichkeiten:
@@ -57,6 +61,24 @@ Gilt das Gesetz **Rechtsänderungen per Abstimmung**, wird jede Änderung im Rec
 - Hat mehr als die Hälfte der Bürger zugestimmt, gilt die Änderung sofort. Hat mindestens die Hälfte abgelehnt, ist sie gescheitert.
 - Sonst wird nach **Dauer einer Abstimmung** (Standard: 2 Tage) ausgezählt. Dann entscheidet die Mehrheit der abgegebenen Stimmen; bei Gleichstand gilt der Antrag als abgelehnt.
 - Dorfbewohner und Einwohner ohne Bürgerrecht stimmen nicht mit ab.
+- Ohne Abstimmungen ändert nur der Bürgermeister das Recht.
+
+### Ämter und Wahlen
+Jede Gemeinde hat drei Ämter: **Bürgermeister**, **Schatzmeister** und **Bauamt**.
+
+| Amt | Darf |
+|---|---|
+| Bürgermeister | Recht ändern (ohne Abstimmungen), Kasse verwalten, Grundstücke verwalten, Sitz verlegen, Gemeinde auflösen, Schatzmeister und Bauamt ernennen oder entlassen |
+| Schatzmeister | Geld aus der Gemeindekasse nehmen |
+| Bauamt | Grundstücke der Gemeinde anlegen, anbieten, vergeben und auflösen |
+
+- Solange niemand gewählt wurde, ist der dienstälteste Bürger kommissarisch Bürgermeister, anfangs der Gründer.
+- **Wahl ausrufen:** im Gemeindehaus unter **Ämter und Wahlen** per Umschalt-Klick auf das Amt oder mit `/civ wahl ausrufen <Amt>`. Der Bürgermeister darf das jederzeit, andere Bürger nur, wenn das Amt frei oder die Amtszeit abgelaufen ist.
+- **Kandidieren und wählen:** Klick aufs Amt bzw. auf einen Kandidaten, oder `/civ wahl kandidieren <Amt> [Programm]` und `/civ wahl stimmen <Amt> <Spieler>`. Programme: `ordnung` (Sicherheit und Ordnung), `freiheit`, `steuern` (niedrige Steuern), `ausbau` (Ausbau der Gemeinde) oder `ohne`. Die Stimme lässt sich bis zum Ende ändern. Wer wen gewählt hat, bleibt geheim.
+- **Auszählung** am Ende von Tag *Ausruf + Wahldauer* (Standard 2 Tage). Es gewinnt die höchste Stimmenzahl; bei Gleichstand der Amtsinhaber, sonst wer zuerst kandidiert hat. Hat niemand kandidiert, bleibt alles, wie es ist.
+- **Amtszeit:** Mit `term_days` größer 0 laufen Ämter ab und werden automatisch neu gewählt, das Bürgermeisteramt auch, wenn es noch nie gewählt wurde. Bei 0 (Standard) sind Ämter unbefristet.
+- **Dorfbewohner wählen mit**, wenn `villager_vote_percent` größer 0 ist; ihre Stimme zählt mit diesem Gewicht (100 = wie ein Bürger). Kandidieren können sie nicht. Sie wählen nach ihrer Persönlichkeit das passende Programm; wer unter Steuern leidet, neigt zu „Niedrige Steuern“. Zufriedene halten zum Amtsinhaber, Unzufriedene wählen den Wechsel. Wem kein Kandidat zusagt, bleibt zu Hause.
+- Wer austritt, verliert seine Ämter, seine Kandidatur und seine Stimme.
 
 ### Schutz
 Im Gemeindegebiet gilt Folgendes, solange das Recht nichts anderes erlaubt:
@@ -90,7 +112,7 @@ Der Server stellt eine Webseite bereit, standardmäßig auf Port 8765:
 - **Übersicht** mit allen Gemeinden, Einwohnern, Kassen und Grundstücken
 - **Karte** aller beanspruchten Chunks je Dimension, zum Verschieben und Zoomen
 - **Markt** mit aktuellen Preisen und Lagerbeständen sowie allen Läden der Spieler
-- **Mein Bereich:** Mit `/civ web` holst du dir im Spiel einen Code. Mit ihm meldest du dich an und siehst deinen Kontostand, überweist Geld und stimmst ab.
+- **Mein Bereich:** Mit `/civ web` holst du dir im Spiel einen Code. Mit ihm meldest du dich an und siehst deinen Kontostand, überweist Geld, stimmst ab, kandidierst und wählst.
 
 ### Befehle
 | Befehl | Wirkung |
@@ -119,28 +141,35 @@ Der Server stellt eine Webseite bereit, standardmäßig auf Port 8765:
 | `/civ kaufen <Anzahl> <Item>` | vom Markt kaufen |
 | `/civ grundstueck [info]` | Grundstück unter dir, Umriss als Partikel |
 | `/civ grundstueck ecke1` / `ecke2` | Ecken einer Auswahl setzen |
-| `/civ grundstueck erstellen <Art>` | Auswahl zum Grundstück machen (Bürger) |
-| `/civ grundstueck chunk <Art>` | ganzen Chunk zum Grundstück machen (Bürger) |
+| `/civ grundstueck erstellen <Art>` | Auswahl zum Grundstück machen (Bürgermeister, Bauamt) |
+| `/civ grundstueck chunk <Art>` | ganzen Chunk zum Grundstück machen (Bürgermeister, Bauamt) |
 | `/civ grundstueck anbieten <Preis>` | Grundstück zum Verkauf anbieten |
 | `/civ grundstueck zurueckziehen` | Verkaufsangebot zurückziehen |
 | `/civ grundstueck kaufen` | angebotenes Grundstück kaufen |
-| `/civ grundstueck vergeben <Spieler>` | Gemeindeland verschenken (Bürger) |
-| `/civ grundstueck aufloesen` | Grundstück der Gemeinde auflösen (Bürger) |
+| `/civ grundstueck vergeben <Spieler>` | Gemeindeland verschenken (Bürgermeister, Bauamt) |
+| `/civ grundstueck aufloesen` | Grundstück der Gemeinde auflösen (Bürgermeister, Bauamt) |
 | `/civ laden eroeffnen <Preis>` | Kiste im Blick wird Laden für das Item in der Hand |
 | `/civ laden schliessen` | Laden an der Kiste im Blick schließen |
 | `/civ laden liste` | eigene Läden |
 | `/civ web` | Anmeldecode für die Webseite |
 | `/civ abstimmungen` | offene Abstimmungen |
 | `/civ abstimmen <Nr> ja\|nein` | abstimmen |
+| `/civ aemter` | Ämter, Inhaber und laufende Wahlen |
+| `/civ stimmung` | Stimmung der Dorfbewohner |
+| `/civ wahl ausrufen <Amt>` | Wahl ausrufen (`buergermeister`, `schatzmeister`, `bauamt`) |
+| `/civ wahl kandidieren <Amt> [Programm]` | kandidieren, optional mit Programm |
+| `/civ wahl stimmen <Amt> <Spieler>` | wählen |
+| `/civ amt ernennen <Amt> <Spieler>` | Schatzmeister oder Bauamt ernennen (Bürgermeister) |
+| `/civ amt entlassen <Amt>` | Amt frei machen (Bürgermeister) |
 
 Nur für Admins:
 - `/civ gruenden <Name>` gründet eine Gemeinde ohne Gemeindehaus.
 - `/civ admin umgehen` schaltet den Gebietsschutz für dich selbst ab und wieder an.
 - `/civ admin aufloesen <Name>` löst eine Gemeinde auf.
-- `/civ admin tag` beendet den laufenden Tag sofort: Grundsteuer, Einnahmen der Dorfbewohner und fällige Abstimmungen werden abgerechnet. Praktisch zum Testen.
+- `/civ admin tag` beendet den laufenden Tag sofort: Grundsteuer, Einnahmen der Dorfbewohner, fällige Abstimmungen und Wahlen werden abgerechnet. Praktisch zum Testen.
 
 ### Recht
-Bürger stellen diese Regelungen im Menü **Recht** des Gemeindehauses ein:
+Der Bürgermeister (oder mit Abstimmungen die Bürger) stellt diese Regelungen im Menü **Recht** des Gemeindehauses ein:
 
 | Regelung | Bedeutung |
 |---|---|
@@ -157,6 +186,9 @@ Bürger stellen diese Regelungen im Menü **Recht** des Gemeindehauses ein:
 | Rechtsänderungen per Abstimmung | ja/nein |
 | Dauer einer Abstimmung in Tagen | Standard 2 |
 | Umsatzsteuer auf Ladenverkäufe in Prozent | 0 bis 50 |
+| Amtszeit gewählter Ämter in Tagen (`term_days`) | 0 = unbefristet (Standard) |
+| Dauer einer Wahl in Tagen (`election_days`) | Standard 2 |
+| Stimmgewicht von Dorfbewohnern in Prozent (`villager_vote_percent`) | 0 = kein Wahlrecht (Standard) |
 
 ## Für Server-Admins
 `config/eddies-civ-mod.properties` wird beim ersten Start angelegt:
@@ -168,6 +200,7 @@ Bürger stellen diese Regelungen im Menü **Recht** des Gemeindehauses ein:
 | `claim_per_member` | zusätzliche Chunks je Mitglied |
 | `price_reference_emeralds_per_player` | Geldmenge je Spieler, bei der der Markt Grundpreise zahlt |
 | `villager_income_hundredths_per_day` | Einnahmen je Dorfbewohner und Tag; 100 = 1 Smaragd |
+| `villager_emigration` | ob sehr unzufriedene Dorfbewohner wegziehen (Standard `true`) |
 | `market_town_inhabitants`, `city_inhabitants`, `metropolis_inhabitants` | Einwohner für die Siedlungsstufen |
 | `web_enabled`, `web_bind`, `web_port` | Webseite ein/aus, Adresse und Port (Standard `true`, `0.0.0.0`, `8765`) |
 | `web_public_url` | Adresse, die `/civ web` den Spielern nennt, z. B. `https://civ.example.org` |

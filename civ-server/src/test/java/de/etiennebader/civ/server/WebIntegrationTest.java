@@ -17,6 +17,8 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -25,6 +27,28 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class WebIntegrationTest {
 
     private record Response(int status, String body, String cookie) {
+    }
+
+    @Test
+    @DisplayName("Pausierter Einzelspieler: ohne Ticks beantwortet die Webseite Anfragen über den Executor des Servers")
+    void answersWhileServerIsPaused() throws Exception {
+        SeededIdGenerator ids = new SeededIdGenerator(62);
+        PlayerRef alice = new PlayerRef(PlayerId.generate(ids));
+        CivServer civ = CivServer.start(new MemoryStateStore(), withWeb(ServerSettings.withDayLength(1_200)), ids,
+                SaveListener.NONE);
+        civ.playerJoined(alice, "Alice");
+        civ.commands().found(new Caller(alice, "Alice", new ChunkCoord(DimensionId.OVERWORLD, 0, 0).center(64)),
+                "Nordhain");
+        ExecutorService mainThread = Executors.newSingleThreadExecutor();
+        try {
+            int port = civ.startWeb(id -> Optional.empty(), mainThread).orElseThrow();
+            Response world = request("http://127.0.0.1:" + port + "/api/world", null, null);
+            assertEquals(200, world.status());
+            assertTrue(world.body().contains("\"name\":\"Nordhain\""));
+        } finally {
+            civ.stop();
+            mainThread.shutdownNow();
+        }
     }
 
     @Test
@@ -40,7 +64,7 @@ class WebIntegrationTest {
         civ.playerJoined(bob, "Bob");
         civ.commands().found(aliceCaller, "Nordhain");
         civ.bank().deposit(aliceCaller, 10);
-        int port = civ.startWeb(id -> Optional.empty()).orElseThrow();
+        int port = civ.startWeb(id -> Optional.empty(), command -> { }).orElseThrow();
         String code = String.valueOf(civ.webLogin(aliceCaller).lines().getFirst().args().getFirst());
 
         AtomicBoolean running = new AtomicBoolean(true);
@@ -68,6 +92,9 @@ class WebIntegrationTest {
             Response me = request(base + "/api/me", null, cookie);
             assertTrue(me.body().contains("\"balance\":\"10,00\""), me.body());
             assertTrue(me.body().contains("\"town\":\"Nordhain\""));
+            assertTrue(me.body().contains("\"office\":\"MAYOR\""), me.body());
+            assertEquals(422, request(base + "/api/stand", "{\"office\":\"MAYOR\"}", cookie).status());
+            assertEquals(400, request(base + "/api/stand", "{\"office\":\"KAISER\"}", cookie).status());
 
             Response transfer = request(base + "/api/transfer", "{\"to\":\"Bob\",\"amount\":\"2,5\"}", cookie);
             assertEquals(200, transfer.status());

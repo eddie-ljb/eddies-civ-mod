@@ -16,6 +16,10 @@ import de.etiennebader.civ.application.land.OfferPlot;
 import de.etiennebader.civ.application.land.SellPlot;
 import de.etiennebader.civ.application.market.BuyFromMarket;
 import de.etiennebader.civ.application.market.SellToMarket;
+import de.etiennebader.civ.application.office.AppointOfficer;
+import de.etiennebader.civ.application.office.CallElection;
+import de.etiennebader.civ.application.office.CastBallot;
+import de.etiennebader.civ.application.office.StandForElection;
 import de.etiennebader.civ.application.persistence.ChangeTracker;
 import de.etiennebader.civ.application.persistence.FlushReport;
 import de.etiennebader.civ.application.persistence.PendingSave;
@@ -42,10 +46,13 @@ import de.etiennebader.civ.domain.law.StandardParameters;
 import de.etiennebader.civ.domain.market.Commodity;
 import de.etiennebader.civ.domain.market.PriceLevel;
 import de.etiennebader.civ.domain.polity.MembershipType;
+import de.etiennebader.civ.domain.polity.Office;
+import de.etiennebader.civ.domain.polity.Platform;
 import de.etiennebader.civ.domain.polity.PolityName;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.Day;
+import de.etiennebader.civ.domain.shared.ElectionId;
 import de.etiennebader.civ.domain.shared.Money;
 import de.etiennebader.civ.domain.shared.PersonId;
 import de.etiennebader.civ.domain.shared.PlayerId;
@@ -94,6 +101,9 @@ class SqliteStateStoreTest {
             assertTrue(session.persistence.flush().events() > 0);
             saved = session.dump();
         }
+        assertTrue(saved.contains("  office|TREASURER|"), saved);
+        assertTrue(saved.contains("  election|"), saved);
+        assertTrue(saved.contains(":LOW_TAXES"), saved);
 
         try (Session reloaded = Session.open(file)) {
             reloaded.persistence.restore();
@@ -147,6 +157,9 @@ class SqliteStateStoreTest {
 
             assertEquals(saved, reloaded.dump());
             assertEquals(0, count("SELECT COUNT(*) FROM claim WHERE type = 'OUTPOST'"));
+            assertEquals(0, count("SELECT COUNT(*) FROM election"));
+            assertEquals(1, count("SELECT COUNT(*) FROM office WHERE office = 'PLANNER'"));
+            assertEquals(0, count("SELECT COUNT(*) FROM office WHERE office = 'TREASURER'"));
         }
     }
 
@@ -322,6 +335,14 @@ class SqliteStateStoreTest {
             app.proposeLawChange().execute(new ProposeLawChange.Command(nordhain, alice,
                     ParameterValue.of(StandardParameters.EXPLOSIONS_ALLOWED, true), DAY));
             app.claimChunk().execute(new ClaimChunk.Command(nordhain, chunk(1, 0), ClaimType.CORE, DAY));
+            app.appointOfficer().execute(new AppointOfficer.Command(nordhain, alice, Office.TREASURER, Optional.of(dora),
+                    DAY));
+            ElectionId plannerElection = app.callElection().execute(new CallElection.Command(nordhain, dora, Office.PLANNER,
+                    DAY));
+            app.standForElection().execute(new StandForElection.Command(nordhain, plannerElection, dora, Platform.LOW_TAXES,
+                    DAY));
+            app.standForElection().execute(new StandForElection.Command(nordhain, plannerElection, alice, DAY));
+            app.castBallot().execute(new CastBallot.Command(nordhain, plannerElection, alice, dora, DAY));
             outpostLaw = app.enactStatute().execute(new EnactStatute.Command(nordhain, "Außenpostengesetz",
                     List.of(ParameterValue.of(StandardParameters.MAX_OUTPOSTS, 1)), DAY));
             app.enactStatute().execute(new EnactStatute.Command(nordhain, "Grundsteuerordnung",
@@ -351,6 +372,9 @@ class SqliteStateStoreTest {
 
         void changeWorld() {
             Day later = Day.of(5);
+            app.appointOfficer().execute(new AppointOfficer.Command(nordhain, alice, Office.TREASURER, Optional.empty(),
+                    later));
+            app.runElections().execute(later);
             app.dissolvePlot().execute(new DissolvePlot.Command(nordhain, embassy, later));
             app.repealStatute().execute(new RepealStatute.Command(nordhain, outpostLaw, later));
             app.releaseChunk().execute(new ReleaseChunk.Command(nordhain, chunk(9, 9), later));

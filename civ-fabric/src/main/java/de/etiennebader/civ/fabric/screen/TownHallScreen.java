@@ -18,6 +18,7 @@ import de.etiennebader.civ.server.command.Reply;
 import de.etiennebader.civ.server.town.TownOverview;
 import de.etiennebader.civ.server.town.TownService;
 import de.etiennebader.civ.server.town.Viewer;
+import de.etiennebader.civ.server.villager.VillagerService;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.Items;
@@ -74,9 +75,14 @@ public final class TownHallScreen extends MenuScreen {
                         money(civ.villagers().dailyIncome(civ.queries().polity(this.town).orElseThrow()))))
                 .line(TownService.territorySummary(town))
                 .line(GuiKeys.OVERVIEW_TREASURY.text(money(town.treasury())))
+                .line(moodLine())
                 .blank()
                 .line(GuiKeys.OVERVIEW_ROLE.text(role(viewer)), viewer.isMember() ? Icon.GOOD : Icon.HINT)
-                .glint().build());
+                .hint(GuiKeys.OVERVIEW_MOOD_HINT.text())
+                .glint().build(), click -> {
+            Feedback.click(click.player());
+            Screens.open(click.player(), new MoodScreen(civ, player, this.town, town.name(), this));
+        });
 
         canvas.set(19, Icon.of(Items.PLAYER_HEAD).name(GuiKeys.MEMBERS.text(town.members().size()))
                 .hint(GuiKeys.MEMBERS_HINT.text()).count(town.members().size()).build(), click -> {
@@ -115,7 +121,7 @@ public final class TownHallScreen extends MenuScreen {
         });
 
         int plotCount = civ.plots().plotsOf(this.town, Players.ref(player)).size();
-        canvas.set(29, Icon.of(Items.OAK_SIGN).name(GuiKeys.PLOTS.text(plotCount))
+        canvas.set(28, Icon.of(Items.OAK_SIGN).name(GuiKeys.PLOTS.text(plotCount))
                 .hint(GuiKeys.PLOTS_HINT.text()).build(), click -> {
             Feedback.click(click.player());
             Screens.open(click.player(), new PlotsScreen(civ, player, this.town, town.name(), this));
@@ -126,13 +132,24 @@ public final class TownHallScreen extends MenuScreen {
         if (votes > 0) {
             voteIcon.glint();
         }
-        canvas.set(33, voteIcon.build(), click -> {
+        canvas.set(32, voteIcon.build(), click -> {
             Feedback.click(click.player());
             Screens.open(click.player(), new VotesScreen(civ, player, this.town, town.name(), this));
         });
 
+        int elections = civ.queries().polity(this.town).map(polity -> polity.elections().size()).orElse(0);
+        Icon officesIcon = Icon.of(Items.GOLDEN_HELMET).name(GuiKeys.OFFICES.text(elections))
+                .hint(GuiKeys.OFFICES_HINT.text());
+        if (elections > 0) {
+            officesIcon.glint();
+        }
+        canvas.set(34, officesIcon.build(), click -> {
+            Feedback.click(click.player());
+            Screens.open(click.player(), new OfficesScreen(civ, player, this.town, town.name(), this));
+        });
+
         if (viewer.isMember()) {
-            canvas.set(31, Icon.of(Items.GRASS_BLOCK).name(GuiKeys.CLAIM_HERE.text())
+            canvas.set(30, Icon.of(Items.GRASS_BLOCK).name(GuiKeys.CLAIM_HERE.text())
                     .hint(GuiKeys.CLAIM_HERE_HINT.text(town.chunks(), town.claimLimit())).build(), click ->
                     report(click, civ.commands().claim(caller(), ClaimType.CORE)));
             canvas.set(40, Icon.of(Items.IRON_DOOR).name(GuiKeys.LEAVE.text(), Icon.BAD)
@@ -142,7 +159,7 @@ public final class TownHallScreen extends MenuScreen {
                 }
             });
         } else {
-            canvas.set(31, Icon.of(Items.BANNER.lime()).name(GuiKeys.JOIN.text(), Icon.GOOD)
+            canvas.set(30, Icon.of(Items.BANNER.lime()).name(GuiKeys.JOIN.text(), Icon.GOOD)
                     .hint(GuiKeys.JOIN_HINT.text(town.name())).build(), click -> {
                 Reply reply = civ.commands().join(caller(), town.name());
                 report(click, reply);
@@ -177,6 +194,15 @@ public final class TownHallScreen extends MenuScreen {
                     Feedback.click(click.player());
                     Components.send(click.player(), civ.commands().help());
                 });
+    }
+
+    private Message moodLine() {
+        return civ.queries().polity(town)
+                .map(polity -> civ.villagers().moodOf(polity))
+                .filter(mood -> mood.villagers() > 0)
+                .map(mood -> GuiKeys.OVERVIEW_MOOD.text(VillagerService.moodWord(mood.averageScore()),
+                        mood.averageScore()))
+                .orElseGet(GuiKeys.OVERVIEW_MOOD_NONE::text);
     }
 
     static Message role(Viewer viewer) {

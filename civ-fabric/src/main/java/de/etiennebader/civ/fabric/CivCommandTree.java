@@ -10,6 +10,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import de.etiennebader.civ.EddiesCivMod;
+import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.territory.ClaimType;
 import de.etiennebader.civ.server.CivServer;
 import de.etiennebader.civ.server.command.Caller;
@@ -17,6 +18,8 @@ import de.etiennebader.civ.server.command.CivCommands;
 import de.etiennebader.civ.server.command.Message;
 import de.etiennebader.civ.server.command.MessageKey;
 import de.etiennebader.civ.server.command.Reply;
+import de.etiennebader.civ.server.office.OfficeService;
+import de.etiennebader.civ.server.office.OfficeView;
 import de.etiennebader.civ.server.plot.PlotService;
 import de.etiennebader.civ.server.town.TownHallService;
 import net.minecraft.commands.CommandSourceStack;
@@ -65,6 +68,13 @@ import java.util.function.Function;
  * /civ web                          Anmeldecode für die Webseite
  * /civ abstimmungen                offene Abstimmungen der eigenen Gemeinde
  * /civ abstimmen &lt;Nr&gt; ja|nein     abstimmen (nur Bürger)
+ * /civ aemter                      Ämter, Inhaber und laufende Wahlen
+ * /civ wahl ausrufen &lt;Amt&gt;         Wahl ausrufen (Bürgermeister; andere bei freiem Amt)
+ * /civ wahl kandidieren &lt;Amt&gt; [Programm]  kandidieren (nur Bürger); ordnung|freiheit|steuern|ausbau|ohne
+ * /civ stimmung                    Stimmung der Dorfbewohner der eigenen Gemeinde
+ * /civ wahl stimmen &lt;Amt&gt; &lt;Name&gt;  wählen (nur Bürger), bis zum Ende der Wahl änderbar
+ * /civ amt ernennen &lt;Amt&gt; &lt;Name&gt;  Schatzmeister oder Bauamt ernennen (Bürgermeister)
+ * /civ amt entlassen &lt;Amt&gt;         Amt frei machen (Bürgermeister)
  * /civ grundstueck [info]           Grundstück unter den Füßen, Umriss als Partikel
  * /civ grundstueck ecke1|ecke2      Ecken einer Auswahl setzen
  * /civ grundstueck erstellen &lt;Art&gt;  Auswahl zum Grundstück der Gemeinde machen (Bürger)
@@ -92,6 +102,9 @@ public final class CivCommandTree {
     private static final String AMOUNT = "betrag";
     private static final String COUNT = "anzahl";
     private static final String RECIPIENT = "empfaenger";
+    private static final String OFFICE = "amt";
+    private static final String CANDIDATE = "kandidat";
+    private static final String PLATFORM = "programm";
     private static final String ITEM = "item";
     private static final String TYPE = "art";
     private static final String PRICE = "preis";
@@ -173,6 +186,49 @@ public final class CivCommandTree {
                                 .then(Commands.literal("nein")
                                         .executes(context -> withCiv(context, (civ, player) -> civ.voting().vote(
                                                 Players.caller(player), IntegerArgumentType.getInteger(context, COUNT), false))))))
+                .then(Commands.literal("stimmung")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.villagers().mood(Players.caller(player)))))
+                .then(Commands.literal("aemter")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.offices().list(Players.caller(player)))))
+                .then(Commands.literal("wahl")
+                        .then(Commands.literal("ausrufen")
+                                .then(Commands.argument(OFFICE, StringArgumentType.word())
+                                        .suggests(CivCommandTree::suggestOffices)
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.offices().callElection(
+                                                Players.caller(player), StringArgumentType.getString(context, OFFICE))))))
+                        .then(Commands.literal("kandidieren")
+                                .then(Commands.argument(OFFICE, StringArgumentType.word())
+                                        .suggests(CivCommandTree::suggestOffices)
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.offices().stand(
+                                                Players.caller(player), StringArgumentType.getString(context, OFFICE))))
+                                        .then(Commands.argument(PLATFORM, StringArgumentType.word())
+                                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                        OfficeService.platformNames(), builder))
+                                                .executes(context -> withCiv(context, (civ, player) -> civ.offices().stand(
+                                                        Players.caller(player), StringArgumentType.getString(context, OFFICE),
+                                                        StringArgumentType.getString(context, PLATFORM)))))))
+                        .then(Commands.literal("stimmen")
+                                .then(Commands.argument(OFFICE, StringArgumentType.word())
+                                        .suggests(CivCommandTree::suggestOffices)
+                                        .then(Commands.argument(CANDIDATE, StringArgumentType.string())
+                                                .suggests(this::suggestCandidates)
+                                                .executes(context -> withCiv(context, (civ, player) -> civ.offices().vote(
+                                                        Players.caller(player), StringArgumentType.getString(context, OFFICE),
+                                                        StringArgumentType.getString(context, CANDIDATE))))))))
+                .then(Commands.literal("amt")
+                        .then(Commands.literal("ernennen")
+                                .then(Commands.argument(OFFICE, StringArgumentType.word())
+                                        .suggests(CivCommandTree::suggestOffices)
+                                        .then(Commands.argument(RECIPIENT, StringArgumentType.string())
+                                                .suggests(this::suggestRecipients)
+                                                .executes(context -> withCiv(context, (civ, player) -> civ.offices().appoint(
+                                                        Players.caller(player), StringArgumentType.getString(context, OFFICE),
+                                                        StringArgumentType.getString(context, RECIPIENT)))))))
+                        .then(Commands.literal("entlassen")
+                                .then(Commands.argument(OFFICE, StringArgumentType.word())
+                                        .suggests(CivCommandTree::suggestOffices)
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.offices().dismiss(
+                                                Players.caller(player), StringArgumentType.getString(context, OFFICE)))))))
                 .then(Commands.literal("hilfe")
                         .executes(context -> run(context.getSource(), CivCommands::help)))
                 .then(Commands.literal("menue")
@@ -467,6 +523,31 @@ public final class CivCommandTree {
         host.current().ifPresent(civ -> {
             civ.queries().polities().forEach(polity -> names.add(StringArgumentType.escapeIfRequired(polity.name().value())));
             names.addAll(context.getSource().getOnlinePlayerNames());
+        });
+        return SharedSuggestionProvider.suggest(names, builder);
+    }
+
+    private static CompletableFuture<Suggestions> suggestOffices(CommandContext<CommandSourceStack> context,
+                                                                 SuggestionsBuilder builder) {
+        return SharedSuggestionProvider.suggest(OfficeService.officeNames(), builder);
+    }
+
+    /** Kandidaten der laufenden Wahl für das schon eingegebene Amt. */
+    private CompletableFuture<Suggestions> suggestCandidates(CommandContext<CommandSourceStack> context,
+                                                             SuggestionsBuilder builder) {
+        List<String> names = new java.util.ArrayList<>();
+        ServerPlayer player = context.getSource().getPlayer();
+        Optional<Office> office = OfficeService.parse(StringArgumentType.getString(context, OFFICE));
+        host.current().ifPresent(civ -> {
+            if (player == null || office.isEmpty()) {
+                return;
+            }
+            civ.queries().municipalityOf(Players.ref(player))
+                    .flatMap(town -> civ.offices().officesOf(town, Players.ref(player)).stream()
+                            .filter(view -> view.office() == office.get()).findFirst())
+                    .flatMap(OfficeView::election)
+                    .ifPresent(election -> election.candidates().forEach(candidate ->
+                            names.add(StringArgumentType.escapeIfRequired(candidate.name()))));
         });
         return SharedSuggestionProvider.suggest(names, builder);
     }

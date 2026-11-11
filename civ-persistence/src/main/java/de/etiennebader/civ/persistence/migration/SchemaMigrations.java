@@ -15,7 +15,9 @@ public final class SchemaMigrations {
             "V004__market.sql",
             "V005__plot_offer.sql",
             "V006__proposals.sql",
-            "V007__shops.sql");
+            "V007__shops.sql",
+            "V008__offices_and_elections.sql",
+            "V009__election_platforms.sql");
 
     private SchemaMigrations() {
     }

@@ -126,7 +126,7 @@ public final class BankService {
         if (town.isEmpty()) {
             return Reply.failure(Message.of(MessageKey.NOT_IN_MUNICIPALITY));
         }
-        if (!TownRoles.isMayor(town.get(), caller.player())) {
+        if (!TownRoles.mayManageTreasury(town.get(), caller.player())) {
             return Reply.failure(Message.of(MessageKey.ONLY_MAYOR, town.get().name().value()));
         }
         return withAmount(amountInput, amount -> attempt(() -> {

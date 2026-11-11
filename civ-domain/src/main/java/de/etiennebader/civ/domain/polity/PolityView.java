@@ -10,6 +10,7 @@ import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.territory.BlockPosition;
 
 import java.util.Collection;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -47,6 +48,43 @@ public interface PolityView {
 
     /** Offene Abstimmungen in Reihenfolge ihrer Eröffnung. */
     Collection<Proposal> proposals();
+
+    /** Die Amtszeit des aktuellen Inhabers; leer, wenn das Amt frei ist. */
+    Optional<OfficeTerm> officeTerm(Office office);
+
+    /** Alle besetzten Ämter in der Reihenfolge von {@link Office}. */
+    Collection<OfficeTerm> offices();
+
+    /** Laufende Wahlen in Reihenfolge ihrer Ausrufung. */
+    Collection<Election> elections();
+
+    /** Die laufende Wahl für dieses Amt, falls es eine gibt. */
+    Optional<Election> electionFor(Office office);
+
+    /**
+     * Wer die Gemeinde leitet: der Inhaber des Amts {@link Office#MAYOR}; ist es frei, der dienstälteste Bürger, der kein
+     * Dorfbewohner ist. So hat auch eine Gemeinde ohne Wahl immer einen Bürgermeister, anfangs den Gründer.
+     */
+    default Optional<ActorRef> mayor() {
+        Optional<ActorRef> elected = officeTerm(Office.MAYOR).map(OfficeTerm::holder);
+        if (elected.isPresent()) {
+            return elected;
+        }
+        return members().stream()
+                .filter(membership -> membership.type() == MembershipType.CITIZEN)
+                .map(Membership::member)
+                .filter(member -> !(member instanceof PersonRef))
+                .findFirst();
+    }
+
+    /** Ob der Akteur dieses Amt innehat; für {@link Office#MAYOR} gilt {@link #mayor()}. */
+    default boolean holds(ActorRef actor, Office office) {
+        Objects.requireNonNull(actor, "actor");
+        if (office == Office.MAYOR) {
+            return mayor().filter(actor::equals).isPresent();
+        }
+        return officeTerm(office).map(OfficeTerm::holder).filter(actor::equals).isPresent();
+    }
 
     /**
      * Wie viele Mitglieder für die Größe des Gebiets zählen: Spieler und Gemeinden voll, Personen wie Dorfbewohner

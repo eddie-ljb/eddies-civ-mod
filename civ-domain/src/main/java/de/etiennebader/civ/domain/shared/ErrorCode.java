@@ -47,6 +47,14 @@ public enum ErrorCode {
     UNKNOWN_PROPOSAL,
     /** Argumente: Parameter-ID. */
     PROPOSAL_ALREADY_OPEN,
+    /** Argumente: Amt. */
+    ELECTION_ALREADY_OPEN,
+    /** Argumente: Wahl-ID. */
+    UNKNOWN_ELECTION,
+    /** Argumente: Akteur. */
+    NOT_A_CANDIDATE,
+    /** Argumente: Akteur. */
+    ALREADY_CANDIDATE,
 
     // territory
     /** Argumente: Chunk-X, Chunk-Z. */
@@ -91,6 +99,10 @@ public enum ErrorCode {
     MEMBER_OF_OTHER_POLITY,
     POLITY_NAME_TAKEN,
     NOT_A_CITIZEN,
+    /** Argumente: Akteur, Amt. */
+    NOT_OFFICE_HOLDER,
+    /** Das Bürgermeisteramt wird nur gewählt, nicht ernannt. */
+    MAYOR_NOT_APPOINTABLE,
     /** Argumente: Chunk-X, Chunk-Z. */
     CHUNK_HAS_PLOTS,
 
