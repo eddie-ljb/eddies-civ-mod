@@ -34,6 +34,34 @@ public record Personality(int order, int thrift, int belonging) {
         return new Personality(axis(seed, 1), axis(seed, 2), axis(seed, 3));
     }
 
+    /**
+     * Naturverbundenheit (positiv) gegen Nutzen (negativ). Wie die folgenden Achsen ergibt sie sich fest aus den drei
+     * gespeicherten Achsen, damit sich nichts Neues speichern muss.
+     */
+    public int nature() {
+        return derived(4);
+    }
+
+    /** Gemeinsinn (positiv) gegen Eigenverantwortung (negativ). */
+    public int community() {
+        return derived(5);
+    }
+
+    /** Tradition (positiv) gegen Fortschritt (negativ). */
+    public int tradition() {
+        return derived(6);
+    }
+
+    /** Friedfertigkeit (positiv) gegen Stärke (negativ). */
+    public int peace() {
+        return derived(7);
+    }
+
+    private int derived(int salt) {
+        long seed = (order + 101L) * 1_000_003L + (thrift + 101L) * 1_009L + (belonging + 101L);
+        return axis(seed, salt);
+    }
+
     /** Die am stärksten ausgeprägte Eigenschaft, für Anzeigen. */
     public Trait dominant() {
         int absOrder = Math.abs(order);

@@ -1,5 +1,12 @@
 package de.etiennebader.civ.server;
 
+import de.etiennebader.civ.server.election.DebateService;
+import de.etiennebader.civ.server.election.LiveCountService;
+import de.etiennebader.civ.domain.territory.BlockPosition;
+import de.etiennebader.civ.domain.actor.PersonRef;
+import de.etiennebader.civ.domain.actor.ActorRef;
+import de.etiennebader.civ.server.civic.CivicService;
+import de.etiennebader.civ.server.justice.JusticeService;
 import de.etiennebader.civ.application.CivApplication;
 import de.etiennebader.civ.application.Repositories;
 import de.etiennebader.civ.application.day.Calendar;
@@ -99,6 +106,12 @@ public final class CivServer {
     private final OfficeService offices;
     private final FederationService federations;
     private final LevelService levels;
+    private final CivicService civic;
+    private final JusticeService justice;
+    private volatile java.nio.file.Path mapDirectory;
+    private final LiveCountService liveCount;
+    private final DebateService debates;
+    private final Clock clock = Clock.systemUTC();
     private final ConstitutionService constitutions;
     private final LawBookService lawBooks;
     private final PartyService parties;
@@ -142,8 +155,6 @@ public final class CivServer {
         this.campaigns = new CampaignService(app, calendar, texts, offices);
         this.constitutions = new ConstitutionService(app, calendar, texts, announcements, commands, offices, voting,
                 federations);
-        this.levels = new LevelService(app.queries(), texts, federations, commands, offices, voting, parliaments,
-                constitutions, campaigns, lawBooks);
         this.bank = new BankService(app, calendar, settings.currency(), players, texts);
         this.market = new MarketService(app, calendar, settings, players, texts);
         this.territory = new TerritoryWatcher(app.queries(), texts);
@@ -157,6 +168,15 @@ public final class CivServer {
         this.community = new CommunityService(app, calendar, players, texts, announcements, Clock.systemUTC());
         this.companies = new CompanyService(app, calendar, players, settings.currency(), texts, announcements);
         this.press = new PressService(app, calendar, players, settings.currency(), texts, announcements);
+        this.civic = new CivicService(app, calendar, texts, announcements, plots);
+        this.justice = new JusticeService(app, calendar, players, texts, announcements);
+        this.liveCount = new LiveCountService(announcements, settings.show().liveCount(),
+                settings.show().liveCountSeconds(), settings.show().projections());
+        this.debates = new DebateService(app, calendar, texts, announcements, settings.show().debateMinutes());
+        offices.liveCount(liveCount, clock);
+        this.levels = new LevelService(app.queries(), texts, federations, commands, offices, voting, parliaments,
+                constitutions, campaigns, lawBooks, civic, debates);
+        app.runElections().residence(this::residenceOf);
         app.pressInfluence().today(calendar.today());
     }
 
@@ -190,6 +210,9 @@ public final class CivServer {
     public Optional<DayReport> tick() {
         requireRunning();
         gameThread.runPending();
+        long now = clock.millis();
+        liveCount.tick(now);
+        debates.tick(now);
         return calendar.tick().map(this::closeDay);
     }
 
@@ -212,9 +235,11 @@ public final class CivServer {
         villagers.endOfDay(day);
         campaigns.endOfDay(day);
         civil.endOfDay(day);
+        justice.endOfDay(day);
         companies.endOfDay(day);
         press.endOfDay(day.plus(1));
         community.endOfDay(day.plus(1));
+        debates.newDay(day.plus(1), clock.millis());
         return report;
     }
 
@@ -391,6 +416,49 @@ public final class CivServer {
         return federations;
     }
 
+    /** Live-Auszählung von Wahlergebnissen. */
+    public LiveCountService liveCount() {
+        return liveCount;
+    }
+
+    /** Wahldebatten. */
+    public DebateService debates() {
+        return debates;
+    }
+
+    /** Wahlkreise und Hoheitszeichen. */
+    public CivicService civic() {
+        return civic;
+    }
+
+    /** Ordner mit den gerenderten Kartenkacheln ({@code <dim>/<x>_<z>.png}); leer ohne Weltkarte. */
+    public Optional<java.nio.file.Path> mapDirectory() {
+        return settings.show().worldMap() ? Optional.ofNullable(mapDirectory) : Optional.empty();
+    }
+
+    /** Setzt den Ordner der Kartenkacheln; die Fabric-Seite rendert hinein. */
+    public void mapDirectory(java.nio.file.Path directory) {
+        this.mapDirectory = directory;
+    }
+
+    /** Gerichte und Verfahren. */
+    public JusticeService justice() {
+        return justice;
+    }
+
+    /**
+     * Wohnsitz für Wahlkreise: bei Spielern die Mitte ihres Wohngrundstücks, bei Dorfbewohnern, wo sie zuletzt gesehen
+     * wurden.
+     */
+    private Optional<BlockPosition> residenceOf(ActorRef actor) {
+        if (actor instanceof PersonRef villager) {
+            return villagers.lastSeen(villager);
+        }
+        return app.addresses().residenceOf(actor).flatMap(address -> app.queries().land(address.town())
+                .plot(address.plot()).map(plot -> new BlockPosition(plot.area().dimension(),
+                        (plot.area().minX() + plot.area().maxX()) / 2, 64, (plot.area().minZ() + plot.area().maxZ()) / 2)));
+    }
+
     /** Befehle je politischer Ebene. */
     public LevelService levels() {
         return levels;
@@ -414,6 +482,11 @@ public final class CivServer {
     }
 
     /** Baut übersetzbare Texte, z. B. Geldbeträge und Namen. */
+    /** Die Einstellungen dieses Servers. */
+    public ServerSettings settings() {
+        return settings;
+    }
+
     public Texts texts() {
         return texts;
     }

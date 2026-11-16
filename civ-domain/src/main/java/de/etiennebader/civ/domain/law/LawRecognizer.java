@@ -114,6 +114,28 @@ public final class LawRecognizer {
     private static final Pattern BALLOT_BOX = Pattern.compile("\\burne|wahlurne|wahllokal|ballot box|polling station");
     private static final Pattern POSTAL = Pattern.compile("briefwahl|per brief|postal vot|by mail|mail.in");
     private static final Pattern SALARY = Pattern.compile("gehalt|diaet|besoldung|salary|stipend");
+    private static final Pattern RUNOFF = Pattern.compile("stichwahl|absolute mehrheit|run-?off|absolute majority");
+    private static final Pattern PLURALITY = Pattern.compile(
+            "relative mehrheit|einfache mehrheit|first past the post|fptp|plurality|meisten stimmen");
+    private static final Pattern PROPORTIONAL = Pattern.compile("verhaeltnis|proportional");
+    private static final Pattern DHONDT = Pattern.compile("d.?hondt");
+    private static final Pattern HARE = Pattern.compile("hare|niemeyer|largest remainder");
+    private static final Pattern SAINTE_LAGUE = Pattern.compile("sainte|lague|webster");
+    private static final Pattern MIXED = Pattern.compile("personalisiert|gemischt|mixed member|mixed");
+    private static final Pattern DISTRICT = Pattern.compile("wahlkreis|bezirk|district|constituenc");
+    private static final Pattern MAJORITY_VOTE = Pattern.compile("mehrheitswahl|majoritarian|majority vot|winner takes");
+    private static final Pattern LIST = Pattern.compile("listenwahl|\\bliste|party list|\\blist\\b");
+    private static final Pattern PERSON = Pattern.compile("personenwahl|persoenlich|kandidat|candidate|personal vote");
+    private static final Pattern THRESHOLD = Pattern.compile("sperrklausel|huerde|threshold");
+    private static final Pattern TERM_LIMIT = Pattern.compile(
+            "amtszeiten|wiederwahl|in folge|hintereinander|term limit|re-?elect|consecutive");
+    private static final Pattern COMPULSORY = Pattern.compile("wahlpflicht|pflicht zu waehlen|muessen waehlen|compulsory vot");
+    private static final Pattern DEBATE = Pattern.compile("debatte|streitgespraech|debate");
+    private static final Pattern PRESS = Pattern.compile("pressefreiheit|presse|zensur|zeitung|press|censor");
+    private static final Pattern JURY = Pattern.compile("geschworen|schoeffe|jury|juror");
+    private static final Pattern FINE = Pattern.compile("hoechststrafe|geldstrafe|bussgeld|strafe|maximum fine|\\bfine");
+    private static final Pattern EXILE = Pattern.compile("verbannung|\\bexil|ausweisung|banishment|\\bexile\\b");
+    private static final Pattern COURT_FEE = Pattern.compile("gerichtsgebuehr|klagegebuehr|court fee");
     private static final Pattern PREVAILS = Pattern.compile("bricht|geht vor|vorrang|prevail|takes precedence|overrides");
 
     private LawRecognizer() {
@@ -167,7 +189,7 @@ public final class LawRecognizer {
             }
             return value(StandardParameters.VILLAGER_VOTE_PERCENT, number(clause).map(Math::round).orElse(100L));
         }
-        if (TERM.matcher(clause).find()) {
+        if (TERM.matcher(clause).find() && !TERM_LIMIT.matcher(clause).find()) {
             if (clause.contains("unbefrist") || clause.contains("unlimited") || clause.contains("indefinite")) {
                 return value(StandardParameters.TERM_DAYS, 0L);
             }
@@ -179,6 +201,82 @@ public final class LawRecognizer {
                 return value(StandardParameters.SESSION_DAYS, 1L);
             }
             return days(clause).flatMap(days -> value(StandardParameters.SESSION_DAYS, days));
+        }
+        if (COMPULSORY.matcher(clause).find()) {
+            if (allowed && number(clause).isPresent() && (FINE.matcher(clause).find() || EMERALD.matcher(clause).find())) {
+                boolean emeralds = EMERALD.matcher(clause).find();
+                return number(clause).flatMap(amount -> value(StandardParameters.VOTING_FINE,
+                        Math.round(emeralds ? amount * 100 : amount)));
+            }
+            return value(StandardParameters.COMPULSORY_VOTING, allowed);
+        }
+        if (COURT_FEE.matcher(clause).find()) {
+            boolean emeralds = EMERALD.matcher(clause).find();
+            return number(clause).flatMap(amount -> value(StandardParameters.COURT_FEE,
+                    Math.round(emeralds ? amount * 100 : amount)));
+        }
+        if (JURY.matcher(clause).find()) {
+            if (!allowed && number(clause).isEmpty()) {
+                return value(StandardParameters.JURY_SIZE, 0L);
+            }
+            return number(clause).flatMap(jurors -> value(StandardParameters.JURY_SIZE, Math.round(jurors)));
+        }
+        if (EXILE.matcher(clause).find() && hasPolarity) {
+            return value(StandardParameters.EXILE_ALLOWED, allowed);
+        }
+        if (DEBATE.matcher(clause).find()) {
+            return value(StandardParameters.ELECTION_DEBATES, allowed);
+        }
+        if (PRESS.matcher(clause).find() && (clause.contains("freiheit") || clause.contains("freedom")
+                || clause.contains("zensur") || clause.contains("censor") || hasPolarity)) {
+            boolean censored = clause.contains("zensur") || clause.contains("censor");
+            return value(StandardParameters.PRESS_FREEDOM, censored ? !allowed : allowed);
+        }
+        if (FINE.matcher(clause).find() && !VOTING.matcher(clause).find()) {
+            boolean emeralds = EMERALD.matcher(clause).find();
+            return number(clause).flatMap(amount -> value(StandardParameters.MAX_FINE,
+                    Math.round(emeralds ? amount * 100 : amount)));
+        }
+        if (THRESHOLD.matcher(clause).find()) {
+            return number(clause).flatMap(percent -> value(StandardParameters.THRESHOLD_PERCENT, Math.round(percent)));
+        }
+        if (TERM_LIMIT.matcher(clause).find() && (TERM.matcher(clause).find() || clause.contains("wiederwahl")
+                || clause.contains("re-elect") || clause.contains("reelect"))) {
+            if (clause.contains("unbegrenzt") || clause.contains("unlimited") || (!allowed && number(clause).isEmpty())) {
+                return value(StandardParameters.TERM_LIMIT, allowed ? 0L : 1L);
+            }
+            return number(clause).flatMap(terms -> value(StandardParameters.TERM_LIMIT, Math.round(terms)));
+        }
+        if (RUNOFF.matcher(clause).find()) {
+            return value(StandardParameters.OFFICE_VOTING, VotingMethod.Office.RUNOFF.id());
+        }
+        if (PLURALITY.matcher(clause).find() && !PARLIAMENT.matcher(clause).find()) {
+            return value(StandardParameters.OFFICE_VOTING, VotingMethod.Office.PLURALITY.id());
+        }
+        if (clause.contains("listenwahl") || clause.contains("personenwahl")
+                || (ELECTION.matcher(clause).find() || PARLIAMENT.matcher(clause).find())
+                && (LIST.matcher(clause).find() || PERSON.matcher(clause).find()) && !SEATS.matcher(clause).find()) {
+            return value(StandardParameters.BALLOT_TYPE, LIST.matcher(clause).find() && !clause.contains("personenwahl")
+                    ? VotingMethod.Ballot.LIST.id() : VotingMethod.Ballot.PERSON.id());
+        }
+        if (MIXED.matcher(clause).find() && (ELECTION.matcher(clause).find() || PARLIAMENT.matcher(clause).find()
+                || PROPORTIONAL.matcher(clause).find())) {
+            return value(StandardParameters.PARLIAMENT_VOTING, VotingMethod.Parliament.MIXED.id());
+        }
+        if (DHONDT.matcher(clause).find()) {
+            return value(StandardParameters.PARLIAMENT_VOTING, VotingMethod.Parliament.DHONDT.id());
+        }
+        if (HARE.matcher(clause).find()) {
+            return value(StandardParameters.PARLIAMENT_VOTING, VotingMethod.Parliament.HARE_NIEMEYER.id());
+        }
+        if (SAINTE_LAGUE.matcher(clause).find() || PROPORTIONAL.matcher(clause).find()
+                && (ELECTION.matcher(clause).find() || PARLIAMENT.matcher(clause).find())) {
+            return value(StandardParameters.PARLIAMENT_VOTING, VotingMethod.Parliament.SAINTE_LAGUE.id());
+        }
+        if (MAJORITY_VOTE.matcher(clause).find() || PARLIAMENT.matcher(clause).find()
+                && (clause.contains("mehrheit") || clause.contains("majority"))) {
+            return value(StandardParameters.PARLIAMENT_VOTING, DISTRICT.matcher(clause).find()
+                    ? VotingMethod.Parliament.DISTRICTS.id() : VotingMethod.Parliament.MAJORITY.id());
         }
         if (POSTAL.matcher(clause).find()) {
             return value(StandardParameters.POSTAL_VOTE_ALLOWED, allowed);

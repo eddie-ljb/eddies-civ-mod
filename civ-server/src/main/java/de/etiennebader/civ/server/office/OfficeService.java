@@ -1,5 +1,7 @@
 package de.etiennebader.civ.server.office;
 
+import java.util.LinkedHashMap;
+import de.etiennebader.civ.server.election.LiveCountService;
 import de.etiennebader.civ.application.CivApplication;
 import de.etiennebader.civ.application.day.Calendar;
 import de.etiennebader.civ.application.directory.PlayerDirectory;
@@ -58,10 +60,23 @@ import java.util.stream.Collectors;
  */
 public final class OfficeService {
 
-    private static final Map<String, Platform> PLATFORMS = Map.of(
-            "ohne", Platform.NONE, "ordnung", Platform.ORDER, "freiheit", Platform.FREEDOM,
-            "steuern", Platform.LOW_TAXES, "sparen", Platform.LOW_TAXES, "ausbau", Platform.INVESTMENT,
-            "none", Platform.NONE, "order", Platform.ORDER, "freedom", Platform.FREEDOM, "investment", Platform.INVESTMENT);
+    private static final Map<String, Platform> PLATFORMS = Map.ofEntries(
+            Map.entry("ohne", Platform.NONE), Map.entry("ordnung", Platform.ORDER),
+            Map.entry("freiheit", Platform.FREEDOM), Map.entry("steuern", Platform.LOW_TAXES),
+            Map.entry("sparen", Platform.LOW_TAXES), Map.entry("ausbau", Platform.INVESTMENT),
+            Map.entry("umwelt", Platform.ENVIRONMENT), Map.entry("soziales", Platform.WELFARE),
+            Map.entry("wirtschaft", Platform.ECONOMY), Map.entry("bildung", Platform.EDUCATION),
+            Map.entry("tradition", Platform.TRADITION), Map.entry("fortschritt", Platform.PROGRESS),
+            Map.entry("frieden", Platform.PEACE), Map.entry("staerke", Platform.EXPANSION),
+            Map.entry("stärke", Platform.EXPANSION), Map.entry("beteiligung", Platform.DEMOCRACY),
+            Map.entry("landwirtschaft", Platform.AGRICULTURE), Map.entry("heimat", Platform.AUTONOMY),
+            Map.entry("none", Platform.NONE), Map.entry("order", Platform.ORDER), Map.entry("freedom", Platform.FREEDOM),
+            Map.entry("investment", Platform.INVESTMENT), Map.entry("environment", Platform.ENVIRONMENT),
+            Map.entry("welfare", Platform.WELFARE), Map.entry("economy", Platform.ECONOMY),
+            Map.entry("education", Platform.EDUCATION), Map.entry("progress", Platform.PROGRESS),
+            Map.entry("peace", Platform.PEACE), Map.entry("expansion", Platform.EXPANSION),
+            Map.entry("democracy", Platform.DEMOCRACY), Map.entry("agriculture", Platform.AGRICULTURE),
+            Map.entry("autonomy", Platform.AUTONOMY));
 
     private static final Map<String, Office> NAMES = Map.of(
             "buergermeister", Office.MAYOR, "bürgermeister", Office.MAYOR, "mayor", Office.MAYOR,
@@ -75,6 +90,9 @@ public final class OfficeService {
     private final PlayerDirectory players;
     private final Texts texts;
     private final Announcements announcements;
+
+    private LiveCountService liveCount;
+    private java.time.Clock clock = java.time.Clock.systemUTC();
 
     public OfficeService(CivApplication app, Calendar calendar, PlayerDirectory players, Texts texts,
                          Announcements announcements) {
@@ -93,7 +111,8 @@ public final class OfficeService {
 
     /** Programmnamen für die Vervollständigung im Chat. */
     public static List<String> platformNames() {
-        return List.of("ordnung", "freiheit", "steuern", "ausbau", "ohne");
+        return List.of("ordnung", "freiheit", "steuern", "ausbau", "umwelt", "soziales", "wirtschaft", "bildung",
+                "tradition", "fortschritt", "frieden", "staerke", "beteiligung", "landwirtschaft", "heimat", "ohne");
     }
 
     /** Das Wahlprogramm zu einem Namen wie {@code steuern}. */
@@ -234,6 +253,15 @@ public final class OfficeService {
                 .filter(actor -> texts.actor(actor).equalsIgnoreCase(candidateName.strip()))
                 .findFirst();
         if (candidate.isEmpty()) {
+            // Listenwahl: Die Stimme für eine Partei geht an ihren ersten Listenplatz und zählt für die ganze Liste.
+            candidate = queries.polityNamed(candidateName.strip())
+                    .filter(party -> party.kind() == PolityKind.PARTY)
+                    .flatMap(party -> election.candidates().stream()
+                            .filter(actor -> queries.partyOf(actor).map(PolityView::id).filter(party.id()::equals)
+                                    .isPresent())
+                            .findFirst());
+        }
+        if (candidate.isEmpty()) {
             return Reply.failure(Message.of(MessageKey.UNKNOWN_CANDIDATE, candidateName.strip(),
                     officeName(town, election.office())));
         }
@@ -345,13 +373,26 @@ public final class OfficeService {
                         texts.actor(seated.count().seats().getFirst().member()));
                 case RunElections.Dissolved ignored ->
                         Message.of(MessageKey.PARLIAMENT_DISSOLVED, town.get().name().value());
+                case RunElections.Runoff runoff -> Message.of(MessageKey.ELECTION_RUNOFF, town.get().name().value(),
+                        office, result(runoff.count()),
+                        runoff.finalists().stream().map(texts::actor).collect(Collectors.joining(" / ")),
+                        runoff.closesOn().value());
+                case RunElections.Fined fined -> Message.of(MessageKey.VOTING_FINES, town.get().name().value(),
+                        fined.absentees().size(), texts.money(fined.perVoter()));
                 case RunElections.Nominated nominated -> Message.of(MessageKey.PARLIAMENT_NOMINATED,
                         nominated.candidates().size(), town.get().name().value(),
                         nominated.candidates().stream().map(texts::actor).collect(Collectors.joining(", ")));
             };
-            announcements.add(Announcement.toTown(outcome.polity(), message));
-            districtsOf(town.get(), outcome).ifPresent(line -> announcements.add(Announcement.toTown(outcome.polity(),
-                    line)));
+            List<Message> finale = new ArrayList<>();
+            finale.add(message);
+            districtsOf(town.get(), outcome).ifPresent(finale::add);
+            Optional<Map<String, Long>> tally = tallyOf(outcome);
+            if (liveCount != null && tally.isPresent()) {
+                liveCount.start(outcome.polity(), town.get().name().value(), office, tally.get(), seatsOf(outcome),
+                        finale, clock.millis());
+                continue;
+            }
+            finale.forEach(line -> announcements.add(Announcement.toTown(outcome.polity(), line)));
         }
     }
 
@@ -436,6 +477,42 @@ public final class OfficeService {
     }
 
     /** Sitze je Liste, z. B. „Rot 2, Carla 1“. */
+    /** Stimmen je Kandidat bzw. Liste für die Live-Auszählung; leer bei Ergebnissen ohne Auszählung. */
+    private Optional<Map<String, Long>> tallyOf(RunElections.Outcome outcome) {
+        Map<String, Long> totals = new LinkedHashMap<>();
+        switch (outcome) {
+            case RunElections.Decided decided -> decided.count().totals()
+                    .forEach((candidate, votes) -> totals.merge(texts.actor(candidate), votes, Long::sum));
+            case RunElections.Runoff runoff -> runoff.count().totals()
+                    .forEach((candidate, votes) -> totals.merge(texts.actor(candidate), votes, Long::sum));
+            case RunElections.Seated seated -> seated.count().lists().forEach(list -> totals.merge(listName(list),
+                    list.votes(), Long::sum));
+            default -> {
+                return Optional.empty();
+            }
+        }
+        return Optional.of(totals);
+    }
+
+    private Map<String, Integer> seatsOf(RunElections.Outcome outcome) {
+        Map<String, Integer> seats = new LinkedHashMap<>();
+        if (outcome instanceof RunElections.Seated seated) {
+            seated.count().lists().forEach(list -> seats.merge(listName(list), list.seats(), Integer::sum));
+        }
+        return seats;
+    }
+
+    private String listName(ParliamentCount.ListResult list) {
+        return list.party().flatMap(queries::polity).map(party -> party.name().value())
+                .orElseGet(() -> texts.actor(list.candidates().getFirst()));
+    }
+
+    /** Live-Auszählung für Wahlergebnisse; ohne sie erscheinen Ergebnisse sofort. */
+    public void liveCount(LiveCountService liveCount, java.time.Clock clock) {
+        this.liveCount = liveCount;
+        this.clock = Objects.requireNonNull(clock, "clock");
+    }
+
     private String parliamentResult(ParliamentCount count) {
         return count.lists().stream()
                 .filter(list -> list.seats() > 0)

@@ -1,5 +1,7 @@
 package de.etiennebader.civ.application.support;
 
+import de.etiennebader.civ.domain.justice.Judiciary;
+import de.etiennebader.civ.domain.civic.CivicRegistry;
 import de.etiennebader.civ.application.Repositories;
 import de.etiennebader.civ.application.port.DomainEventPublisher;
 import de.etiennebader.civ.domain.community.Community;
@@ -96,6 +98,24 @@ public final class Aggregates {
     public void commit(StockExchange exchange) {
         repositories.exchange().save(exchange);
         publisher.publish(exchange.pullEvents());
+    }
+
+    public CivicRegistry civic() {
+        return repositories.civic().load();
+    }
+
+    public void commit(CivicRegistry civic) {
+        repositories.civic().save(civic);
+        publisher.publish(civic.pullEvents());
+    }
+
+    public Judiciary justice() {
+        return repositories.justice().load();
+    }
+
+    public void commit(Judiciary judiciary) {
+        repositories.justice().save(judiciary);
+        publisher.publish(judiciary.pullEvents());
     }
 
     public Press press() {

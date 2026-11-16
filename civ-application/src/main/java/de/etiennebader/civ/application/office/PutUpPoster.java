@@ -22,12 +22,17 @@ import java.util.Optional;
  * Wahlplakate (Litfaßsäulen) aufstellen und abbauen.
  *
  * <p>Ein Plakat wirbt für den, der es aufstellt, wenn er bei einer laufenden Wahl der Gemeinde oder eines ihrer Bünde
- * kandidiert, sonst für seine Partei. Außerhalb eines Gemeindegebiets oder ohne beides ist es nur Deko.
+ * kandidiert, sonst für seine Partei. Ohne beides trägt es seinen Namen und wirkt, sobald er kandidiert. Außerhalb
+ * eines Gemeindegebiets ist es nur Deko.
  */
 public final class PutUpPoster {
 
-    /** Das aufgestellte Plakat und die Gemeinde, in der es steht. */
-    public record Result(PolityId town, Poster poster) {
+    /**
+     * Das aufgestellte Plakat und die Gemeinde, in der es steht.
+     *
+     * @param active ob es schon wirbt; sonst erst, wenn der Aufsteller kandidiert
+     */
+    public record Result(PolityId town, Poster poster, boolean active) {
     }
 
     private final Aggregates aggregates;
@@ -47,15 +52,12 @@ public final class PutUpPoster {
         }
         Polity polity = aggregates.polity(town.get());
         Optional<ActorRef> subject = subjectFor(polity, owner);
-        if (subject.isEmpty()) {
-            return Optional.empty();
-        }
-        Poster poster = new Poster(position, subject.get(), owner, day);
+        Poster poster = new Poster(position, subject.orElse(owner), owner, day);
         if (!polity.putUpPoster(poster)) {
             return Optional.empty();
         }
         aggregates.commit(polity);
-        return Optional.of(new Result(polity.id(), poster));
+        return Optional.of(new Result(polity.id(), poster, subject.isPresent()));
     }
 
     /** Baut das Plakat an dieser Stelle ab, falls dort eines stand. */

@@ -234,6 +234,9 @@ public final class CommunityService {
             }
             announcements.add(Announcement.toPlayer(other.get(), Message.of(MessageKey.FRIEND_REQUEST_RECEIVED,
                     fromName)));
+            announcements.add(Announcement.toPlayer(other.get(), Message.of(MessageKey.FRIEND_REQUEST_ACTIONS,
+                    Message.action(Message.of(MessageKey.FRIEND_ACTION_ACCEPT), "/civ freund annehmen " + fromName),
+                    Message.action(Message.of(MessageKey.FRIEND_ACTION_DECLINE), "/civ freund ablehnen " + fromName))));
             return Reply.success(Message.of(MessageKey.FRIEND_REQUEST_SENT, name));
         });
     }
@@ -249,23 +252,66 @@ public final class CommunityService {
                 : Reply.failure(Message.of(MessageKey.FRIEND_NOT, texts.actor(other.get())));
     }
 
+    /** {@code /civ freund ablehnen <Spieler>}: lehnt eine eingehende Anfrage ab. */
+    public Reply decline(PlayerRef actor, String otherName) {
+        Optional<PlayerRef> other = players.findByName(otherName.strip());
+        if (other.isEmpty() || !view().requestsTo(actor).contains(other.get())) {
+            return Reply.failure(Message.of(MessageKey.FRIEND_NO_REQUEST, otherName.strip()));
+        }
+        app.community().unfriend(actor, other.get(), calendar.today());
+        announcements.add(Announcement.toPlayer(other.get(), Message.of(MessageKey.FRIEND_DECLINED_BY,
+                texts.actor(actor))));
+        return Reply.success(Message.of(MessageKey.FRIEND_DECLINED, texts.actor(other.get())));
+    }
+
+    /**
+     * {@code /civ freund vertrauen|misstrauen <Spieler>}: gibt einem Freund Baurecht auf den eigenen (und gemieteten)
+     * Grundstücken oder nimmt es zurück.
+     */
+    public Reply trust(PlayerRef actor, String otherName, boolean trusted) {
+        Optional<PlayerRef> other = players.findByName(otherName.strip());
+        if (other.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.UNKNOWN_RECIPIENT, otherName.strip()));
+        }
+        String name = texts.actor(other.get());
+        return attempt(() -> {
+            app.community().trust(actor, other.get(), trusted, calendar.today());
+            if (trusted) {
+                announcements.add(Announcement.toPlayer(other.get(), Message.of(MessageKey.FRIEND_TRUSTED_BY,
+                        texts.actor(actor))));
+            }
+            return Reply.success(Message.of(trusted ? MessageKey.FRIEND_TRUSTED : MessageKey.FRIEND_UNTRUSTED, name));
+        });
+    }
+
+    /** Online-Spieler, die weder Freund noch angefragt sind, z. B. für das Freunde-Menü. */
+    public List<String> strangersOnline(PlayerRef player) {
+        Set<PlayerRef> known = new java.util.HashSet<>(view().friendsOf(player));
+        known.addAll(view().requestsFrom(player));
+        known.addAll(view().requestsTo(player));
+        known.add(player);
+        return online.stream().filter(other -> !known.contains(other)).map(texts::actor)
+                .sorted(String.CASE_INSENSITIVE_ORDER).toList();
+    }
+
     /** Freunde zuerst (online vor offline), dann eingehende und ausgehende Anfragen. */
     public List<FriendView> friends(PlayerRef player) {
         List<FriendView> views = new ArrayList<>();
-        view().friendsOf(player).stream().map(friend -> friend(friend, "friend"))
+        view().friendsOf(player).stream().map(friend -> friend(player, friend, "friend"))
                 .sorted(Comparator.comparing(FriendView::online).reversed()
                         .thenComparing(FriendView::name, String.CASE_INSENSITIVE_ORDER))
                 .forEach(views::add);
-        view().requestsTo(player).stream().map(other -> friend(other, "incoming"))
+        view().requestsTo(player).stream().map(other -> friend(player, other, "incoming"))
                 .sorted(Comparator.comparing(FriendView::name, String.CASE_INSENSITIVE_ORDER)).forEach(views::add);
-        view().requestsFrom(player).stream().map(other -> friend(other, "outgoing"))
+        view().requestsFrom(player).stream().map(other -> friend(player, other, "outgoing"))
                 .sorted(Comparator.comparing(FriendView::name, String.CASE_INSENSITIVE_ORDER)).forEach(views::add);
         return views;
     }
 
-    private FriendView friend(PlayerRef player, String state) {
+    private FriendView friend(PlayerRef viewer, PlayerRef player, String state) {
         return new FriendView(player.uuid().toString(), texts.actor(player), online.contains(player), state,
-                queries.municipalityOf(player).map(town -> town.name().value()).orElse(""));
+                queries.municipalityOf(player).map(town -> town.name().value()).orElse(""),
+                view().trusts(viewer, player), view().trusts(player, viewer));
     }
 
     /** {@code /civ freunde} */
@@ -283,6 +329,13 @@ public final class CommunityService {
                 default -> friend.online() ? MessageKey.FRIEND_ENTRY_ONLINE : MessageKey.FRIEND_ENTRY_OFFLINE;
             };
             lines.add(Message.of(key, friend.name(), friend.town()));
+            if (friend.state().equals("incoming")) {
+                lines.add(Message.of(MessageKey.FRIEND_REQUEST_ACTIONS,
+                        Message.action(Message.of(MessageKey.FRIEND_ACTION_ACCEPT), "/civ freund annehmen " + friend.name()),
+                        Message.action(Message.of(MessageKey.FRIEND_ACTION_DECLINE), "/civ freund ablehnen " + friend.name())));
+            } else if (friend.trusted()) {
+                lines.add(Message.of(MessageKey.FRIEND_ENTRY_TRUSTED));
+            }
         }
         return Reply.success(lines);
     }

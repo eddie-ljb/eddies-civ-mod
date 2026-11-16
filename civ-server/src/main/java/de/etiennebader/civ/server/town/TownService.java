@@ -109,6 +109,17 @@ public final class TownService {
         return amendIn(caller, polity, law, Long.toString(value));
     }
 
+    /** Schaltet eine Auswahl-Regelung (z. B. Wahlverfahren) zum nächsten oder vorigen Wert weiter. */
+    public Reply cycleLaw(Caller caller, PolityId polity, LawSetting law, boolean forward) {
+        List<String> options = law.options();
+        if (options.isEmpty()) {
+            throw new IllegalArgumentException("Keine Auswahl-Regelung: " + law.id());
+        }
+        int index = Math.max(0, options.indexOf(String.valueOf(law.own())));
+        int next = Math.floorMod(index + (forward ? 1 : -1), options.size());
+        return amendIn(caller, polity, law, options.get(next));
+    }
+
     private Reply amendIn(Caller caller, PolityId polity, LawSetting law, String value) {
         Optional<PolityView> target = queries.polity(polity);
         Optional<ParameterKey<?>> key = laws.find(law.id());

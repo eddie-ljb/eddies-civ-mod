@@ -48,6 +48,7 @@ public final class SqliteStateStore implements StateStore, AutoCloseable {
     private final ShopTable shopTable = new ShopTable();
     private final CivilTables civilTables = new CivilTables();
     private final MarketPressTables marketPressTables = new MarketPressTables();
+    private final CivicJusticeTables civicJusticeTables = new CivicJusticeTables();
 
     public SqliteStateStore(SqliteDatabase database, ParameterCatalog catalog) {
         this.database = Objects.requireNonNull(database, "database");
@@ -89,7 +90,8 @@ public final class SqliteStateStore implements StateStore, AutoCloseable {
                     marketTable.load(connection, MARKET_CURRENCY), shopTable.load(connection), playerTable.loadAll(connection),
                     calendarTable.load(connection), civilTables.loadContracts(connection),
                     civilTables.loadCommunity(connection), marketPressTables.loadExchange(connection),
-                    marketPressTables.loadPress(connection));
+                    marketPressTables.loadPress(connection), civicJusticeTables.loadCivic(connection),
+                    civicJusticeTables.loadJustice(connection));
         } catch (IllegalArgumentException e) {
             throw new PersistenceException("Gespeicherter Zustand ist ungültig: " + e.getMessage(), e);
         }
@@ -127,6 +129,12 @@ public final class SqliteStateStore implements StateStore, AutoCloseable {
             }
             if (delta.press().isPresent()) {
                 marketPressTables.writePress(connection, delta.press().get());
+            }
+            if (delta.civic().isPresent()) {
+                civicJusticeTables.writeCivic(connection, delta.civic().get());
+            }
+            if (delta.justice().isPresent()) {
+                civicJusticeTables.writeJustice(connection, delta.justice().get());
             }
             eventTable.append(connection, delta.events());
             playerTable.write(connection, delta.players());

@@ -118,6 +118,13 @@ public final class TownHallScreen extends MenuScreen {
                     Feedback.click(click.player());
                     Screens.open(click.player(), new ExchangeScreen(civ, player, Optional.of(this)));
                 });
+        canvas.set(3, Icon.of(Items.BELL).name(GuiKeys.COURT_OPEN.text(), Icon.TITLE)
+                .line(GuiKeys.COURT_OPEN_LINE.text(), Icon.INFO)
+                .hint(GuiKeys.CASE_OPEN_HINT.text()).build(), click -> {
+                    Feedback.click(click.player());
+                    Screens.open(click.player(), new CourtScreen(civ, player, civ.queries().polity(this.town),
+                            Optional.of(this)));
+                });
         canvas.set(7, Icon.of(Items.PAPER).name(GuiKeys.PRESS_OPEN.text(), Icon.TITLE)
                 .hint(GuiKeys.PRESS_OPEN_HINT.text()).build(), click -> {
                     Feedback.click(click.player());

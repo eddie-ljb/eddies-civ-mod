@@ -1,5 +1,7 @@
 package de.etiennebader.civ.application;
 
+import de.etiennebader.civ.application.justice.JusticeUseCases;
+import de.etiennebader.civ.application.civic.CivicUseCases;
 import de.etiennebader.civ.application.civil.Addresses;
 import de.etiennebader.civ.application.civil.CommunityUseCases;
 import de.etiennebader.civ.application.civil.ContractUseCases;
@@ -121,6 +123,8 @@ public final class CivApplication {
     private final Trading trading;
     private final CompanyUseCases companies;
     private final PressUseCases press;
+    private final CivicUseCases civic;
+    private final JusticeUseCases justice;
     private final PressInfluence pressInfluence;
     private final VillagerInvestors villagerInvestors;
     private final FoundParty foundParty;
@@ -219,6 +223,8 @@ public final class CivApplication {
         this.trading = new Trading(aggregates, ids);
         this.companies = new CompanyUseCases(aggregates, ids, trading, dissolvePolity);
         this.press = new PressUseCases(aggregates, ids);
+        this.civic = new CivicUseCases(aggregates, ids);
+        this.justice = new JusticeUseCases(aggregates, ids);
         this.villagerInvestors = new VillagerInvestors(() -> new WorldQueries(repositories), trading);
         this.foundParty = new FoundParty(aggregates, ids);
         this.joinParty = new JoinParty(aggregates);
@@ -425,6 +431,16 @@ public final class CivApplication {
 
     public CompanyUseCases companies() {
         return companies;
+    }
+
+    /** Gerichte und Verfahren. */
+    public JusticeUseCases justice() {
+        return justice;
+    }
+
+    /** Wahlkreise und Hoheitszeichen. */
+    public CivicUseCases civic() {
+        return civic;
     }
 
     public PressUseCases press() {

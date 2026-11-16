@@ -1,5 +1,7 @@
 package de.etiennebader.civ.application.persistence;
 
+import de.etiennebader.civ.domain.justice.Judiciary;
+import de.etiennebader.civ.domain.civic.CivicRegistry;
 import de.etiennebader.civ.application.day.CalendarState;
 import de.etiennebader.civ.application.directory.KnownPlayer;
 import de.etiennebader.civ.domain.community.Community;
@@ -25,7 +27,16 @@ import java.util.Objects;
  */
 public record StoredWorld(List<Polity> polities, TerritoryRegistry territory, List<LandRegistry> land, Ledger ledger,
                           Market market, ShopRegistry shops, List<KnownPlayer> players, CalendarState calendar,
-                          ContractRegistry contracts, Community community, StockExchange exchange, Press press) {
+                          ContractRegistry contracts, Community community, StockExchange exchange, Press press,
+                          CivicRegistry civic, Judiciary justice) {
+
+    /** Ohne Wahlkreise und Justiz. */
+    public StoredWorld(List<Polity> polities, TerritoryRegistry territory, List<LandRegistry> land, Ledger ledger,
+                       Market market, ShopRegistry shops, List<KnownPlayer> players, CalendarState calendar,
+                       ContractRegistry contracts, Community community, StockExchange exchange, Press press) {
+        this(polities, territory, land, ledger, market, shops, players, calendar, contracts, community, exchange,
+                press, CivicRegistry.empty(), Judiciary.empty());
+    }
 
     /** Ohne Börse und Presse. */
     public StoredWorld(List<Polity> polities, TerritoryRegistry territory, List<LandRegistry> land, Ledger ledger,
@@ -55,5 +66,7 @@ public record StoredWorld(List<Polity> polities, TerritoryRegistry territory, Li
         Objects.requireNonNull(community, "community");
         Objects.requireNonNull(exchange, "exchange");
         Objects.requireNonNull(press, "press");
+        Objects.requireNonNull(civic, "civic");
+        Objects.requireNonNull(justice, "justice");
     }
 }

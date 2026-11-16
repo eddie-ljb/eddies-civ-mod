@@ -1,5 +1,6 @@
 package de.etiennebader.civ.domain.law;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.function.Predicate;
 
@@ -17,8 +18,15 @@ public final class ParameterKey<T> {
     private final Class<T> type;
     private final T defaultValue;
     private final Predicate<? super T> constraint;
+    private final List<String> options;
 
     private ParameterKey(String id, Class<T> type, T defaultValue, Predicate<? super T> constraint) {
+        this(id, type, defaultValue, constraint, List.of());
+    }
+
+    private ParameterKey(String id, Class<T> type, T defaultValue, Predicate<? super T> constraint,
+                         List<String> options) {
+        this.options = List.copyOf(options);
         this.id = requireValidId(id);
         this.type = Objects.requireNonNull(type, "type");
         this.defaultValue = Objects.requireNonNull(defaultValue, "defaultValue");
@@ -37,6 +45,26 @@ public final class ParameterKey<T> {
     public static <T> ParameterKey<T> constrained(String id, Class<T> type, T defaultValue,
                                                   Predicate<? super T> constraint) {
         return new ParameterKey<>(id, type, defaultValue, constraint);
+    }
+
+    /**
+     * Auswahl-Parameter: ein Text aus einer festen Liste, z. B. das Wahlverfahren.
+     *
+     * @param options gültige Werte in Anzeigereihenfolge; {@code defaultValue} muss dazugehören
+     */
+    public static ParameterKey<String> choice(String id, String defaultValue, List<String> options) {
+        List<String> allowed = List.copyOf(options);
+        return new ParameterKey<>(id, String.class, defaultValue, allowed::contains, allowed);
+    }
+
+    /** Die erlaubten Werte eines Auswahl-Parameters; leer bei allen anderen. */
+    public List<String> options() {
+        return options;
+    }
+
+    /** Ob dies ein Auswahl-Parameter ist. */
+    public boolean isChoice() {
+        return !options.isEmpty();
     }
 
     public String id() {

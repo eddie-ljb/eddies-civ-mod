@@ -195,6 +195,16 @@ class WebIntegrationTest {
                     preview.body());
             assertEquals(200, request(base + "/api/press",
                     "{\"paper\":\"Bote\",\"title\":\"Holz AG ist großartig\",\"body\":\"Ein Erfolg.\"}", cookie).status());
+            Response courts = request(base + "/api/justice", null, cookie);
+            assertTrue(courts.status() == 200 && courts.body().contains("\"courts\":[{"), courts.body());
+            int courtStart = courts.body().indexOf("\"courts\":[{\"id\":\"") + 17;
+            String courtId = courts.body().substring(courtStart, courts.body().indexOf('"', courtStart));
+            Response sue = request(base + "/api/justice", "{\"action\":\"file\",\"court\":\"" + courtId
+                    + "\",\"kind\":\"verfassung\",\"text\":\"tax_rate | zu hoch\"}", cookie);
+            assertTrue(sue.body().contains("\"ok\""), sue.body());
+            assertEquals(400, request(base + "/api/justice", "{\"action\":\"zaubern\"}", cookie).status());
+            assertTrue(request(base + "/api/show", null, null).body().contains("\"running\":["));
+            assertTrue(request(base + "/api/civic", null, null).body().contains("\"name\":\"Nordhain\""));
             Response press = request(base + "/api/press", null, null);
             assertTrue(press.body().contains("\"title\":\"Holz AG ist großartig\"")
                     && press.body().contains("\"tendencyWord\":\"wohlwollend\""), press.body());

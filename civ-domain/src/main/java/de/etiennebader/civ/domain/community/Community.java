@@ -34,6 +34,7 @@ public final class Community extends AggregateRoot<CommunityEvent> implements Co
     private final Map<LetterId, Letter> letters = new LinkedHashMap<>();
     private final Set<List<PlayerRef>> friendships = new LinkedHashSet<>();
     private final Set<List<PlayerRef>> requests = new LinkedHashSet<>();
+    private final Set<List<PlayerRef>> trusts = new LinkedHashSet<>();
     private final List<ChatMessage> messages = new ArrayList<>();
     private long lastSeq;
 
@@ -50,7 +51,17 @@ public final class Community extends AggregateRoot<CommunityEvent> implements Co
      */
     public static Community restore(Collection<Letter> letters, Collection<List<PlayerRef>> friendships,
                                     Collection<List<PlayerRef>> requests, Collection<ChatMessage> messages) {
+        return restore(letters, friendships, requests, List.of(), messages);
+    }
+
+    /**
+     * @param trusts (Inhaber, Freund): der Freund darf auf den Grundstücken des Inhabers bauen
+     */
+    public static Community restore(Collection<Letter> letters, Collection<List<PlayerRef>> friendships,
+                                    Collection<List<PlayerRef>> requests, Collection<List<PlayerRef>> trusts,
+                                    Collection<ChatMessage> messages) {
         Community community = new Community();
+        trusts.forEach(pair -> community.trusts.add(List.copyOf(pair)));
         letters.forEach(letter -> community.letters.put(letter.id(), letter));
         friendships.forEach(pair -> community.friendships.add(pair(pair.get(0), pair.get(1))));
         community.requests.addAll(requests.stream().map(List::copyOf).toList());
@@ -132,6 +143,8 @@ public final class Community extends AggregateRoot<CommunityEvent> implements Co
         boolean changed = friendships.remove(pair(actor, other));
         changed |= requests.remove(List.of(actor, other));
         changed |= requests.remove(List.of(other, actor));
+        trusts.remove(List.of(actor, other));
+        trusts.remove(List.of(other, actor));
         if (changed) {
             raise(new FriendshipChanged(actor, other, false, day));
         }
@@ -149,6 +162,37 @@ public final class Community extends AggregateRoot<CommunityEvent> implements Co
             }
         }
         return friends;
+    }
+
+    /**
+     * Gibt einem Freund Baurecht auf den eigenen Grundstücken oder nimmt es zurück.
+     *
+     * @return ob sich etwas änderte
+     * @throws NotFriendsException wenn beide nicht befreundet sind und Vertrauen gegeben werden soll
+     */
+    public boolean trust(PlayerRef owner, PlayerRef friend, boolean trusted, Day day) {
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(friend, "friend");
+        if (trusted && !areFriends(owner, friend)) {
+            throw new NotFriendsException(friend);
+        }
+        boolean changed = trusted ? trusts.add(List.of(owner, friend)) : trusts.remove(List.of(owner, friend));
+        if (changed) {
+            raise(new FriendTrustChanged(owner, friend, trusted, day));
+        }
+        return changed;
+    }
+
+    @Override
+    public Set<PlayerRef> trustedBy(PlayerRef owner) {
+        Set<PlayerRef> trusted = new LinkedHashSet<>();
+        trusts.stream().filter(pair -> pair.get(0).equals(owner)).forEach(pair -> trusted.add(pair.get(1)));
+        return trusted;
+    }
+
+    @Override
+    public List<List<PlayerRef>> trusts() {
+        return List.copyOf(trusts);
     }
 
     @Override

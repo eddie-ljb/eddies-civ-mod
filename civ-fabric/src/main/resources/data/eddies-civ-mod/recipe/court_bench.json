@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "GBG",
+    "WWW",
+    "W W"
+  ],
+  "key": {
+    "G": "minecraft:gold_ingot",
+    "B": "minecraft:book",
+    "W": "#minecraft:planks"
+  },
+  "result": {
+    "id": "eddies-civ-mod:court_bench",
+    "count": 1
+  }
+}

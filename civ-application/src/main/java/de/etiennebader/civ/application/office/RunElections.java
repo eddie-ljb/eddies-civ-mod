@@ -1,22 +1,31 @@
 package de.etiennebader.civ.application.office;
 
+import de.etiennebader.civ.domain.territory.BlockPosition;
+import de.etiennebader.civ.domain.civic.CivicView;
 import de.etiennebader.civ.application.support.Aggregates;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
+import de.etiennebader.civ.domain.actor.PlayerRef;
+import de.etiennebader.civ.domain.economy.Ledger;
+import de.etiennebader.civ.domain.economy.TransferReason;
 import de.etiennebader.civ.domain.law.StandardParameters;
+import de.etiennebader.civ.domain.law.VotingMethod;
 import de.etiennebader.civ.domain.polity.Election;
 import de.etiennebader.civ.domain.polity.ElectionResult;
-import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.polity.Membership;
+import de.etiennebader.civ.domain.polity.MembershipType;
 import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.OfficeTerm;
 import de.etiennebader.civ.domain.polity.Parliament;
 import de.etiennebader.civ.domain.polity.PartyProfile;
 import de.etiennebader.civ.domain.polity.Platform;
 import de.etiennebader.civ.domain.polity.Polity;
+import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.shared.Day;
+import de.etiennebader.civ.domain.shared.ElectionId;
 import de.etiennebader.civ.domain.shared.IdGenerator;
+import de.etiennebader.civ.domain.shared.Money;
 import de.etiennebader.civ.domain.shared.PolityId;
 
 import java.util.ArrayList;
@@ -75,6 +84,23 @@ public final class RunElections {
     public record Dissolved(PolityId polity, Office office) implements Outcome {
     }
 
+    /** Niemand hatte die absolute Mehrheit: Die beiden Besten treten in einer Stichwahl an. */
+    public record Runoff(PolityId polity, Office office, List<ActorRef> finalists, ElectionCount count, Day closesOn)
+            implements Outcome {
+
+        public Runoff {
+            finalists = List.copyOf(finalists);
+        }
+    }
+
+    /** Wahlpflicht: Bürger, die nicht abgestimmt haben, zahlten ein Bußgeld. */
+    public record Fined(PolityId polity, Office office, List<ActorRef> absentees, Money perVoter) implements Outcome {
+
+        public Fined {
+            absentees = List.copyOf(absentees);
+        }
+    }
+
     /** Dorfbewohner kandidieren für ihre Parteien. */
     public record Nominated(PolityId polity, Office office, List<ActorRef> candidates) implements Outcome {
 
@@ -88,6 +114,7 @@ public final class RunElections {
     private final VillagerVoter villagerVoter;
     private final Function<ActorRef, Optional<PolityView>> partyOf;
     private final Function<ActorRef, Optional<PolityId>> homeOf;
+    private volatile Function<ActorRef, Optional<BlockPosition>> residence = actor -> Optional.empty();
 
     /** Ohne Parteien, z. B. für Tests. */
     public RunElections(Aggregates aggregates, IdGenerator ids, VillagerVoter villagerVoter) {
@@ -143,11 +170,16 @@ public final class RunElections {
                 continue;
             }
             closed.add(election.office());
+            fineAbsentees(polity, election, day, outcomes);
             if (election.office() == Office.PARLIAMENT) {
                 closeParliament(polity, election, until, day, outcomes);
                 continue;
             }
             ElectionCount count = ElectionCount.of(polity, election, villagerVoter, districtOf(polity));
+            if (needsRunoff(polity, election, count)) {
+                callRunoff(polity, election, count, until, day, outcomes);
+                continue;
+            }
             Optional<ActorRef> winner = count.winner(polity, election);
             polity.closeElection(election.id(), winner, until, day);
             polity.recordResult(new ElectionResult(election.id(), election.office(), day, count.districtResults(),
@@ -163,6 +195,54 @@ public final class RunElections {
             }
         }
         return closed;
+    }
+
+    /** Stichwahl nötig: Verfahren „absolute Mehrheit“, mehr als zwei Kandidaten und niemand über 50 %. */
+    private static boolean needsRunoff(PolityView polity, Election election, ElectionCount count) {
+        return VotingMethod.Office.of(polity.laws().valueOf(StandardParameters.OFFICE_VOTING)) == VotingMethod.Office.RUNOFF
+                && election.candidates().size() > 2 && !count.hasAbsoluteMajority();
+    }
+
+    private void callRunoff(Polity polity, Election election, ElectionCount count, Optional<Day> until, Day day,
+                            List<Outcome> outcomes) {
+        List<ActorRef> finalists = count.leaders(2);
+        polity.closeElection(election.id(), Optional.empty(), until, day);
+        polity.recordResult(new ElectionResult(election.id(), election.office(), day, count.districtResults(),
+                List.of()));
+        ElectionId runoff = CallElection.call(polity, election.office(), ids, day);
+        for (ActorRef finalist : finalists) {
+            polity.standForElection(runoff, finalist, election.platformOf(finalist), day);
+        }
+        Day closesOn = polity.electionFor(election.office()).orElseThrow().closesOn();
+        outcomes.add(new Runoff(polity.id(), election.office(), finalists, count, closesOn));
+    }
+
+    /** Wahlpflicht: Bürger (Spieler) ohne Stimme zahlen das Bußgeld, soweit ihr Konto reicht. */
+    private void fineAbsentees(Polity polity, Election election, Day day, List<Outcome> outcomes) {
+        if (!polity.laws().valueOf(StandardParameters.COMPULSORY_VOTING) || election.candidates().isEmpty()) {
+            return;
+        }
+        long fine = polity.laws().valueOf(StandardParameters.VOTING_FINE);
+        if (fine <= 0) {
+            return;
+        }
+        Ledger ledger = aggregates.ledger();
+        List<ActorRef> fined = new ArrayList<>();
+        for (Membership membership : polity.members()) {
+            if (membership.type() != MembershipType.CITIZEN || !(membership.member() instanceof PlayerRef player)
+                    || election.ballots().stream().anyMatch(ballot -> ballot.voter().equals(player))) {
+                continue;
+            }
+            long due = Math.min(fine, ledger.balanceOf(player, polity.currency()).amount());
+            if (due > 0) {
+                ledger.transfer(player, polity.asActor(), Money.of(due, polity.currency()), TransferReason.FINE, day);
+                fined.add(player);
+            }
+        }
+        if (!fined.isEmpty()) {
+            aggregates.commit(ledger);
+            outcomes.add(new Fined(polity.id(), election.office(), fined, Money.of(fine, polity.currency())));
+        }
     }
 
     private void callDue(Polity polity, Day day, Set<Office> justClosed, List<Outcome> outcomes) {
@@ -198,12 +278,30 @@ public final class RunElections {
         }
     }
 
-    /** Wahlbezirk eines Wählers: in einer Gemeinde sie selbst, in einem Bund seine Gemeinde. */
-    private Function<ActorRef, Optional<PolityId>> districtOf(Polity polity) {
-        if (polity.kind() == PolityKind.FEDERATION) {
-            return homeOf;
+    /**
+     * Wahlbezirk eines Wählers: Hat die Polity eigene Wahlkreise, der Wahlkreis seines Wohnsitzes bzw. seiner Gemeinde;
+     * sonst in einer Gemeinde sie selbst, in einem Bund seine Gemeinde.
+     */
+    public Function<ActorRef, Optional<PolityId>> districtOf(PolityView polity) {
+        Function<ActorRef, Optional<PolityId>> fallback = polity.kind() == PolityKind.FEDERATION
+                ? homeOf : actor -> Optional.of(polity.id());
+        CivicView civic = aggregates.civic();
+        if (civic.constituenciesOf(polity.id()).isEmpty()) {
+            return fallback;
         }
-        return actor -> Optional.of(polity.id());
+        Function<ActorRef, Optional<BlockPosition>> where = residence;
+        return actor -> civic.constituencyFor(polity.id(), where.apply(actor), homeOf.apply(actor).or(() ->
+                        polity.kind() == PolityKind.FEDERATION ? Optional.empty() : Optional.of(polity.id())))
+                .map(constituency -> constituency.id().asDistrict())
+                .or(() -> fallback.apply(actor));
+    }
+
+    /**
+     * Wo ein Akteur wohnt, für eigene Wahlkreise: z. B. sein Grundstück oder wo ein Dorfbewohner zuletzt gesehen wurde.
+     * Ohne Angabe zählen nur Wahlkreise, die ganze Gemeinden aufzählen.
+     */
+    public void residence(Function<ActorRef, Optional<BlockPosition>> residence) {
+        this.residence = Objects.requireNonNull(residence, "residence");
     }
 
     private void callParliament(Polity polity, Day day, Set<Office> justClosed, List<Outcome> outcomes) {

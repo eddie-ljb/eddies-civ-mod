@@ -17,7 +17,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -111,45 +110,39 @@ public final class Campaign implements CampaignInfluence {
         return Optional.of(new Reception(listeners.size(), convinced, repelled, topic));
     }
 
+    /**
+     * Ein Beitrag in einer Wahldebatte: wirkt wie eine halbe Rede auf alle Zuhörer, ohne Tageslimit.
+     *
+     * @return wie der Beitrag ankam
+     */
+    public synchronized Reception debate(ActorRef speaker, Platform topic, Collection<PersonRef> listeners, Day day) {
+        Objects.requireNonNull(speaker, "speaker");
+        Objects.requireNonNull(topic, "topic");
+        Objects.requireNonNull(day, "day");
+        int convinced = 0;
+        int repelled = 0;
+        for (PersonRef listener : listeners) {
+            double strength = topic == Platform.NONE ? NEUTRAL_SPEECH / 2
+                    : SPEECH * 0.5 * agreement(Personality.of(listener), topic);
+            if (strength > 0) {
+                convinced++;
+            } else if (strength < 0) {
+                repelled++;
+            }
+            heard.computeIfAbsent(listener, ignored -> new ArrayList<>())
+                    .add(new Heard(speaker, strength, day.plus(SPEECH_DAYS)));
+        }
+        return new Reception(listeners.size(), convinced, repelled, topic);
+    }
+
     /** Wie sehr ein Thema einer Persönlichkeit zusagt: -1 bis 1. */
     static double agreement(Personality personality, Platform topic) {
-        return switch (topic) {
-            case NONE -> 0;
-            case ORDER -> personality.order() / 100.0;
-            case FREEDOM -> -personality.order() / 100.0;
-            case LOW_TAXES -> personality.thrift() / 100.0;
-            case INVESTMENT -> -personality.thrift() / 100.0;
-        };
+        return PlatformAffinity.of(topic, personality);
     }
 
     /** Das Thema einer Rede nach Stichworten; ohne erkennbares Thema {@link Platform#NONE}. */
     public static Platform topicOf(String text) {
-        String lower = text.toLowerCase(Locale.ROOT);
-        int order = count(lower, "ordnung", "sicherheit", "schutz", "verbot", "regeln", "order", "safety", "security");
-        int freedom = count(lower, "freiheit", "frei", "erlaub", "freedom", "liberty", "free");
-        int taxes = count(lower, "steuer", "sparen", "abgabe", "tax", "save");
-        int investment = count(lower, "ausbau", "bauen", "investi", "fortschritt", "build", "invest", "progress");
-        int best = Math.max(Math.max(order, freedom), Math.max(taxes, investment));
-        if (best == 0) {
-            return Platform.NONE;
-        }
-        if (best == order) {
-            return Platform.ORDER;
-        }
-        if (best == freedom) {
-            return Platform.FREEDOM;
-        }
-        return best == taxes ? Platform.LOW_TAXES : Platform.INVESTMENT;
-    }
-
-    private static int count(String text, String... words) {
-        int found = 0;
-        for (String word : words) {
-            if (text.contains(word)) {
-                found++;
-            }
-        }
-        return found;
+        return PlatformAffinity.topicOf(text);
     }
 
     /** Tagesende: abgelaufene Reden vergessen. */

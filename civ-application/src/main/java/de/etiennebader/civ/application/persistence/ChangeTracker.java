@@ -1,5 +1,7 @@
 package de.etiennebader.civ.application.persistence;
 
+import de.etiennebader.civ.domain.justice.JusticeEvent;
+import de.etiennebader.civ.domain.civic.CivicEvent;
 import de.etiennebader.civ.application.port.DomainEventPublisher;
 import de.etiennebader.civ.domain.community.CommunityEvent;
 import de.etiennebader.civ.domain.contract.ContractEvent;
@@ -49,6 +51,8 @@ public final class ChangeTracker implements DomainEventPublisher {
     private boolean community;
     private boolean exchange;
     private boolean press;
+    private boolean civic;
+    private boolean justice;
 
     @Override
     public void publish(List<? extends DomainEvent> published) {
@@ -70,6 +74,8 @@ public final class ChangeTracker implements DomainEventPublisher {
             case CommunityEvent ignored -> community = true;
             case ExchangeEvent ignored -> exchange = true;
             case PressEvent ignored -> press = true;
+            case CivicEvent ignored -> civic = true;
+            case JusticeEvent ignored -> justice = true;
             default -> {
                 // Events anderer Bereiche ändern keinen gespeicherten Zustand, landen aber im Audit-Log.
             }
@@ -110,7 +116,9 @@ public final class ChangeTracker implements DomainEventPublisher {
     /** Liefert alle Änderungen seit dem letzten Aufruf und beginnt von vorn. */
     public ChangeSet takeChanges() {
         ChangeSet changes = new ChangeSet(polities, chunks, plots, accounts, currencies, commodities, shops, events,
-                contracts, community, exchange, press);
+                contracts, community, exchange, press, civic, justice);
+        civic = false;
+        justice = false;
         contracts = false;
         community = false;
         exchange = false;
@@ -142,6 +150,8 @@ public final class ChangeTracker implements DomainEventPublisher {
         community |= failed.community();
         exchange |= failed.exchange();
         press |= failed.press();
+        civic |= failed.civic();
+        justice |= failed.justice();
         events.addAll(0, failed.events());
     }
 }

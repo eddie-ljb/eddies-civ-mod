@@ -43,6 +43,17 @@ public final class TranslationKeys {
     }
 
     /** Name einer Regelung des Rechts, z. B. „Fremde dürfen bauen“. */
+    /** Anzeigename einer Auswahl wie {@code sainte_lague}. */
+    public static String lawOption(String option) {
+        return PREFIX + "law_option." + option;
+    }
+
+    /** Ob dieser Text ein Wert eines Auswahl-Parameters ist. */
+    public static boolean isLawOption(String value) {
+        return de.etiennebader.civ.domain.law.StandardParameters.all().stream()
+                .anyMatch(key -> key.options().contains(value));
+    }
+
     public static String law(ParameterKey<?> key) {
         return PREFIX + "law." + key.id();
     }

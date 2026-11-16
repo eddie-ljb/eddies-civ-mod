@@ -13,5 +13,27 @@ public enum Platform {
     /** Niedrige Steuern. */
     LOW_TAXES,
     /** Ausbau der Gemeinde: Steuern für Investitionen. */
-    INVESTMENT
+    INVESTMENT,
+    /** Umwelt und Natur: Wälder, Tiere, keine Explosionen. */
+    ENVIRONMENT,
+    /** Soziales: Gerechtigkeit, Hilfe für Schwache, Gehälter. */
+    WELFARE,
+    /** Wirtschaft und Handel: Märkte, Firmen, Börse. */
+    ECONOMY,
+    /** Bildung und Wissen. */
+    EDUCATION,
+    /** Tradition und Heimat. */
+    TRADITION,
+    /** Fortschritt und Technik. */
+    PROGRESS,
+    /** Frieden und Diplomatie: Bündnisse, keine Kämpfe. */
+    PEACE,
+    /** Stärke und Expansion: mehr Gebiet, Verteidigung. */
+    EXPANSION,
+    /** Bürgerbeteiligung: Abstimmungen, Transparenz, Pressefreiheit. */
+    DEMOCRACY,
+    /** Landwirtschaft und Versorgung. */
+    AGRICULTURE,
+    /** Heimat zuerst: Selbstbestimmung der Gemeinde gegenüber dem Bund. */
+    AUTONOMY
 }

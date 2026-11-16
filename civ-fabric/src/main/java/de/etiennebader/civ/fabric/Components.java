@@ -3,7 +3,9 @@ package de.etiennebader.civ.fabric;
 import de.etiennebader.civ.server.command.Message;
 import de.etiennebader.civ.server.command.Reply;
 import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -24,6 +26,16 @@ public final class Components {
     }
 
     public static MutableComponent of(Message message) {
+        if (message.isAction()) {
+            String command = message.args().get(1).toString();
+            MutableComponent label = message.args().getFirst() instanceof Message nested ? of(nested)
+                    : Component.literal(message.args().getFirst().toString());
+            return Component.literal("[").append(label).append("]").withStyle(style -> style
+                    .withColor(ChatFormatting.GREEN).withUnderlined(true)
+                    .withClickEvent(command.endsWith(" ") ? new ClickEvent.SuggestCommand(command)
+                            : new ClickEvent.RunCommand(command))
+                    .withHoverEvent(new HoverEvent.ShowText(Component.literal(command))));
+        }
         Object[] args = message.args().stream()
                 .map(arg -> arg instanceof Message nested ? of(nested) : arg)
                 .toArray();

@@ -48,7 +48,9 @@ class PackageDependencyRulesTest {
             Map.entry("contract", Set.of("shared", "actor", "land")),
             Map.entry("community", Set.of("shared", "actor")),
             Map.entry("exchange", Set.of("shared", "actor")),
-            Map.entry("media", Set.of("shared", "actor", "polity")));
+            Map.entry("media", Set.of("shared", "actor", "polity")),
+            Map.entry("civic", Set.of("shared", "actor", "territory")),
+            Map.entry("justice", Set.of("shared", "actor")));
 
     @Test
     @DisplayName("Pakete verwenden nur erlaubte Pakete")

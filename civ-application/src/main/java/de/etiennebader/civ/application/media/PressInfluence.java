@@ -6,6 +6,7 @@ import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.media.Article;
 import de.etiennebader.civ.domain.media.PressView;
 import de.etiennebader.civ.domain.polity.Election;
+import de.etiennebader.civ.application.population.PlatformAffinity;
 import de.etiennebader.civ.domain.polity.Platform;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.population.Personality;
@@ -67,13 +68,7 @@ public final class PressInfluence implements CampaignInfluence {
 
     /** Wie stark ein Thema bei diesem Leser verfängt: 1 bis 1,5. */
     static double framing(Personality personality, Platform topic) {
-        double agreement = switch (topic) {
-            case NONE -> 0;
-            case ORDER -> personality.order() / 100.0;
-            case FREEDOM -> -personality.order() / 100.0;
-            case LOW_TAXES -> personality.thrift() / 100.0;
-            case INVESTMENT -> -personality.thrift() / 100.0;
-        };
+        double agreement = PlatformAffinity.of(topic, personality);
         return 1 + Math.max(0, agreement) * 0.5;
     }
 

@@ -33,7 +33,7 @@ import java.util.Optional;
  */
 public final class ConstitutionScreen extends MenuScreen {
 
-    private static final int[] ARTICLE_SLOTS = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25};
+    private static final int[] ARTICLE_SLOTS = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 9, 17, 18, 26};
     private static final int[] CONSTITUENT_SLOTS = {39, 40, 41, 42, 43};
     private static final int LINE_LENGTH = 40;
     private static final int MAX_PREAMBLE_LINES = 8;
@@ -127,7 +127,7 @@ public final class ConstitutionScreen extends MenuScreen {
                     .hint(view.proclaimed()
                             ? GuiKeys.CONSTITUTION_ARTICLE_HINT_VOTE.text(article.id(), view.amendmentPercent())
                             : GuiKeys.CONSTITUTION_ARTICLE_HINT_DRAFT.text(article.id()));
-            if (!article.isSwitch()) {
+            if (!article.isSwitch() && !article.isChoice()) {
                 icon.count((int) Math.max(1, Math.min(64, article.number())));
             }
             canvas.set(ARTICLE_SLOTS[index], icon.build());

@@ -74,7 +74,7 @@ Jede Gemeinde hat drei Ämter: **Bürgermeister**, **Schatzmeister** und **Bauam
 
 - Solange niemand gewählt wurde, ist der dienstälteste Bürger kommissarisch Bürgermeister, anfangs der Gründer.
 - **Wahl ausrufen:** im Gemeindehaus unter **Ämter und Wahlen** per Umschalt-Klick auf das Amt oder mit `/civ wahl ausrufen <Amt>`. Der Bürgermeister darf das jederzeit, andere Bürger nur, wenn das Amt frei oder die Amtszeit abgelaufen ist.
-- **Kandidieren und wählen:** Klick aufs Amt bzw. auf einen Kandidaten, oder `/civ wahl kandidieren <Amt> [Programm]` und `/civ wahl stimmen <Amt> <Spieler>`. Programme: `ordnung` (Sicherheit und Ordnung), `freiheit`, `steuern` (niedrige Steuern), `ausbau` (Ausbau der Gemeinde) oder `ohne`. Die Stimme lässt sich bis zum Ende ändern. Wer wen gewählt hat, bleibt geheim.
+- **Kandidieren und wählen:** Klick aufs Amt bzw. auf einen Kandidaten, oder `/civ wahl kandidieren <Amt> [Programm]` und `/civ wahl stimmen <Amt> <Spieler>`. Programme: `ordnung`, `freiheit`, `steuern` (niedrige Steuern), `ausbau`, `umwelt`, `soziales`, `wirtschaft`, `bildung`, `tradition`, `fortschritt`, `frieden`, `staerke`, `beteiligung`, `landwirtschaft`, `heimat` oder `ohne`. Dorfbewohner wählen das Programm, das zu ihrer Persönlichkeit passt (z. B. Naturfreunde `umwelt`, Gemeinschaftssinnige `soziales`, Traditionsbewusste `tradition`). Die Stimme lässt sich bis zum Ende ändern. Wer wen gewählt hat, bleibt geheim.
 - **Auszählung** am Ende von Tag *Ausruf + Wahldauer* (Standard 2 Tage). Es gewinnt die höchste Stimmenzahl; bei Gleichstand der Amtsinhaber, sonst wer zuerst kandidiert hat. Hat niemand kandidiert, bleibt alles, wie es ist.
 - **Amtszeit:** Mit `term_days` größer 0 laufen Ämter ab und werden automatisch neu gewählt, das Bürgermeisteramt auch, wenn es noch nie gewählt wurde. Bei 0 (Standard) sind Ämter unbefristet.
 - **Dorfbewohner wählen mit**, wenn `villager_vote_percent` größer 0 ist; ihre Stimme zählt mit diesem Gewicht (100 = wie ein Bürger). Kandidieren können sie nicht. Sie wählen nach ihrer Persönlichkeit das passende Programm; wer unter Steuern leidet, neigt zu „Niedrige Steuern“. Zufriedene halten zum Amtsinhaber, Unzufriedene wählen den Wechsel. Wem kein Kandidat zusagt, bleibt zu Hause.
@@ -138,10 +138,48 @@ Gemeinden und Bünde können ein Parlament haben. Die Regelung `parliament_seats
 - **Menü „Wahlen und Umfragen“** (Gemeindehaus unten links, Parlamentsmenü unten rechts): Umfragen und Ergebnisse je Bezirk.
 - **Webseite:** Reiter „Wahlen“ mit Umfragen und Ergebnissen, filterbar nach Ebene und Partei. Auf der Karte färbt die Ansicht „Wahlkarte“ jede Gemeinde nach dem Führenden ihres Bezirks; der Parteifilter hebt die Bezirke einer Partei hervor.
 
+### Wahlverfahren
+Jede Ebene stellt im Recht ein, wie gewählt wird (Menü **Recht**: Klick schaltet durch die Möglichkeiten):
+
+| Regel | Möglichkeiten |
+|---|---|
+| `office_voting` (Ämter) | `plurality`: relative Mehrheit, „First past the post“ · `runoff`: absolute Mehrheit, sonst Stichwahl der beiden Besten (neue Wahl, gleiche Dauer) |
+| `parliament_voting` (Parlament) | `sainte_lague`, `dhondt`, `hare_niemeyer` (Verhältniswahl) · `majority` (Mehrheitswahl ohne Ausgleich) · `districts` (Mehrheitswahl je Wahlkreis) · `mixed` (Wahlkreissieger sicher, Rest als Ausgleich nach Sainte-Laguë) |
+| `ballot_type` | `person`: Personenwahl · `list`: Listenwahl; man wählt eine Partei (`/civ wahl stimmen parlament <Partei>`), ihre Sitze gehen der Reihe der Kandidatur nach an ihre Kandidaten |
+| `threshold_percent` | Sperrklausel 0–20 % für Verhältniswahlen |
+| `term_limit` | wie oft jemand dasselbe Amt in Folge haben darf (0 = beliebig) |
+| `compulsory_voting`, `voting_fine` | Wahlpflicht für Spieler; wer nicht wählt, zahlt die Strafe (Hundertstel Smaragd) an die Kasse |
+| `election_debates` | ob am letzten Wahltag automatisch eine Debatte läuft |
+
+### Wahlkreise
+Unabhängig von Gemeinden kann jede Ebene eigene Wahlkreise schneiden: `/civ <Ebene> wahlkreis anlegen <Name>`, dann mit dem Grundstücksstab zwei Ecken markieren und `/civ <Ebene> wahlkreis gebiet <Name>` (beliebig viele Rechtecke) oder ganze Gemeinden mit `/civ <Ebene> wahlkreis gemeinde <Name> <Gemeinde>` (Namen mit Leerzeichen in Anführungszeichen) zuordnen. `wahlkreis liste`, `leeren <Name>`, `aufloesen <Name>`. Spieler zählen im Wahlkreis ihres Wohngrundstücks, Dorfbewohner dort, wo sie zuletzt gesehen wurden; wer in keinem Wahlkreis liegt, zählt in seiner Gemeinde. Bei `districts` und `mixed` gibt jeder Wahlkreis seinen Sieger, Ergebnisse und die Wahlkarte zeigen die Kreise.
+
+### Wahldebatten und Live-Auszählung
+- **Debatte:** am letzten Wahltag startet für jede Wahl mit mindestens zwei Kandidaten eine Debatte (`election_debates`), oder sofort mit `/civ <Ebene> debatte starten [Amt]`. Kandidaten sprechen mit `/civ debatte <Text>`; Dorfbewohner-Kandidaten antworten nach ihrem Programm. Jeder Beitrag wirkt wie eine halbe Rede auf alle Dorfbewohner der Ebene; am Ende gibt es eine Blitzumfrage.
+- **Live-Auszählung:** Nach Wahlschluss wird nicht sofort verkündet: Zwischenstände bei 10, 25, 45, 65, 85 und 100 % mit Hochrechnung und Sitzprognose, als Chat-Meldung und Bossleiste, dann das amtliche Ergebnis. Abschaltbar in der Konfiguration (`live_count`, `live_count_projections`).
+
+### Justiz
+Jede Gemeinde und jeder Bund hat ein Gericht; Richter ist, wen die Spitze ernennt (`/civ <Ebene> gericht richter ernennen <Spieler|dorfbewohner>`), sonst die Spitze selbst. Staatsanwälte ebenso mit `staatsanwalt ernennen`.
+
+- **Klagen:** `/civ gericht klage straf <Beklagter> | <Vorwurf>`, `… zivil <Beklagter> <Smaragde> | <Grund>`, `… verfassung <§n oder Regel> | <Begründung>` beim Gemeindegericht, bei Bünden mit `/civ <Ebene> gericht klage …`. Die Gerichtsgebühr (`court_fee`) zahlt der Kläger; gewinnt er, erstattet sie der Beklagte.
+- **Ablauf:** eingereicht → Beweisaufnahme → Plädoyers → Beratung → Urteil → nach zwei Tagen Berufungsfrist rechtskräftig und vollstreckt. Versäumt der Richter eine Frist, schaltet das Gericht am Tagesende selbst weiter und entscheidet nach Aktenlage.
+- **Beteiligte:** Strafprozesse bekommen eine Staatsanwaltschaft und Geschworene (`jury_size`, aus Spielern und Dorfbewohnern der Gemeinde; Dorfbewohner urteilen nach Beweislage und Persönlichkeit). Mit Jury entscheidet ihre Mehrheit über schuldig, der Richter nur über die Strafe. Der Angeklagte bestellt einen Verteidiger (`/civ gericht verteidiger <Nr> <Spieler|dorfbewohner>`), Parteien laden Zeugen (`zeuge <Nr> …`); Dorfbewohner sagen sofort aus.
+- **Beweise:** `/civ gericht beweis <Nr>` legt vor, was du in der Hand hast (Buch mit Feder, signiertes Buch, beliebiger Gegenstand), `beweis <Nr> vertrag <Vertragsnr>`, `beweis <Nr> artikel <Artikelnr>`, `beweis <Nr> text <Text>`. Verträge wiegen am schwersten.
+- **Aussagen und Plädoyers:** `/civ gericht aussage <Nr> <Text>`, `plaedoyer <Nr> <Text>`; der Ton (be- oder entlastend) wird erkannt.
+- **Richter:** `eroeffnen <Nr>`, `weiter <Nr>`, `einstellen <Nr> [Grund]`, `urteil <Nr> schuldig|freispruch [Smaragde] [verbannen] [absetzen] | Begründung`. Strafen: Geldstrafe bis `max_fine`, Schadensersatz bis zur Klagesumme, Verbannung für 30 Tage (`exile_allowed`; man fliegt aus der Gemeinde und darf nicht wieder beitreten), Amtsenthebung. Eine erfolgreiche Verfassungsklage hebt die Regel bzw. den Paragraphen auf.
+- **Geschworene:** `/civ gericht stimme <Nr> schuldig|unschuldig`.
+- **Berufung:** `/civ gericht berufung <Nr>` durch die unterlegene Seite, solange das Urteil nicht rechtskräftig ist; das Gericht der nächsthöheren Ebene verhandelt neu, die Beweise wandern mit.
+- **Menüs:** `/civ gericht` (Gericht der eigenen Gemeinde), `/civ gericht fall <Nr>` (Akte mit allen Beteiligten, Beweisen, Protokoll und den Knöpfen, die dir offenstehen), `/civ gericht faelle`, `/civ gericht akte <Nr>` (in den Chat). Im Rathaus oben (Glocke) und im Ebenenmenü.
+- **Richterbank (Block):** Rezept Gold, Buch, Gold über drei Bretter über Brett-leer-Brett. Rechtsklick öffnet das Gericht der Gemeinde, in der sie steht.
+
+### Flaggen und Hymnen
+- **Flagge:** Banner gestalten (Webstuhl), in die Hand nehmen und `/civ <Ebene> flagge setzen`. `flagge holen` gibt ein Banner mit der Flagge, `flagge entfernen`. Im Ebenenmenü (Banner): Klick holt die Flagge. Die Webseite zeichnet die Flaggen nach.
+- **Hymne:** `/civ <Ebene> hymne setzen <Titel> | [Instrument |] <Noten>`. Noten von F#3 bis F#5 (`C4 D4 E4 F#4 …`), `*2` verdoppelt, `/2` halbiert die Länge, `-` ist eine Pause. Instrumente: `harp`, `bell`, `flute`, `chime`, `guitar`, `xylophone` und alle anderen Notenblock-Instrumente. `hymne spielen`, `hymne entfernen`; Rechtsklick aufs Banner im Ebenenmenü spielt sie. Mit `anthem_on_enter` hört man sie beim Betreten des Gebiets.
+
 ### Wahlkampf
 - **Reden:** `/civ rede <Text>`: Spieler in 32 Blöcken lesen mit. Kandidierst du gerade, reagieren Dorfbewohner in Hörweite drei Tage lang: Das Thema (Ordnung, Freiheit, Steuern, Ausbau; aus Stichworten erkannt) zieht passende Persönlichkeiten an und stößt andere ab. Eine wirksame Rede pro Tag.
 - **Wahlversprechen:** `/civ versprechen geben <Text>` als Kandidat; das Gesetzbuch erkennt Messbares wie „Die Umsatzsteuer beträgt 5 %.“ `/civ versprechen [liste [Name]]` zeigt alle Versprechen mit Bilanz (gehalten, gebrochen, teilweise, nicht messbar). Wer wieder antritt, wird von Dorfbewohnern an seiner Bilanz gemessen. Kandidaten-Tooltips in Ämter-, Parlaments- und Urnenmenü zeigen die Versprechen.
-- **Wahlplakate (Litfaßsäule):** Aufstellen im Gemeindegebiet wirbt für dich, wenn du kandidierst, sonst für deine Partei: Jedes Plakat zieht die Dorfbewohner der Gemeinde etwas zum Beworbenen (bis zu drei zählen). Rechtsklick zeigt, wofür es wirbt.
+- **Wahlplakate (Litfaßsäule):** Aufstellen im Gemeindegebiet wirbt für dich, wenn du kandidierst, sonst für deine Partei: Jedes Plakat zieht die Dorfbewohner der Gemeinde etwas zum Beworbenen (bis zu drei zählen). Rechtsklick zeigt, wofür es wirbt; über der Säule schwebt ein Schild mit dem Namen. Wer noch nicht kandidiert und keine Partei hat, dessen Plakat wartet und wird aktiv, sobald er kandidiert.
 - `/civ parlament [zeigen <Name> | menue]` zeigt Sitzverteilung, Fraktionen, Präsidium, Wahlperiode und Tagesordnung.
 
 ### Gesetzes-Baukasten
@@ -189,7 +227,8 @@ Rezept: Eisen, Papier, Truhe (`III / IPI / ICI`).
 - **Briefwahl:** Erlaubt das Gesetz `postal_vote_allowed` („Briefwahl ist erlaubt.“), wählt man am Briefkasten; die Stimme zählt wie an der Urne.
 
 ### Freunde und Chat
-- `/civ freund <Spieler>` fragt an; fragt die andere Seite zurück, seid ihr befreundet. `/civ freund entfernen <Spieler>`, `/civ freunde`.
+- `/civ freund <Spieler>` fragt an; die Anfrage kommt mit Knöpfen [Annehmen] [Ablehnen], alternativ `/civ freund annehmen|ablehnen <Spieler>`. `/civ freund entfernen <Spieler>`, `/civ freunde` (Menü: Klick schreibt eine Nachricht, Rechtsklick schaltet Vertrauen, unten rechts neue Freunde aus allen Online-Spielern).
+- **Vertrauen:** `/civ freund vertrauen|misstrauen <Spieler>`. Wem du vertraust, der darf auf deinen Grundstücken (eigene und gemietete) bauen, Behälter öffnen und Dinge benutzen.
 - `/civ nachricht <Freund> <Text>` schickt eine Direktnachricht, auch an Freunde, die gerade auf der Webseite sind.
 - Der allgemeine Chat im Spiel erscheint auf der Webseite; was dort geschrieben wird, erscheint im Spiel mit „[Web]“.
 
@@ -231,7 +270,9 @@ So entstehen die Preise:
 Der Server stellt eine Webseite bereit, standardmäßig auf Port 8765, hell und dunkel, auch auf dem Handy:
 - **Start:** Live-Karte aller Gemeinden, Kennzahlen, wer gerade online ist, Einstieg und wichtige Befehle
 - **Welt:** Register aller Gemeinden (mit generiertem Wappen, Postleitzahl, Straßen und Adressen), Bünde, Parteien, Firmen und Zeitungen mit Suche
-- **Karte:** alle beanspruchten Chunks je Dimension mit Straßen, Wahlkarte nach Bezirken
+- **Karte:** alle beanspruchten Chunks je Dimension mit Straßen, Wahlkarte nach Bezirken; mit `world_map` darunter die echte Landschaft: Der Mod zeichnet geladene Chunks um die Spieler (Umkreis `world_map_radius_chunks`) alle paar Minuten neu in Kacheln (ähnlich Dynmap)
+- **Staat:** Live-Auszählung mit Hochrechnung, laufende Debatten, Flaggen, Hymnen zum Abspielen und Wahlkreise
+- **Justiz:** alle Verfahren mit Akte und Protokoll, Klage einreichen, Aussagen, Plädoyers, Beweise, Urteile und Abstimmen als Geschworener
 - **Wahlen** mit Umfragen und Ergebnissen, **Markt** mit Preisen und Läden der Spieler
 - **Börse:** Kursliste mit Verlauf, Chart mit Umsatz, Kennzahlen, Aktionäre, Orderbuch, Handeln und Depot
 - **Presse:** Artikel mit Haltung und Thema, Zeitungen mit Redaktion und Verbreitung, Artikel schreiben mit Live-Erkennung
@@ -318,6 +359,8 @@ Anmelden: Mit `/civ web` holst du dir im Spiel einen Code und gibst ihn auf der 
 | `/civ post [lesen <Nr> \| menue]` / `/civ brief <Spieler> <Betreff> \| <Text>` | Post |
 | `/civ freund [entfernen] <Spieler>` / `/civ freunde [menue]` | Freunde |
 | `/civ nachricht <Freund> <Text>` | Direktnachricht |
+| `/civ gericht [faelle\|fall\|akte\|klage\|beweis\|aussage\|plaedoyer\|stimme\|urteil\|berufung …]` | Justiz, siehe oben |
+| `/civ <Ebene> wahlkreis\|debatte\|flagge\|hymne\|gericht …` | Wahlkreise, Debatten, Hoheitszeichen und Gericht einer Ebene |
 | `/civ firma gruenden\|info\|liste\|aufnehmen\|entlassen\|einstellen\|dividende\|ausgeben\|aufloesen` | Firmen, siehe oben |
 | `/civ boerse [kaufen\|verkaufen\|depot\|buch\|streichen\|menue]` | Börse |
 | `/civ zeitung gruenden\|redakteur\|entlassen\|schreiben\|veroeffentlichen\|lesen\|artikel\|liste\|menue\|aufloesen` | Presse |
@@ -353,6 +396,12 @@ Der Bürgermeister (oder mit Abstimmungen die Bürger) stellt diese Regelungen i
 | Sitze im Parlament (`parliament_seats`) | 0 = kein Parlament (Standard), bis 99 |
 | Sitzungen alle … Tage (`session_days`) | 1 bis 7, Standard 1 |
 | Gewählt wird nur an der Wahlurne (`ballot_box_required`) | ja/nein, Standard nein |
+| Wahlverfahren, Sperrklausel, Amtszeitbegrenzung, Wahlpflicht, Debatten | siehe **Wahlverfahren** |
+| Pressefreiheit (`press_freedom`) | aus: Artikel, die die Gemeinde oder ihre Amtsträger kritisieren, erscheinen dort nicht |
+| Geschworene je Strafprozess (`jury_size`) | 0–12, Standard 5 |
+| Höchste Geldstrafe (`max_fine`) | Hundertstel Smaragd, Standard 5000 |
+| Verbannung erlaubt (`exile_allowed`) | ja/nein, Standard ja |
+| Gerichtsgebühr (`court_fee`) | Hundertstel Smaragd, Standard 100 |
 
 ## Für Server-Admins
 `config/eddies-civ-mod.properties` wird beim ersten Start angelegt:
@@ -370,6 +419,12 @@ Der Bürgermeister (oder mit Abstimmungen die Bürger) stellt diese Regelungen i
 | `market_town_inhabitants`, `city_inhabitants`, `metropolis_inhabitants` | Einwohner für die Siedlungsstufen |
 | `web_enabled`, `web_bind`, `web_port` | Webseite ein/aus, Adresse und Port (Standard `true`, `0.0.0.0`, `8765`) |
 | `web_public_url` | Adresse, die `/civ web` den Spielern nennt, z. B. `https://civ.example.org` |
+| `live_count`, `live_count_seconds`, `live_count_projections` | Live-Auszählung nach Wahlschluss an/aus, Dauer in Sekunden, Hochrechnungen an/aus (Standard `true`, 60, `true`) |
+| `debate_minutes` | Länge einer Wahldebatte (Standard 5) |
+| `anthem_on_enter` | Hymne beim Betreten eines Gebiets (Standard `false`) |
+| `world_map`, `world_map_radius_chunks` | gerenderte Weltkarte für die Webseite an/aus und Umkreis um Spieler (Standard `true`, 6); Kacheln unter `<Welt>/data/eddies-civ-mod/map/` |
+
+Fehlen Einträge (nach einem Update), ergänzt der Mod sie beim Start mit Standardwerten.
 
 Der Zustand liegt je Welt in `<Welt>/data/eddies-civ-mod/civ.sqlite` und wird im Hintergrund zusammen mit der Welt gespeichert.
 

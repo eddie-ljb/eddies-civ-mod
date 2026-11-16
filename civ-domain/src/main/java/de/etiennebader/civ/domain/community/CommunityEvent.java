@@ -7,7 +7,7 @@ import de.etiennebader.civ.domain.shared.DomainEvent;
  * Alle Events des {@link Community}-Aggregats.
  */
 public sealed interface CommunityEvent extends DomainEvent
-        permits LetterSent, LetterRead, FriendRequested, FriendshipChanged, ChatPosted {
+        permits LetterSent, LetterRead, FriendRequested, FriendshipChanged, FriendTrustChanged, ChatPosted {
 
     /** Wer gehandelt hat. */
     PlayerRef actor();

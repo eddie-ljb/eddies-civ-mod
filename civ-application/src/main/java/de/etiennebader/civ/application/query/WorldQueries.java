@@ -1,10 +1,13 @@
 package de.etiennebader.civ.application.query;
 
+import de.etiennebader.civ.domain.justice.JudiciaryView;
+import de.etiennebader.civ.domain.civic.CivicView;
 import de.etiennebader.civ.application.Repositories;
 import de.etiennebader.civ.application.federation.Federations;
 import de.etiennebader.civ.application.law.EffectiveLaws;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PolityRef;
+import de.etiennebader.civ.domain.actor.PlayerRef;
 import de.etiennebader.civ.domain.community.CommunityView;
 import de.etiennebader.civ.domain.contract.Contract;
 import de.etiennebader.civ.domain.contract.ContractKind;
@@ -66,7 +69,7 @@ public final class WorldQueries {
 
         @Override
         public boolean mayUsePlot(ActorRef actor, PolityId polity, PlotId plot) {
-            return isTenant(actor, polity, plot);
+            return isTenant(actor, polity, plot) || isTrustedFriend(actor, polity, plot);
         }
 
         @Override
@@ -86,6 +89,14 @@ public final class WorldQueries {
     }
 
     /** Alle Zeitungsartikel. */
+    public CivicView civic() {
+        return repositories.civic().load();
+    }
+
+    public JudiciaryView justice() {
+        return repositories.justice().load();
+    }
+
     public PressView press() {
         return repositories.press().load();
     }
@@ -111,6 +122,22 @@ public final class WorldQueries {
         return contracts().active().stream()
                 .anyMatch(contract -> contract.kind() == ContractKind.LEASE && contract.payer().equals(actor)
                         && contract.plot().filter(ref::equals).isPresent());
+    }
+
+    /**
+     * Ob der Akteur als Freund auf diesem Grundstück bauen darf: Inhaber oder Mieter ist ein Spieler, der ihm mit
+     * {@code /civ freund vertrauen} Baurecht gegeben hat.
+     */
+    public boolean isTrustedFriend(ActorRef actor, PolityId polity, PlotId plot) {
+        if (!(actor instanceof PlayerRef friend)) {
+            return false;
+        }
+        CommunityView community = community();
+        List<ActorRef> users = new ArrayList<>();
+        repositories.land().findByPolity(polity).flatMap(land -> land.plot(plot)).ifPresent(found ->
+                users.add(found.holder()));
+        leaseOf(polity, plot).ifPresent(lease -> users.add(lease.payer()));
+        return users.stream().anyMatch(user -> user instanceof PlayerRef owner && community.trusts(owner, friend));
     }
 
     /** Der geltende Mietvertrag eines Grundstücks. */

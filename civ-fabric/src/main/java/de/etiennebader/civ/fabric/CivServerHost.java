@@ -156,7 +156,8 @@ public final class CivServerHost {
         }
         civ.queries().polity(announcement.town().get()).ifPresent(town -> {
             for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-                if (town.isMember(Players.ref(player))) {
+                if (town.isMember(Players.ref(player)) || civ.levels().chainOf(Players.ref(player)).stream()
+                        .anyMatch(level -> level.id().equals(town.id()))) {
                     player.sendSystemMessage(Components.prefixed(Components.of(announcement.message()), true));
                     Feedback.success(player);
                 }

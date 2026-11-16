@@ -449,6 +449,21 @@ class SqliteStateStoreTest {
             app.companies().admit(alice, paper, de.etiennebader.civ.domain.polity.PolityKind.NEWSPAPER, bertram, DAY);
             app.press().publish(alice, paper, "Holz AG zahlt Dividende", "Ein Erfolg.",
                     app.press().analyse("Holz AG zahlt Dividende", "Ein Erfolg.", java.util.Map.of()), DAY);
+            app.civic().define(alice, nordhain, "Nordviertel", DAY);
+            app.civic().addArea(alice, nordhain, "Nordviertel", new de.etiennebader.civ.domain.civic.Area(
+                    de.etiennebader.civ.domain.territory.DimensionId.OVERWORLD, 0, 0, 15, 15), DAY);
+            app.civic().addTown(alice, nordhain, "Nordviertel", nordhain, DAY);
+            app.civic().setFlag(alice, nordhain, Optional.of(new de.etiennebader.civ.domain.civic.Flag("red",
+                    java.util.List.of(new de.etiennebader.civ.domain.civic.Flag.Layer("minecraft:stripe_top", "white")))),
+                    DAY);
+            app.civic().setAnthem(alice, nordhain, Optional.of(new de.etiennebader.civ.domain.civic.Anthem(
+                    "Heimatlied", "bell", "C4 E4 G4 C5*2 - G4/2")), DAY);
+            app.justice().appoint(alice, nordhain, de.etiennebader.civ.domain.justice.Role.JUDGE, dora, true, DAY);
+            var lawsuit = app.justice().file(alice, nordhain, de.etiennebader.civ.domain.justice.CaseKind.CIVIL, bertram,
+                    "Zaun beschädigt", "250", DAY);
+            app.justice().open(dora, lawsuit.id(), DAY);
+            app.justice().submit(alice, lawsuit.id(), "buch", "Foto", "Der Zaun ist kaputt.", 2, DAY);
+            app.justice().testify(bertram, lawsuit.id(), "Das war ich nicht.", DAY);
             app.endOfDay().execute(DAY);
             app.runElections().execute(DAY.plus(1));
         }

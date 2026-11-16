@@ -7,6 +7,7 @@ import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.media.Article;
 import de.etiennebader.civ.domain.polity.Election;
 import de.etiennebader.civ.domain.polity.Membership;
+import de.etiennebader.civ.application.population.PlatformAffinity;
 import de.etiennebader.civ.domain.polity.Platform;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.population.Personality;
@@ -121,20 +122,11 @@ public final class VillagerEditors {
     }
 
     static double agreement(Personality personality, Platform topic) {
-        return switch (topic) {
-            case NONE -> 0;
-            case ORDER -> personality.order() / 100.0;
-            case FREEDOM -> -personality.order() / 100.0;
-            case LOW_TAXES -> personality.thrift() / 100.0;
-            case INVESTMENT -> -personality.thrift() / 100.0;
-        };
+        return PlatformAffinity.of(topic, personality);
     }
 
     /** Das Thema, das einer Persönlichkeit am meisten zusagt. */
     static Platform preferred(Personality personality) {
-        if (Math.abs(personality.order()) >= Math.abs(personality.thrift())) {
-            return personality.order() >= 0 ? Platform.ORDER : Platform.FREEDOM;
-        }
-        return personality.thrift() >= 0 ? Platform.LOW_TAXES : Platform.INVESTMENT;
+        return PlatformAffinity.preferred(personality);
     }
 }

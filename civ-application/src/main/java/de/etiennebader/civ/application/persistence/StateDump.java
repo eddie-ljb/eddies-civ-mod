@@ -170,6 +170,7 @@ public final class StateDump {
                 day(letter.sentOn().value()), day(letter.deliverOn().value()), Boolean.toString(letter.read()))));
         community.friendships().forEach(pair -> lines.add("friends|" + actor(pair.get(0)) + "|" + actor(pair.get(1))));
         community.requests().forEach(pair -> lines.add("request|" + actor(pair.get(0)) + "|" + actor(pair.get(1))));
+        community.trusts().forEach(pair -> lines.add("trust|" + actor(pair.get(0)) + "|" + actor(pair.get(1))));
         community.messages().forEach(message -> lines.add(String.join("|", "chat", Long.toString(message.seq()),
                 actor(message.from()), message.to().map(StateDump::actor).orElse("-"), message.text(),
                 Long.toString(message.at()), message.origin())));
@@ -202,6 +203,32 @@ public final class StateDump {
                 actor(article.author()), article.title(), article.body(), article.topic().name(),
                 article.subject().map(StateDump::actor).orElse("-"), Integer.toString(article.tendency()),
                 day(article.day().value()), article.towns().toString(), Integer.toString(article.readers()))));
+        world.civic().constituencies().forEach(constituency -> lines.add(String.join("|", "constituency",
+                constituency.id().value().toString(), constituency.polity().value().toString(), constituency.name(),
+                constituency.areas().toString(), constituency.towns().toString())));
+        world.civic().flags().entrySet().stream().sorted(java.util.Map.Entry.comparingByKey(
+                java.util.Comparator.comparing(id -> id.value().toString()))).forEach(entry -> lines.add(String.join("|",
+                "flag", entry.getKey().value().toString(), entry.getValue().toString())));
+        world.civic().anthems().entrySet().stream().sorted(java.util.Map.Entry.comparingByKey(
+                java.util.Comparator.comparing(id -> id.value().toString()))).forEach(entry -> lines.add(String.join("|",
+                "anthem", entry.getKey().value().toString(), entry.getValue().toString())));
+        world.justice().cases().forEach(found -> lines.add(String.join("|", "case", Integer.toString(found.number()),
+                found.id().value().toString(), found.court().value().toString(), found.kind().name(), actor(found.plaintiff()),
+                actor(found.defendant()), found.charge(), found.target(), found.stage().name(),
+                day(found.filedOn().value()), day(found.stageUntil().value()), found.judge().map(StateDump::actor).orElse("-"),
+                found.prosecutor().map(StateDump::actor).orElse("-"), found.defense().map(StateDump::actor).orElse("-"),
+                found.witnesses().stream().map(StateDump::actor).toList().toString(),
+                found.jurors().stream().map(StateDump::actor).toList().toString(),
+                Integer.toString(found.evidence().size()), Integer.toString(found.statements().size()),
+                found.votes().toString(), found.verdict().map(Object::toString).orElse("-"),
+                found.appealOf().map(id -> id.value().toString()).orElse("-"))));
+        world.justice().staff().entrySet().stream().sorted(java.util.Map.Entry.comparingByKey(
+                java.util.Comparator.comparing(id -> id.value().toString()))).forEach(entry -> lines.add(String.join("|",
+                "court", entry.getKey().value().toString(),
+                entry.getValue().judges().stream().map(StateDump::actor).toList().toString(),
+                entry.getValue().prosecutors().stream().map(StateDump::actor).toList().toString())));
+        world.justice().exiles().forEach(exile -> lines.add(String.join("|", "exile", exile.polity().value().toString(),
+                actor(exile.actor()), day(exile.until().value()))));
         world.market().stocks().stream()
                 .map(stock -> "stock|" + stock.commodity().id() + "|" + stock.quantity() + "|" + day(stock.asOf().value()))
                 .sorted()

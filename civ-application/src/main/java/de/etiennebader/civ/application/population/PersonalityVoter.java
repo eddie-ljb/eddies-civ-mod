@@ -93,10 +93,9 @@ public final class PersonalityVoter implements VillagerVoter {
         double taxBurden = -satisfaction.points(Satisfaction.Factor.TAXES) / 40.0;
         double programme = switch (platform) {
             case NONE -> 0;
-            case ORDER -> personality.order() / 100.0;
-            case FREEDOM -> -personality.order() / 100.0;
             case LOW_TAXES -> personality.thrift() / 100.0 * 0.6 + taxBurden * 0.8;
             case INVESTMENT -> -personality.thrift() / 100.0 * 0.6;
+            default -> PlatformAffinity.of(platform, personality);
         };
         double mood = satisfaction.score() / 100.0;
         double loyalty = 0.6 + personality.belonging() / 333.0;

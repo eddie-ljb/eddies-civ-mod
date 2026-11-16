@@ -51,7 +51,9 @@ public final class Texts {
     }
 
     public String polityName(PolityId polity) {
-        return queries.polity(polity).map(found -> found.name().value()).orElseGet(() -> shortId(polity.value()));
+        return queries.polity(polity).map(found -> found.name().value())
+                .or(() -> queries.civic().byDistrict(polity).map(constituency -> constituency.name()))
+                .orElseGet(() -> shortId(polity.value()));
     }
 
     /** Ein Geldbetrag wie „12,05 Smaragde“; das Dezimalzeichen kommt aus der Sprachdatei. */
@@ -63,6 +65,9 @@ public final class Texts {
 
     /** Der Wert einer Regelung: Wahrheitswerte als „ja“/„nein“, sonst als Zahl oder Text. */
     public Object lawValue(Object value) {
+        if (value instanceof String option && TranslationKeys.isLawOption(option)) {
+            return Message.of(TranslationKeys.lawOption(option));
+        }
         return value instanceof Boolean bool ? Message.of(TranslationKeys.yesNo(bool)) : value.toString();
     }
 

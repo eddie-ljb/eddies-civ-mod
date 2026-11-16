@@ -82,6 +82,12 @@ public final class Json {
             return this;
         }
 
+        /** Mehrere Schlüssel mit schon kodierten JSON-Werten. */
+        public ObjectBuilder rawAll(java.util.List<java.util.Map.Entry<String, String>> entries) {
+            entries.forEach(entry -> raw(entry.getKey(), entry.getValue()));
+            return this;
+        }
+
         public String build() {
             return out + "}";
         }

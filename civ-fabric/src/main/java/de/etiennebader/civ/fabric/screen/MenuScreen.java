@@ -1,6 +1,7 @@
 package de.etiennebader.civ.fabric.screen;
 
 import de.etiennebader.civ.domain.shared.Money;
+import de.etiennebader.civ.fabric.Components;
 import de.etiennebader.civ.fabric.Feedback;
 import de.etiennebader.civ.fabric.Players;
 import de.etiennebader.civ.fabric.gui.Canvas;
@@ -51,6 +52,14 @@ abstract class MenuScreen extends Screen {
                     parent.ifPresentOrElse(screen -> Screens.open(click.player(), screen),
                             () -> Screens.close(click.player()));
                 });
+    }
+
+    /** Schließt das Menü und legt einen anklickbaren Befehl in den Chat, der die Eingabezeile vorbefüllt. */
+    protected static void prompt(Click click, Message label, String command) {
+        Feedback.click(click.player());
+        click.player().closeContainer();
+        click.player().sendSystemMessage(Components.prefixed(Components.of(Message.of(
+                de.etiennebader.civ.server.command.MessageKey.COURT_PROMPT, Message.action(label, command))), true));
     }
 
     /** Führt eine Aktion aus und meldet das Ergebnis über der Schnellzugriffsleiste. */

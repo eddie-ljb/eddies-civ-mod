@@ -34,6 +34,19 @@ public record Message(String key, List<Object> args) {
         return new Message(key, Arrays.stream(args).map(Message::normalize).toList());
     }
 
+    /**
+     * Ein anklickbarer Knopf im Chat, z. B. {@code [Annehmen]}; im Spiel führt ein Klick den Befehl aus, die Webseite
+     * zeigt nur die Beschriftung.
+     */
+    public static Message action(Message label, String command) {
+        return of(MessageKey.ACTION, label, command);
+    }
+
+    /** Ob dies ein Knopf aus {@link #action(Message, String)} ist. */
+    public boolean isAction() {
+        return key.equals(MessageKey.ACTION.key()) && args.size() == 2;
+    }
+
     private static Object normalize(Object arg) {
         Objects.requireNonNull(arg, "arg");
         return arg instanceof Number number ? number.toString() : arg;

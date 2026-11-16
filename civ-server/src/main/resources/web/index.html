@@ -301,6 +301,16 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
   .letter, .article { padding: 20px; }
   .account { grid-template-columns: minmax(0, 1fr); }
 }
+.flag { width: 40px; height: 80px; border-radius: 2px; box-shadow: 0 1px 3px rgb(0 0 0 / .25); flex: none; }
+.entry .flag { width: 40px; height: 80px; }
+.liveband { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; margin-bottom: 36px; }
+.counted { font-variant-numeric: tabular-nums; font-weight: 700; }
+.proj { height: 3px; background: repeating-linear-gradient(90deg, var(--c) 0 6px, transparent 6px 10px); margin: -8px 0 10px; opacity: .7; }
+.debate p { margin: 6px 0; }
+.debate .who { font-weight: 650; }
+.case-actions { display: grid; gap: 10px; margin-top: 18px; }
+.case-actions .row { flex-wrap: wrap; }
+.stmt { border-left: 3px solid var(--c, var(--line)); padding: 4px 0 4px 12px; margin: 8px 0; }
 @media (prefers-reduced-motion: no-preference) {
   .hero h1, .hero .lead, .hero .row, .ledger { animation: rise .6s cubic-bezier(.2,.7,.2,1) both; }
   .hero .lead { animation-delay: .06s; } .hero .row { animation-delay: .12s; } .ledger { animation-delay: .18s; }
@@ -332,6 +342,8 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
       <a href="#markt">Markt</a>
       <a href="#boerse">Börse</a>
       <a href="#presse">Presse</a>
+      <a href="#staat">Staat</a>
+      <a href="#justiz">Justiz</a>
       <a href="#post">Post<span class="badge" id="b-post"></span></a>
       <a href="#chat">Chat<span class="badge" id="b-chat"></span></a>
       <a href="#freunde">Freunde<span class="badge" id="b-friends"></span></a>
@@ -431,6 +443,7 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
         </select>
         <select id="mapmode" aria-label="Ansicht"><option value="">Gebiete</option></select>
         <label class="btn small" style="background:var(--surface)"><input type="checkbox" id="showstreets" checked style="padding:0"> Straßen</label>
+        <label class="btn small" style="background:var(--surface)" id="terrainbox" hidden><input type="checkbox" id="showterrain" checked style="padding:0"> Gelände</label>
         <button class="btn small" id="recenter">Zentrieren</button>
       </div>
       <div class="legend" id="legend"></div>
@@ -501,6 +514,32 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
     </div>
     <h3 style="margin:32px 0 12px">Zeitungen</h3>
     <div class="register" id="papers"></div>
+  </section>
+
+  <section data-page="staat">
+    <div class="pagehead"><div><h2>Staat</h2><p>Wahlabende mit Hochrechnung, Wahldebatten, Flaggen, Hymnen und Wahlkreise aller Ebenen.</p></div></div>
+    <h3 style="margin-bottom:12px">Wahlabend</h3>
+    <div class="liveband" id="livecounts"></div>
+    <h3 style="margin-bottom:12px">Wahldebatten</h3>
+    <div class="liveband" id="debates"></div>
+    <h3 style="margin:8px 0 12px">Hoheitszeichen und Wahlkreise</h3>
+    <div class="register" id="symbols"></div>
+  </section>
+
+  <section data-page="justiz">
+    <div class="pagehead">
+      <div><h2>Justiz</h2><p>Jede Gemeinde und jeder Bund hat ein Gericht. Verfahren laufen in Abschnitten: Beweisaufnahme, Plädoyers, Beratung, Urteil, Rechtskraft. Verpasst ein Richter eine Frist, entscheidet das Gericht nach Aktenlage.</p></div>
+      <div class="row">
+        <select id="casefilter" aria-label="Filter"><option value="">Alle Verfahren</option><option value="mine">Meine Verfahren</option><option value="open">Laufende</option></select>
+        <button class="btn primary" id="newcase" hidden>Klage einreichen</button>
+      </div>
+    </div>
+    <div class="press">
+      <div class="list" id="cases"></div>
+      <div id="caseview"></div>
+    </div>
+    <h3 style="margin:32px 0 12px">Gerichte</h3>
+    <div class="register" id="courts"></div>
   </section>
 
   <section data-page="post">
@@ -677,7 +716,7 @@ const head = name => el("img", { className: "avatar", alt: "", loading: "lazy", 
 const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
 /* Seiten */
-const pages = ["start", "welt", "karte", "wahlen", "markt", "boerse", "presse", "post", "chat", "freunde", "ich"];
+const pages = ["start", "welt", "karte", "wahlen", "markt", "boerse", "presse", "staat", "justiz", "post", "chat", "freunde", "ich"];
 let page = "start";
 function route() {
   const wanted = location.hash.slice(1).split("/")[0];
@@ -685,10 +724,11 @@ function route() {
   document.querySelectorAll("section[data-page]").forEach(s => s.classList.toggle("on", s.dataset.page === page));
   document.querySelectorAll(".nav a").forEach(a => { if (a.getAttribute("href") === "#" + page) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
   const loaders = { start: loadStart, welt: loadWorld, karte: openMap, wahlen: loadElections, markt: loadMarket,
-    boerse: loadExchange, presse: loadPress, post: loadLetters,
+    boerse: loadExchange, presse: loadPress, staat: loadState, justiz: loadJustice, post: loadLetters,
     chat: openChat, freunde: loadFriends, ich: loadMe };
   loaders[page]();
   if (page !== "chat") stopChat();
+  if (page !== "staat") clearTimeout(stateTimer);
 }
 window.addEventListener("hashchange", () => { route(); window.scrollTo(0, 0); });
 
@@ -877,9 +917,12 @@ function resize() {
 window.addEventListener("resize", () => { if (page === "karte") resize(); });
 async function loadMap() {
   if (!electionData.results.length) { const r = await api("/api/elections"); if (r.ok) { electionData = r.data; fillModes(); } }
-  const { ok, data } = await api("/api/map?dim=" + encodeURIComponent($("dim").value));
+  const [{ ok, data }, tiles] = await Promise.all([api("/api/map?dim=" + encodeURIComponent($("dim").value)),
+    api("/api/map/tiles?dim=" + encodeURIComponent($("dim").value))]);
   if (!ok) return;
   mapData = data;
+  terrain = tiles.ok ? tiles.data : { enabled: false, tiles: [] };
+  $("terrainbox").hidden = !terrain.enabled;
   const result = electionResult();
   if (result) {
     const leaders = result.districts.filter(d => d.town);
@@ -925,10 +968,33 @@ function chunkColor(c) {
   if (!d || (party && d.party !== party)) return css("--line");
   return colorOf(d.key);
 }
+let terrain = { enabled: false, tiles: [], chunks: 32 };
+const tileImages = new Map();
+function tileImage(t) {
+  const key = $("dim").value + "/" + t.x + "/" + t.z + "/" + t.v;
+  let img = tileImages.get(key);
+  if (!img) {
+    img = new Image(); img.onload = () => { if (page === "karte") draw(); };
+    img.src = "/api/map/tile?dim=" + encodeURIComponent($("dim").value) + "&x=" + t.x + "&z=" + t.z + "&v=" + t.v;
+    tileImages.set(key, img);
+  }
+  return img;
+}
 function draw() {
   if (!canvas.width) return;
   ctx.fillStyle = css("--sunk"); ctx.fillRect(0, 0, canvas.width, canvas.height);
   const s = view.scale * devicePixelRatio;
+  const showTerrain = terrain.enabled && terrain.tiles.length && $("showterrain").checked;
+  if (showTerrain) {
+    ctx.imageSmoothingEnabled = false;
+    const size = terrain.chunks * s;
+    for (const t of terrain.tiles) {
+      const [px, pz] = toScreen(t.x * terrain.chunks, t.z * terrain.chunks);
+      if (px > canvas.width || pz > canvas.height || px + size < 0 || pz + size < 0) continue;
+      const img = tileImage(t);
+      if (img.complete && img.naturalWidth) ctx.drawImage(img, px, pz, size, size);
+    }
+  }
   if (view.scale >= 6) {
     ctx.strokeStyle = css("--line"); ctx.globalAlpha = .6; ctx.lineWidth = 1; ctx.beginPath();
     const sx = Math.floor(view.x - canvas.width / 2 / s), sz = Math.floor(view.z - canvas.height / 2 / s);
@@ -938,7 +1004,7 @@ function draw() {
   }
   for (const c of mapData.chunks) {
     const [px, pz] = toScreen(c.x, c.z);
-    ctx.fillStyle = chunkColor(c); ctx.globalAlpha = c.outpost ? .4 : .78;
+    ctx.fillStyle = chunkColor(c); ctx.globalAlpha = (c.outpost ? .4 : .78) * (showTerrain ? .55 : 1);
     ctx.fillRect(px, pz, s + .5, s + .5);
     if (c.outpost && s > 8) { ctx.globalAlpha = .9; ctx.strokeStyle = chunkColor(c); ctx.beginPath(); ctx.moveTo(px, pz + s); ctx.lineTo(px + s, pz); ctx.stroke(); }
   }
@@ -1000,6 +1066,7 @@ canvas.addEventListener("wheel", e => { e.preventDefault(); view.scale = Math.mi
 $("dim").addEventListener("change", () => loadMap().then(recenter));
 $("mapmode").addEventListener("change", loadMap);
 $("showstreets").addEventListener("change", draw);
+$("showterrain").addEventListener("change", draw);
 $("recenter").addEventListener("click", recenter);
 
 /* Wahlen */
@@ -1255,6 +1322,202 @@ function writeArticle() {
 $("newarticle").addEventListener("click", writeArticle);
 $("paperfilter").addEventListener("change", () => { openArticle = null; renderPress(); });
 
+/* Staat: Wahlabend, Debatten, Flaggen, Hymnen, Wahlkreise */
+let stateTimer = null;
+const dyes = { white: "#f9fffe", orange: "#f9801d", magenta: "#c74ebd", light_blue: "#3ab3da", yellow: "#fed83d", lime: "#80c71f",
+  pink: "#f38baa", gray: "#474f52", light_gray: "#9d9d97", cyan: "#169c9c", purple: "#8932b8", blue: "#3c44aa", brown: "#835432",
+  green: "#5e7c16", red: "#b02e26", black: "#1d1d21" };
+const patternShapes = {
+  stripe_bottom: "M0 28h20v12H0Z", stripe_top: "M0 0h20v12H0Z", stripe_left: "M0 0h6v40H0Z", stripe_right: "M14 0h6v40h-6Z",
+  stripe_center: "M7 0h6v40H7Z", stripe_middle: "M0 17h20v6H0Z", stripe_downright: "M0 0h4l16 32v8h-4L0 8Z", stripe_downleft: "M20 0h-4L0 32v8h4l16-32Z",
+  small_stripes: "M1 0h3v40H1ZM6 0h3v40H6ZM11 0h3v40h-3ZM16 0h3v40h-3Z", cross: "M0 0h4l16 32v8h-4L0 8ZM20 0h-4L0 32v8h4l16-32Z",
+  straight_cross: "M8 0h4v40H8ZM0 18h20v4H0Z", triangle_bottom: "M0 40 10 28l10 12Z", triangle_top: "M0 0l10 12L20 0Z",
+  triangles_bottom: "M0 40l2.5-4 2.5 4 2.5-4 2.5 4 2.5-4 2.5 4 2.5-4L20 40Z", triangles_top: "M0 0l2.5 4L5 0l2.5 4L10 0l2.5 4L15 0l2.5 4L20 0Z",
+  diagonal_left: "M0 0h20L0 40Z", diagonal_right: "M20 0v40H0Z", diagonal_up_left: "M0 0v40h20Z", diagonal_up_right: "M0 0h20v40Z",
+  circle: "M10 15a5 5 0 1 1 0 10a5 5 0 1 1 0-10Z", rhombus: "M10 9l6 11-6 11-6-11Z", half_vertical: "M0 0h10v40H0Z",
+  half_horizontal: "M0 0h20v20H0Z", half_vertical_right: "M10 0h10v40H10Z", half_horizontal_bottom: "M0 20h20v20H0Z",
+  square_bottom_left: "M0 32h7v8H0Z", square_bottom_right: "M13 32h7v8h-7Z", square_top_left: "M0 0h7v8H0Z", square_top_right: "M13 0h7v8h-7Z",
+  border: "M0 0h20v40H0ZM2 2v36h16V2Z", curly_border: "M0 0h20v40H0ZM2.5 2.5v35h15v-35Z",
+  bricks: "M0 4h20v1H0ZM0 9h20v1H0ZM0 14h20v1H0ZM0 19h20v1H0ZM0 24h20v1H0ZM0 29h20v1H0ZM0 34h20v1H0ZM5 0h1v4H5ZM15 5h1v4h-1ZM5 10h1v4H5ZM15 15h1v4h-1ZM5 20h1v4H5ZM15 25h1v4h-1ZM5 30h1v4H5Z",
+  creeper: "M6 12h3v3H6ZM11 12h3v3h-3ZM8.5 15h3v2h2v5h-2v-1h-3v1h-2v-5h2Z", skull: "M5 12h10v8l-2 2H7l-2-2ZM7 15v2h2v-2ZM11 15v2h2v-2Z",
+  flower: "M10 13a2 2 0 0 1 2 2 2 2 0 0 1 2 2 2 2 0 0 1-2 2 2 2 0 0 1-2 2 2 2 0 0 1-2-2 2 2 0 0 1-2-2 2 2 0 0 1 2-2 2 2 0 0 1 2-2Z",
+  globe: "M10 13a7 7 0 1 1 0 14a7 7 0 1 1 0-14ZM10 15a5 5 0 1 0 0 10a5 5 0 1 0 0-10Z", mojang: "M5 14h10v10H5ZM8 17v4h4v-4Z",
+  piglin: "M6 14h8v8H6Z", flow: "M10 12l7 8-7 8-7-8Z", guster: "M4 16h12v2H4ZM6 20h10v2H6Z" };
+function flagSvg(flag, name) {
+  const s = svg("svg", { viewBox: "0 0 20 40", class: "flag", role: "img", "aria-label": "Flagge " + name });
+  s.append(svg("rect", { x: 0, y: 0, width: 20, height: 40, fill: dyes[flag.base] || "#ccc" }));
+  flag.layers.forEach((layer, i) => {
+    const kind = layer.pattern.replace(/^.*:/, ""), color = dyes[layer.color] || "#000";
+    if (kind === "gradient" || kind === "gradient_up") {
+      const id = "g" + hash(name + i).toString(36), grad = svg("linearGradient", { id, x1: 0, y1: 0, x2: 0, y2: 1 });
+      grad.append(svg("stop", { offset: 0, "stop-color": color, "stop-opacity": kind === "gradient" ? 1 : 0 }),
+        svg("stop", { offset: 1, "stop-color": color, "stop-opacity": kind === "gradient" ? 0 : 1 }));
+      const defs = svg("defs"); defs.append(grad); s.append(defs, svg("rect", { width: 20, height: 40, fill: "url(#" + id + ")" }));
+    } else if (patternShapes[kind]) {
+      s.append(svg("path", { d: patternShapes[kind], fill: color, "fill-rule": "evenodd" }));
+    }
+  });
+  return s;
+}
+let audio = null;
+function playAnthem(anthem) {
+  audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+  const waves = { harp: "triangle", bell: "sine", flute: "sine", chime: "sine", guitar: "sawtooth", xylophone: "square", bass: "triangle",
+    banjo: "sawtooth", bit: "square", pling: "triangle", didgeridoo: "sawtooth", cow_bell: "square", iron_xylophone: "square" };
+  let t = audio.currentTime + .05;
+  const volume = audio.createGain(); volume.gain.value = .18; volume.connect(audio.destination);
+  for (const note of anthem.melody) {
+    const length = note.t * .05;
+    if (note.s >= 0) {
+      const osc = audio.createOscillator(), env = audio.createGain();
+      osc.type = waves[anthem.instrument] || "triangle";
+      osc.frequency.value = 185 * Math.pow(2, note.s / 12) * (anthem.instrument === "chime" || anthem.instrument === "bell" ? 2 : 1);
+      env.gain.setValueAtTime(0, t); env.gain.linearRampToValueAtTime(1, t + .01);
+      env.gain.exponentialRampToValueAtTime(.001, t + Math.max(.15, length * 1.4));
+      osc.connect(env); env.connect(volume); osc.start(t); osc.stop(t + Math.max(.2, length * 1.5));
+    }
+    t += length;
+  }
+}
+const share = n => (Math.round(n * 10) / 10).toLocaleString("de-DE") + " %";
+async function loadState() {
+  clearTimeout(stateTimer);
+  const [show, civic] = await Promise.all([api("/api/show"), api("/api/civic")]);
+  if (show.ok) renderShow(show.data);
+  if (civic.ok) renderSymbols(civic.data);
+  if (show.ok && (show.data.running.length || show.data.debates.some(d => !d.finished))) stateTimer = setTimeout(loadState, 3000);
+}
+function renderShow(d) {
+  const card = (v, live) => {
+    const c = el("div", { className: "poll" }); c.style.setProperty("--c", colorOf(v.polity));
+    c.append(el("h3", { textContent: v.polityName + ": " + v.office }),
+      el("div", { className: "sub" }, live ? el("span", {}, "Ausgezählt: ", el("span", { className: "counted", textContent: share(v.counted) })) : "Endergebnis"));
+    const names = Object.keys(v.shares).sort((a, b) => v.shares[b] - v.shares[a]);
+    for (const n of names) {
+      const bar = el("div", { className: "bar" }), f = el("span"); f.style.width = v.shares[n] + "%"; f.style.setProperty("--c", colorOf(n)); bar.append(f);
+      c.append(el("div", { className: "line" }, el("span", { textContent: n }), el("b", { textContent: share(v.shares[n]) })), bar);
+      if (live && v.projection[n] !== undefined) {
+        const p = el("div", { className: "proj", title: "Hochrechnung " + share(v.projection[n]) }); p.style.width = v.projection[n] + "%"; p.style.setProperty("--c", colorOf(n)); c.append(p);
+      }
+    }
+    if (live && Object.keys(v.projection).length) c.append(el("div", { className: "muted small", textContent: "Gestrichelt: Hochrechnung" }));
+    if (Object.keys(v.seats).length) c.append(el("div", { className: "muted small", textContent: "Sitze: " + Object.entries(v.seats).map(([k, s]) => k + " " + s).join(", ") }));
+    return c;
+  };
+  const live = d.running.map(v => card(v, true)), done = d.recent.slice(-4).reverse().map(v => card(v, false));
+  $("livecounts").replaceChildren(...(live.length || done.length ? [...live, ...done]
+    : [el("div", { className: "empty", textContent: d.liveCount ? "Gerade wird nichts ausgezählt. Nach Wahlschluss erscheint hier die Auszählung mit Hochrechnung." : "Die Live-Auszählung ist in der Konfiguration abgeschaltet." })]));
+  $("debates").replaceChildren(...(d.debates.length ? d.debates.map(x => {
+    const c = el("div", { className: "poll debate" }); c.style.setProperty("--c", colorOf(x.polityName));
+    c.append(el("h3", { textContent: x.polityName + ": " + x.office }), el("div", { className: "sub", textContent: x.candidates.join(" · ") + (x.finished ? " – beendet" : " – läuft (" + Math.round(x.progress * 100) + " %)") }));
+    x.contributions.slice(-8).forEach(l => c.append(el("p", {}, el("span", { className: "who", textContent: l.speaker + ": " }), "„" + l.text + "“ ",
+      el("span", { className: "muted small", textContent: l.topic + ", " + l.convinced + " überzeugt, " + l.repelled + " abgeschreckt" }))));
+    if (Object.keys(x.verdict).length) c.append(el("div", { className: "muted small", textContent: "Blitzumfrage: " + Object.entries(x.verdict).map(([k, v]) => k + " " + share(v)).join(", ") }));
+    return c;
+  }) : [el("div", { className: "empty", textContent: "Keine Debatte. Am letzten Wahltag starten sie von selbst, sonst mit /civ <Ebene> debatte starten." })]));
+}
+function renderSymbols(d) {
+  $("symbols").replaceChildren(...(d.polities.length ? d.polities.map(p => el("div", { className: "entry" },
+    p.flag ? flagSvg(p.flag, p.name) : crest(p.id, p.name, p.level === "Gemeinde" ? "town" : "federation"),
+    el("div", {}, el("h3", { textContent: p.name }), el("div", { className: "sub", textContent: p.level }),
+      p.anthem ? el("button", { className: "btn small", style: "margin-top:8px", textContent: "▶ " + p.anthem.title, onclick: () => playAnthem(p.anthem) }) : el("div", { className: "muted small", textContent: "Keine Hymne" })),
+    facts([["Flagge", p.flag ? p.flag.layers.length + " Muster auf " + p.flag.base : "keine (Banner in die Hand, /civ <Ebene> flagge setzen)"],
+      ["Wahlkreise", p.constituencies.length ? p.constituencies.map(c => c.name + (c.towns.length ? " (" + c.towns.join(", ") + ")" : "") + (c.areas.length ? " – " + c.areas.length + " Gebiet(e)" : "")).join("; ") : "keine eigenen, es gelten Gemeinden"]])))
+    : [el("div", { className: "empty", textContent: "Noch keine Gemeinde." })]));
+}
+
+/* Justiz */
+let justiceData = null, openCase = null, filingCase = false;
+async function loadJustice() {
+  const [j] = await Promise.all([api("/api/justice"), refreshMe()]);
+  if (!j.ok) return;
+  justiceData = j.data;
+  $("newcase").hidden = !me;
+  renderJustice();
+}
+function renderJustice() {
+  const filter = $("casefilter").value;
+  const list = justiceData.cases.filter(c => filter === "mine" ? c.role : filter === "open" ? !["FINAL", "DISMISSED", "APPEALED"].includes(c.stage) : true);
+  $("cases").replaceChildren(...(list.length ? list.map(c => el("button", { className: openCase === c.number ? "sel" : "", onclick: () => { filingCase = false; openCase = c.number; renderJustice(); } },
+    el("div", { className: "t" }, el("span", { textContent: "#" + c.number + " " + c.kindName }), el("span", { textContent: c.stageName })),
+    el("div", { className: "s", textContent: c.plaintiff + " gegen " + c.defendant }),
+    el("div", { className: "muted small", textContent: c.charge })))
+    : [el("div", { className: "empty", style: "border:none", textContent: "Keine Verfahren." })]));
+  $("courts").replaceChildren(...justiceData.courts.map(c => el("div", { className: "entry" }, crest(c.id, c.name, c.level === "Gemeinde" ? "town" : "federation"),
+    el("div", {}, el("h3", { textContent: "Gericht von " + c.name }), el("div", { className: "sub", textContent: c.level })),
+    facts([["Richter", c.judges.join(", ") || "die Spitze der Ebene"], ["Staatsanwälte", c.prosecutors.join(", ") || "–"], ["Gebühr", c.fee + " Smaragde"], ["Geschworene", c.jury]]))));
+  if (filingCase) return;
+  const current = list.find(c => c.number === openCase) || list[0];
+  if (current) { openCase = current.number; showCase(current); } else $("caseview").replaceChildren();
+}
+function showCase(c) {
+  const msg = el("div", { className: "msg" });
+  const act = async (action, extra) => {
+    const r = await api("/api/justice", Object.assign({ action, number: String(c.number) }, extra || {}));
+    msg.textContent = r.data.message || r.data.error; msg.className = "msg " + (r.ok ? "ok" : "err");
+    if (r.ok) { const j = await api("/api/justice"); if (j.ok) { justiceData = j.data; renderJustice(); } }
+  };
+  const textAction = (label, action, placeholder) => {
+    const input = el("input", { placeholder, ariaLabel: label });
+    return el("form", { className: "row", onsubmit: e => { e.preventDefault(); act(action, { text: input.value }); } }, input, el("button", { className: "btn small", textContent: label }));
+  };
+  const role = c.role, side = ["PLAINTIFF", "DEFENDANT", "PROSECUTOR", "DEFENSE"].includes(role), early = c.stage === "FILED" || c.stage === "EVIDENCE";
+  const actions = el("div", { className: "case-actions" });
+  if (me) {
+    if (c.stage === "FILED") actions.append(el("div", { className: "row" }, el("button", { className: "btn small", textContent: "Verfahren eröffnen (Richter)", onclick: () => act("open") })));
+    if (role === "JUDGE" && (c.stage === "EVIDENCE" || c.stage === "PLEADINGS")) actions.append(el("div", { className: "row" }, el("button", { className: "btn small", textContent: "Nächster Abschnitt", onclick: () => act("advance") })));
+    if (role === "JUDGE" && (c.stage === "PLEADINGS" || c.stage === "DELIBERATION")) actions.append(textAction("Urteil sprechen", "decide", "schuldig 5 | Begründung  oder  freispruch | Begründung"));
+    if (role === "JUDGE" && early) actions.append(textAction("Einstellen", "dismiss", "Grund"));
+    if (side && early) { actions.append(textAction("Beweis vorlegen", "evidence", "Beweis als Text")); actions.append(textAction("Zeugen laden", "summon", "Spielername")); }
+    if ((side || role === "WITNESS") && early) actions.append(textAction("Aussagen", "testify", "Deine Aussage"));
+    if (side && c.stage === "PLEADINGS") actions.append(textAction("Plädieren", "plead", "Dein Schlussvortrag"));
+    if (role === "DEFENDANT" && early && !c.defense) actions.append(textAction("Verteidiger bestellen", "defense", "Spielername"));
+    if (role === "JUROR" && (c.stage === "PLEADINGS" || c.stage === "DELIBERATION")) actions.append(el("div", { className: "row" },
+      el("button", { className: "btn small", textContent: "Schuldig", onclick: () => act("vote", { guilty: "true" }) }),
+      el("button", { className: "btn small", textContent: "Unschuldig", onclick: () => act("vote", { guilty: "false" }) })));
+    if (side && c.stage === "DECIDED") actions.append(el("div", { className: "row" }, el("button", { className: "btn small", textContent: "Berufung einlegen", onclick: () => act("appeal") })));
+  }
+  actions.append(msg);
+  $("caseview").replaceChildren(el("article", { className: "article" },
+    el("div", { className: "masthead" }, el("b", { textContent: "Gericht von " + c.court }), el("span", { className: "muted", textContent: "Verfahren #" + c.number + (c.appealOf ? ", Berufung zu #" + c.appealOf : "") })),
+    el("h3", { textContent: c.plaintiff + " gegen " + c.defendant }),
+    el("div", { className: "muted small", style: "margin-bottom:16px", textContent: c.kindName + " · " + c.stageName + " bis Tag " + c.until + (c.roleName ? " · deine Rolle: " + c.roleName : "") }),
+    el("div", { className: "body", textContent: c.charge + (c.target ? "\nGegenstand: " + c.target : "") }),
+    c.verdict ? el("p", { style: "margin-top:14px;font-weight:600", textContent: c.verdict }) : null,
+    el("div", { className: "afoot" }, facts([["Richter", c.judge || "–"], ["Anklage", c.prosecutor || "–"], ["Verteidigung", c.defense || "–"],
+      ["Zeugen", c.witnesses.join(", ") || "–"], ["Geschworene", c.jurors.join(", ") || "–"]])),
+    c.evidence.length ? el("div", { className: "afoot" }, el("b", { textContent: "Beweise" }), ...c.evidence.map(e => el("div", { className: "stmt" },
+      el("div", { textContent: e.number + ". " + e.title + " (" + e.by + ", Gewicht " + e.weight + ")" }), el("div", { className: "muted small", textContent: e.content })))) : null,
+    c.statements.length ? el("div", { className: "afoot" }, el("b", { textContent: "Protokoll" }), ...c.statements.map(st => {
+      const d = el("div", { className: "stmt" }, el("span", { className: "who", textContent: st.speaker + " (" + st.role + "): " }), "„" + st.text + "“");
+      d.style.setProperty("--c", st.tendency > 0 ? "var(--red)" : st.tendency < 0 ? "var(--emerald)" : "var(--line)"); return d;
+    })) : null,
+    actions));
+}
+function fileCase() {
+  filingCase = true;
+  const court = el("select", { ariaLabel: "Gericht" }, ...justiceData.courts.map(c => el("option", { value: c.id, textContent: c.name + " (" + c.level + ")" })));
+  const kind = el("select", { ariaLabel: "Art" }, el("option", { value: "straf", textContent: "Strafanzeige" }), el("option", { value: "zivil", textContent: "Zivilklage" }), el("option", { value: "verfassung", textContent: "Verfassungsklage" }));
+  const text = el("input", { required: true, ariaLabel: "Klage", placeholder: "Beklagter | Vorwurf" });
+  const hint = el("div", { className: "muted small" });
+  const hints = { straf: "Beklagter | Vorwurf, z. B. Bob | Diebstahl von Weizen", zivil: "Beklagter Smaragde | Grund, z. B. Bob 12 | Unbezahlte Lieferung", verfassung: "§n oder Regel | Begründung, z. B. tax_rate | verletzt §2" };
+  const update = () => { hint.textContent = hints[kind.value]; text.placeholder = hints[kind.value].split(",")[0]; };
+  kind.addEventListener("change", update); update();
+  const msg = el("div", { className: "msg" });
+  const form = el("form", { className: "article compose" }, el("h3", { textContent: "Klage einreichen" }),
+    el("label", { className: "field" }, "Gericht", court), el("label", { className: "field" }, "Art", kind), el("label", { className: "field" }, "Klage", text), hint,
+    el("div", { className: "row" }, el("button", { className: "btn primary", textContent: "Einreichen" }), el("button", { type: "button", className: "btn", textContent: "Verwerfen", onclick: () => { filingCase = false; renderJustice(); } })), msg);
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    const r = await api("/api/justice", { action: "file", court: court.value, kind: kind.value, text: text.value });
+    msg.textContent = r.data.message || r.data.error; msg.className = "msg " + (r.ok ? "ok" : "err");
+    if (r.ok) { filingCase = false; openCase = null; await loadJustice(); }
+  });
+  $("caseview").replaceChildren(form);
+}
+$("newcase").addEventListener("click", fileCase);
+$("casefilter").addEventListener("change", () => { openCase = null; renderJustice(); });
+
 /* Spielerliste für Eingaben */
 let players = [];
 async function loadPlayers() {
@@ -1411,13 +1674,15 @@ async function loadFriends() {
   $("friendlist").replaceChildren(friends.length ? el("div", { className: "people" }, ...friends.map(f => person(f, [
     el("a", { className: "btn small", href: "#chat", textContent: "Nachricht", onclick: () => { channel = f.name; } }),
     el("button", { className: "btn small", textContent: "Brief", onclick: () => { location.hash = "#post"; setTimeout(() => compose(f.name), 150); } }),
+    el("button", { className: "btn small" + (f.trusted ? " primary" : ""), title: "Baurecht auf deinen Grundstücken",
+      textContent: f.trusted ? "Darf bauen ✓" : "Bauen erlauben", onclick: () => act(f.trusted ? "untrust" : "trust", f.name) }),
     el("button", { className: "btn small danger", textContent: "Entfernen", onclick: () => act("remove", f.name) })])))
     : el("div", { className: "empty", textContent: "Noch keine Freunde. Schick oben eine Anfrage." }));
   const incoming = all.filter(f => f.state === "incoming"), outgoing = all.filter(f => f.state === "outgoing");
   $("requestlist").replaceChildren(incoming.length || outgoing.length ? el("div", { className: "people" },
     ...incoming.map(f => person(Object.assign({}, f, { town: "möchte mit dir befreundet sein" }), [
       el("button", { className: "btn small primary", textContent: "Annehmen", onclick: () => act("accept", f.name) }),
-      el("button", { className: "btn small", textContent: "Ablehnen", onclick: () => act("remove", f.name) })])),
+      el("button", { className: "btn small", textContent: "Ablehnen", onclick: () => act("decline", f.name) })])),
     ...outgoing.map(f => person(Object.assign({}, f, { town: "Anfrage gesendet" }), [
       el("button", { className: "btn small", textContent: "Zurückziehen", onclick: () => act("remove", f.name) })])))
     : el("div", { className: "empty", textContent: "Keine offenen Anfragen." }));

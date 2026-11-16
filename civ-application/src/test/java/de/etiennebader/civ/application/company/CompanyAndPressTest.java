@@ -218,4 +218,18 @@ class CompanyAndPressTest {
             }
         }
     }
+
+    @Test
+    @DisplayName("Ohne Pressefreiheit erscheinen Artikel gegen die eigene Führung dort nicht")
+    void censorship() {
+        PolityId paper = fixture.app.companies().found(alice, PolityName.of("Bote"), PolityKind.NEWSPAPER, EMERALD, DAY);
+        ArticleAnalysis againstMayor = new ArticleAnalysis(Optional.of(alice), -2, Platform.NONE, 1, -4);
+        ArticleAnalysis praise = new ArticleAnalysis(Optional.of(alice), 2, Platform.NONE, 1, 4);
+        assertEquals(List.of(nordhain), fixture.app.press().publish(alice, paper, "Kritik", "", againstMayor, DAY).towns());
+        fixture.app.amendLaw().execute(new de.etiennebader.civ.application.polity.AmendLaw.Command(nordhain, alice,
+                de.etiennebader.civ.domain.law.ParameterValue.of(de.etiennebader.civ.domain.law.StandardParameters.PRESS_FREEDOM,
+                        false), DAY));
+        assertEquals(List.of(), fixture.app.press().publish(alice, paper, "Kritik 2", "", againstMayor, DAY).towns());
+        assertEquals(List.of(nordhain), fixture.app.press().publish(alice, paper, "Lob", "", praise, DAY).towns());
+    }
 }

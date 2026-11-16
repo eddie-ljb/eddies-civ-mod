@@ -1,5 +1,9 @@
 package de.etiennebader.civ.application;
 
+import de.etiennebader.civ.domain.justice.JusticeRepository;
+import de.etiennebader.civ.domain.civic.CivicRepository;
+import de.etiennebader.civ.application.inmemory.InMemoryJusticeRepository;
+import de.etiennebader.civ.application.inmemory.InMemoryCivicRepository;
 import de.etiennebader.civ.application.inmemory.InMemoryCommunityRepository;
 import de.etiennebader.civ.application.inmemory.InMemoryContractRepository;
 import de.etiennebader.civ.application.inmemory.InMemoryExchangeRepository;
@@ -23,7 +27,17 @@ import java.util.Objects;
 public record Repositories(PolityRepository polities, TerritoryRepository territory,
                            LandRepository land, LedgerRepository ledger, MarketRepository market,
                            ShopRegistryRepository shops, ContractRegistryRepository contracts,
-                           CommunityRepository community, StockExchangeRepository exchange, PressRepository press) {
+                           CommunityRepository community, StockExchangeRepository exchange, PressRepository press,
+                           CivicRepository civic, JusticeRepository justice) {
+
+    /** Ohne Wahlkreise, Hoheitszeichen und Justiz (im Speicher). */
+    public Repositories(PolityRepository polities, TerritoryRepository territory, LandRepository land,
+                        LedgerRepository ledger, MarketRepository market, ShopRegistryRepository shops,
+                        ContractRegistryRepository contracts, CommunityRepository community,
+                        StockExchangeRepository exchange, PressRepository press) {
+        this(polities, territory, land, ledger, market, shops, contracts, community, exchange, press,
+                new InMemoryCivicRepository(), new InMemoryJusticeRepository());
+    }
 
     /** Ohne Börse und Presse (im Speicher). */
     public Repositories(PolityRepository polities, TerritoryRepository territory, LandRepository land,
@@ -45,6 +59,8 @@ public record Repositories(PolityRepository polities, TerritoryRepository territ
         Objects.requireNonNull(community, "community");
         Objects.requireNonNull(exchange, "exchange");
         Objects.requireNonNull(press, "press");
+        Objects.requireNonNull(civic, "civic");
+        Objects.requireNonNull(justice, "justice");
         Objects.requireNonNull(polities, "polities");
         Objects.requireNonNull(territory, "territory");
         Objects.requireNonNull(land, "land");

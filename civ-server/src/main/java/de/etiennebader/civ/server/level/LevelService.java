@@ -7,6 +7,9 @@ import de.etiennebader.civ.domain.law.ParameterKey;
 import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.server.campaign.CampaignService;
+import de.etiennebader.civ.server.election.DebateService;
+import de.etiennebader.civ.domain.polity.Office;
+import de.etiennebader.civ.server.civic.CivicService;
 import de.etiennebader.civ.server.command.Caller;
 import de.etiennebader.civ.server.command.CivCommands;
 import de.etiennebader.civ.server.command.Message;
@@ -44,11 +47,16 @@ public final class LevelService {
     private final ConstitutionService constitutions;
     private final CampaignService campaigns;
     private final LawBookService lawBooks;
+    private final CivicService civic;
+    private final DebateService debates;
     private final ParameterCatalog laws = ParameterCatalog.standard();
 
     public LevelService(WorldQueries queries, Texts texts, FederationService federations, CivCommands commands,
                         OfficeService offices, VotingService voting, ParliamentService parliaments,
-                        ConstitutionService constitutions, CampaignService campaigns, LawBookService lawBooks) {
+                        ConstitutionService constitutions, CampaignService campaigns, LawBookService lawBooks,
+                        CivicService civic, DebateService debates) {
+        this.civic = Objects.requireNonNull(civic, "civic");
+        this.debates = Objects.requireNonNull(debates, "debates");
         this.queries = Objects.requireNonNull(queries, "queries");
         this.texts = Objects.requireNonNull(texts, "texts");
         this.federations = Objects.requireNonNull(federations, "federations");
@@ -211,5 +219,49 @@ public final class LevelService {
     /** {@code /civ <Ebene> wahlergebnis} */
     public Reply lastResult(Caller caller, String level) {
         return with(caller, level, polity -> campaigns.lastResult(caller, Optional.of(polity.name().value())));
+    }
+
+    /** {@code /civ <Ebene> wahlkreis liste} */
+    public Reply constituencies(Caller caller, String level) {
+        return with(caller, level, polity -> civic.list(caller, polity));
+    }
+
+    /** {@code /civ <Ebene> wahlkreis anlegen|gebiet|leeren|aufloesen <Name>} */
+    public Reply constituency(Caller caller, String level, String action, String name) {
+        return with(caller, level, polity -> switch (action) {
+            case "anlegen" -> civic.define(caller, polity, name);
+            case "gebiet" -> civic.addArea(caller, polity, name);
+            case "leeren" -> civic.clear(caller, polity, name);
+            case "aufloesen" -> civic.remove(caller, polity, name);
+            default -> throw new IllegalArgumentException("Unbekannte Aktion: " + action);
+        });
+    }
+
+    /** {@code /civ <Ebene> wahlkreis gemeinde <Name> <Gemeinde>} */
+    public Reply constituencyTown(Caller caller, String level, String name, String town) {
+        return with(caller, level, polity -> civic.addTown(caller, polity, name, town));
+    }
+
+    /** {@code /civ <Ebene> hymne setzen <Titel> | [Instrument |] <Noten>} */
+    public Reply setAnthem(Caller caller, String level, String input) {
+        return with(caller, level, polity -> civic.setAnthem(caller, polity, input));
+    }
+
+    public Reply removeAnthem(Caller caller, String level) {
+        return with(caller, level, polity -> civic.removeAnthem(caller, polity));
+    }
+
+    /** {@code /civ <Ebene> debatte starten [Amt]} */
+    public Reply startDebate(Caller caller, String level, Optional<String> office) {
+        Optional<Office> wanted = office.flatMap(OfficeService::parse);
+        if (office.isPresent() && wanted.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.UNKNOWN_OFFICE, office.get().strip()));
+        }
+        return with(caller, level, polity -> debates.start(caller, polity, wanted, System.currentTimeMillis()));
+    }
+
+    /** Flagge setzen oder entfernen; die Flagge liest das Spiel aus einem Banner. */
+    public Reply setFlag(Caller caller, String level, Optional<de.etiennebader.civ.domain.civic.Flag> flag) {
+        return with(caller, level, polity -> civic.setFlag(caller, polity, flag));
     }
 }

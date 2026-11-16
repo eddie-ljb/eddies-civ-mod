@@ -102,6 +102,20 @@ public record ElectionCount(Map<ActorRef, Long> totals, int villagers,
         return new ElectionCount(totals, villagers, districts);
     }
 
+    /** Ob der Führende mehr als die Hälfte aller gewerteten Stimmen hat. */
+    public boolean hasAbsoluteMajority() {
+        long total = totals.values().stream().mapToLong(Long::longValue).sum();
+        long best = totals.values().stream().mapToLong(Long::longValue).max().orElse(0);
+        return total > 0 && best * 2 > total;
+    }
+
+    /** Die {@code count} Kandidaten mit den meisten Stimmen, bei Gleichstand wer zuerst kandidiert hat. */
+    public List<ActorRef> leaders(int count) {
+        return totals.entrySet().stream()
+                .sorted(Map.Entry.<ActorRef, Long>comparingByValue().reversed())
+                .limit(count).map(Map.Entry::getKey).toList();
+    }
+
     /** Der Gewinner; leer, wenn niemand kandidiert hat. */
     public Optional<ActorRef> winner(PolityView polity, Election election) {
         if (totals.isEmpty()) {

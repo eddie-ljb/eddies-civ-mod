@@ -35,6 +35,7 @@ public final class CivContent {
     public static final Identifier MAILBOX_ID = EddiesCivMod.id("mailbox");
     public static final Identifier NEWSSTAND_ID = EddiesCivMod.id("newsstand");
     public static final Identifier STOCK_EXCHANGE_ID = EddiesCivMod.id("stock_exchange");
+    public static final Identifier COURT_BENCH_ID = EddiesCivMod.id("court_bench");
     public static final Identifier LAW_BOOK_ID = EddiesCivMod.id("law_book");
     public static final Identifier TAB_ID = EddiesCivMod.id("civ");
 
@@ -54,10 +55,12 @@ public final class CivContent {
     private final Block mailbox;
     private final Block newsstand;
     private final Block stockExchange;
+    private final Block courtBench;
 
     private CivContent(Block townHall, Item townHallItem, Block bank, Block market, Item plotWand, Block constitution,
                        Item constitutionCopy, Block ballotBox, Block electionPoster, Block mailbox, Block newsstand,
-                       Block stockExchange) {
+                       Block stockExchange, Block courtBench) {
+        this.courtBench = courtBench;
         this.mailbox = mailbox;
         this.newsstand = newsstand;
         this.stockExchange = stockExchange;
@@ -117,11 +120,13 @@ public final class CivContent {
         Item newsstandItem = blockItem(NEWSSTAND_ID, newsstand);
         Block stockExchange = simpleBlock(STOCK_EXCHANGE_ID, MapColor.METAL, SoundType.METAL, 3.0F);
         Item stockExchangeItem = blockItem(STOCK_EXCHANGE_ID, stockExchange);
+        Block courtBench = simpleBlock(COURT_BENCH_ID, MapColor.COLOR_BROWN, SoundType.WOOD, 2.5F);
+        Item courtBenchItem = blockItem(COURT_BENCH_ID, courtBench);
 
         registerTab(townHallItem, bankItem, marketItem, constitutionItem, lawBook, plotWand, ballotBoxItem,
-                electionPosterItem, mailboxItem, newsstandItem, stockExchangeItem);
+                electionPosterItem, mailboxItem, newsstandItem, stockExchangeItem, courtBenchItem);
         return new CivContent(townHall, townHallItem, bank, market, plotWand, constitution, constitutionCopy, ballotBox,
-                electionPoster, mailbox, newsstand, stockExchange);
+                electionPoster, mailbox, newsstand, stockExchange, courtBench);
     }
 
     /**
@@ -130,7 +135,7 @@ public final class CivContent {
      */
     private static void registerTab(Item townHall, Item bank, Item market, Item constitution, Item lawBook,
                                     Item plotWand, Item ballotBox, Item electionPoster, Item mailbox,
-                                    Item newsstand, Item stockExchange) {
+                                    Item newsstand, Item stockExchange, Item courtBench) {
         ResourceKey<CreativeModeTab> key = ResourceKey.create(Registries.CREATIVE_MODE_TAB, TAB_ID);
         Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, key, FabricCreativeModeTab.builder()
                 .title(Component.translatable("itemGroup." + EddiesCivMod.MOD_ID + ".civ"))
@@ -146,6 +151,7 @@ public final class CivContent {
                     output.accept(mailbox);
                     output.accept(newsstand);
                     output.accept(stockExchange);
+                    output.accept(courtBench);
                     output.accept(Items.WRITABLE_BOOK);
                     output.accept(plotWand);
                     output.accept(Items.EMERALD);
@@ -225,6 +231,11 @@ public final class CivContent {
 
     public Block stockExchange() {
         return stockExchange;
+    }
+
+    /** Richterbank: Rechtsklick öffnet das Gericht der Gemeinde, in der sie steht. */
+    public Block courtBench() {
+        return courtBench;
     }
 
     /** Werkzeug für Grundstücke: Linksklick setzt Ecke 1, Rechtsklick Ecke 2. */

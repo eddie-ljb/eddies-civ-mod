@@ -190,9 +190,66 @@ public final class CampaignService {
     /** Ein Plakat wurde aufgestellt. */
     public Reply posterPlaced(Caller caller, BlockPosition position) {
         return attempt(() -> app.putUpPoster().execute(position, caller.player(), calendar.today())
-                .map(result -> Reply.success(Message.of(MessageKey.POSTER_PLACED, texts.actor(result.poster().subject()),
-                        texts.polityName(result.town()))))
+                .map(result -> Reply.success(result.active()
+                        ? Message.of(MessageKey.POSTER_PLACED, texts.actor(result.poster().subject()),
+                        texts.polityName(result.town()))
+                        : Message.of(MessageKey.POSTER_WAITING, texts.polityName(result.town()))))
                 .orElseGet(() -> Reply.success(Message.of(MessageKey.POSTER_DECORATION))));
+    }
+
+    /** Ein Plakat mit seiner Aufschrift für die Anzeige über der Litfaßsäule. */
+    public record PosterLabel(BlockPosition position, List<Message> lines, boolean active) {
+
+        public PosterLabel {
+            lines = List.copyOf(lines);
+        }
+    }
+
+    /** Alle registrierten Plakate mit Aufschrift, z. B. um die Anzeigen am Tagesende aufzufrischen. */
+    public List<PosterLabel> posters() {
+        List<PosterLabel> labels = new ArrayList<>();
+        for (PolityView polity : queries.polities()) {
+            for (Poster poster : polity.posters()) {
+                labels.add(label(poster));
+            }
+        }
+        return labels;
+    }
+
+    /** Die Aufschrift des Plakats an dieser Stelle. */
+    public Optional<PosterLabel> posterLabel(BlockPosition position) {
+        return queries.polities().stream().flatMap(polity -> polity.posters().stream())
+                .filter(poster -> poster.position().equals(position)).findFirst().map(this::label);
+    }
+
+    private PosterLabel label(Poster poster) {
+        List<Message> lines = new ArrayList<>();
+        boolean active;
+        if (poster.subject() instanceof PolityRef party) {
+            active = true;
+            lines.add(Message.of(MessageKey.POSTER_LABEL_PARTY, texts.actor(party)));
+            queries.polity(party.id()).flatMap(PolityView::partyProfile).ifPresent(profile -> lines.add(
+                    Message.of(MessageKey.POSTER_LABEL_LINE, Message.of(TranslationKeys.platform(profile.platform())))));
+        } else {
+            List<PolityView> electing = electingFor(poster.subject());
+            active = !electing.isEmpty();
+            lines.add(Message.of((active ? MessageKey.POSTER_LABEL_CANDIDATE : MessageKey.POSTER_LABEL_WAITING).key(),
+                    texts.actor(poster.subject())));
+            for (PolityView polity : electing) {
+                polity.elections().stream().filter(election -> election.isCandidate(poster.subject())).findFirst()
+                        .ifPresent(election -> {
+                            lines.add(Message.of(MessageKey.POSTER_LABEL_LINE,
+                                    Message.of(TranslationKeys.office(election.office()))));
+                            if (election.platformOf(poster.subject()) != de.etiennebader.civ.domain.polity.Platform.NONE) {
+                                lines.add(Message.of(MessageKey.POSTER_LABEL_LINE, Message.of(
+                                        TranslationKeys.platform(election.platformOf(poster.subject())))));
+                            }
+                        });
+                promisesOf(polity, poster.subject()).stream().findFirst().ifPresent(promise ->
+                        lines.add(Message.of(MessageKey.POSTER_LABEL_PROMISE, promise.text())));
+            }
+        }
+        return new PosterLabel(poster.position(), lines, active);
     }
 
     /** Ein Plakat wurde abgebaut. */

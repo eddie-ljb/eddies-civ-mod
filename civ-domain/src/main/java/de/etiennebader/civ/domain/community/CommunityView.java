@@ -40,6 +40,21 @@ public interface CommunityView {
     /** Alle gespeicherten Chatnachrichten. */
     List<ChatMessage> messages();
 
+    /** Freunde, denen der Inhaber Baurecht auf seinen Grundstücken gibt. */
+    default Set<PlayerRef> trustedBy(PlayerRef owner) {
+        return Set.of();
+    }
+
+    /** Alle Vertrauensstellungen als (Inhaber, Freund), z. B. zum Speichern. */
+    default List<List<PlayerRef>> trusts() {
+        return List.of();
+    }
+
+    /** Ob der Inhaber diesem Freund Baurecht gibt. */
+    default boolean trusts(PlayerRef owner, PlayerRef friend) {
+        return trustedBy(owner).contains(friend);
+    }
+
     default boolean areFriends(PlayerRef one, PlayerRef other) {
         return friendsOf(one).contains(other);
     }

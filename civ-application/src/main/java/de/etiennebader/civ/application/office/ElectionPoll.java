@@ -3,6 +3,7 @@ package de.etiennebader.civ.application.office;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.law.StandardParameters;
+import de.etiennebader.civ.domain.law.VotingMethod;
 import de.etiennebader.civ.domain.polity.Election;
 import de.etiennebader.civ.domain.polity.Membership;
 import de.etiennebader.civ.domain.polity.MembershipType;
@@ -84,8 +85,25 @@ public record ElectionPoll(Map<ActorRef, Integer> candidates, Map<Optional<Polit
         if (election.office() == Office.PARLIAMENT) {
             int count = (int) Math.min(polity.laws().valueOf(StandardParameters.PARLIAMENT_SEATS),
                     election.candidates().size());
-            seats = SeatAllocation.sainteLague(lists, capacity, count);
+            VotingMethod.Parliament method = VotingMethod.Parliament.of(
+                    polity.laws().valueOf(StandardParameters.PARLIAMENT_VOTING));
+            long threshold = polity.laws().valueOf(StandardParameters.THRESHOLD_PERCENT);
+            seats = method.proportional()
+                    ? SeatAllocation.allocate(method == VotingMethod.Parliament.MIXED ? "sainte_lague" : method.id(),
+                    lists, capacity, count, threshold)
+                    : majorityProjection(candidates, partyOf, count);
         }
         return new ElectionPoll(candidates, parties, undecided, seats);
+    }
+
+    /** Sitzprognose bei Mehrheitswahl: die stärksten Kandidaten ziehen ein, gezählt je Liste. */
+    private static Map<Object, Integer> majorityProjection(Map<ActorRef, Integer> candidates,
+                                                           Function<ActorRef, Optional<PolityView>> partyOf, int seats) {
+        Map<Object, Integer> projection = new LinkedHashMap<>();
+        candidates.entrySet().stream().filter(entry -> entry.getValue() > 0)
+                .sorted(Map.Entry.<ActorRef, Integer>comparingByValue().reversed()).limit(seats)
+                .forEach(entry -> projection.merge(partyOf.apply(entry.getKey()).map(PolityView::id)
+                        .<Object>map(id -> id).orElse(entry.getKey()), 1, Integer::sum));
+        return projection;
     }
 }

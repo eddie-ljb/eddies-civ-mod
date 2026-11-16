@@ -27,6 +27,18 @@ public record LawSetting(String id, Message name, Object value, Optional<String>
         Objects.requireNonNull(own, "own");
     }
 
+    /** Ob dies eine Auswahl ist, z. B. das Wahlverfahren; die Werte stehen in {@link #options()}. */
+    public boolean isChoice() {
+        return value instanceof String;
+    }
+
+    /** Die möglichen Werte einer Auswahl; leer bei allen anderen. */
+    public java.util.List<String> options() {
+        return new de.etiennebader.civ.domain.law.ParameterCatalog(
+                de.etiennebader.civ.domain.law.StandardParameters.all()).find(id)
+                .map(de.etiennebader.civ.domain.law.ParameterKey::options).orElse(java.util.List.of());
+    }
+
     public boolean isSwitch() {
         return value instanceof Boolean;
     }
@@ -37,6 +49,6 @@ public record LawSetting(String id, Message name, Object value, Optional<String>
 
     /** Der Zahlenwert; nur für Regelungen, die keine Schalter sind. */
     public long number() {
-        return ((Number) value).longValue();
+        return value instanceof Number number ? number.longValue() : 0;
     }
 }

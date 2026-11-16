@@ -52,6 +52,14 @@ public final class CommunityUseCases {
         return friends;
     }
 
+    /** Baurecht für einen Freund geben oder nehmen. @return ob sich etwas änderte */
+    public boolean trust(PlayerRef owner, PlayerRef friend, boolean trusted, Day day) {
+        Community community = aggregates.community();
+        boolean changed = community.trust(owner, friend, trusted, day);
+        aggregates.commit(community);
+        return changed;
+    }
+
     public boolean unfriend(PlayerRef actor, PlayerRef other, Day day) {
         Community community = aggregates.community();
         boolean changed = community.unfriend(actor, other, day);

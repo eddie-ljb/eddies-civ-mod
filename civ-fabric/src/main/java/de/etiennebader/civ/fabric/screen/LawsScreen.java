@@ -37,10 +37,19 @@ final class LawsScreen extends MenuScreen {
             "outsiders_may_build", Items.BRICKS,
             "outsiders_may_interact", Items.OAK_DOOR,
             "outsiders_may_open_containers", Items.CHEST);
+    private static final Map<String, Item> MORE_ICONS = Map.ofEntries(
+            Map.entry("office_voting", Items.GOLDEN_HELMET), Map.entry("parliament_voting", Items.LECTERN),
+            Map.entry("ballot_type", Items.PAPER), Map.entry("threshold_percent", Items.IRON_BARS),
+            Map.entry("term_limit", Items.CLOCK), Map.entry("compulsory_voting", Items.BELL),
+            Map.entry("voting_fine", Items.GOLD_NUGGET), Map.entry("election_debates", Items.GOAT_HORN),
+            Map.entry("press_freedom", Items.WRITABLE_BOOK), Map.entry("jury_size", Items.PLAYER_HEAD),
+            Map.entry("max_fine", Items.IRON_INGOT), Map.entry("exile_allowed", Items.BARRIER),
+            Map.entry("court_fee", Items.EMERALD), Map.entry("parliament_seats", Items.OAK_STAIRS),
+            Map.entry("postal_vote_allowed", Items.FEATHER), Map.entry("ballot_box_required", Items.BARREL));
     private static final Map<String, Long> STEPS = Map.of("land_tax_free_blocks", 16L);
     private static final String MONEY_LAW = "land_tax_per_block";
-    /** Drei volle Reihen: Platz für 27 Regelungen. */
-    private static final int[] SLOTS = IntStream.rangeClosed(9, 35).toArray();
+    /** Fünf volle Reihen: Platz für 45 Regelungen. */
+    private static final int[] SLOTS = IntStream.rangeClosed(0, 44).toArray();
 
     private final PolityId town;
 
@@ -51,7 +60,7 @@ final class LawsScreen extends MenuScreen {
 
     @Override
     public int rows() {
-        return 5;
+        return 6;
     }
 
     @Override
@@ -65,7 +74,7 @@ final class LawsScreen extends MenuScreen {
 
     @Override
     public void render(Canvas canvas) {
-        canvas.fillRow(4, Icon.of(Items.STAINED_GLASS_PANE.black()).hidden().build());
+        canvas.fillRow(5, Icon.of(Items.STAINED_GLASS_PANE.black()).hidden().build());
         backButton(canvas);
         Optional<TownOverview> found = overview();
         if (found.isEmpty()) {
@@ -81,6 +90,8 @@ final class LawsScreen extends MenuScreen {
                 }
                 if (law.isSwitch()) {
                     report(click, civ.towns().toggleLaw(caller(), town, law));
+                } else if (law.isChoice()) {
+                    report(click, civ.towns().cycleLaw(caller(), town, law, !click.right()));
                 } else {
                     long step = STEPS.getOrDefault(law.id(), 1L) * click.multiplier();
                     report(click, civ.towns().adjustLaw(caller(), town, law, click.right() ? -step : step));
@@ -90,11 +101,11 @@ final class LawsScreen extends MenuScreen {
     }
 
     private net.minecraft.world.item.ItemStack icon(LawSetting law, boolean citizen) {
-        Icon icon = Icon.of(ICONS.getOrDefault(law.id(), Items.PAPER)).name(law.name());
+        Icon icon = Icon.of(ICONS.getOrDefault(law.id(), MORE_ICONS.getOrDefault(law.id(), Items.PAPER))).name(law.name());
         Object value = law.id().equals(MONEY_LAW)
                 ? money(Money.of(law.number(), CurrencyId.EMERALD))
                 : civ.texts().lawValue(law.value());
-        boolean on = law.isSwitch() ? law.enabled() : law.number() > 0;
+        boolean on = law.isSwitch() ? law.enabled() : law.isChoice() || law.number() > 0;
         icon.line(GuiKeys.LAW_VALUE.text(value), on ? Icon.GOOD : Icon.INFO);
         law.federal().ifPresent(federation -> icon.line(GuiKeys.LAW_FEDERAL.text(federation), Icon.HINT));
         icon.hint(GuiKeys.LAW_ID.text(law.id()));
@@ -103,6 +114,12 @@ final class LawsScreen extends MenuScreen {
             icon.hint(GuiKeys.LAW_CITIZENS_ONLY.text());
         } else if (law.isSwitch()) {
             icon.hint(GuiKeys.LAW_TOGGLE_HINT.text());
+        } else if (law.isChoice()) {
+            for (String option : law.options()) {
+                icon.line(GuiKeys.LAW_OPTION.text(civ.texts().lawValue(option)),
+                        option.equals(law.value()) ? Icon.GOOD : Icon.HINT);
+            }
+            icon.hint(GuiKeys.LAW_CYCLE_HINT.text());
         } else {
             icon.hint(GuiKeys.LAW_ADJUST_HINT.text(STEPS.getOrDefault(law.id(), 1L)));
         }

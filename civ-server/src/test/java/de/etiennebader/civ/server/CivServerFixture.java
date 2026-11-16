@@ -91,6 +91,22 @@ public final class CivServerFixture {
         return server.federations();
     }
 
+    public de.etiennebader.civ.server.civic.CivicService civic() {
+        return server.civic();
+    }
+
+    public de.etiennebader.civ.server.justice.JusticeService justice() {
+        return server.justice();
+    }
+
+    public de.etiennebader.civ.server.election.DebateService debates() {
+        return server.debates();
+    }
+
+    public de.etiennebader.civ.server.election.LiveCountService liveCount() {
+        return server.liveCount();
+    }
+
     public de.etiennebader.civ.server.level.LevelService levels() {
         return server.levels();
     }

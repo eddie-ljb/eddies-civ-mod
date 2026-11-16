@@ -183,7 +183,7 @@ public final class PartyAffiliation {
             case FREEDOM -> "minecraft:yellow_banner";
             case LOW_TAXES -> "minecraft:green_banner";
             case INVESTMENT -> "minecraft:orange_banner";
-            case NONE -> PartyProfile.DEFAULT_EMBLEM;
+            default -> PartyProfile.DEFAULT_EMBLEM;
         };
         return new PartyProfile(clamp(found.order()), clamp(found.economy()), emblem);
     }

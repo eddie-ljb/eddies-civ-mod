@@ -146,6 +146,10 @@ final class CivilTables {
             for (List<PlayerRef> pair : community.requests()) {
                 bindPair(insert, pair, 1);
             }
+            // request = 2: (Inhaber, Freund) mit Baurecht
+            for (List<PlayerRef> pair : community.trusts()) {
+                bindPair(insert, pair, 2);
+            }
             insert.executeBatch();
         }
         try (PreparedStatement insert = connection.prepareStatement(
@@ -179,11 +183,16 @@ final class CivilTables {
         }
         List<List<PlayerRef>> friendships = new ArrayList<>();
         List<List<PlayerRef>> requests = new ArrayList<>();
+        List<List<PlayerRef>> trusts = new ArrayList<>();
         try (PreparedStatement select = connection.prepareStatement("SELECT * FROM friendship");
              ResultSet rows = select.executeQuery()) {
             while (rows.next()) {
                 List<PlayerRef> pair = List.of(player(rows, "first_id"), player(rows, "second_id"));
-                (rows.getInt("request") == 1 ? requests : friendships).add(pair);
+                switch (rows.getInt("request")) {
+                    case 1 -> requests.add(pair);
+                    case 2 -> trusts.add(pair);
+                    default -> friendships.add(pair);
+                }
             }
         }
         List<ChatMessage> messages = new ArrayList<>();
@@ -196,7 +205,7 @@ final class CivilTables {
                         rows.getString("text"), rows.getLong("at"), rows.getString("origin")));
             }
         }
-        return Community.restore(letters, friendships, requests, messages);
+        return Community.restore(letters, friendships, requests, trusts, messages);
     }
 
     private static void bindPair(PreparedStatement insert, List<PlayerRef> pair, int request) throws SQLException {

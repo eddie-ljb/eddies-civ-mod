@@ -30,6 +30,30 @@ import java.util.Optional;
  */
 public final class LevelScreen extends MenuScreen {
 
+    /** Flagge (Klick: Banner holen) und Hymne (Rechtsklick: abspielen). */
+    private void renderSymbols(Canvas canvas, PolityView current, Level level) {
+        Optional<de.etiennebader.civ.domain.civic.Flag> flag = civ.civic().flagOf(current.id());
+        Icon flagIcon = flag.map(found -> Icon.of(de.etiennebader.civ.fabric.content.Flags.banner(found,
+                        player.level().registryAccess())).name(GuiKeys.LEVEL_FLAG.text(current.name().value()), Icon.TITLE)
+                        .hint(GuiKeys.LEVEL_FLAG_HINT.text()))
+                .orElseGet(() -> Icon.of(Items.BANNER.white()).name(GuiKeys.LEVEL_FLAG.text(current.name().value()),
+                        Icon.TITLE).line(GuiKeys.LEVEL_FLAG_NONE.text(level.id()), Icon.HINT));
+        Optional<de.etiennebader.civ.domain.civic.Anthem> anthem = civ.civic().anthemOf(current.id());
+        anthem.ifPresentOrElse(found -> flagIcon.line(GuiKeys.LEVEL_ANTHEM.text(found.title()), Icon.INFO)
+                        .hint(GuiKeys.LEVEL_ANTHEM_HINT.text()),
+                () -> flagIcon.line(GuiKeys.LEVEL_ANTHEM_NONE.text(level.id()), Icon.HINT));
+        canvas.set(29, flagIcon.build(), click -> {
+            Feedback.click(click.player());
+            if (click.right()) {
+                anthem.ifPresent(found -> de.etiennebader.civ.fabric.Ambience.play(click.player(), found));
+            } else {
+                flag.ifPresent(found -> click.player().getInventory().placeItemBackInInventory(
+                        de.etiennebader.civ.fabric.content.Flags.banner(found, click.player().level().registryAccess()),
+                        net.minecraft.util.Prediction.SERVER_ONLY));
+            }
+        });
+    }
+
     private static final int MAX_TABS = 9;
     private static final int MAX_CONSTITUENTS = 12;
 
@@ -122,6 +146,14 @@ public final class LevelScreen extends MenuScreen {
                     Feedback.click(click.player());
                     Screens.open(click.player(), new LawBookScreen(civ, player, target, Optional.of(this)));
                 }));
+
+        canvas.set(31, Icon.of(Items.BELL).name(GuiKeys.COURT_OPEN.text(), Icon.TITLE)
+                .line(GuiKeys.COURT_OPEN_LINE.text(), Icon.INFO)
+                .hint(GuiKeys.CASE_OPEN_HINT.text()).build(), click -> withPolity(target -> {
+                    Feedback.click(click.player());
+                    Screens.open(click.player(), new CourtScreen(civ, player, Optional.of(target), Optional.of(this)));
+                }));
+        renderSymbols(canvas, current, level);
 
         canvas.set(40, Icon.of(Items.KNOWLEDGE_BOOK).name(GuiKeys.LEVEL_COMMANDS.text(level.displayName()), Icon.TITLE)
                 .line(GuiKeys.LEVEL_COMMAND_LINE.text("/civ " + level.id() + " aemter|parlament|umfrage"))

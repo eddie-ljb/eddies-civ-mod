@@ -1,5 +1,6 @@
 package de.etiennebader.civ.domain.law;
 
+
 import java.util.List;
 
 /**
@@ -127,6 +128,59 @@ public final class StandardParameters {
     public static final ParameterKey<Long> OFFICE_SALARY =
             ParameterKey.constrained("office_salary", Long.class, 0L, salary -> salary >= 0 && salary <= 10_000);
 
+    /** Wie Ämter besetzt werden: relative Mehrheit oder absolute Mehrheit mit Stichwahl. */
+    public static final ParameterKey<String> OFFICE_VOTING =
+            ParameterKey.choice("office_voting", VotingMethod.Office.PLURALITY.id(), VotingMethod.Office.ids());
+
+    /** Wie Parlamentssitze verteilt werden, z. B. Sainte-Laguë, D'Hondt, Mehrheitswahl in Wahlkreisen. */
+    public static final ParameterKey<String> PARLIAMENT_VOTING =
+            ParameterKey.choice("parliament_voting", VotingMethod.Parliament.SAINTE_LAGUE.id(),
+                    VotingMethod.Parliament.ids());
+
+    /** Personenwahl oder Listenwahl bei der Parlamentswahl. */
+    public static final ParameterKey<String> BALLOT_TYPE =
+            ParameterKey.choice("ballot_type", VotingMethod.Ballot.PERSON.id(), VotingMethod.Ballot.ids());
+
+    /** Sperrklausel in Prozent: Listen darunter bekommen bei Verhältniswahl keine Sitze (Wahlkreissieger schon). */
+    public static final ParameterKey<Long> THRESHOLD_PERCENT =
+            ParameterKey.constrained("threshold_percent", Long.class, 0L, percent -> percent >= 0 && percent <= 20);
+
+    /** Amtszeitbegrenzung: höchstens so viele Amtszeiten in Folge im selben Amt; 0 heißt unbegrenzt. */
+    public static final ParameterKey<Long> TERM_LIMIT =
+            ParameterKey.constrained("term_limit", Long.class, 0L, terms -> terms >= 0 && terms <= 10);
+
+    /** Wahlpflicht: Bürger, die bei einer Wahl nicht abstimmen, zahlen {@link #VOTING_FINE} an die Kasse. */
+    public static final ParameterKey<Boolean> COMPULSORY_VOTING =
+            ParameterKey.of("compulsory_voting", Boolean.class, false);
+
+    /** Bußgeld bei Wahlpflicht in kleinster Einheit (100 = ein Smaragd). */
+    public static final ParameterKey<Long> VOTING_FINE =
+            ParameterKey.constrained("voting_fine", Long.class, 100L, fine -> fine >= 0 && fine <= 10_000);
+
+    /** Wahldebatte: am Vortag jeder Wahl diskutieren die Kandidaten öffentlich. */
+    public static final ParameterKey<Boolean> ELECTION_DEBATES =
+            ParameterKey.of("election_debates", Boolean.class, true);
+
+    /** Pressefreiheit: ohne sie veröffentlichen Zeitungen keine Kritik an der Führung dieser Polity. */
+    public static final ParameterKey<Boolean> PRESS_FREEDOM =
+            ParameterKey.of("press_freedom", Boolean.class, true);
+
+    /** Geschworene je Strafverfahren; 0 heißt, der Richter entscheidet allein. */
+    public static final ParameterKey<Long> JURY_SIZE =
+            ParameterKey.constrained("jury_size", Long.class, 5L, jurors -> jurors >= 0 && jurors <= 12);
+
+    /** Höchststrafe eines Gerichts in kleinster Einheit. */
+    public static final ParameterKey<Long> MAX_FINE =
+            ParameterKey.constrained("max_fine", Long.class, 5_000L, fine -> fine >= 0 && fine <= 1_000_000);
+
+    /** Ob ein Gericht Verurteilte aus der Gemeinde verbannen darf. */
+    public static final ParameterKey<Boolean> EXILE_ALLOWED =
+            ParameterKey.of("exile_allowed", Boolean.class, true);
+
+    /** Gerichtsgebühr für eine Klage in kleinster Einheit; der Unterlegene trägt sie. */
+    public static final ParameterKey<Long> COURT_FEE =
+            ParameterKey.constrained("court_fee", Long.class, 100L, fee -> fee >= 0 && fee <= 100_000);
+
     /** Alle Standardparameter in fester Reihenfolge. */
     public static List<ParameterKey<?>> all() {
         return List.of(LAND_TAX_PER_BLOCK, LAND_TAX_FREE_BLOCKS, LAND_TAX_GRACE_DAYS, TAX_EMBASSIES, MAX_OUTPOSTS,
@@ -134,7 +188,9 @@ public final class StandardParameters {
                 FIRE_SPREAD_ALLOWED, LAWS_BY_VOTE, VOTE_DAYS, SALES_TAX_PERCENT, TERM_DAYS, ELECTION_DAYS,
                 VILLAGER_VOTE_PERCENT, AMENDMENT_MAJORITY_PERCENT, FEDERAL_LAW_PREVAILS, PVP_ALLOWED, HOSTILE_MOBS_ALLOWED,
                 OUTSIDERS_MAY_HURT_ANIMALS, FEDERAL_LEVY_PERCENT, PARLIAMENT_SEATS, SESSION_DAYS, BALLOT_BOX_REQUIRED,
-                POSTAL_VOTE_ALLOWED, OFFICE_SALARY);
+                POSTAL_VOTE_ALLOWED, OFFICE_SALARY, OFFICE_VOTING, PARLIAMENT_VOTING, BALLOT_TYPE, THRESHOLD_PERCENT,
+                TERM_LIMIT, COMPULSORY_VOTING, VOTING_FINE, ELECTION_DEBATES, PRESS_FREEDOM, JURY_SIZE, MAX_FINE,
+                EXILE_ALLOWED, COURT_FEE);
     }
 
     /**
@@ -144,7 +200,8 @@ public final class StandardParameters {
     public static List<ParameterKey<?>> constitutional() {
         return List.of(LAWS_BY_VOTE, VOTE_DAYS, TERM_DAYS, ELECTION_DAYS, VILLAGER_VOTE_PERCENT,
                 AMENDMENT_MAJORITY_PERCENT, FEDERAL_LAW_PREVAILS, PARLIAMENT_SEATS, SESSION_DAYS, BALLOT_BOX_REQUIRED,
-                POSTAL_VOTE_ALLOWED);
+                POSTAL_VOTE_ALLOWED, OFFICE_VOTING, PARLIAMENT_VOTING, BALLOT_TYPE, THRESHOLD_PERCENT, TERM_LIMIT,
+                PRESS_FREEDOM);
     }
 
     public static boolean isConstitutional(ParameterKey<?> key) {

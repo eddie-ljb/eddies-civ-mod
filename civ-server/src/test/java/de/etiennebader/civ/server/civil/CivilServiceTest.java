@@ -17,6 +17,8 @@ import de.etiennebader.civ.server.plot.PlotService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import de.etiennebader.civ.domain.protection.ProtectedAction;
+import de.etiennebader.civ.server.command.Message;
 import java.util.List;
 import java.util.Optional;
 
@@ -111,5 +113,41 @@ class CivilServiceTest {
         server.community().left(bob);
         assertFalse(server.community().friends(alice).getFirst().online());
         assertTrue(server.community().unfriend(alice, "Bob").success());
+    }
+
+    @Test
+    @DisplayName("Freundschaft: ablehnen, Knöpfe im Chat, Baurecht für Freunde auf dem gemieteten Grundstück")
+    void friendTrust() {
+        setUpTown();
+        PlayerRef carla = new PlayerRef(PlayerId.generate(ids));
+        server.playerJoined(carla, "Carla");
+        Caller mayor = at(alice, "Alice", 1, 1);
+        server.plots().selectCorner(at(alice, "Alice", 0, 0), 1);
+        server.plots().selectCorner(at(alice, "Alice", 3, 3), 2);
+        assertTrue(server.plots().createFromSelection(mayor, PlotService.typeNames().getFirst()).success());
+        assertTrue(server.civil().offerLease(mayor, "Bob", "1", Optional.empty(), 0).success());
+        Caller tenant = at(bob, "Bob", 8, 8);
+        server.bank().deposit(tenant, 10);
+        assertTrue(server.civil().sign(tenant, 1).success());
+        BlockPosition inPlot = new BlockPosition(DimensionId.OVERWORLD, 2, 64, 2);
+        assertTrue(server.queries().access(carla, ProtectedAction.BUILD, inPlot).isPresent());
+
+        server.takeAnnouncements();
+        assertTrue(server.community().befriend(carla, "Carla", "Bob").success());
+        assertTrue(server.takeAnnouncements().stream().anyMatch(a -> a.message().key()
+                .equals(MessageKey.FRIEND_REQUEST_ACTIONS.key()) && a.message().args().getFirst() instanceof Message button
+                && button.isAction()));
+        assertTrue(has(server.community().decline(bob, "Carla"), MessageKey.FRIEND_DECLINED));
+        assertFalse(server.community().decline(bob, "Carla").success(), "keine Anfrage mehr");
+        assertFalse(server.community().trust(bob, "Carla", true).success(), "nur Freunden");
+
+        server.community().befriend(carla, "Carla", "Bob");
+        server.community().befriend(bob, "Bob", "Carla");
+        assertTrue(has(server.community().trust(bob, "Carla", true), MessageKey.FRIEND_TRUSTED));
+        assertTrue(server.community().friends(bob).getFirst().trusted());
+        assertTrue(server.community().friends(carla).getFirst().trustsMe());
+        assertTrue(server.queries().access(carla, ProtectedAction.BUILD, inPlot).isEmpty(), "Freund darf bauen");
+        assertTrue(server.community().unfriend(carla, "Bob").success());
+        assertTrue(server.queries().access(carla, ProtectedAction.BUILD, inPlot).isPresent(), "Freundschaft beendet");
     }
 }

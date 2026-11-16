@@ -6,6 +6,7 @@ import de.etiennebader.civ.fabric.Players;
 import de.etiennebader.civ.fabric.gui.Canvas;
 import de.etiennebader.civ.fabric.gui.Icon;
 import de.etiennebader.civ.fabric.gui.Screen;
+import de.etiennebader.civ.fabric.gui.Screens;
 import de.etiennebader.civ.server.CivServer;
 import de.etiennebader.civ.server.command.GuiKeys;
 import de.etiennebader.civ.server.command.Message;
@@ -66,7 +67,15 @@ public final class FriendsScreen extends MenuScreen {
                     if (friend.online()) {
                         icon.glint();
                     }
-                    icon.blank().hint(GuiKeys.FRIEND_REMOVE_HINT.text());
+                    if (friend.trusted()) {
+                        icon.line(GuiKeys.FRIEND_TRUSTED.text(), Icon.GOOD);
+                    }
+                    if (friend.trustsMe()) {
+                        icon.line(GuiKeys.FRIEND_TRUSTS_ME.text(), Icon.INFO);
+                    }
+                    icon.blank().hint(GuiKeys.FRIEND_MESSAGE_HINT.text())
+                            .hint(friend.trusted() ? GuiKeys.FRIEND_UNTRUST_HINT.text() : GuiKeys.FRIEND_TRUST_HINT.text())
+                            .hint(GuiKeys.FRIEND_REMOVE_HINT.text());
                 }
             }
             if (!friend.town().isEmpty()) {
@@ -75,10 +84,19 @@ public final class FriendsScreen extends MenuScreen {
             canvas.set(index, icon.build(), click -> {
                 Feedback.click(click.player());
                 if (click.shift()) {
-                    report(click, civ.community().unfriend(Players.ref(click.player()), friend.name()));
+                    report(click, friend.state().equals("incoming")
+                            ? civ.community().decline(Players.ref(click.player()), friend.name())
+                            : civ.community().unfriend(Players.ref(click.player()), friend.name()));
                 } else if (friend.state().equals("incoming")) {
                     report(click, civ.community().befriend(Players.ref(click.player()), Players.name(click.player()),
                             friend.name()));
+                } else if (friend.state().equals("friend") && click.right()) {
+                    report(click, civ.community().trust(Players.ref(click.player()), friend.name(), !friend.trusted()));
+                } else if (friend.state().equals("friend")) {
+                    click.player().closeContainer();
+                    click.player().sendSystemMessage(Components.prefixed(Components.of(Message.of(
+                            MessageKey.FRIEND_WRITE_PROMPT, Message.action(Message.of(MessageKey.FRIEND_ACTION_MESSAGE),
+                                    "/civ nachricht " + friend.name() + " "))), true));
                 }
             });
         }
@@ -87,6 +105,13 @@ public final class FriendsScreen extends MenuScreen {
         }
         canvas.fillRow(5, Icon.of(Items.STAINED_GLASS_PANE.gray()).hidden().build());
         backButton(canvas);
+        List<String> strangers = civ.community().strangersOnline(Players.ref(player));
+        canvas.set(53, Icon.of(Items.EMERALD).name(GuiKeys.FRIEND_ADD.text(), Icon.TITLE)
+                .line(GuiKeys.FRIEND_ADD_LINE.text(strangers.size()), Icon.INFO)
+                .hint(GuiKeys.FRIEND_ADD_HINT.text()).build(), click -> {
+                    Feedback.click(click.player());
+                    Screens.open(click.player(), new FriendPickScreen(civ, click.player(), this));
+                });
         canvas.set(49, Icon.of(Items.KNOWLEDGE_BOOK).name(GuiKeys.FRIENDS_INFO.text(), Icon.TITLE)
                 .line(GuiKeys.FRIENDS_INFO_LINE.text(), Icon.INFO)
                 .line(GuiKeys.FRIENDS_ONLINE_COUNT.text(civ.community().onlineCount()), Icon.HINT).build());

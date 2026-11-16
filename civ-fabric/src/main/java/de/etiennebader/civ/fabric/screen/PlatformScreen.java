@@ -25,7 +25,7 @@ import java.util.Optional;
  */
 final class PlatformScreen extends MenuScreen {
 
-    private static final int[] SLOTS = {11, 12, 13, 14, 15};
+    private static final int[] SLOTS = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29};
 
     private final PolityId polity;
     private final Office office;
@@ -40,7 +40,7 @@ final class PlatformScreen extends MenuScreen {
 
     @Override
     public int rows() {
-        return 3;
+        return 5;
     }
 
     @Override
@@ -50,7 +50,7 @@ final class PlatformScreen extends MenuScreen {
 
     @Override
     public void render(Canvas canvas) {
-        canvas.fillRow(2, Icon.of(Items.STAINED_GLASS_PANE.black()).hidden().build());
+        canvas.fillRow(4, Icon.of(Items.STAINED_GLASS_PANE.black()).hidden().build());
         backButton(canvas);
         int index = 0;
         for (Platform platform : Platform.values()) {
@@ -74,6 +74,17 @@ final class PlatformScreen extends MenuScreen {
             case FREEDOM -> Items.FEATHER;
             case LOW_TAXES -> Items.GOLD_NUGGET;
             case INVESTMENT -> Items.BRICKS;
+            case ENVIRONMENT -> Items.OAK_SAPLING;
+            case WELFARE -> Items.BREAD;
+            case ECONOMY -> Items.EMERALD;
+            case EDUCATION -> Items.BOOK;
+            case TRADITION -> Items.LANTERN;
+            case PROGRESS -> Items.REDSTONE;
+            case PEACE -> Items.WOOL.white();
+            case EXPANSION -> Items.IRON_SWORD;
+            case DEMOCRACY -> Items.BELL;
+            case AGRICULTURE -> Items.WHEAT;
+            case AUTONOMY -> Items.CAMPFIRE;
         };
     }
 }

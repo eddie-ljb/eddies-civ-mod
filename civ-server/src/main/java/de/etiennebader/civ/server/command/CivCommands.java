@@ -250,7 +250,7 @@ public final class CivCommands {
     public Reply help() {
         return Reply.success(Message.of(MessageKey.HELP_HEADER), Message.of(MessageKey.HELP_TOWN),
                 Message.of(MessageKey.HELP_JOIN), Message.of(MessageKey.HELP_LAND), Message.of(MessageKey.HELP_LAWS),
-                Message.of(MessageKey.HELP_VOTES), Message.of(MessageKey.HELP_OFFICES), Message.of(MessageKey.HELP_FEDERATION), Message.of(MessageKey.HELP_LEVELS), Message.of(MessageKey.HELP_CONSTITUTION), Message.of(MessageKey.HELP_LAW_BOOK), Message.of(MessageKey.HELP_PARTIES), Message.of(MessageKey.HELP_PARLIAMENT), Message.of(MessageKey.HELP_CAMPAIGN), Message.of(MessageKey.HELP_MOOD), Message.of(MessageKey.HELP_PLOTS),
+                Message.of(MessageKey.HELP_VOTES), Message.of(MessageKey.HELP_OFFICES), Message.of(MessageKey.HELP_FEDERATION), Message.of(MessageKey.HELP_LEVELS), Message.of(MessageKey.HELP_SHOW), Message.of(MessageKey.HELP_COURT), Message.of(MessageKey.HELP_CONSTITUTION), Message.of(MessageKey.HELP_LAW_BOOK), Message.of(MessageKey.HELP_PARTIES), Message.of(MessageKey.HELP_PARLIAMENT), Message.of(MessageKey.HELP_CAMPAIGN), Message.of(MessageKey.HELP_MOOD), Message.of(MessageKey.HELP_PLOTS),
                 Message.of(MessageKey.HELP_SHOPS), Message.of(MessageKey.HELP_CIVIL), Message.of(MessageKey.HELP_CONTRACTS),
                 Message.of(MessageKey.HELP_MARKET_PRESS),
                 Message.of(MessageKey.HELP_BANK), Message.of(MessageKey.HELP_MARKET), Message.of(MessageKey.HELP_INFO));
@@ -308,6 +308,16 @@ public final class CivCommands {
         return switch (value.strip().toLowerCase(Locale.ROOT)) {
             case "ja", "an", "yes", "on" -> "true";
             case "nein", "aus", "no", "off" -> "false";
+            case "relativ", "relative", "fptp", "mehrheit_relativ", "einfach" -> "plurality";
+            case "stichwahl", "absolut", "absolute" -> "runoff";
+            case "saintelague", "sainte-lague", "sainte_laguë", "webster" -> "sainte_lague";
+            case "d'hondt", "d_hondt", "hondt" -> "dhondt";
+            case "hare", "hare-niemeyer", "niemeyer" -> "hare_niemeyer";
+            case "mehrheit", "mehrheitswahl" -> "majority";
+            case "wahlkreise", "wahlkreis" -> "districts";
+            case "gemischt", "personalisiert", "personalisierte" -> "mixed";
+            case "personen", "personenwahl", "personal" -> "person";
+            case "liste", "listen", "listenwahl" -> "list";
             default -> value.strip();
         };
     }

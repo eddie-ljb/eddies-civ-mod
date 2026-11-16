@@ -5,10 +5,12 @@ import de.etiennebader.civ.domain.protection.ProtectedAction;
 import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.fabric.content.CivContent;
+import de.etiennebader.civ.fabric.content.PosterDisplays;
 import de.etiennebader.civ.fabric.content.ConstitutionCopies;
 import de.etiennebader.civ.fabric.content.LawBooks;
 import de.etiennebader.civ.fabric.gui.Screens;
 import de.etiennebader.civ.fabric.screen.BallotBoxScreen;
+import de.etiennebader.civ.fabric.screen.CourtScreen;
 import de.etiennebader.civ.fabric.screen.ExchangeScreen;
 import de.etiennebader.civ.fabric.screen.MailScreen;
 import de.etiennebader.civ.fabric.screen.PressScreen;
@@ -106,6 +108,9 @@ public final class ProtectionListener {
         PlayerBlockBreakEvents.AFTER.register((level, player, pos, state, blockEntity) -> {
             if (state.is(content.electionPoster())) {
                 host.current().ifPresent(civ -> civ.campaigns().posterRemoved(Players.position(level, pos)));
+                if (level instanceof ServerLevel serverLevel) {
+                    PosterDisplays.remove(serverLevel, pos);
+                }
             }
         });
         UseItemCallback.EVENT.register((player, level, hand) -> readCopy(player, hand));
@@ -168,6 +173,13 @@ public final class ProtectionListener {
                     Optional.empty())));
             return InteractionResult.SUCCESS;
         }
+        if (usesBlock && state.is(content.courtBench())) {
+            host.current().ifPresent(civ -> Screens.open(serverPlayer, new CourtScreen(civ, serverPlayer,
+                    civ.constitutions().governing(Players.position(level, pos))
+                            .or(() -> civ.queries().municipalityOf(Players.ref(serverPlayer))),
+                    Optional.empty())));
+            return InteractionResult.SUCCESS;
+        }
         if (usesBlock && state.is(content.mailbox())) {
             host.current().ifPresent(civ -> Screens.open(serverPlayer, new MailScreen(civ, serverPlayer)));
             return InteractionResult.SUCCESS;
@@ -201,8 +213,12 @@ public final class ProtectionListener {
             if (placement != InteractionResult.FAIL && level instanceof ServerLevel serverLevel) {
                 serverLevel.getServer().execute(() -> {
                     if (serverLevel.getBlockState(target).is(content.electionPoster())) {
-                        host.current().ifPresent(civ -> Feedback.reply(serverPlayer, civ.campaigns().posterPlaced(
-                                Players.caller(serverPlayer), Players.position(level, target))));
+                        host.current().ifPresent(civ -> {
+                            Feedback.reply(serverPlayer, civ.campaigns().posterPlaced(
+                                    Players.caller(serverPlayer), Players.position(level, target)));
+                            civ.campaigns().posterLabel(Players.position(level, target))
+                                    .ifPresent(label -> PosterDisplays.show(serverLevel, target, label));
+                        });
                     }
                 });
             }

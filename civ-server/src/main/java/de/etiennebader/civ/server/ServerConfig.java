@@ -36,6 +36,15 @@ public final class ServerConfig {
     static final String WEB_BIND = "web_bind";
     static final String WEB_PORT = "web_port";
     static final String WEB_URL = "web_public_url";
+    static final String LIVE_COUNT = "live_count";
+    static final String LIVE_COUNT_SECONDS = "live_count_seconds";
+    static final String PROJECTIONS = "live_count_projections";
+    static final String DEBATE_MINUTES = "debate_minutes";
+    static final String ANTHEM_ON_ENTER = "anthem_on_enter";
+    static final String WORLD_MAP = "world_map";
+    static final String MAP_RADIUS = "world_map_radius_chunks";
+    private static final java.util.List<String> KEYS = java.util.List.of(LIVE_COUNT, LIVE_COUNT_SECONDS, PROJECTIONS,
+            DEBATE_MINUTES, ANTHEM_ON_ENTER, WORLD_MAP, MAP_RADIUS);
 
     private static final String HEADER = """
             Eddies Civ Mod
@@ -49,7 +58,12 @@ public final class ServerConfig {
               (eingebaut: gemeinde 0, land 20, nation 30; ein Bund steht immer hoeher als seine Glieder)
             villager_parties: ob Dorfbewohner Parteien beitreten und gruenden (true/false)
             villager_party_founders: wie viele parteilose Gleichgesinnte einer Gemeinde eine Partei gruenden (ab 2)
-            web_enabled, web_bind, web_port: eingebettete Webseite; web_public_url: Adresse fuer Spieler (optional)""";
+            web_enabled, web_bind, web_port: eingebettete Webseite; web_public_url: Adresse fuer Spieler (optional)
+            live_count: Wahlergebnisse als Live-Auszaehlung mit Zwischenstaenden (true/false)
+            live_count_seconds: Dauer der Live-Auszaehlung (5-600); live_count_projections: Hochrechnungen (true/false)
+            debate_minutes: Laenge einer Wahldebatte in Minuten (0 = keine Debatten)
+            anthem_on_enter: Hymne beim Betreten einer Gemeinde abspielen (true/false)
+            world_map: gerenderte Weltkarte auf der Webseite (true/false); world_map_radius_chunks: Umkreis um Spieler""";
 
     private ServerConfig() {
     }
@@ -66,7 +80,12 @@ public final class ServerConfig {
         } catch (IOException e) {
             throw new UncheckedIOException("Konfiguration nicht lesbar: " + file, e);
         }
-        return of(properties);
+        ServerSettings settings = of(properties);
+        if (KEYS.stream().anyMatch(key -> !properties.containsKey(key))) {
+            // Neue Einstellungen einer neueren Version mit ihren Standardwerten ergänzen.
+            write(file, settings);
+        }
+        return settings;
     }
 
     static ServerSettings of(Properties properties) {
@@ -99,7 +118,27 @@ public final class ServerConfig {
                 new ServerSettings.PartySettings(
                         Boolean.parseBoolean(properties.getProperty(VILLAGER_PARTIES,
                                 Boolean.toString(defaults.parties().villagers())).strip()),
-                        (int) number(properties, PARTY_FOUNDERS, defaults.parties().founders(), 2)));
+                        (int) number(properties, PARTY_FOUNDERS, defaults.parties().founders(), 2)),
+                show(properties, defaults.show()));
+    }
+
+    private static ServerSettings.ShowSettings show(Properties properties, ServerSettings.ShowSettings defaults) {
+        try {
+            return new ServerSettings.ShowSettings(
+                    flag(properties, LIVE_COUNT, defaults.liveCount()),
+                    (int) Math.min(600, number(properties, LIVE_COUNT_SECONDS, defaults.liveCountSeconds(), 5)),
+                    flag(properties, PROJECTIONS, defaults.projections()),
+                    (int) Math.min(60, number(properties, DEBATE_MINUTES, defaults.debateMinutes(), 0)),
+                    flag(properties, ANTHEM_ON_ENTER, defaults.anthemOnEnter()),
+                    flag(properties, WORLD_MAP, defaults.worldMap()),
+                    (int) Math.min(32, number(properties, MAP_RADIUS, defaults.mapRadius(), 1)));
+        } catch (IllegalArgumentException e) {
+            return defaults;
+        }
+    }
+
+    private static boolean flag(Properties properties, String key, boolean fallback) {
+        return Boolean.parseBoolean(properties.getProperty(key, Boolean.toString(fallback)).strip());
     }
 
     static void write(Path file, ServerSettings settings) {
@@ -121,6 +160,13 @@ public final class ServerConfig {
         properties.setProperty(WEB_BIND, settings.web().bind());
         properties.setProperty(WEB_PORT, Integer.toString(settings.web().port()));
         properties.setProperty(WEB_URL, settings.web().publicUrl());
+        properties.setProperty(LIVE_COUNT, Boolean.toString(settings.show().liveCount()));
+        properties.setProperty(LIVE_COUNT_SECONDS, Integer.toString(settings.show().liveCountSeconds()));
+        properties.setProperty(PROJECTIONS, Boolean.toString(settings.show().projections()));
+        properties.setProperty(DEBATE_MINUTES, Integer.toString(settings.show().debateMinutes()));
+        properties.setProperty(ANTHEM_ON_ENTER, Boolean.toString(settings.show().anthemOnEnter()));
+        properties.setProperty(WORLD_MAP, Boolean.toString(settings.show().worldMap()));
+        properties.setProperty(MAP_RADIUS, Integer.toString(settings.show().mapRadius()));
         try {
             Files.createDirectories(file.toAbsolutePath().getParent());
             try (Writer writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {

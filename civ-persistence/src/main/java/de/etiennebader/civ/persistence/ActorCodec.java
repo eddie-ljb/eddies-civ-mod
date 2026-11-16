@@ -35,4 +35,15 @@ public final class ActorCodec {
             default -> throw new IllegalArgumentException("Unbekannte Akteursart: " + kind);
         };
     }
+
+    /** Ein Akteur in einer Spalte: {@code PLAYER:<uuid>}. */
+    public static String encode(ActorRef actor) {
+        return kindOf(actor) + ":" + actor.uuid();
+    }
+
+    /** Gegenstück zu {@link #encode}. */
+    public static ActorRef decode(String encoded) {
+        int colon = encoded.indexOf(':');
+        return decode(encoded.substring(0, colon), encoded.substring(colon + 1));
+    }
 }

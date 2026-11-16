@@ -44,6 +44,12 @@ public final class JoinPolity {
             throw new NotAMunicipalityException(polity.name());
         }
         membershipRule.requireNoMunicipality(command.member());
+        aggregates.justice().exiles().stream()
+                .filter(exile -> exile.polity().equals(polity.id()) && exile.actor().equals(command.member())
+                        && !command.day().isAfter(exile.until()))
+                .findFirst().ifPresent(exile -> {
+                    throw new de.etiennebader.civ.domain.justice.ExiledException(command.member(), exile.until());
+                });
         polity.admit(command.member(), command.type(), command.day());
         aggregates.commit(polity);
         Federations.memberJoined(aggregates, polity.id(), command.member(), command.type(), command.day());

@@ -1,5 +1,6 @@
 package de.etiennebader.civ.fabric;
 
+import de.etiennebader.civ.fabric.content.Flags;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
@@ -21,6 +22,9 @@ import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.shared.PersonId;
 import de.etiennebader.civ.domain.territory.ClaimType;
 import de.etiennebader.civ.fabric.content.LawBooks;
+import de.etiennebader.civ.fabric.screen.CaseScreen;
+import de.etiennebader.civ.fabric.screen.CourtScreen;
+import de.etiennebader.civ.domain.justice.Role;
 import de.etiennebader.civ.fabric.content.Newspapers;
 import de.etiennebader.civ.fabric.gui.Screens;
 import de.etiennebader.civ.fabric.screen.ContractsScreen;
@@ -51,6 +55,7 @@ import de.etiennebader.civ.server.town.TownHallService;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
@@ -159,6 +164,7 @@ public final class CivCommandTree {
     private static final String LEVEL = "ebene";
     private static final String ARTICLE = "artikel";
     private static final String TEXT = "text";
+    private static final String TOWN = "gemeinde";
     private static final String NUMBER = "nr";
     private static final String DEPOSIT = "kaution";
     private static final String DAYS = "tage";
@@ -394,7 +400,8 @@ public final class CivCommandTree {
                                     Components.broadcast(player.level().getServer(), civ.commands().newDay(civ.endDayNow()));
                                     return null;
                                 })))
-                        .then(Commands.literal("ebenen")
+                        .then(courtRoot())
+                .then(Commands.literal("ebenen")
                                 .executes(context -> withCiv(context, (civ, player) -> civ.federations().listLevels())))
                         .then(Commands.literal("aufloesen")
                                 .then(Commands.argument(NAME, StringArgumentType.greedyString())
@@ -670,6 +677,11 @@ public final class CivCommandTree {
                 .then(Commands.literal("ebenen")
                         .executes(context -> withCiv(context, (civ, player) -> civ.levels().overview(
                                 Players.caller(player)))))
+                .then(Commands.literal("debatte")
+                        .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.debates().speak(
+                                        Players.caller(player), StringArgumentType.getString(context, TEXT),
+                                        System.currentTimeMillis())))))
                 .then(Commands.literal("ebene")
                         .executes(context -> withCiv(context, (civ, player) -> civ.levels().overview(
                                 Players.caller(player))))
@@ -803,7 +815,291 @@ public final class CivCommandTree {
                                 Players.caller(player), level.apply(context)))))
                 .then(Commands.literal("wahlergebnis")
                         .executes(context -> withCiv(context, (civ, player) -> civ.levels().lastResult(
-                                Players.caller(player), level.apply(context)))));
+                                Players.caller(player), level.apply(context)))))
+                .then(Commands.literal("wahlkreis")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().constituencies(
+                                Players.caller(player), level.apply(context))))
+                        .then(Commands.literal("liste")
+                                .executes(context -> withCiv(context, (civ, player) -> civ.levels().constituencies(
+                                        Players.caller(player), level.apply(context)))))
+                        .then(constituencyAction("anlegen", level))
+                        .then(constituencyAction("gebiet", level))
+                        .then(constituencyAction("leeren", level))
+                        .then(constituencyAction("aufloesen", level))
+                        .then(Commands.literal("gemeinde")
+                                .then(Commands.argument(NAME, StringArgumentType.string())
+                                        .then(Commands.argument(TOWN, StringArgumentType.greedyString())
+                                                .executes(context -> withCiv(context, (civ, player) ->
+                                                        civ.levels().constituencyTown(Players.caller(player),
+                                                                level.apply(context),
+                                                                StringArgumentType.getString(context, NAME),
+                                                                StringArgumentType.getString(context, TOWN))))))))
+                .then(Commands.literal("debatte")
+                        .then(Commands.literal("starten")
+                                .executes(context -> withCiv(context, (civ, player) -> civ.levels().startDebate(
+                                        Players.caller(player), level.apply(context), Optional.empty())))
+                                .then(Commands.argument(OFFICE, StringArgumentType.word())
+                                        .suggests(CivCommandTree::suggestOffices)
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().startDebate(
+                                                Players.caller(player), level.apply(context),
+                                                Optional.of(StringArgumentType.getString(context, OFFICE))))))))
+                .then(Commands.literal("flagge")
+                        .executes(context -> withCiv(context, (civ, player) -> giveFlag(civ, player,
+                                level.apply(context))))
+                        .then(Commands.literal("setzen")
+                                .executes(context -> withCiv(context, (civ, player) -> {
+                                    Optional<de.etiennebader.civ.domain.civic.Flag> flag = Flags.of(player.getMainHandItem());
+                                    if (flag.isEmpty()) {
+                                        return Reply.failure(Message.of(MessageKey.FLAG_NEEDS_BANNER));
+                                    }
+                                    return civ.levels().setFlag(Players.caller(player), level.apply(context), flag);
+                                })))
+                        .then(Commands.literal("holen")
+                                .executes(context -> withCiv(context, (civ, player) -> giveFlag(civ, player,
+                                        level.apply(context)))))
+                        .then(Commands.literal("entfernen")
+                                .executes(context -> withCiv(context, (civ, player) -> civ.levels().setFlag(
+                                        Players.caller(player), level.apply(context), Optional.empty())))))
+                .then(Commands.literal("hymne")
+                        .executes(context -> withCiv(context, (civ, player) -> playAnthem(civ, player,
+                                level.apply(context))))
+                        .then(Commands.literal("spielen")
+                                .executes(context -> withCiv(context, (civ, player) -> playAnthem(civ, player,
+                                        level.apply(context)))))
+                        .then(Commands.literal("setzen")
+                                .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().setAnthem(
+                                                Players.caller(player), level.apply(context),
+                                                StringArgumentType.getString(context, TEXT))))))
+                        .then(Commands.literal("entfernen")
+                                .executes(context -> withCiv(context, (civ, player) -> civ.levels().removeAnthem(
+                                        Players.caller(player), level.apply(context))))))
+                .then(courtOf(level));
+    }
+
+    // ---- Gerichte ----
+
+    /** {@code /civ <Ebene> gericht …}: Gericht einer Ebene, Klagen dort, Personal. */
+    private LiteralArgumentBuilder<CommandSourceStack> courtOf(Function<CommandContext<CommandSourceStack>, String> level) {
+        return Commands.literal("gericht")
+                .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(Players.caller(player),
+                        level.apply(context), polity -> civ.justice().court(Players.caller(player), polity))))
+                .then(Commands.literal("menue")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(Players.caller(player),
+                                level.apply(context), polity -> {
+                                    Screens.open(player, new CourtScreen(civ, player, Optional.of(polity), Optional.empty()));
+                                    return null;
+                                }))))
+                .then(Commands.literal("klage")
+                        .then(Commands.argument(TYPE, StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                        List.of("straf", "zivil", "verfassung"), builder))
+                                .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(
+                                                Players.caller(player), level.apply(context), polity -> civ.justice().file(
+                                                        Players.caller(player), polity,
+                                                        StringArgumentType.getString(context, TYPE),
+                                                        StringArgumentType.getString(context, TEXT))))))))
+                .then(courtStaff("richter", Role.JUDGE, level))
+                .then(courtStaff("staatsanwalt", Role.PROSECUTOR, level));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> courtStaff(
+            String literal, Role role, Function<CommandContext<CommandSourceStack>, String> level) {
+        return Commands.literal(literal)
+                .then(courtStaffAction("ernennen", true, role, level))
+                .then(courtStaffAction("entlassen", false, role, level));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> courtStaffAction(
+            String literal, boolean appointed, Role role, Function<CommandContext<CommandSourceStack>, String> level) {
+        return Commands.literal(literal)
+                .then(Commands.argument(PLAYER, StringArgumentType.word())
+                        .suggests(CivCommandTree::suggestPeople)
+                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(Players.caller(player),
+                                level.apply(context), polity -> civ.justice().appoint(Players.caller(player), polity,
+                                        role, StringArgumentType.getString(context, PLAYER), villagerRef(player),
+                                        appointed)))));
+    }
+
+    /** {@code /civ gericht …}: Verfahren nach Nummer, gilt für alle Ebenen. */
+    private LiteralArgumentBuilder<CommandSourceStack> courtRoot() {
+        return Commands.literal("gericht")
+                .executes(context -> withCiv(context, (civ, player) -> {
+                    Screens.open(player, new CourtScreen(civ, player, civ.federations().levels()
+                            .find(Polity.MUNICIPAL_LEVEL)
+                            .flatMap(municipal -> civ.levels().polityOf(Players.ref(player), municipal)),
+                            Optional.empty()));
+                    return null;
+                }))
+                .then(Commands.literal("faelle")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.justice().mine(Players.caller(player)))))
+                .then(Commands.literal("klage")
+                        .then(Commands.argument(TYPE, StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                        List.of("straf", "zivil", "verfassung"), builder))
+                                .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(
+                                                Players.caller(player), Polity.MUNICIPAL_LEVEL, polity -> civ.justice()
+                                                        .file(Players.caller(player), polity,
+                                                                StringArgumentType.getString(context, TYPE),
+                                                                StringArgumentType.getString(context, TEXT))))))))
+                .then(caseCommand("fall", (civ, player, number, context) -> {
+                    Screens.open(player, new CaseScreen(civ, player, number, Optional.empty()));
+                    return null;
+                }))
+                .then(caseCommand("akte", (civ, player, number, context) -> civ.justice().show(Players.caller(player),
+                        number)))
+                .then(caseCommand("eroeffnen", (civ, player, number, context) -> civ.justice().open(
+                        Players.caller(player), number)))
+                .then(caseCommand("weiter", (civ, player, number, context) -> civ.justice().advance(
+                        Players.caller(player), number)))
+                .then(caseCommand("berufung", (civ, player, number, context) -> civ.justice().appeal(
+                        Players.caller(player), number)))
+                .then(caseCommand("beweis", (civ, player, number, context) -> handEvidence(civ, player, number))
+                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                                .then(Commands.literal("vertrag")
+                                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(1))
+                                                .executes(context -> withCiv(context, (civ, player) -> civ.justice()
+                                                        .contractEvidence(Players.caller(player),
+                                                                IntegerArgumentType.getInteger(context, NUMBER),
+                                                                IntegerArgumentType.getInteger(context, COUNT))))))
+                                .then(Commands.literal("artikel")
+                                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(1))
+                                                .executes(context -> withCiv(context, (civ, player) -> civ.justice()
+                                                        .articleEvidence(Players.caller(player),
+                                                                IntegerArgumentType.getInteger(context, NUMBER),
+                                                                IntegerArgumentType.getInteger(context, COUNT))))))
+                                .then(Commands.literal("text")
+                                        .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                                                .executes(context -> withCiv(context, (civ, player) -> civ.justice()
+                                                        .evidence(Players.caller(player),
+                                                                IntegerArgumentType.getInteger(context, NUMBER), "text",
+                                                                shorten(StringArgumentType.getString(context, TEXT)),
+                                                                StringArgumentType.getString(context, TEXT))))))))
+                .then(caseTextCommand("einstellen", (civ, player, number, text) -> civ.justice().dismiss(
+                        Players.caller(player), number, text), true))
+                .then(caseTextCommand("aussage", (civ, player, number, text) -> civ.justice().testify(
+                        Players.caller(player), number, text), false))
+                .then(caseTextCommand("plaedoyer", (civ, player, number, text) -> civ.justice().plead(
+                        Players.caller(player), number, text), false))
+                .then(caseTextCommand("urteil", (civ, player, number, text) -> civ.justice().decide(
+                        Players.caller(player), number, text), false))
+                .then(caseTextCommand("verteidiger", (civ, player, number, text) -> civ.justice().defense(
+                        Players.caller(player), number, text, villagerRef(player)), false))
+                .then(caseTextCommand("zeuge", (civ, player, number, text) -> civ.justice().summon(
+                        Players.caller(player), number, text, villagerRef(player)), false))
+                .then(Commands.literal("stimme")
+                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                                .then(Commands.literal("schuldig")
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.justice().vote(
+                                                Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER),
+                                                true))))
+                                .then(Commands.literal("unschuldig")
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.justice().vote(
+                                                Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER),
+                                                false))))));
+    }
+
+    @FunctionalInterface
+    private interface CaseAction {
+
+        Reply execute(CivServer civ, ServerPlayer player, int number, CommandContext<CommandSourceStack> context);
+    }
+
+    @FunctionalInterface
+    private interface CaseTextAction {
+
+        Reply execute(CivServer civ, ServerPlayer player, int number, String text);
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> caseCommand(String literal, CaseAction action) {
+        return Commands.literal(literal)
+                .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                        .executes(context -> withCiv(context, (civ, player) -> action.execute(civ, player,
+                                IntegerArgumentType.getInteger(context, NUMBER), context))));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> caseTextCommand(String literal, CaseTextAction action,
+                                                                       boolean optional) {
+        var number = Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                        .executes(context -> withCiv(context, (civ, player) -> action.execute(civ, player,
+                                IntegerArgumentType.getInteger(context, NUMBER),
+                                StringArgumentType.getString(context, TEXT)))));
+        if (optional) {
+            number = number.executes(context -> withCiv(context, (civ, player) -> action.execute(civ, player,
+                    IntegerArgumentType.getInteger(context, NUMBER), "")));
+        }
+        return Commands.literal(literal).then(number);
+    }
+
+    /** Beweis aus der Hand: Buch mit Feder, signiertes Buch oder ein beliebiger Gegenstand. */
+    public static Reply handEvidence(CivServer civ, ServerPlayer player, int number) {
+        ItemStack stack = player.getMainHandItem();
+        if (stack.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.CASE_UNKNOWN_EVIDENCE, "-"));
+        }
+        Optional<LawBooks.Draft> draft = LawBooks.draftOf(stack);
+        if (draft.isPresent()) {
+            return civ.justice().evidence(Players.caller(player), number, "buch", draft.get().title(), draft.get().text());
+        }
+        net.minecraft.world.item.component.WrittenBookContent book = stack.get(DataComponents.WRITTEN_BOOK_CONTENT);
+        if (book != null) {
+            String text = book.getPages(false).stream().map(net.minecraft.network.chat.Component::getString)
+                    .collect(java.util.stream.Collectors.joining("\n"));
+            return civ.justice().evidence(Players.caller(player), number, "buch", book.title().raw(),
+                    text.isBlank() ? book.title().raw() : text);
+        }
+        String name = stack.getHoverName().getString();
+        return civ.justice().evidence(Players.caller(player), number, "gegenstand", shorten(stack.getCount() + "× " + name),
+                BuiltInRegistries.ITEM.getKey(stack.getItem()) + " ×" + stack.getCount());
+    }
+
+    private static String shorten(String text) {
+        return text.length() <= 60 ? text : text.substring(0, 59) + "…";
+    }
+
+    /** Der Dorfbewohner, den der Spieler ansieht, sonst der nächste in Reichweite. */
+    private static Optional<PersonRef> villagerRef(ServerPlayer player) {
+        return nearestVillager(player).map(PersonRef.class::cast);
+    }
+
+    private static CompletableFuture<Suggestions> suggestPeople(CommandContext<CommandSourceStack> context,
+                                                                SuggestionsBuilder builder) {
+        List<String> names = new java.util.ArrayList<>(context.getSource().getOnlinePlayerNames());
+        names.add("dorfbewohner");
+        return SharedSuggestionProvider.suggest(names, builder);
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> constituencyAction(
+            String action, Function<CommandContext<CommandSourceStack>, String> level) {
+        return Commands.literal(action)
+                .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().constituency(
+                                Players.caller(player), level.apply(context), action,
+                                StringArgumentType.getString(context, NAME)))));
+    }
+
+    /** Gibt dem Spieler ein Banner mit der Flagge der Ebene. */
+    private static Reply giveFlag(CivServer civ, ServerPlayer player, String levelId) {
+        return civ.levels().with(Players.caller(player), levelId, polity -> civ.civic().flagOf(polity.id())
+                .map(flag -> {
+                    ItemStack banner = Flags.banner(flag, player.level().registryAccess());
+                    player.getInventory().placeItemBackInInventory(banner, Prediction.SERVER_ONLY);
+                    return Reply.success(Message.of(MessageKey.FLAG_GIVEN, polity.name().value()));
+                })
+                .orElseGet(() -> Reply.failure(Message.of(MessageKey.FLAG_NONE, polity.name().value()))));
+    }
+
+    /** Spielt die Hymne der Ebene für den Spieler ab. */
+    private static Reply playAnthem(CivServer civ, ServerPlayer player, String levelId) {
+        return civ.levels().with(Players.caller(player), levelId, polity -> civ.civic().anthemOf(polity.id())
+                .map(anthem -> {
+                    Ambience.play(player, anthem);
+                    return Reply.success(Message.of(MessageKey.ANTHEM_PLAYING, polity.name().value(), anthem.title()));
+                })
+                .orElseGet(() -> Reply.failure(Message.of(MessageKey.ANTHEM_NONE, polity.name().value()))));
     }
 
     /** Kandidaten der laufenden Wahl auf der angegebenen Ebene. */
@@ -1273,6 +1569,27 @@ public final class CivCommandTree {
 
     private LiteralArgumentBuilder<CommandSourceStack> friendCommands() {
         return Commands.literal("freund")
+                .then(Commands.literal("annehmen")
+                        .then(Commands.argument(PLAYER, StringArgumentType.word())
+                                .suggests(this::suggestIncoming)
+                                .executes(context -> withCiv(context, (civ, player) -> civ.community().befriend(
+                                        Players.ref(player), Players.name(player),
+                                        StringArgumentType.getString(context, PLAYER))))))
+                .then(Commands.literal("ablehnen")
+                        .then(Commands.argument(PLAYER, StringArgumentType.word())
+                                .suggests(this::suggestIncoming)
+                                .executes(context -> withCiv(context, (civ, player) -> civ.community().decline(
+                                        Players.ref(player), StringArgumentType.getString(context, PLAYER))))))
+                .then(Commands.literal("vertrauen")
+                        .then(Commands.argument(PLAYER, StringArgumentType.word())
+                                .suggests(this::suggestFriends)
+                                .executes(context -> withCiv(context, (civ, player) -> civ.community().trust(
+                                        Players.ref(player), StringArgumentType.getString(context, PLAYER), true)))))
+                .then(Commands.literal("misstrauen")
+                        .then(Commands.argument(PLAYER, StringArgumentType.word())
+                                .suggests(this::suggestFriends)
+                                .executes(context -> withCiv(context, (civ, player) -> civ.community().trust(
+                                        Players.ref(player), StringArgumentType.getString(context, PLAYER), false)))))
                 .then(Commands.literal("entfernen")
                         .then(Commands.argument(PLAYER, StringArgumentType.word())
                                 .suggests(this::suggestFriends)
@@ -1284,6 +1601,20 @@ public final class CivCommandTree {
                         .executes(context -> withCiv(context, (civ, player) -> civ.community().befriend(
                                 Players.ref(player), Players.name(player),
                                 StringArgumentType.getString(context, PLAYER)))));
+    }
+
+    private CompletableFuture<Suggestions> suggestIncoming(CommandContext<CommandSourceStack> context,
+                                                           SuggestionsBuilder builder) {
+        List<String> names = new java.util.ArrayList<>();
+        ServerPlayer player = context.getSource().getPlayer();
+        host.current().ifPresent(civ -> {
+            if (player != null) {
+                civ.community().friends(Players.ref(player)).stream()
+                        .filter(friend -> friend.state().equals("incoming"))
+                        .forEach(friend -> names.add(friend.name()));
+            }
+        });
+        return SharedSuggestionProvider.suggest(names, builder);
     }
 
     private CompletableFuture<Suggestions> suggestFriends(CommandContext<CommandSourceStack> context,

@@ -145,6 +145,9 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                             case "request", "accept" -> civ.community().befriend(login.player(), login.name(),
                                     body.getOrDefault("name", ""));
                             case "remove" -> civ.community().unfriend(login.player(), body.getOrDefault("name", ""));
+                            case "decline" -> civ.community().decline(login.player(), body.getOrDefault("name", ""));
+                            case "trust" -> civ.community().trust(login.player(), body.getOrDefault("name", ""), true);
+                            case "untrust" -> civ.community().trust(login.player(), body.getOrDefault("name", ""), false);
                             default -> throw new IllegalArgumentException("Unbekannte Aktion");
                         }), texts));
                 case "GET /api/letters" -> withLogin(request, login -> HttpResponse.json(200, game.call(() ->
@@ -178,6 +181,15 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                     return HttpResponse.json(200, game.call(() -> preview(body.getOrDefault("title", ""),
                             body.getOrDefault("body", ""))));
                 });
+                case "GET /api/map/tiles" -> HttpResponse.json(200, mapTiles(request.query().getOrDefault("dim",
+                        DimensionId.OVERWORLD.value())));
+                case "GET /api/map/tile" -> mapTile(request);
+                case "GET /api/justice" -> HttpResponse.json(200, game.call(() -> justice(texts,
+                        request.cookie(SESSION_COOKIE).flatMap(sessions::session))));
+                case "POST /api/justice" -> withLogin(request, login -> action(request, body -> game.call(() ->
+                        justiceAction(login, body)), texts));
+                case "GET /api/show" -> HttpResponse.json(200, game.call(() -> show(texts)));
+                case "GET /api/civic" -> HttpResponse.json(200, game.call(() -> civic(texts)));
                 case "POST /api/login" -> login(request);
                 case "POST /api/logout" -> logout(request);
                 case "GET /api/me" -> withLogin(request, login -> HttpResponse.json(200, game.call(() -> me(login, texts))));
@@ -667,6 +679,8 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                 .put("online", friend.online())
                 .put("state", friend.state())
                 .put("town", friend.town())
+                .put("trusted", friend.trusted())
+                .put("trustsMe", friend.trustsMe())
                 .build()))
                 .raw("players", Json.array(civ.players().all().stream().map(known -> known.name())
                         .filter(name -> !name.equalsIgnoreCase(login.name()))
@@ -853,6 +867,238 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
             return HttpResponse.error(400, "JSON erwartet");
         }
         return action.apply(login.get());
+    }
+
+    // ---- Weltkarte ----
+
+    /** Ordnername einer Dimension: {@code minecraft:overworld} → {@code minecraft_overworld}. */
+    public static String mapFolder(String dimension) {
+        return dimension.replaceAll("[^a-z0-9_.-]", "_");
+    }
+
+    private String mapTiles(String dimension) {
+        Optional<java.nio.file.Path> root = civ.mapDirectory();
+        List<String> tiles = new ArrayList<>();
+        if (root.isPresent()) {
+            java.nio.file.Path folder = root.get().resolve(mapFolder(dimension));
+            if (java.nio.file.Files.isDirectory(folder)) {
+                try (var files = java.nio.file.Files.list(folder)) {
+                    files.map(file -> file.getFileName().toString()).filter(name -> name.matches("-?\\d+_-?\\d+\\.png"))
+                            .forEach(name -> {
+                                String[] parts = name.substring(0, name.length() - 4).split("_");
+                                long modified;
+                                try {
+                                    modified = java.nio.file.Files.getLastModifiedTime(folder.resolve(name)).toMillis();
+                                } catch (java.io.IOException e) {
+                                    modified = 0;
+                                }
+                                tiles.add(Json.object().put("x", Long.parseLong(parts[0])).put("z", Long.parseLong(parts[1]))
+                                        .put("v", modified).build());
+                            });
+                } catch (java.io.IOException e) {
+                    // keine Kacheln
+                }
+            }
+        }
+        return Json.object().put("enabled", root.isPresent()).put("chunks", 32).raw("tiles", "[" + String.join(",", tiles) + "]")
+                .build();
+    }
+
+    private HttpResponse mapTile(HttpRequest request) {
+        Optional<java.nio.file.Path> root = civ.mapDirectory();
+        if (root.isEmpty()) {
+            return HttpResponse.error(404, "Keine Weltkarte");
+        }
+        int x = Integer.parseInt(request.query().getOrDefault("x", "0"));
+        int z = Integer.parseInt(request.query().getOrDefault("z", "0"));
+        java.nio.file.Path file = root.get().resolve(mapFolder(request.query().getOrDefault("dim",
+                DimensionId.OVERWORLD.value()))).resolve(x + "_" + z + ".png");
+        try {
+            return new HttpResponse(200, "image/png", java.nio.file.Files.readAllBytes(file),
+                    Map.of("Cache-Control", "no-cache"));
+        } catch (java.io.IOException e) {
+            return HttpResponse.error(404, "Kachel fehlt");
+        }
+    }
+
+    // ---- Justiz ----
+
+    private String justice(Translator texts, Optional<WebSessions.Login> login) {
+        Optional<de.etiennebader.civ.domain.actor.ActorRef> viewer = login.map(WebSessions.Login::player);
+        return Json.object()
+                .raw("cases", Json.array(civ.justice().allCases(viewer), view -> caseJson(view, texts)))
+                .raw("courts", Json.array(civ.queries().polities().stream()
+                        .filter(polity -> polity.kind() == PolityKind.TERRITORIAL || polity.kind() == PolityKind.FEDERATION)
+                        .toList(), polity -> Json.object()
+                        .put("id", polity.id().value().toString())
+                        .put("name", polity.name().value())
+                        .put("level", polity.kind() == PolityKind.FEDERATION ? levelName(polity, texts)
+                                : texts.translate(Message.of(MessageKey.WEB_MUNICIPALITY)))
+                        .put("fee", MoneyFormat.whole(polity.laws().valueOf(
+                                de.etiennebader.civ.domain.law.StandardParameters.COURT_FEE)))
+                        .put("jury", polity.laws().valueOf(de.etiennebader.civ.domain.law.StandardParameters.JURY_SIZE))
+                        .raw("judges", Json.array(civ.queries().justice().staffOf(polity.id()).judges(),
+                                judge -> Json.string(civ.texts().actor(judge))))
+                        .raw("prosecutors", Json.array(civ.queries().justice().staffOf(polity.id()).prosecutors(),
+                                prosecutor -> Json.string(civ.texts().actor(prosecutor))))
+                        .build()))
+                .put("today", civ.calendar().today().value())
+                .build();
+    }
+
+    private String caseJson(de.etiennebader.civ.server.justice.CaseView view, Translator texts) {
+        de.etiennebader.civ.domain.justice.Stage stage = de.etiennebader.civ.domain.justice.Stage.valueOf(view.stage());
+        return Json.object()
+                .put("number", view.number())
+                .put("court", view.court())
+                .put("kind", view.kind())
+                .put("kindName", texts.translate(de.etiennebader.civ.server.justice.JusticeService.kindName(
+                        de.etiennebader.civ.domain.justice.CaseKind.valueOf(view.kind()))))
+                .put("plaintiff", view.plaintiff())
+                .put("defendant", view.defendant())
+                .put("charge", view.charge())
+                .put("target", view.target())
+                .put("stage", view.stage())
+                .put("stageName", texts.translate(de.etiennebader.civ.server.justice.JusticeService.stageName(stage)))
+                .put("until", view.stageUntil())
+                .put("judge", view.judge().orElse(""))
+                .put("prosecutor", view.prosecutor().orElse(""))
+                .put("defense", view.defense().orElse(""))
+                .raw("witnesses", Json.array(view.witnesses(), Json::string))
+                .raw("jurors", Json.array(view.jurors(), Json::string))
+                .raw("evidence", Json.array(view.evidence(), evidence -> Json.object()
+                        .put("number", evidence.number())
+                        .put("by", evidence.by())
+                        .put("side", evidence.side())
+                        .put("kind", evidence.kind())
+                        .put("title", evidence.title())
+                        .put("content", evidence.content())
+                        .put("weight", evidence.weight())
+                        .build()))
+                .raw("statements", Json.array(view.statements(), statement -> Json.object()
+                        .put("speaker", statement.speaker())
+                        .put("role", texts.translate(de.etiennebader.civ.server.justice.JusticeService.roleName(
+                                de.etiennebader.civ.domain.justice.Role.valueOf(statement.role()))))
+                        .put("text", statement.text())
+                        .put("tendency", statement.tendency())
+                        .build()))
+                .put("verdict", view.verdict().map(texts::translate).orElse(""))
+                .put("upheld", view.upheld())
+                .put("role", view.myRole().orElse(""))
+                .put("roleName", view.myRole().map(role -> texts.translate(de.etiennebader.civ.server.justice
+                        .JusticeService.roleName(de.etiennebader.civ.domain.justice.Role.valueOf(role)))).orElse(""))
+                .put("appealOf", view.appealOf().map(Integer::longValue).orElse(0L))
+                .build();
+    }
+
+    private Reply justiceAction(WebSessions.Login login, Map<String, String> body) {
+        Caller caller = caller(login);
+        int number = Integer.parseInt(body.getOrDefault("number", "0"));
+        String text = body.getOrDefault("text", "");
+        var justice = civ.justice();
+        return switch (body.getOrDefault("action", "")) {
+            case "file" -> civ.queries().polity(new de.etiennebader.civ.domain.shared.PolityId(
+                            UUID.fromString(body.getOrDefault("court", ""))))
+                    .map(court -> justice.file(caller, court, body.getOrDefault("kind", ""), text))
+                    .orElseGet(() -> Reply.failure(Message.of(MessageKey.POLITY_GONE)));
+            case "open" -> justice.open(caller, number);
+            case "advance" -> justice.advance(caller, number);
+            case "appeal" -> justice.appeal(caller, number);
+            case "dismiss" -> justice.dismiss(caller, number, text);
+            case "testify" -> justice.testify(caller, number, text);
+            case "plead" -> justice.plead(caller, number, text);
+            case "decide" -> justice.decide(caller, number, text);
+            case "evidence" -> justice.evidence(caller, number, "text", text.length() <= 60 ? text
+                    : text.substring(0, 59) + "…", text);
+            case "vote" -> justice.vote(caller, number, Boolean.parseBoolean(body.getOrDefault("guilty", "false")));
+            case "defense" -> justice.defense(caller, number, text, Optional.empty());
+            case "summon" -> justice.summon(caller, number, text, Optional.empty());
+            default -> throw new IllegalArgumentException("Unbekannte Aktion");
+        };
+    }
+
+    // ---- Wahlabend und Hoheitszeichen ----
+
+    private String show(Translator texts) {
+        Function<Map<String, Double>, String> shares = map -> Json.object().rawAll(map.entrySet().stream()
+                .map(entry -> Map.entry(entry.getKey(), String.format(Locale.ROOT, "%.2f", entry.getValue())))
+                .toList()).build();
+        Function<de.etiennebader.civ.server.election.LiveCountService.LiveView, String> live = view -> Json.object()
+                .put("polity", view.polity().value().toString())
+                .put("polityName", view.polityName())
+                .put("office", texts.translate(view.office()))
+                .raw("counted", String.format(Locale.ROOT, "%.1f", view.counted()))
+                .raw("shares", shares.apply(view.shares()))
+                .raw("projection", shares.apply(view.projection()))
+                .raw("seats", Json.object().rawAll(view.seats().entrySet().stream()
+                        .map(entry -> Map.entry(entry.getKey(), Integer.toString(entry.getValue()))).toList()).build())
+                .put("finished", view.finished())
+                .build();
+        return Json.object()
+                .put("liveCount", civ.liveCount().enabled())
+                .raw("running", Json.array(civ.liveCount().running(), live))
+                .raw("recent", Json.array(civ.liveCount().recent(), live))
+                .raw("debates", Json.array(civ.debates().debates(System.currentTimeMillis()), debate -> Json.object()
+                        .put("polityName", debate.polityName())
+                        .put("office", texts.translate(debate.office()))
+                        .raw("candidates", Json.array(debate.candidates(), Json::string))
+                        .raw("contributions", Json.array(debate.contributions(), line -> Json.object()
+                                .put("speaker", line.speaker())
+                                .put("text", line.text())
+                                .put("topic", texts.translate(line.topic()))
+                                .put("convinced", line.convinced())
+                                .put("repelled", line.repelled())
+                                .build()))
+                        .raw("verdict", shares.apply(debate.verdict()))
+                        .raw("progress", String.format(Locale.ROOT, "%.2f", debate.progress()))
+                        .put("finished", debate.finished())
+                        .build()))
+                .build();
+    }
+
+    private String civic(Translator texts) {
+        var civic = civ.queries().civic();
+        return Json.object().raw("polities", Json.array(civ.queries().polities().stream()
+                .filter(polity -> polity.kind() == PolityKind.TERRITORIAL || polity.kind() == PolityKind.FEDERATION)
+                .toList(), polity -> {
+                    var flag = civic.flagOf(polity.id());
+                    var anthem = civic.anthemOf(polity.id());
+                    return Json.object()
+                            .put("id", polity.id().value().toString())
+                            .put("name", polity.name().value())
+                            .put("level", polity.kind() == PolityKind.FEDERATION ? levelName(polity, texts)
+                                    : texts.translate(Message.of(MessageKey.WEB_MUNICIPALITY)))
+                            .raw("flag", flag.map(found -> Json.object()
+                                    .put("base", found.base())
+                                    .raw("layers", Json.array(found.layers(), layer -> Json.object()
+                                            .put("pattern", layer.pattern())
+                                            .put("color", layer.color())
+                                            .build()))
+                                    .build()).orElse("null"))
+                            .raw("anthem", anthem.map(found -> Json.object()
+                                    .put("title", found.title())
+                                    .put("instrument", found.instrument())
+                                    .put("notes", found.notes())
+                                    .raw("melody", Json.array(found.melody(), note -> Json.object()
+                                            .put("s", note.semitones())
+                                            .put("t", note.ticks())
+                                            .build()))
+                                    .build()).orElse("null"))
+                            .raw("constituencies", Json.array(civic.constituenciesOf(polity.id()), constituency ->
+                                    Json.object()
+                                            .put("name", constituency.name())
+                                            .raw("towns", Json.array(constituency.towns(), town -> Json.string(
+                                                    civ.texts().polityName(town))))
+                                            .raw("areas", Json.array(constituency.areas(), area -> Json.object()
+                                                    .put("dim", area.dimension().value())
+                                                    .put("minX", area.minX())
+                                                    .put("minZ", area.minZ())
+                                                    .put("maxX", area.maxX())
+                                                    .put("maxZ", area.maxZ())
+                                                    .build()))
+                                            .build()))
+                            .build();
+                })).build();
     }
 
     private static HttpResponse action(HttpRequest request, Function<Map<String, String>, Reply> action, Translator texts) {

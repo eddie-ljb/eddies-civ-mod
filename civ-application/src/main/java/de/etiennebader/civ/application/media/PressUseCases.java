@@ -94,7 +94,8 @@ public final class PressUseCases {
         if (today >= ARTICLES_PER_DAY) {
             throw new PressLimitException(ARTICLES_PER_DAY);
         }
-        List<PolityId> towns = distribution(paper);
+        List<PolityId> towns = distribution(paper).stream()
+                .filter(town -> !censored(aggregates.polity(town), analysis)).toList();
         int readers = 0;
         ArticleId id = ArticleId.generate(ids);
         Article draft = new Article(id, 0, newspaper, author, title, body, analysis.topic(), analysis.subject(),
@@ -110,6 +111,20 @@ public final class PressUseCases {
                 analysis.subject(), analysis.tendency(), day, towns, readers));
         aggregates.commit(press);
         return article;
+    }
+
+    /**
+     * Ohne Pressefreiheit ({@code press_freedom} aus) erscheint in einer Gemeinde kein Artikel, der sie selbst oder
+     * einen ihrer Amtsträger kritisiert.
+     */
+    static boolean censored(Polity town, ArticleAnalysis analysis) {
+        if (town.laws().valueOf(de.etiennebader.civ.domain.law.StandardParameters.PRESS_FREEDOM)
+                || analysis.tendency() >= 0 || analysis.subject().isEmpty()) {
+            return false;
+        }
+        ActorRef subject = analysis.subject().get();
+        return subject.equals(town.asActor()) || java.util.Arrays.stream(de.etiennebader.civ.domain.polity.Office.values())
+                .anyMatch(office -> town.holds(subject, office));
     }
 
     /** Wo eine Zeitung erscheint: in den Gemeinden ihrer Redaktion. */
@@ -129,6 +144,17 @@ public final class PressUseCases {
             case FREEDOM -> "Freiheit";
             case LOW_TAXES -> "niedrige Steuern";
             case INVESTMENT -> "Ausbau";
+            case ENVIRONMENT -> "Umwelt und Natur";
+            case WELFARE -> "Soziales";
+            case ECONOMY -> "Wirtschaft und Handel";
+            case EDUCATION -> "Bildung";
+            case TRADITION -> "Tradition und Heimat";
+            case PROGRESS -> "Fortschritt und Technik";
+            case PEACE -> "Frieden und Diplomatie";
+            case EXPANSION -> "Stärke und Expansion";
+            case DEMOCRACY -> "Bürgerbeteiligung";
+            case AGRICULTURE -> "Landwirtschaft";
+            case AUTONOMY -> "Selbstbestimmung";
             case NONE -> "Allgemeines";
         };
     }

@@ -53,6 +53,10 @@ public enum ErrorCode {
     UNKNOWN_ELECTION,
     /** Argumente: Akteur. */
     NOT_A_CANDIDATE,
+    /** Amtszeitbegrenzung erreicht. */
+    TERM_LIMIT_REACHED,
+    /** Verbannt: Beitritt bis zum Ende der Verbannung verboten. */
+    EXILED,
     /** Argumente: Akteur. */
     ALREADY_CANDIDATE,
 

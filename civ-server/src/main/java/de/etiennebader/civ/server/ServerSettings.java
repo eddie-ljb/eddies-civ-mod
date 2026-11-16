@@ -27,10 +27,48 @@ import java.util.Objects;
  * @param emigration     ob sehr unzufriedene Dorfbewohner ihre Gemeinde verlassen
  * @param levels         politische Ebenen, auf denen Bünde gegründet werden können
  * @param parties        ob und ab wie vielen Gleichgesinnten Dorfbewohner Parteien gründen
+ * @param show           Inszenierung: Live-Auszählung, Debatten, Hymnen, Weltkarte
  */
 public record ServerSettings(long ticksPerDay, int claimBase, int claimPerMember, CurrencyId currency,
                              Money priceReference, Money villagerIncome, TierThresholds tiers, WebSettings web,
-                             boolean emigration, Levels levels, PartySettings parties) {
+                             boolean emigration, Levels levels, PartySettings parties, ShowSettings show) {
+
+    /** Mit Standard-Inszenierung. */
+    public ServerSettings(long ticksPerDay, int claimBase, int claimPerMember, CurrencyId currency,
+                          Money priceReference, Money villagerIncome, TierThresholds tiers, WebSettings web,
+                          boolean emigration, Levels levels, PartySettings parties) {
+        this(ticksPerDay, claimBase, claimPerMember, currency, priceReference, villagerIncome, tiers, web, emigration,
+                levels, parties, ShowSettings.DEFAULT);
+    }
+
+    /**
+     * Inszenierung von Wahlen und Hoheitszeichen.
+     *
+     * @param liveCount        ob Wahlergebnisse als Live-Auszählung nach und nach erscheinen
+     * @param liveCountSeconds wie lange eine Live-Auszählung dauert
+     * @param projections      ob während der Auszählung Hochrechnungen erscheinen
+     * @param debateMinutes    Länge einer Wahldebatte; 0 schaltet Debatten ab
+     * @param anthemOnEnter    ob die Hymne spielt, wenn man das Gebiet einer Gemeinde betritt
+     * @param worldMap         ob die Webseite eine gerenderte Weltkarte zeigt
+     * @param mapRadius        Umkreis in Chunks um Spieler, der für die Karte gezeichnet wird
+     */
+    public record ShowSettings(boolean liveCount, int liveCountSeconds, boolean projections, int debateMinutes,
+                               boolean anthemOnEnter, boolean worldMap, int mapRadius) {
+
+        public static final ShowSettings DEFAULT = new ShowSettings(true, 60, true, 5, false, true, 6);
+
+        public ShowSettings {
+            if (liveCountSeconds < 5 || liveCountSeconds > 600) {
+                throw new IllegalArgumentException("Live-Auszählung 5–600 Sekunden: " + liveCountSeconds);
+            }
+            if (debateMinutes < 0 || debateMinutes > 60) {
+                throw new IllegalArgumentException("Debatte 0–60 Minuten: " + debateMinutes);
+            }
+            if (mapRadius < 1 || mapRadius > 32) {
+                throw new IllegalArgumentException("Kartenumkreis 1–32 Chunks: " + mapRadius);
+            }
+        }
+    }
 
     /** Mit Standardregeln für Parteien. */
     public ServerSettings(long ticksPerDay, int claimBase, int claimPerMember, CurrencyId currency,
@@ -144,7 +182,8 @@ public record ServerSettings(long ticksPerDay, int claimBase, int claimPerMember
         ServerSettings defaults = defaults();
         return new ServerSettings(ticksPerDay, defaults.claimBase(), defaults.claimPerMember(), defaults.currency(),
                 defaults.priceReference(), defaults.villagerIncome(), defaults.tiers(), defaults.web().disabled(),
-                defaults.emigration(), defaults.levels(), defaults.parties());
+                defaults.emigration(), defaults.levels(), defaults.parties(),
+                new ShowSettings(false, 60, true, 5, false, false, 6));
     }
 
     /**
