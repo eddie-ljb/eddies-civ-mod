@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "GRG",
+    "IEI",
+    "III"
+  ],
+  "key": {
+    "G": "minecraft:gold_ingot",
+    "R": "minecraft:redstone",
+    "I": "minecraft:iron_ingot",
+    "E": "minecraft:emerald"
+  },
+  "result": {
+    "id": "eddies-civ-mod:stock_exchange",
+    "count": 1
+  }
+}
