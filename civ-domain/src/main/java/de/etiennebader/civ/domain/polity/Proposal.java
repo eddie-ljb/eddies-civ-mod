@@ -10,15 +10,21 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Eine offene Abstimmung über die Änderung einer Regelung.
+ * Eine offene Abstimmung über eine Rechtsänderung.
  *
- * @param votes in Reihenfolge der Abgabe; jeder Wähler höchstens einmal
+ * @param motion worüber abgestimmt wird
+ * @param votes  in Reihenfolge der Abgabe; jeder Wähler höchstens einmal
  */
-public record Proposal(ProposalId id, ParameterValue<?> change, ActorRef proposer, Day openedOn, List<Vote> votes) {
+public record Proposal(ProposalId id, Motion motion, ActorRef proposer, Day openedOn, List<Vote> votes) {
+
+    /** Abstimmung über eine einzelne Regelung. */
+    public Proposal(ProposalId id, ParameterValue<?> change, ActorRef proposer, Day openedOn, List<Vote> votes) {
+        this(id, new Motion.Change(change), proposer, openedOn, votes);
+    }
 
     public Proposal {
         Objects.requireNonNull(id, "id");
-        Objects.requireNonNull(change, "change");
+        Objects.requireNonNull(motion, "motion");
         Objects.requireNonNull(proposer, "proposer");
         Objects.requireNonNull(openedOn, "openedOn");
         votes = List.copyOf(Objects.requireNonNull(votes, "votes"));
@@ -39,6 +45,6 @@ public record Proposal(ProposalId id, ParameterValue<?> change, ActorRef propose
     Proposal with(Vote vote) {
         List<Vote> updated = new ArrayList<>(votes.stream().filter(cast -> !cast.voter().equals(vote.voter())).toList());
         updated.add(vote);
-        return new Proposal(id, change, proposer, openedOn, updated);
+        return new Proposal(id, motion, proposer, openedOn, updated);
     }
 }

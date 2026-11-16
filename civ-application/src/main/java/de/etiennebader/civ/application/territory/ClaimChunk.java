@@ -1,8 +1,11 @@
 package de.etiennebader.civ.application.territory;
 
+import de.etiennebader.civ.application.federation.Federations;
+import de.etiennebader.civ.application.law.EffectiveLaws;
 import de.etiennebader.civ.application.support.Aggregates;
 import de.etiennebader.civ.application.support.ClaimContexts;
 import de.etiennebader.civ.application.support.ClaimWeighting;
+import de.etiennebader.civ.domain.law.LawView;
 import de.etiennebader.civ.domain.polity.Polity;
 import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.PolityId;
@@ -49,7 +52,10 @@ public final class ClaimChunk {
     public void execute(Command command) {
         Polity polity = aggregates.polity(command.polity());
         TerritoryRegistry territory = aggregates.territory();
-        territory.claim(ClaimContexts.forPolity(polity, command.chunk(), command.type(), weighting), claimPolicy, command.day());
+        LawView laws = new EffectiveLaws(polity, Federations.ancestorsOf(aggregates.repositories().polities().findAll(),
+                polity.id()));
+        territory.claim(ClaimContexts.forPolity(polity, laws, command.chunk(), command.type(), weighting), claimPolicy,
+                command.day());
         aggregates.commit(territory);
     }
 }

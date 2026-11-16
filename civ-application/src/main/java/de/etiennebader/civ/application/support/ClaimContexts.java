@@ -1,5 +1,6 @@
 package de.etiennebader.civ.application.support;
 
+import de.etiennebader.civ.domain.law.LawView;
 import de.etiennebader.civ.domain.law.StandardParameters;
 import de.etiennebader.civ.domain.polity.Polity;
 import de.etiennebader.civ.domain.territory.ChunkCoord;
@@ -16,7 +17,13 @@ public final class ClaimContexts {
     }
 
     public static ClaimContext forPolity(Polity polity, ChunkCoord target, ClaimType type, ClaimWeighting weighting) {
+        return forPolity(polity, polity.laws(), target, type, weighting);
+    }
+
+    /** Wie oben, mit dem tatsächlich geltenden Recht, z. B. samt vorrangigem Bundesrecht. */
+    public static ClaimContext forPolity(Polity polity, LawView laws, ChunkCoord target, ClaimType type,
+                                         ClaimWeighting weighting) {
         return new ClaimContext(polity.id(), type, target, weighting.weightOf(polity),
-                polity.laws().valueOf(StandardParameters.MAX_OUTPOSTS));
+                laws.valueOf(StandardParameters.MAX_OUTPOSTS));
     }
 }

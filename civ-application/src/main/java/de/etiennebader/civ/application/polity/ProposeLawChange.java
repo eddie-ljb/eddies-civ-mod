@@ -3,6 +3,7 @@ package de.etiennebader.civ.application.polity;
 import de.etiennebader.civ.application.support.Aggregates;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.law.ParameterValue;
+import de.etiennebader.civ.domain.polity.Motion;
 import de.etiennebader.civ.domain.polity.Polity;
 import de.etiennebader.civ.domain.polity.Proposal;
 import de.etiennebader.civ.domain.shared.Day;
@@ -32,24 +33,16 @@ public final class ProposeLawChange {
     public record Result(ProposalId proposal, VoteOutcome outcome) {
     }
 
-    private final Aggregates aggregates;
-    private final IdGenerator ids;
+    private final ProposeMotion proposeMotion;
 
     public ProposeLawChange(Aggregates aggregates, IdGenerator ids) {
-        this.aggregates = Objects.requireNonNull(aggregates, "aggregates");
-        this.ids = Objects.requireNonNull(ids, "ids");
+        this.proposeMotion = new ProposeMotion(aggregates, ids);
     }
 
     public Result execute(Command command) {
-        Polity polity = aggregates.polity(command.polity());
-        AmendLaw.requireCitizen(polity, command.citizen());
-        ProposalId id = ProposalId.generate(ids);
-        polity.openProposal(id, command.change(), command.citizen(), command.day());
-        polity.vote(id, command.citizen(), true, command.day());
-        Proposal proposal = proposalOf(polity, id);
-        VoteOutcome outcome = Ballots.settle(polity, proposal, Ballots.evaluate(polity, proposal), ids, command.day());
-        aggregates.commit(polity);
-        return new Result(id, outcome);
+        ProposeMotion.Result result = proposeMotion.execute(new ProposeMotion.Command(command.polity(),
+                command.citizen(), new Motion.Change(command.change()), command.day()));
+        return new Result(result.proposal(), result.outcome());
     }
 
     static Proposal proposalOf(Polity polity, ProposalId id) {

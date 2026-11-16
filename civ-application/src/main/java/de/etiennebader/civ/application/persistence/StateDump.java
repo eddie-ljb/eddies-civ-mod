@@ -10,6 +10,7 @@ import de.etiennebader.civ.domain.law.EnactedStatute;
 import de.etiennebader.civ.domain.law.ParameterCatalog;
 import de.etiennebader.civ.domain.polity.Election;
 import de.etiennebader.civ.domain.polity.Membership;
+import de.etiennebader.civ.domain.polity.Motion;
 import de.etiennebader.civ.domain.polity.OfficeTerm;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.polity.Proposal;
@@ -41,8 +42,16 @@ public final class StateDump {
         TerritoryView territory = world.territory();
         for (PolityView polity : world.polities()) {
             lines.add(String.join("|", "polity", polity.id().value().toString(), polity.name().value(),
-                    polity.kind().name(), polity.tier().name(), polity.currency().code(), day(polity.foundedOn().value()),
+                    polity.kind().name(), polity.level(), polity.tier().name(), polity.currency().code(),
+                    day(polity.foundedOn().value()),
                     polity.seat().map(BlockPosition::toString).orElse("-")));
+            polity.partyProfile().ifPresent(profile -> lines.add(String.join("|", "  party",
+                    Integer.toString(profile.order()), Integer.toString(profile.economy()), profile.emblem())));
+            if (polity.constitution().proclaimed() || !polity.constitution().preamble().isEmpty()) {
+                lines.add(String.join("|", "  constitution",
+                        polity.constitution().proclaimedOn().map(day -> day(day.value())).orElse("draft"),
+                        polity.constitution().preamble()));
+            }
             for (Membership membership : polity.members()) {
                 lines.add(String.join("|", "  member", actor(membership.member()), membership.type().name(),
                         day(membership.since().value())));
@@ -52,14 +61,15 @@ public final class StateDump {
                         .map(value -> value.key().id() + "=" + ParameterCatalog.encode(value))
                         .collect(Collectors.joining(","));
                 lines.add(String.join("|", "  statute", enacted.statute().id().value().toString(),
-                        enacted.statute().title(), day(enacted.enactedOn().value()), values));
+                        enacted.statute().title(), day(enacted.enactedOn().value()), values)
+                        + (enacted.statute().text().isEmpty() ? "" : "|text=" + enacted.statute().text()));
             }
             for (Proposal proposal : polity.proposals()) {
                 String votes = proposal.votes().stream()
                         .map(vote -> actor(vote.voter()) + (vote.inFavour() ? "+" : "-"))
                         .collect(Collectors.joining(","));
                 lines.add(String.join("|", "  proposal", proposal.id().value().toString(),
-                        proposal.change().key().id() + "=" + ParameterCatalog.encode(proposal.change()),
+                        motion(proposal.motion()),
                         actor(proposal.proposer()), day(proposal.openedOn().value()), votes));
             }
             for (OfficeTerm term : polity.offices()) {
@@ -116,6 +126,16 @@ public final class StateDump {
                 area.dimension().value() + "[" + area.minX() + "," + area.minZ() + ".." + area.maxX() + "," + area.maxZ() + "]",
                 actor(plot.holder()), day(plot.holderSince().value()))
                 + plot.askingPrice().map(price -> "|offer=" + price.amount() + price.currency().code()).orElse("");
+    }
+
+    private static String motion(Motion motion) {
+        return switch (motion) {
+            case Motion.Change change -> change.change().key().id() + "=" + ParameterCatalog.encode(change.change());
+            case Motion.Enact enact -> "enact:" + enact.title() + ":" + enact.text() + ":" + enact.values().stream()
+                    .map(value -> value.key().id() + "=" + ParameterCatalog.encode(value))
+                    .collect(Collectors.joining(","));
+            case Motion.Repeal repeal -> "repeal:" + repeal.statute().value() + ":" + repeal.title();
+        };
     }
 
     private static String actor(ActorRef actor) {

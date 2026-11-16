@@ -2,6 +2,7 @@ package de.etiennebader.civ.fabric.screen;
 
 import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.Platform;
+import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.fabric.Components;
 import de.etiennebader.civ.fabric.gui.Canvas;
 import de.etiennebader.civ.fabric.gui.Icon;
@@ -26,11 +27,13 @@ final class PlatformScreen extends MenuScreen {
 
     private static final int[] SLOTS = {11, 12, 13, 14, 15};
 
+    private final PolityId polity;
     private final Office office;
     private final Screen parent;
 
-    PlatformScreen(CivServer civ, ServerPlayer player, Office office, Screen parent) {
+    PlatformScreen(CivServer civ, ServerPlayer player, PolityId polity, Office office, Screen parent) {
         super(civ, player, Optional.of(parent));
+        this.polity = polity;
         this.office = office;
         this.parent = parent;
     }
@@ -55,7 +58,7 @@ final class PlatformScreen extends MenuScreen {
                     .name(Message.of(TranslationKeys.platform(platform)), Icon.TITLE)
                     .line(Message.of(TranslationKeys.platformDescription(platform)), Icon.INFO)
                     .blank().hint(GuiKeys.PLATFORM_HINT.text()).build(), click -> {
-                Reply reply = civ.offices().stand(caller(), office, platform);
+                Reply reply = civ.offices().stand(caller(), polity, office, platform);
                 report(click, reply);
                 if (reply.success()) {
                     Screens.open(click.player(), parent);

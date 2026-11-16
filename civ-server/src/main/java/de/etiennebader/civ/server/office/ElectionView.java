@@ -21,13 +21,22 @@ import java.util.Optional;
 public record ElectionView(ElectionId id, long closesOn, List<Candidate> candidates, Optional<ActorRef> ownChoice,
                            boolean ownCandidacy, long ballots, long electorate) {
 
-    /** Ein Kandidat mit seinem Wahlprogramm. */
-    public record Candidate(ActorRef actor, String name, Platform platform) {
+    /**
+     * Ein Kandidat mit seinem Wahlprogramm.
+     *
+     * @param party Name seiner Partei, falls er einer angehört
+     */
+    public record Candidate(ActorRef actor, String name, Platform platform, Optional<String> party) {
+
+        public Candidate(ActorRef actor, String name, Platform platform) {
+            this(actor, name, platform, Optional.empty());
+        }
 
         public Candidate {
             Objects.requireNonNull(actor, "actor");
             Objects.requireNonNull(name, "name");
             Objects.requireNonNull(platform, "platform");
+            Objects.requireNonNull(party, "party");
         }
     }
 

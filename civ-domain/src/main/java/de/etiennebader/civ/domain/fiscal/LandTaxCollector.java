@@ -40,7 +40,15 @@ import java.util.TreeMap;
 public final class LandTaxCollector {
 
     public LandTaxReport collect(Polity polity, LandView land, Ledger ledger, Day day) {
+        return collect(polity, polity.laws(), land, ledger, day);
+    }
+
+    /**
+     * Wie oben, aber mit dem Recht, das tatsächlich gilt, z. B. ergänzt um vorrangiges Bundesrecht.
+     */
+    public LandTaxReport collect(Polity polity, LawView laws, LandView land, Ledger ledger, Day day) {
         Objects.requireNonNull(polity, "polity");
+        Objects.requireNonNull(laws, "laws");
         Objects.requireNonNull(land, "land");
         Objects.requireNonNull(ledger, "ledger");
         Objects.requireNonNull(day, "day");
@@ -48,7 +56,6 @@ public final class LandTaxCollector {
             throw new IllegalArgumentException("Grundbuch gehört nicht zu " + polity);
         }
 
-        LawView laws = polity.laws();
         long ratePerBlock = laws.valueOf(StandardParameters.LAND_TAX_PER_BLOCK);
         if (ratePerBlock == 0) {
             return LandTaxReport.empty(polity.id(), polity.currency(), day);

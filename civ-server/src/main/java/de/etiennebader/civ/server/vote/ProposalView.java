@@ -14,9 +14,17 @@ import java.util.Optional;
  * @param value     vorgeschlagener Wert
  * @param ownVote   die Stimme des Betrachters, falls er schon abgestimmt hat
  * @param decidedOn Tag, an dem spätestens ausgezählt wird
+ * @param requiredPercent nötige Mehrheit in Prozent: 50 oder die Verfassungsmehrheit
  */
 public record ProposalView(int number, ProposalId id, Message law, Object value, String proposer, long inFavour,
-                           long against, long electorate, Optional<Boolean> ownVote, long decidedOn) {
+                           long against, long electorate, Optional<Boolean> ownVote, long decidedOn,
+                           long requiredPercent) {
+
+    /** Mit einfacher Mehrheit. */
+    public ProposalView(int number, ProposalId id, Message law, Object value, String proposer, long inFavour,
+                        long against, long electorate, Optional<Boolean> ownVote, long decidedOn) {
+        this(number, id, law, value, proposer, inFavour, against, electorate, ownVote, decidedOn, 50);
+    }
 
     public ProposalView {
         Objects.requireNonNull(id, "id");

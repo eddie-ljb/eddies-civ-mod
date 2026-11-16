@@ -2,8 +2,11 @@ package de.etiennebader.civ.fabric;
 
 import de.etiennebader.civ.domain.actor.PlayerRef;
 import de.etiennebader.civ.domain.protection.ProtectedAction;
+import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.fabric.content.CivContent;
+import de.etiennebader.civ.fabric.content.ConstitutionCopies;
+import de.etiennebader.civ.fabric.content.LawBooks;
 import de.etiennebader.civ.fabric.gui.Screens;
 import de.etiennebader.civ.fabric.screen.ShopScreen;
 import de.etiennebader.civ.server.CivServer;
@@ -96,8 +99,28 @@ public final class ProtectionListener {
         });
         PlayerBlockBreakEvents.AFTER.register((level, player, pos, state, blockEntity) ->
                 host.current().ifPresent(civ -> civ.shops().removeAt(Players.position(level, pos))));
+        UseItemCallback.EVENT.register((player, level, hand) -> readCopy(player, hand));
         AttackEntityCallback.EVENT.register((player, level, hand, entity, hit) -> onEntity(player, level, entity, true));
         UseEntityCallback.EVENT.register((player, level, hand, entity, hit) -> onEntity(player, level, entity, false));
+    }
+
+    /** Rechtsklick mit einer Verfassungsabschrift öffnet die Verfassung. */
+    private InteractionResult readCopy(Player player, InteractionHand hand) {
+        ItemStack stack = player.getItemInHand(hand);
+        if (LawBooks.isLawBook(stack)) {
+            if (player instanceof ServerPlayer serverPlayer) {
+                host.current().ifPresent(civ -> MenuOpener.lawBook(civ, serverPlayer, Players.position(serverPlayer)));
+            }
+            return InteractionResult.SUCCESS;
+        }
+        if (!ConstitutionCopies.isCopy(stack)) {
+            return InteractionResult.PASS;
+        }
+        if (player instanceof ServerPlayer serverPlayer) {
+            Optional<PolityId> polity = ConstitutionCopies.polityOf(stack);
+            host.current().ifPresent(civ -> polity.ifPresent(id -> MenuOpener.constitution(civ, serverPlayer, id)));
+        }
+        return InteractionResult.SUCCESS;
     }
 
     private InteractionResult onUseBlock(Player player, Level level, InteractionHand hand, BlockHitResult hit) {
@@ -115,6 +138,10 @@ public final class ProtectionListener {
         }
         if (usesBlock && state.is(content.townHall())) {
             host.current().ifPresent(civ -> MenuOpener.townHall(civ, serverPlayer, Players.position(level, pos)));
+            return InteractionResult.SUCCESS;
+        }
+        if (usesBlock && state.is(content.constitution())) {
+            host.current().ifPresent(civ -> MenuOpener.constitution(civ, serverPlayer, Players.position(level, pos)));
             return InteractionResult.SUCCESS;
         }
         if (usesBlock && state.is(content.bank())) {

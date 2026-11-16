@@ -44,9 +44,15 @@ public record Satisfaction(Map<Factor, Integer> factors) {
     }
 
     public static Satisfaction of(Personality personality, PolityView town) {
+        Objects.requireNonNull(town, "town");
+        return of(personality, town, town.laws());
+    }
+
+    /** Wie oben, aber mit dem tatsächlich geltenden Recht, z. B. samt vorrangigem Bundesrecht. */
+    public static Satisfaction of(Personality personality, PolityView town, LawView laws) {
         Objects.requireNonNull(personality, "personality");
         Objects.requireNonNull(town, "town");
-        LawView laws = town.laws();
+        Objects.requireNonNull(laws, "laws");
         Map<Factor, Integer> factors = new EnumMap<>(Factor.class);
         factors.put(Factor.BASE, 10 + personality.belonging() / 10);
         factors.put(Factor.ORDER, (int) Math.round(personality.order() / 100.0 * orderIndex(laws) * 25));

@@ -1,9 +1,12 @@
 package de.etiennebader.civ.application.polity;
 
+import de.etiennebader.civ.application.federation.Federations;
+import de.etiennebader.civ.application.federation.NotAMunicipalityException;
 import de.etiennebader.civ.application.support.Aggregates;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.polity.MembershipType;
 import de.etiennebader.civ.domain.polity.Polity;
+import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.PolityId;
 
@@ -37,8 +40,12 @@ public final class JoinPolity {
      */
     public void execute(Command command) {
         Polity polity = aggregates.polity(command.polity());
+        if (polity.kind() != PolityKind.TERRITORIAL) {
+            throw new NotAMunicipalityException(polity.name());
+        }
         membershipRule.requireNoMunicipality(command.member());
         polity.admit(command.member(), command.type(), command.day());
         aggregates.commit(polity);
+        Federations.memberJoined(aggregates, polity.id(), command.member(), command.type(), command.day());
     }
 }

@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "eddies-civ-mod:item/constitution_copy"
+  }
+}

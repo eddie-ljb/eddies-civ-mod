@@ -1,5 +1,6 @@
 package de.etiennebader.civ.application.polity;
 
+import de.etiennebader.civ.application.federation.Federations;
 import de.etiennebader.civ.application.support.Aggregates;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PolityRef;
@@ -16,6 +17,7 @@ import de.etiennebader.civ.domain.territory.TerritoryRegistry;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Löst eine Gemeinde auf.
@@ -27,6 +29,9 @@ import java.util.Objects;
  *     <li>Das Geld der Gemeindekasse geht an den Erben, z. B. den Bürgermeister.</li>
  *     <li>Die Gemeinde verschwindet; ihre Mitglieder sind danach ohne Gemeinde.</li>
  * </ol>
+ *
+ * <p>Gehört sie einem Bund an, verlässt sie ihn vorher samt ihren Leuten. War sie dessen letztes Glied, wird der Bund
+ * mit aufgelöst. Die Glieder eines aufgelösten Bundes sind danach frei.
  */
 public final class DissolvePolity {
 
@@ -52,6 +57,13 @@ public final class DissolvePolity {
         Polity polity = aggregates.polity(command.polity());
         PolityRef asActor = polity.asActor();
         Day day = command.day();
+
+        Optional<Polity> parent = Federations.parentOf(aggregates.repositories().polities().findAll(), polity.id());
+        if (parent.isPresent() && parent.get().constituents().size() <= 1) {
+            execute(new Command(parent.get().id(), command.heir(), day));
+        } else if (parent.isPresent()) {
+            Federations.detach(aggregates, polity, day);
+        }
 
         LandRegistry land = aggregates.land(polity.id());
         for (Plot plot : List.copyOf(land.plots())) {

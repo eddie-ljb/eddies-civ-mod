@@ -79,11 +79,11 @@ final class OfficesScreen extends MenuScreen {
         canvas.set(9 + column + 1, officeIcon(office), click -> {
             if (office.election().isPresent() && !office.election().get().ownCandidacy()) {
                 Feedback.click(click.player());
-                Screens.open(click.player(), new PlatformScreen(civ, player, office.office(), this));
+                Screens.open(click.player(), new PlatformScreen(civ, player, town, office.office(), this));
             } else if (office.election().isPresent()) {
                 Feedback.click(click.player());
             } else if (click.shift()) {
-                report(click, civ.offices().callElection(caller(), office.office().name()));
+                report(click, civ.offices().callElection(caller(), town, office.office()));
             } else {
                 Feedback.click(click.player());
             }
@@ -107,11 +107,12 @@ final class OfficesScreen extends MenuScreen {
             Icon icon = Icon.of(head).name(Icon.literal(candidate.name(), chosen ? ChatFormatting.GREEN : ChatFormatting.WHITE))
                     .line(GuiKeys.OFFICE_CANDIDATE_FOR.text(office.name()), Icon.INFO)
                     .line(GuiKeys.OFFICE_PLATFORM.text(Message.of(TranslationKeys.platform(candidate.platform()))));
+            candidate.party().ifPresent(party -> icon.line(GuiKeys.OFFICE_PARTY.text(party), Icon.HINT));
             if (chosen) {
                 icon.line(GuiKeys.OFFICE_OWN_CHOICE.text(), Icon.GOOD).glint();
             }
             canvas.set(slot, icon.blank().hint(GuiKeys.OFFICE_VOTE_HINT.text()).build(), click ->
-                    report(click, civ.offices().vote(caller(), office.office(), candidate.actor())));
+                    report(click, civ.offices().vote(caller(), town, office.office(), candidate.actor())));
         }
     }
 

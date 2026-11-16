@@ -6,6 +6,7 @@ import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.Money;
 import de.etiennebader.civ.domain.territory.ClaimPolicy;
 import de.etiennebader.civ.domain.territory.CompositeClaimPolicy;
+import de.etiennebader.civ.server.federation.Levels;
 
 import java.util.Objects;
 
@@ -24,10 +25,45 @@ import java.util.Objects;
  * @param tiers          ab wie vielen Einwohnern eine Gemeinde welche Stufe erreicht
  * @param web            die eingebettete Webseite
  * @param emigration     ob sehr unzufriedene Dorfbewohner ihre Gemeinde verlassen
+ * @param levels         politische Ebenen, auf denen Bünde gegründet werden können
+ * @param parties        ob und ab wie vielen Gleichgesinnten Dorfbewohner Parteien gründen
  */
 public record ServerSettings(long ticksPerDay, int claimBase, int claimPerMember, CurrencyId currency,
                              Money priceReference, Money villagerIncome, TierThresholds tiers, WebSettings web,
-                             boolean emigration) {
+                             boolean emigration, Levels levels, PartySettings parties) {
+
+    /** Mit Standardregeln für Parteien. */
+    public ServerSettings(long ticksPerDay, int claimBase, int claimPerMember, CurrencyId currency,
+                          Money priceReference, Money villagerIncome, TierThresholds tiers, WebSettings web,
+                          boolean emigration, Levels levels) {
+        this(ticksPerDay, claimBase, claimPerMember, currency, priceReference, villagerIncome, tiers, web, emigration,
+                levels, PartySettings.DEFAULT);
+    }
+
+    /**
+     * Parteien der Dorfbewohner.
+     *
+     * @param villagers ob Dorfbewohner Parteien beitreten und gründen
+     * @param founders  wie viele parteilose Gleichgesinnte einer Gemeinde mindestens eine Partei gründen
+     */
+    public record PartySettings(boolean villagers, int founders) {
+
+        public static final PartySettings DEFAULT = new PartySettings(true, 5);
+
+        public PartySettings {
+            if (founders < 2) {
+                throw new IllegalArgumentException("Mindestens 2 Gründer: " + founders);
+            }
+        }
+    }
+
+    /** Mit den eingebauten Ebenen. */
+    public ServerSettings(long ticksPerDay, int claimBase, int claimPerMember, CurrencyId currency,
+                          Money priceReference, Money villagerIncome, TierThresholds tiers, WebSettings web,
+                          boolean emigration) {
+        this(ticksPerDay, claimBase, claimPerMember, currency, priceReference, villagerIncome, tiers, web, emigration,
+                Levels.DEFAULT);
+    }
 
     /** Mit Abwanderung. */
     public ServerSettings(long ticksPerDay, int claimBase, int claimPerMember, CurrencyId currency,
@@ -99,6 +135,8 @@ public record ServerSettings(long ticksPerDay, int claimBase, int claimPerMember
         }
         Objects.requireNonNull(tiers, "tiers");
         Objects.requireNonNull(web, "web");
+        Objects.requireNonNull(levels, "levels");
+        Objects.requireNonNull(parties, "parties");
     }
 
     /** Wie {@link #defaults()}, aber mit eigener Tageslänge, z. B. für Tests. */
@@ -106,7 +144,7 @@ public record ServerSettings(long ticksPerDay, int claimBase, int claimPerMember
         ServerSettings defaults = defaults();
         return new ServerSettings(ticksPerDay, defaults.claimBase(), defaults.claimPerMember(), defaults.currency(),
                 defaults.priceReference(), defaults.villagerIncome(), defaults.tiers(), defaults.web().disabled(),
-                defaults.emigration());
+                defaults.emigration(), defaults.levels(), defaults.parties());
     }
 
     /**

@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "GBG",
+    "PFP",
+    "PPP"
+  ],
+  "key": {
+    "G": "minecraft:gold_ingot",
+    "B": "minecraft:writable_book",
+    "F": "minecraft:feather",
+    "P": "minecraft:dark_oak_planks"
+  },
+  "result": {
+    "id": "eddies-civ-mod:constitution",
+    "count": 1
+  }
+}

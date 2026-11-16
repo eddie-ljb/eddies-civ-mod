@@ -1,9 +1,12 @@
 package de.etiennebader.civ.application.query;
 
 import de.etiennebader.civ.application.Repositories;
+import de.etiennebader.civ.application.federation.Federations;
+import de.etiennebader.civ.application.law.EffectiveLaws;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.economy.LedgerView;
 import de.etiennebader.civ.domain.land.LandView;
+import de.etiennebader.civ.domain.law.LawView;
 import de.etiennebader.civ.domain.market.MarketView;
 import de.etiennebader.civ.domain.market.PriceLevel;
 import de.etiennebader.civ.domain.polity.PolityKind;
@@ -46,6 +49,11 @@ public final class WorldQueries {
         public Optional<? extends LandView> land(PolityId polity) {
             return repositories.land().findByPolity(polity);
         }
+
+        @Override
+        public LawView laws(PolityView polity) {
+            return effectiveLaws(polity);
+        }
     };
 
     public WorldQueries(Repositories repositories) {
@@ -59,6 +67,49 @@ public final class WorldQueries {
 
     public Optional<PolityView> polity(PolityId id) {
         return repositories.polities().findById(id).map(PolityView.class::cast);
+    }
+
+    /** Der Bund, dem die Polity direkt angehört. */
+    public Optional<PolityView> parentOf(PolityId id) {
+        return Federations.parentOf(repositories.polities().findAll(), id).map(PolityView.class::cast);
+    }
+
+    /** Alle Bünde über der Polity, vom nächsten bis zum obersten. */
+    public List<PolityView> ancestorsOf(PolityId id) {
+        return Federations.ancestorsOf(repositories.polities().findAll(), id).stream()
+                .map(PolityView.class::cast)
+                .toList();
+    }
+
+    /** Das Recht, das in der Polity tatsächlich gilt: eigenes Recht, wo nötig von Bundesrecht verdrängt. */
+    public EffectiveLaws effectiveLaws(PolityView polity) {
+        Objects.requireNonNull(polity, "polity");
+        return new EffectiveLaws(polity, ancestorsOf(polity.id()));
+    }
+
+    /** Die Partei, der ein Akteur angehört. */
+    public Optional<PolityView> partyOf(ActorRef actor) {
+        Objects.requireNonNull(actor, "actor");
+        return repositories.polities().findAll().stream()
+                .filter(polity -> polity.kind() == PolityKind.PARTY && polity.isMember(actor))
+                .map(PolityView.class::cast)
+                .findFirst();
+    }
+
+    /** Alle Parteien, in Reihenfolge ihrer Gründung. */
+    public List<PolityView> parties() {
+        return repositories.polities().findAll().stream()
+                .filter(polity -> polity.kind() == PolityKind.PARTY)
+                .map(PolityView.class::cast)
+                .toList();
+    }
+
+    /** Alle Bünde, in Reihenfolge ihrer Gründung. */
+    public List<PolityView> federations() {
+        return repositories.polities().findAll().stream()
+                .filter(polity -> polity.kind() == PolityKind.FEDERATION)
+                .map(PolityView.class::cast)
+                .toList();
     }
 
     /** Sucht eine Polity nach ihrem Namen, ohne Groß- und Kleinschreibung zu beachten. */

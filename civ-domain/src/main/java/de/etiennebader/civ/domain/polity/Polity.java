@@ -7,6 +7,7 @@ import de.etiennebader.civ.domain.law.LawBook;
 import de.etiennebader.civ.domain.law.LawView;
 import de.etiennebader.civ.domain.law.ParameterValue;
 import de.etiennebader.civ.domain.law.Statute;
+import de.etiennebader.civ.domain.law.UnknownStatuteException;
 import de.etiennebader.civ.domain.shared.AggregateRoot;
 import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.Day;
@@ -35,6 +36,7 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
     private final PolityId id;
     private final PolityName name;
     private final PolityKind kind;
+    private final String level;
     private SettlementTier tier;
     private final CurrencyId currency;
     private final Day foundedOn;
@@ -44,12 +46,18 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
     private final Map<Office, OfficeTerm> offices = new EnumMap<>(Office.class);
     private final Map<ElectionId, Election> elections = new LinkedHashMap<>();
     private final LawBook lawBook = new LawBook();
+    private Constitution constitution = Constitution.DRAFT;
+    private Optional<PartyProfile> party = Optional.empty();
 
-    private Polity(PolityId id, PolityName name, PolityKind kind, SettlementTier tier,
+    /** Ebene jeder Gemeinde. */
+    public static final String MUNICIPAL_LEVEL = "gemeinde";
+
+    private Polity(PolityId id, PolityName name, PolityKind kind, String level, SettlementTier tier,
                    CurrencyId currency, Day foundedOn, Optional<BlockPosition> seat) {
         this.id = Objects.requireNonNull(id, "id");
         this.name = Objects.requireNonNull(name, "name");
         this.kind = Objects.requireNonNull(kind, "kind");
+        this.level = requireLevel(kind, level);
         this.tier = Objects.requireNonNull(tier, "tier");
         this.currency = Objects.requireNonNull(currency, "currency");
         this.foundedOn = Objects.requireNonNull(foundedOn, "foundedOn");
@@ -68,11 +76,90 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
         if (founder instanceof PolityRef) {
             throw new IllegalFounderException(founder);
         }
-        Polity polity = new Polity(id, name, PolityKind.TERRITORIAL, SettlementTier.MUNICIPALITY, currency, day,
-                Optional.of(seat));
+        Polity polity = new Polity(id, name, PolityKind.TERRITORIAL, MUNICIPAL_LEVEL, SettlementTier.MUNICIPALITY,
+                currency, day, Optional.of(seat));
         polity.members.put(founder, new Membership(founder, MembershipType.CITIZEN, day));
         polity.raise(new PolityFounded(id, name, founder, seat, day));
         return polity;
+    }
+
+    /**
+     * Gründet einen Bund auf einer höheren Ebene mit seiner ersten Gliedkörperschaft. Ein Bund hat kein eigenes Gebiet
+     * und keinen Sitz; seine Bürger sind die Bürger seiner Glieder. Wer ihn gründet, führt ihn zunächst.
+     *
+     * @param level Schlüssel der Ebene, z. B. {@code land}; nicht {@link #MUNICIPAL_LEVEL}
+     * @throws IllegalFounderException wenn der Gründer selbst eine Polity ist
+     */
+    public static Polity foundFederation(PolityId id, PolityName name, String level, PolityRef constituent,
+                                         ActorRef head, CurrencyId currency, Day day) {
+        Objects.requireNonNull(constituent, "constituent");
+        Objects.requireNonNull(head, "head");
+        if (head instanceof PolityRef) {
+            throw new IllegalFounderException(head);
+        }
+        if (constituent.id().equals(id)) {
+            throw new IllegalArgumentException("Ein Bund kann nicht Glied seiner selbst sein");
+        }
+        Polity polity = new Polity(id, name, PolityKind.FEDERATION, level, SettlementTier.MUNICIPALITY, currency, day,
+                Optional.empty());
+        polity.members.put(head, new Membership(head, MembershipType.CITIZEN, day));
+        polity.members.put(constituent, new Membership(constituent, MembershipType.CONSTITUENT, day));
+        polity.raise(new FederationFounded(id, name, polity.level, constituent, head, day));
+        return polity;
+    }
+
+    /** Ebenen-Schlüssel aller Parteien. */
+    public static final String PARTY_LEVEL = "partei";
+
+    /**
+     * Gründet eine Partei. Der Gründer wird erstes Mitglied und Vorsitz.
+     *
+     * @throws IllegalFounderException wenn der Gründer selbst eine Polity ist
+     */
+    public static Polity foundParty(PolityId id, PolityName name, ActorRef founder, PartyProfile profile,
+                                    CurrencyId currency, Day day) {
+        Objects.requireNonNull(founder, "founder");
+        Objects.requireNonNull(profile, "profile");
+        if (founder instanceof PolityRef) {
+            throw new IllegalFounderException(founder);
+        }
+        Polity polity = new Polity(id, name, PolityKind.PARTY, PARTY_LEVEL, SettlementTier.MUNICIPALITY, currency, day,
+                Optional.empty());
+        polity.party = Optional.of(profile);
+        polity.members.put(founder, new Membership(founder, MembershipType.CITIZEN, day));
+        polity.offices.put(Office.MAYOR, new OfficeTerm(Office.MAYOR, founder, day, Optional.empty()));
+        polity.raise(new PartyFounded(id, name, founder, profile, day));
+        return polity;
+    }
+
+    /** Ändert Richtung oder Wappen einer Partei. */
+    public void changePartyProfile(PartyProfile profile, Day day) {
+        Objects.requireNonNull(profile, "profile");
+        Objects.requireNonNull(day, "day");
+        if (kind != PolityKind.PARTY) {
+            throw new IllegalStateException("Keine Partei: " + id);
+        }
+        party = Optional.of(profile);
+        raise(new PartyProfileChanged(id, profile, day));
+    }
+
+    @Override
+    public Optional<PartyProfile> partyProfile() {
+        return party;
+    }
+
+    private static String requireLevel(PolityKind kind, String level) {
+        Objects.requireNonNull(level, "level");
+        if (!level.matches("[a-z][a-z0-9_]{0,31}")) {
+            throw new IllegalArgumentException("Ungültiger Ebenen-Schlüssel: " + level);
+        }
+        if ((kind == PolityKind.PARTY) != level.equals(PARTY_LEVEL)) {
+            throw new IllegalArgumentException("Ebene " + level + " passt nicht zu " + kind);
+        }
+        if ((kind == PolityKind.TERRITORIAL) != level.equals(MUNICIPAL_LEVEL)) {
+            throw new IllegalArgumentException("Ebene " + level + " passt nicht zu " + kind);
+        }
+        return level;
     }
 
     /**
@@ -110,9 +197,55 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
                                  Day foundedOn, Optional<BlockPosition> seat, List<Membership> members,
                                  List<EnactedStatute> statutes, List<Proposal> proposals, List<OfficeTerm> offices,
                                  List<Election> elections) {
+        return restore(id, name, kind, kind == PolityKind.TERRITORIAL ? MUNICIPAL_LEVEL : "land", tier, currency,
+                foundedOn, seat, members, statutes, proposals, offices, elections);
+    }
+
+    /**
+     * Wie oben, zusätzlich mit der Ebene.
+     *
+     * @throws IllegalArgumentException wenn die Daten keine gültige Polity ergeben
+     */
+    public static Polity restore(PolityId id, PolityName name, PolityKind kind, String level, SettlementTier tier,
+                                 CurrencyId currency, Day foundedOn, Optional<BlockPosition> seat,
+                                 List<Membership> members, List<EnactedStatute> statutes, List<Proposal> proposals,
+                                 List<OfficeTerm> offices, List<Election> elections) {
+        return restore(id, name, kind, level, tier, currency, foundedOn, seat, members, statutes, proposals, offices,
+                elections, Constitution.DRAFT);
+    }
+
+    /**
+     * Wie oben, zusätzlich mit der Verfassung.
+     *
+     * @throws IllegalArgumentException wenn die Daten keine gültige Polity ergeben
+     */
+    public static Polity restore(PolityId id, PolityName name, PolityKind kind, String level, SettlementTier tier,
+                                 CurrencyId currency, Day foundedOn, Optional<BlockPosition> seat,
+                                 List<Membership> members, List<EnactedStatute> statutes, List<Proposal> proposals,
+                                 List<OfficeTerm> offices, List<Election> elections, Constitution constitution) {
+        return restore(id, name, kind, level, tier, currency, foundedOn, seat, members, statutes, proposals, offices,
+                elections, constitution, Optional.empty());
+    }
+
+    /**
+     * Wie oben, zusätzlich mit Richtung und Wappen einer Partei.
+     *
+     * @throws IllegalArgumentException wenn die Daten keine gültige Polity ergeben, z. B. eine Partei ohne Richtung
+     */
+    public static Polity restore(PolityId id, PolityName name, PolityKind kind, String level, SettlementTier tier,
+                                 CurrencyId currency, Day foundedOn, Optional<BlockPosition> seat,
+                                 List<Membership> members, List<EnactedStatute> statutes, List<Proposal> proposals,
+                                 List<OfficeTerm> offices, List<Election> elections, Constitution constitution,
+                                 Optional<PartyProfile> party) {
+        Objects.requireNonNull(party, "party");
+        if ((kind == PolityKind.PARTY) != party.isPresent()) {
+            throw new IllegalArgumentException("Parteiprofil passt nicht zu " + kind + ": " + id);
+        }
         Objects.requireNonNull(offices, "offices");
+        Objects.requireNonNull(constitution, "constitution");
         Objects.requireNonNull(elections, "elections");
-        Polity polity = restoreCore(id, name, kind, tier, currency, foundedOn, seat, members, statutes, proposals);
+        Polity polity = restoreCore(id, name, kind, level, tier, currency, foundedOn, seat, members, statutes,
+                proposals);
         for (OfficeTerm term : offices) {
             if (!polity.isMember(term.holder())) {
                 throw new IllegalArgumentException("Amtsinhaber ist kein Mitglied von " + id + ": " + term.holder());
@@ -127,17 +260,19 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
             }
             polity.elections.put(election.id(), election);
         }
+        polity.constitution = constitution;
+        polity.party = party;
         return polity;
     }
 
-    private static Polity restoreCore(PolityId id, PolityName name, PolityKind kind, SettlementTier tier,
-                                      CurrencyId currency, Day foundedOn, Optional<BlockPosition> seat,
-                                      List<Membership> members, List<EnactedStatute> statutes,
-                                      List<Proposal> proposals) {
+    private static Polity restoreCore(PolityId id, PolityName name, PolityKind kind, String level,
+                                      SettlementTier tier, CurrencyId currency, Day foundedOn,
+                                      Optional<BlockPosition> seat, List<Membership> members,
+                                      List<EnactedStatute> statutes, List<Proposal> proposals) {
         Objects.requireNonNull(members, "members");
         Objects.requireNonNull(proposals, "proposals");
         Objects.requireNonNull(statutes, "statutes");
-        Polity polity = new Polity(id, name, kind, tier, currency, foundedOn, seat);
+        Polity polity = new Polity(id, name, kind, level, tier, currency, foundedOn, seat);
         if (members.isEmpty()) {
             throw new IllegalArgumentException("Gespeicherte Polity ohne Mitglieder: " + id);
         }
@@ -353,8 +488,20 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
      * @throws ProposalAlreadyOpenException wenn über diese Regelung schon abgestimmt wird
      */
     public void openProposal(ProposalId proposalId, ParameterValue<?> change, ActorRef proposer, Day day) {
-        Objects.requireNonNull(proposalId, "proposalId");
         Objects.requireNonNull(change, "change");
+        openProposal(proposalId, new Motion.Change(change), proposer, day);
+    }
+
+    /**
+     * Eröffnet eine Abstimmung über eine Regelung, einen neuen Paragraphen oder eine Aufhebung.
+     *
+     * @throws NotAMemberException         wenn der Antragsteller kein Mitglied ist
+     * @throws ProposalAlreadyOpenException wenn über denselben Gegenstand schon abgestimmt wird
+     * @throws UnknownStatuteException     wenn ein aufzuhebender Paragraph nicht gilt
+     */
+    public void openProposal(ProposalId proposalId, Motion motion, ActorRef proposer, Day day) {
+        Objects.requireNonNull(proposalId, "proposalId");
+        Objects.requireNonNull(motion, "motion");
         Objects.requireNonNull(day, "day");
         if (!isMember(proposer)) {
             throw new NotAMemberException(proposer);
@@ -362,12 +509,15 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
         if (proposals.containsKey(proposalId)) {
             throw new IllegalArgumentException("Abstimmung existiert bereits: " + proposalId);
         }
-        String parameter = change.key().id();
-        if (proposals.values().stream().anyMatch(open -> open.change().key().id().equals(parameter))) {
-            throw new ProposalAlreadyOpenException(parameter);
+        if (motion instanceof Motion.Repeal repeal && !lawBook.isInForce(repeal.statute())) {
+            throw new UnknownStatuteException(repeal.statute());
         }
-        proposals.put(proposalId, new Proposal(proposalId, change, proposer, day, List.of()));
-        raise(new ProposalOpened(id, proposalId, parameter, proposer, day));
+        String subject = motion.subject();
+        if (proposals.values().stream().anyMatch(open -> open.motion().subject().equals(subject))) {
+            throw new ProposalAlreadyOpenException(subject);
+        }
+        proposals.put(proposalId, new Proposal(proposalId, motion, proposer, day, List.of()));
+        raise(new ProposalOpened(id, proposalId, subject, proposer, day));
     }
 
     /**
@@ -412,6 +562,45 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
             throw new UnknownProposalException(proposalId);
         }
         return proposal;
+    }
+
+    /**
+     * Ruft die Verfassung aus. Danach steht die Präambel fest, und Verfassungsartikel ändern sich nur durch Abstimmung.
+     *
+     * @throws ConstitutionAlreadyProclaimedException wenn sie schon ausgerufen ist
+     */
+    public void proclaimConstitution(Day day) {
+        Objects.requireNonNull(day, "day");
+        if (constitution.proclaimed()) {
+            throw new ConstitutionAlreadyProclaimedException(name);
+        }
+        constitution = constitution.proclaim(day);
+        raise(new ConstitutionProclaimed(id, day));
+    }
+
+    /**
+     * Setzt die Präambel des Entwurfs.
+     *
+     * @throws ConstitutionAlreadyProclaimedException wenn die Verfassung schon ausgerufen ist
+     * @throws PreambleTooLongException               bei mehr als {@link Constitution#MAX_PREAMBLE} Zeichen
+     */
+    public void changePreamble(String text, Day day) {
+        Objects.requireNonNull(text, "text");
+        Objects.requireNonNull(day, "day");
+        if (constitution.proclaimed()) {
+            throw new ConstitutionAlreadyProclaimedException(name);
+        }
+        String preamble = text.strip();
+        if (preamble.length() > Constitution.MAX_PREAMBLE) {
+            throw new PreambleTooLongException(preamble.length());
+        }
+        constitution = constitution.withPreamble(preamble);
+        raise(new PreambleChanged(id, preamble, day));
+    }
+
+    @Override
+    public Constitution constitution() {
+        return constitution;
     }
 
     /** Verlegt den Sitz, z. B. weil das Gemeindehaus an anderer Stelle neu errichtet wurde. */
@@ -517,6 +706,11 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
     @Override
     public PolityKind kind() {
         return kind;
+    }
+
+    @Override
+    public String level() {
+        return level;
     }
 
     @Override

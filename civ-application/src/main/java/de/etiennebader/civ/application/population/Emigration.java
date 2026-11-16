@@ -1,6 +1,7 @@
 package de.etiennebader.civ.application.population;
 
 import de.etiennebader.civ.domain.actor.PersonRef;
+import de.etiennebader.civ.domain.law.LawView;
 import de.etiennebader.civ.domain.polity.Membership;
 import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.polity.PolityView;
@@ -13,6 +14,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * Wer am Ende eines Tages seine Gemeinde verlässt, und wohin.
@@ -58,7 +60,18 @@ public final class Emigration {
     }
 
     public static List<Departure> plan(List<? extends PolityView> towns, Day day) {
+        return plan(towns, day, PolityView::laws);
+    }
+
+    /**
+     * Wie oben, mit dem tatsächlich geltenden Recht je Gemeinde.
+     *
+     * @param lawsOf liefert das Recht einer Gemeinde, z. B. samt vorrangigem Bundesrecht
+     */
+    public static List<Departure> plan(List<? extends PolityView> towns, Day day,
+                                       Function<PolityView, LawView> lawsOf) {
         Objects.requireNonNull(towns, "towns");
+        Objects.requireNonNull(lawsOf, "lawsOf");
         Objects.requireNonNull(day, "day");
         List<PolityView> settlements = towns.stream()
                 .filter(town -> town.kind() == PolityKind.TERRITORIAL)
@@ -74,7 +87,7 @@ public final class Emigration {
             List<Candidate> leaving = new ArrayList<>();
             for (PersonRef villager : villagers) {
                 Personality personality = Personality.of(villager);
-                int score = Satisfaction.of(personality, town).score();
+                int score = Satisfaction.of(personality, town, lawsOf.apply(town)).score();
                 if (atRisk(score) && roll(villager, day) < chance(score, personality)) {
                     leaving.add(new Candidate(villager, personality, score));
                 }
@@ -84,7 +97,7 @@ public final class Emigration {
                     .sorted(Comparator.comparingInt(Candidate::score))
                     .limit(limit)
                     .forEach(candidate -> departures.add(new Departure(candidate.villager(), town.id(),
-                            destination(candidate.personality(), candidate.score(), town, settlements))));
+                            destination(candidate.personality(), candidate.score(), town, settlements, lawsOf))));
         }
         return departures;
     }
@@ -97,14 +110,14 @@ public final class Emigration {
     }
 
     private static Optional<PolityId> destination(Personality personality, int score, PolityView home,
-                                                  List<PolityView> towns) {
+                                                  List<PolityView> towns, Function<PolityView, LawView> lawsOf) {
         PolityView best = null;
         int bestScore = Integer.MIN_VALUE;
         for (PolityView town : towns) {
             if (town.id().equals(home.id())) {
                 continue;
             }
-            int there = Satisfaction.of(personality, town).score();
+            int there = Satisfaction.of(personality, town, lawsOf.apply(town)).score();
             if (there > bestScore) {
                 bestScore = there;
                 best = town;

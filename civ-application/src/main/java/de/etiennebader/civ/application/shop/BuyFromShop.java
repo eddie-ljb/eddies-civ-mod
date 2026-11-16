@@ -1,5 +1,7 @@
 package de.etiennebader.civ.application.shop;
 
+import de.etiennebader.civ.application.federation.Federations;
+import de.etiennebader.civ.application.law.EffectiveLaws;
 import de.etiennebader.civ.application.support.Aggregates;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.economy.InsufficientFundsException;
@@ -65,7 +67,9 @@ public final class BuyFromShop {
         Optional<Polity> town = aggregates.territory().sovereignOf(command.position().chunk())
                 .flatMap(id -> aggregates.repositories().polities().findById(id))
                 .filter(polity -> polity.currency().equals(total.currency()));
-        long percent = town.map(polity -> polity.laws().valueOf(StandardParameters.SALES_TAX_PERCENT)).orElse(0L);
+        long percent = town.map(polity -> new EffectiveLaws(polity, Federations.ancestorsOf(
+                        aggregates.repositories().polities().findAll(), polity.id()))
+                .valueOf(StandardParameters.SALES_TAX_PERCENT)).orElse(0L);
         Money tax = Money.of(total.amount() * percent / 100, total.currency());
         Money toOwner = Money.of(total.amount() - tax.amount(), total.currency());
         if (toOwner.isPositive()) {

@@ -17,7 +17,11 @@ public final class SchemaMigrations {
             "V006__proposals.sql",
             "V007__shops.sql",
             "V008__offices_and_elections.sql",
-            "V009__election_platforms.sql");
+            "V009__election_platforms.sql",
+            "V010__polity_level.sql",
+            "V011__constitution.sql",
+            "V012__law_book.sql",
+            "V013__parties.sql");
 
     private SchemaMigrations() {
     }

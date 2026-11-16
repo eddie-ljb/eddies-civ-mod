@@ -2,6 +2,7 @@ package de.etiennebader.civ.server.villager;
 
 import de.etiennebader.civ.application.CivApplication;
 import de.etiennebader.civ.application.economy.CreditTownIncome;
+import de.etiennebader.civ.application.party.LeaveParty;
 import de.etiennebader.civ.application.polity.ChangeTier;
 import de.etiennebader.civ.application.polity.JoinPolity;
 import de.etiennebader.civ.application.polity.LeavePolity;
@@ -131,19 +132,19 @@ public final class VillagerService {
      * bis 50 % mehr, unzufriedene bis 50 % weniger ({@link TownMood#productivity()}).
      */
     public Money dailyIncome(PolityView town) {
-        long units = settings.villagerIncome().amount() * TownMood.of(town).productivity() / 100;
+        long units = settings.villagerIncome().amount() * TownMood.of(town, queries.effectiveLaws(town)).productivity() / 100;
         return Money.of(units, town.currency());
     }
 
     /** Die Stimmung der Dorfbewohner einer Gemeinde. */
     public TownMood moodOf(PolityView town) {
-        return TownMood.of(town);
+        return TownMood.of(town, queries.effectiveLaws(town));
     }
 
     /** Zufriedenheit eines Dorfbewohners mit seiner Gemeinde; leer, wenn er zu keiner gehört. */
     public Optional<Satisfaction> satisfactionOf(PersonRef villager) {
         return queries.municipalityOf(villager)
-                .map(town -> Satisfaction.of(Personality.of(villager), town));
+                .map(town -> Satisfaction.of(Personality.of(villager), town, queries.effectiveLaws(town)));
     }
 
     /** Auskunft über einen Dorfbewohner, z. B. beim Anschauen mit Schleichen und Rechtsklick. */
@@ -155,7 +156,7 @@ public final class VillagerService {
             return Reply.success(Message.of(MessageKey.VILLAGER_HOMELESS, trait, personality.order(),
                     personality.thrift(), personality.belonging()));
         }
-        Satisfaction satisfaction = Satisfaction.of(personality, town.get());
+        Satisfaction satisfaction = Satisfaction.of(personality, town.get(), queries.effectiveLaws(town.get()));
         return Reply.success(
                 Message.of(MessageKey.VILLAGER_INFO, town.get().name().value(), trait, personality.order(),
                         personality.thrift(), personality.belonging()),
@@ -173,7 +174,7 @@ public final class VillagerService {
         if (town.isEmpty()) {
             return Reply.failure(Message.of(MessageKey.NOT_IN_MUNICIPALITY));
         }
-        TownMood mood = TownMood.of(town.get());
+        TownMood mood = TownMood.of(town.get(), queries.effectiveLaws(town.get()));
         if (mood.villagers() == 0) {
             return Reply.success(Message.of(MessageKey.MOOD_NONE, town.get().name().value()));
         }
@@ -250,7 +251,7 @@ public final class VillagerService {
     private void emigrate(Day day) {
         Map<PolityId, Integer> toWild = new HashMap<>();
         Map<PolityId, Map<PolityId, Integer>> moved = new HashMap<>();
-        for (Emigration.Departure departure : Emigration.plan(queries.polities(), day)) {
+        for (Emigration.Departure departure : Emigration.plan(queries.polities(), day, queries::effectiveLaws)) {
             try {
                 app.leavePolity().execute(new LeavePolity.Command(departure.from(), departure.villager(), day));
                 Optional<BlockPosition> seat = Optional.empty();
@@ -262,6 +263,9 @@ public final class VillagerService {
                             .merge(departure.to().get(), 1, Integer::sum);
                 } else {
                     toWild.merge(departure.from(), 1, Integer::sum);
+                    if (queries.partyOf(departure.villager()).isPresent()) {
+                        app.leaveParty().execute(new LeaveParty.Command(departure.villager(), day));
+                    }
                 }
                 departures.put(departure.villager(), new PendingDeparture(departure.villager(), seat));
             } catch (DomainException ignored) {

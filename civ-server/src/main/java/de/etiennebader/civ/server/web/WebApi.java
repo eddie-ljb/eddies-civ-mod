@@ -5,6 +5,7 @@ import de.etiennebader.civ.server.command.TranslationKeys;
 import de.etiennebader.civ.domain.polity.Platform;
 
 import de.etiennebader.civ.domain.actor.ActorRef;
+import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.actor.PlayerRef;
 import de.etiennebader.civ.domain.market.Quote;
 import de.etiennebader.civ.domain.polity.Office;
@@ -153,6 +154,35 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                     .put("plotsForSale", civ.plots().plotsOf(town.id(), ANONYMOUS).stream()
                             .filter(plot -> plot.askingPrice().isPresent()).count())
                     .put("votes", polity.proposals().size())
+                    .put("constitution", polity.constitution().proclaimedOn().map(day -> day.value()).orElse(0L))
+                    .put("paragraphs", polity.laws().inForce().size())
+                    .put("partOf", String.join(" › ", civ.queries().ancestorsOf(polity.id()).stream()
+                            .map(ancestor -> ancestor.name().value()).toList()))
+                    .build());
+        }
+        List<String> federations = new ArrayList<>();
+        for (PolityView polity : civ.queries().polities()) {
+            if (polity.kind() != PolityKind.FEDERATION) {
+                continue;
+            }
+            Object level = civ.federations().levelOf(polity).displayName();
+            List<String> constituents = polity.constituents().stream()
+                    .map(ref -> civ.queries().polity(ref.id()).map(found -> found.name().value()).orElse("?"))
+                    .toList();
+            federations.add(Json.object()
+                    .put("id", polity.id().value().toString())
+                    .put("name", polity.name().value())
+                    .put("level", level instanceof Message message ? texts.translate(message) : level.toString())
+                    .put("rank", civ.federations().levelOf(polity).rank())
+                    .put("head", polity.mayor().map(civ.texts()::actor).orElse("-"))
+                    .raw("constituents", Json.array(constituents, Json::string))
+                    .put("players", polity.members().stream().filter(m -> m.member() instanceof PlayerRef).count())
+                    .put("villagers", polity.members().stream()
+                            .filter(m -> m.member() instanceof PersonRef).count())
+                    .put("parent", civ.queries().parentOf(polity.id()).map(parent -> parent.name().value()).orElse(""))
+                    .put("founded", polity.foundedOn().value())
+                    .put("constitution", polity.constitution().proclaimedOn().map(day -> day.value()).orElse(0L))
+                    .put("paragraphs", polity.laws().inForce().size())
                     .build());
         }
         return Json.object()
@@ -160,6 +190,19 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                 .put("priceLevel", civ.market().priceLevelPercent())
                 .put("players", civ.players().all().size())
                 .raw("towns", "[" + String.join(",", towns) + "]")
+                .raw("federations", "[" + String.join(",", federations) + "]")
+                .raw("parties", Json.array(civ.parties().parties(ANONYMOUS),
+                        party -> Json.object()
+                                .put("id", party.id().value().toString())
+                                .put("name", party.name())
+                                .put("platform", texts.translate(Message.of(TranslationKeys.platform(party.platform()))))
+                                .put("order", party.order())
+                                .put("economy", party.economy())
+                                .put("chair", party.chair())
+                                .put("players", party.players())
+                                .put("villagers", party.villagers())
+                                .put("founded", party.foundedOn())
+                                .build()))
                 .build();
     }
 
@@ -287,6 +330,7 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                         .put("name", candidate.name())
                         .put("platform", candidate.platform().name())
                         .put("platformName", texts.translate(Message.of(TranslationKeys.platform(candidate.platform()))))
+                        .put("party", candidate.party().orElse(""))
                         .build()))
                 .build()).build();
     }

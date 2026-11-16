@@ -6,9 +6,12 @@ import de.etiennebader.civ.domain.law.ParameterCatalog;
 import de.etiennebader.civ.domain.law.ParameterValue;
 import de.etiennebader.civ.domain.law.Statute;
 import de.etiennebader.civ.domain.polity.Ballot;
+import de.etiennebader.civ.domain.polity.Constitution;
 import de.etiennebader.civ.domain.polity.Election;
 import de.etiennebader.civ.domain.polity.Membership;
 import de.etiennebader.civ.domain.polity.MembershipType;
+import de.etiennebader.civ.domain.polity.Motion;
+import de.etiennebader.civ.domain.polity.PartyProfile;
 import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.OfficeTerm;
 import de.etiennebader.civ.domain.polity.Platform;
@@ -51,9 +54,14 @@ import java.util.UUID;
 final class PolityTable {
 
     private static final String UPSERT_POLITY = """
-            INSERT INTO polity (id, seq, name, kind, tier, currency, founded_on, seat_dimension, seat_x, seat_y, seat_z)
-            VALUES (?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM polity), ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT (id) DO UPDATE SET name = excluded.name, kind = excluded.kind, tier = excluded.tier,
+            INSERT INTO polity (id, seq, name, kind, tier, currency, founded_on, seat_dimension, seat_x, seat_y, seat_z,
+                                level, constitution_proclaimed_on, preamble, party_order, party_economy, party_emblem)
+            VALUES (?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM polity), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (id) DO UPDATE SET name = excluded.name, kind = excluded.kind, level = excluded.level,
+                constitution_proclaimed_on = excluded.constitution_proclaimed_on, preamble = excluded.preamble,
+                party_order = excluded.party_order, party_economy = excluded.party_economy,
+                party_emblem = excluded.party_emblem,
+                tier = excluded.tier,
                 currency = excluded.currency, founded_on = excluded.founded_on,
                 seat_dimension = excluded.seat_dimension, seat_x = excluded.seat_x, seat_y = excluded.seat_y,
                 seat_z = excluded.seat_z""";
@@ -74,6 +82,22 @@ final class PolityTable {
             upsert.setString(5, polity.currency().code());
             upsert.setLong(6, polity.foundedOn().value());
             bindSeat(upsert, 7, polity.seat());
+            upsert.setString(11, polity.level());
+            if (polity.constitution().proclaimedOn().isPresent()) {
+                upsert.setLong(12, polity.constitution().proclaimedOn().get().value());
+            } else {
+                upsert.setNull(12, Types.INTEGER);
+            }
+            upsert.setString(13, polity.constitution().preamble());
+            if (polity.party().isPresent()) {
+                upsert.setInt(14, polity.party().get().order());
+                upsert.setInt(15, polity.party().get().economy());
+                upsert.setString(16, polity.party().get().emblem());
+            } else {
+                upsert.setNull(14, Types.INTEGER);
+                upsert.setNull(15, Types.INTEGER);
+                upsert.setNull(16, Types.VARCHAR);
+            }
             upsert.executeUpdate();
         }
         deleteChildren(connection, id);
@@ -97,6 +121,20 @@ final class PolityTable {
         statement.setInt(firstIndex + 1, seat.get().x());
         statement.setInt(firstIndex + 2, seat.get().y());
         statement.setInt(firstIndex + 3, seat.get().z());
+    }
+
+    private static Optional<PartyProfile> partyOf(ResultSet row) throws SQLException {
+        String emblem = row.getString("party_emblem");
+        if (emblem == null) {
+            return Optional.empty();
+        }
+        return Optional.of(new PartyProfile(row.getInt("party_order"), row.getInt("party_economy"), emblem));
+    }
+
+    private static Constitution constitutionOf(ResultSet row) throws SQLException {
+        long proclaimed = row.getLong("constitution_proclaimed_on");
+        Optional<Day> proclaimedOn = row.wasNull() ? Optional.empty() : Optional.of(Day.of(proclaimed));
+        return new Constitution(proclaimedOn, row.getString("preamble"));
     }
 
     private static Optional<BlockPosition> seatOf(ResultSet row) throws SQLException {
@@ -143,7 +181,7 @@ final class PolityTable {
 
     private static void insertStatutes(Connection connection, String polityId, List<EnactedStatute> statutes) throws SQLException {
         try (PreparedStatement insertStatute = connection.prepareStatement(
-                "INSERT INTO statute (id, polity_id, position, title, enacted_on) VALUES (?, ?, ?, ?, ?)");
+                "INSERT INTO statute (id, polity_id, position, title, enacted_on, text) VALUES (?, ?, ?, ?, ?, ?)");
              PreparedStatement insertValue = connection.prepareStatement(
                      "INSERT INTO statute_value (statute_id, position, parameter, value) VALUES (?, ?, ?, ?)")) {
             int position = 0;
@@ -154,6 +192,7 @@ final class PolityTable {
                 insertStatute.setInt(3, position++);
                 insertStatute.setString(4, enacted.statute().title());
                 insertStatute.setLong(5, enacted.enactedOn().value());
+                insertStatute.setString(6, enacted.statute().text());
                 insertStatute.addBatch();
                 int valuePosition = 0;
                 for (ParameterValue<?> value : enacted.statute().values()) {
@@ -172,8 +211,11 @@ final class PolityTable {
     private static void insertProposals(Connection connection, String polityId, List<Proposal> proposals)
             throws SQLException {
         try (PreparedStatement insertProposal = connection.prepareStatement("""
-                INSERT INTO proposal (id, polity_id, position, parameter, value, proposer_kind, proposer_id, opened_on)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""");
+                INSERT INTO proposal (id, polity_id, position, parameter, value, proposer_kind, proposer_id, opened_on,
+                                      motion, title, text, statute_ref)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""");
+             PreparedStatement insertValue = connection.prepareStatement(
+                     "INSERT INTO proposal_value (proposal_id, position, parameter, value) VALUES (?, ?, ?, ?)");
              PreparedStatement insertVote = connection.prepareStatement(
                      "INSERT INTO proposal_vote (proposal_id, position, voter_kind, voter_id, in_favour) VALUES (?, ?, ?, ?, ?)")) {
             int position = 0;
@@ -182,11 +224,43 @@ final class PolityTable {
                 insertProposal.setString(1, proposalId);
                 insertProposal.setString(2, polityId);
                 insertProposal.setInt(3, position++);
-                insertProposal.setString(4, proposal.change().key().id());
-                insertProposal.setString(5, ParameterCatalog.encode(proposal.change()));
                 insertProposal.setString(6, ActorCodec.kindOf(proposal.proposer()));
                 insertProposal.setString(7, proposal.proposer().uuid().toString());
                 insertProposal.setLong(8, proposal.openedOn().value());
+                switch (proposal.motion()) {
+                    case Motion.Change change -> {
+                        insertProposal.setString(4, change.change().key().id());
+                        insertProposal.setString(5, ParameterCatalog.encode(change.change()));
+                        insertProposal.setString(9, "CHANGE");
+                        insertProposal.setString(10, "");
+                        insertProposal.setString(11, "");
+                        insertProposal.setNull(12, Types.VARCHAR);
+                    }
+                    case Motion.Enact enact -> {
+                        insertProposal.setString(4, "");
+                        insertProposal.setString(5, "");
+                        insertProposal.setString(9, "ENACT");
+                        insertProposal.setString(10, enact.title());
+                        insertProposal.setString(11, enact.text());
+                        insertProposal.setNull(12, Types.VARCHAR);
+                        int valuePosition = 0;
+                        for (ParameterValue<?> value : enact.values()) {
+                            insertValue.setString(1, proposalId);
+                            insertValue.setInt(2, valuePosition++);
+                            insertValue.setString(3, value.key().id());
+                            insertValue.setString(4, ParameterCatalog.encode(value));
+                            insertValue.addBatch();
+                        }
+                    }
+                    case Motion.Repeal repeal -> {
+                        insertProposal.setString(4, "");
+                        insertProposal.setString(5, "");
+                        insertProposal.setString(9, "REPEAL");
+                        insertProposal.setString(10, repeal.title());
+                        insertProposal.setString(11, "");
+                        insertProposal.setString(12, repeal.statute().value().toString());
+                    }
+                }
                 insertProposal.addBatch();
                 int votePosition = 0;
                 for (Vote vote : proposal.votes()) {
@@ -199,6 +273,7 @@ final class PolityTable {
                 }
             }
             insertProposal.executeBatch();
+            insertValue.executeBatch();
             insertVote.executeBatch();
         }
     }
@@ -340,15 +415,32 @@ final class PolityTable {
                                 rows.getInt("in_favour") == 1));
             }
         }
+        Map<String, List<ParameterValue<?>>> values = new HashMap<>();
+        try (PreparedStatement select = connection.prepareStatement(
+                "SELECT proposal_id, parameter, value FROM proposal_value ORDER BY proposal_id, position");
+             ResultSet rows = select.executeQuery()) {
+            while (rows.next()) {
+                values.computeIfAbsent(rows.getString("proposal_id"), ignored -> new ArrayList<>())
+                        .add(catalog.decode(rows.getString("parameter"), rows.getString("value")));
+            }
+        }
         Map<String, List<Proposal>> proposals = new HashMap<>();
         try (PreparedStatement select = connection.prepareStatement("""
-                SELECT id, polity_id, parameter, value, proposer_kind, proposer_id, opened_on
+                SELECT id, polity_id, parameter, value, proposer_kind, proposer_id, opened_on, motion, title, text,
+                       statute_ref
                 FROM proposal ORDER BY polity_id, position""");
              ResultSet rows = select.executeQuery()) {
             while (rows.next()) {
                 String id = rows.getString("id");
+                Motion motion = switch (rows.getString("motion")) {
+                    case "ENACT" -> new Motion.Enact(rows.getString("title"), rows.getString("text"),
+                            values.getOrDefault(id, List.of()));
+                    case "REPEAL" -> new Motion.Repeal(new StatuteId(UUID.fromString(rows.getString("statute_ref"))),
+                            rows.getString("title"));
+                    default -> new Motion.Change(catalog.decode(rows.getString("parameter"), rows.getString("value")));
+                };
                 proposals.computeIfAbsent(rows.getString("polity_id"), ignored -> new ArrayList<>()).add(new Proposal(
-                        new ProposalId(UUID.fromString(id)), catalog.decode(rows.getString("parameter"), rows.getString("value")),
+                        new ProposalId(UUID.fromString(id)), motion,
                         ActorCodec.decode(rows.getString("proposer_kind"), rows.getString("proposer_id")),
                         Day.of(rows.getLong("opened_on")), votes.getOrDefault(id, List.of())));
             }
@@ -366,17 +458,19 @@ final class PolityTable {
         List<Polity> polities = new ArrayList<>();
         try (PreparedStatement select = connection.prepareStatement(
                 """
-                SELECT id, name, kind, tier, currency, founded_on, seat_dimension, seat_x, seat_y, seat_z
+                SELECT id, name, kind, level, tier, currency, founded_on, seat_dimension, seat_x, seat_y, seat_z,
+                       constitution_proclaimed_on, preamble, party_order, party_economy, party_emblem
                 FROM polity ORDER BY seq""");
              ResultSet rows = select.executeQuery()) {
             while (rows.next()) {
                 String id = rows.getString("id");
                 polities.add(Polity.restore(new PolityId(UUID.fromString(id)), new PolityName(rows.getString("name")),
-                        PolityKind.valueOf(rows.getString("kind")), SettlementTier.valueOf(rows.getString("tier")),
+                        PolityKind.valueOf(rows.getString("kind")), rows.getString("level"),
+                        SettlementTier.valueOf(rows.getString("tier")),
                         new CurrencyId(rows.getString("currency")), Day.of(rows.getLong("founded_on")), seatOf(rows),
                         members.getOrDefault(id, List.of()), statutes.getOrDefault(id, List.of()),
                         proposals.getOrDefault(id, List.of()), offices.getOrDefault(id, List.of()),
-                        elections.getOrDefault(id, List.of())));
+                        elections.getOrDefault(id, List.of()), constitutionOf(rows), partyOf(rows)));
             }
         }
         return polities;
@@ -408,12 +502,12 @@ final class PolityTable {
         }
         Map<String, List<EnactedStatute>> statutes = new HashMap<>();
         try (PreparedStatement select = connection.prepareStatement(
-                "SELECT id, polity_id, title, enacted_on FROM statute ORDER BY polity_id, position");
+                "SELECT id, polity_id, title, enacted_on, text FROM statute ORDER BY polity_id, position");
              ResultSet rows = select.executeQuery()) {
             while (rows.next()) {
                 String id = rows.getString("id");
                 Statute statute = new Statute(new StatuteId(UUID.fromString(id)), rows.getString("title"),
-                        values.getOrDefault(id, List.of()));
+                        rows.getString("text"), values.getOrDefault(id, List.of()));
                 statutes.computeIfAbsent(rows.getString("polity_id"), ignored -> new ArrayList<>())
                         .add(new EnactedStatute(statute, Day.of(rows.getLong("enacted_on"))));
             }

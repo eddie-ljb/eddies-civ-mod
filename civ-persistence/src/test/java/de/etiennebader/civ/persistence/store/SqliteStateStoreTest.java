@@ -2,24 +2,30 @@ package de.etiennebader.civ.persistence.store;
 
 import de.etiennebader.civ.application.CivApplication;
 import de.etiennebader.civ.application.Repositories;
+import de.etiennebader.civ.application.constitution.ChangePreamble;
+import de.etiennebader.civ.application.constitution.ProclaimConstitution;
 import de.etiennebader.civ.application.day.Calendar;
 import de.etiennebader.civ.application.day.CalendarState;
 import de.etiennebader.civ.application.directory.PlayerDirectory;
 import de.etiennebader.civ.application.economy.DepositEmeralds;
 import de.etiennebader.civ.application.economy.TransferFunds;
 import de.etiennebader.civ.application.economy.WithdrawCash;
+import de.etiennebader.civ.application.federation.FoundFederation;
+import de.etiennebader.civ.application.federation.JoinFederation;
 import de.etiennebader.civ.application.inmemory.InMemoryRepositories;
 import de.etiennebader.civ.application.land.AssignPlot;
 import de.etiennebader.civ.application.land.CreatePlot;
 import de.etiennebader.civ.application.land.DissolvePlot;
 import de.etiennebader.civ.application.land.OfferPlot;
 import de.etiennebader.civ.application.land.SellPlot;
+import de.etiennebader.civ.application.law.EnactParagraph;
 import de.etiennebader.civ.application.market.BuyFromMarket;
 import de.etiennebader.civ.application.market.SellToMarket;
 import de.etiennebader.civ.application.office.AppointOfficer;
 import de.etiennebader.civ.application.office.CallElection;
 import de.etiennebader.civ.application.office.CastBallot;
 import de.etiennebader.civ.application.office.StandForElection;
+import de.etiennebader.civ.application.party.FoundParty;
 import de.etiennebader.civ.application.persistence.ChangeTracker;
 import de.etiennebader.civ.application.persistence.FlushReport;
 import de.etiennebader.civ.application.persistence.PendingSave;
@@ -30,6 +36,7 @@ import de.etiennebader.civ.application.polity.EnactStatute;
 import de.etiennebader.civ.application.polity.FoundPolity;
 import de.etiennebader.civ.application.polity.JoinPolity;
 import de.etiennebader.civ.application.polity.ProposeLawChange;
+import de.etiennebader.civ.application.polity.ProposeMotion;
 import de.etiennebader.civ.application.polity.RepealStatute;
 import de.etiennebader.civ.application.shop.OpenShop;
 import de.etiennebader.civ.application.territory.ClaimChunk;
@@ -46,7 +53,9 @@ import de.etiennebader.civ.domain.law.StandardParameters;
 import de.etiennebader.civ.domain.market.Commodity;
 import de.etiennebader.civ.domain.market.PriceLevel;
 import de.etiennebader.civ.domain.polity.MembershipType;
+import de.etiennebader.civ.domain.polity.Motion;
 import de.etiennebader.civ.domain.polity.Office;
+import de.etiennebader.civ.domain.polity.PartyProfile;
 import de.etiennebader.civ.domain.polity.Platform;
 import de.etiennebader.civ.domain.polity.PolityName;
 import de.etiennebader.civ.domain.polity.PolityView;
@@ -129,7 +138,14 @@ class SqliteStateStoreTest {
             reloaded.persistence.restore();
 
             assertEquals(saved, reloaded.dump());
-            assertEquals(1, count("SELECT COUNT(*) FROM polity"));
+            assertTrue(saved.contains("constitution|d1|Wir, die Bürger von Nordhain."), saved);
+            assertTrue(saved.contains("constitution|draft|Entwurf des Landes."), saved);
+            assertTrue(saved.contains("|text=Feuer ist verboten. Wer stiehlt, wird verbannt."), saved);
+            assertTrue(saved.contains("enact:Fristen:Abstimmungen dauern 4 Tage.:vote_days=4"), saved);
+            assertTrue(saved.contains("repeal:"), saved);
+            assertTrue(saved.contains("party|60|-10|minecraft:blue_banner"), saved);
+            assertEquals(3, count("SELECT COUNT(*) FROM polity"), "Nordhain, der Bund Westmark und die Ordnungspartei");
+            assertEquals(1, count("SELECT COUNT(*) FROM polity WHERE level = 'land'"));
             assertEquals(0, count("SELECT COUNT(*) FROM plot WHERE type = 'EMBASSY'"));
             assertEquals(1, count("SELECT COUNT(*) FROM shop"));
         }
@@ -367,6 +383,20 @@ class SqliteStateStoreTest {
                     PriceLevel.NEUTRAL, DAY));
             app.buyFromMarket().execute(new BuyFromMarket.Command(alice, new Commodity("minecraft:oak_log"), 4, 10,
                     PriceLevel.NEUTRAL, DAY));
+            PolityId westmark = app.foundFederation().execute(new FoundFederation.Command(PolityName.of("Westmark"),
+                    "land", nordhain, alice, DAY));
+            app.joinFederation().execute(new JoinFederation.Command(westmark, eichenfurt, DAY));
+            app.changePreamble().execute(new ChangePreamble.Command(nordhain, alice, "Wir, die Bürger von Nordhain.", DAY));
+            app.proclaimConstitution().execute(new ProclaimConstitution.Command(nordhain, alice, DAY));
+            app.changePreamble().execute(new ChangePreamble.Command(westmark, alice, "Entwurf des Landes.", DAY));
+            var house = app.enactParagraph().execute(new EnactParagraph.Command(nordhain, alice, "Hausordnung",
+                    "Feuer ist verboten. Wer stiehlt, wird verbannt.", DAY)).statute().orElseThrow();
+            app.enactParagraph().execute(new EnactParagraph.Command(nordhain, alice, "Fristen",
+                    "Abstimmungen dauern 4 Tage.", DAY));
+            app.foundParty().execute(new FoundParty.Command(PolityName.of("Ordnungspartei"), dora,
+                    new PartyProfile(60, -10, "minecraft:blue_banner"), EMERALD, List.of(bertram), DAY));
+            app.proposeMotion().execute(new ProposeMotion.Command(nordhain, dora,
+                    new Motion.Repeal(house, "Hausordnung"), DAY));
             app.endOfDay().execute(DAY);
         }
 

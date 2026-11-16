@@ -1,5 +1,6 @@
 package de.etiennebader.civ.server.town;
 
+import de.etiennebader.civ.application.law.EffectiveLaws;
 import de.etiennebader.civ.application.query.WorldQueries;
 import de.etiennebader.civ.application.support.ClaimWeighting;
 import de.etiennebader.civ.domain.actor.ActorRef;
@@ -84,8 +85,11 @@ public final class TownService {
     public List<LawSetting> laws(TownOverview town) {
         PolityView polity = queries.polity(town.id()).orElseThrow();
         List<LawSetting> settings = new ArrayList<>();
+        EffectiveLaws effective = queries.effectiveLaws(polity);
         for (ParameterKey<?> key : laws.keys()) {
-            settings.add(new LawSetting(key.id(), Message.of(TranslationKeys.law(key)), polity.laws().valueOf(key)));
+            settings.add(new LawSetting(key.id(), Message.of(TranslationKeys.law(key)), effective.valueOf(key),
+                    effective.overriddenBy(key).map(federation -> federation.name().value()),
+                    polity.laws().valueOf(key)));
         }
         return settings;
     }
@@ -95,12 +99,12 @@ public final class TownService {
         if (!law.isSwitch()) {
             throw new IllegalArgumentException("Keine Ja/Nein-Regelung: " + law.id());
         }
-        return commands.amendLaw(caller, law.id(), law.enabled() ? "nein" : "ja");
+        return commands.amendLaw(caller, law.id(), Boolean.TRUE.equals(law.own()) ? "nein" : "ja");
     }
 
     /** Ändert eine Zahlen-Regelung der eigenen Gemeinde um {@code delta}, nicht unter 0. */
     public Reply adjustLaw(Caller caller, LawSetting law, long delta) {
-        long value = Math.max(0, law.number() + delta);
+        long value = Math.max(0, ((Number) law.own()).longValue() + delta);
         return commands.amendLaw(caller, law.id(), Long.toString(value));
     }
 

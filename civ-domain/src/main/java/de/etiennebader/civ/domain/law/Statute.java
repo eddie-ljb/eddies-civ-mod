@@ -11,18 +11,32 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Ein Gesetz, das einen oder mehrere Parameter setzt.
+ * Ein Gesetz bzw. Paragraph: Titel, optional Freitext und die Regelungen, die es setzt. Ein Gesetz braucht
+ * mindestens eine Regelung oder einen Text; Text ohne erkannte Regelung gilt, wird aber nicht automatisch
+ * durchgesetzt.
+ *
+ * @param text Freitext, höchstens {@link #MAX_TEXT_LENGTH} Zeichen; leer bei reinen Regelungsgesetzen
  */
-public record Statute(StatuteId id, String title, List<ParameterValue<?>> values) {
+public record Statute(StatuteId id, String title, String text, List<ParameterValue<?>> values) {
 
     public static final int MIN_TITLE_LENGTH = 3;
     public static final int MAX_TITLE_LENGTH = 80;
+    public static final int MAX_TEXT_LENGTH = 1000;
+
+    /** Ohne Freitext. */
+    public Statute(StatuteId id, String title, List<ParameterValue<?>> values) {
+        this(id, title, "", values);
+    }
 
     public Statute {
         Objects.requireNonNull(id, "id");
         title = requireValidTitle(title);
+        text = Objects.requireNonNull(text, "text").strip();
+        if (text.length() > MAX_TEXT_LENGTH) {
+            throw new InvalidValueException(ErrorCode.STATUTE_TEXT_TOO_LONG, text.length(), MAX_TEXT_LENGTH);
+        }
         values = List.copyOf(Objects.requireNonNull(values, "values"));
-        if (values.isEmpty()) {
+        if (values.isEmpty() && text.isEmpty()) {
             throw new InvalidValueException(ErrorCode.STATUTE_WITHOUT_VALUES);
         }
         requireUniqueKeys(values);

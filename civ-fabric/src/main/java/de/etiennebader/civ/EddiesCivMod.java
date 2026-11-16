@@ -4,6 +4,7 @@ import de.etiennebader.civ.fabric.CivCommandTree;
 import de.etiennebader.civ.fabric.CivServerHost;
 import de.etiennebader.civ.fabric.PlotWand;
 import de.etiennebader.civ.fabric.ProtectionListener;
+import de.etiennebader.civ.fabric.TerritoryRules;
 import de.etiennebader.civ.fabric.TownHallPlacement;
 import de.etiennebader.civ.fabric.WorldHooks;
 import de.etiennebader.civ.fabric.content.CivContent;
@@ -32,6 +33,7 @@ public class EddiesCivMod implements ModInitializer {
         CivContent content = CivContent.register(new TownHallPlacement(host));
         new PlotWand(host, content).register();
         new ProtectionListener(host, content).register();
+        new TerritoryRules(host).register();
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
                 new CivCommandTree(host).register(dispatcher));
         LOGGER.info("Eddies Civ Mod initialisiert");

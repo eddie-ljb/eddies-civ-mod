@@ -2,10 +2,14 @@ package de.etiennebader.civ.server.protection;
 
 import de.etiennebader.civ.application.query.WorldQueries;
 import de.etiennebader.civ.domain.actor.PlayerRef;
+import de.etiennebader.civ.domain.law.ParameterKey;
+import de.etiennebader.civ.domain.law.StandardParameters;
+import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.protection.Denial;
 import de.etiennebader.civ.domain.protection.Hazard;
 import de.etiennebader.civ.domain.protection.ProtectedAction;
 import de.etiennebader.civ.domain.territory.BlockPosition;
+import de.etiennebader.civ.domain.territory.Claim;
 import de.etiennebader.civ.server.command.Message;
 import de.etiennebader.civ.server.command.MessageKey;
 import de.etiennebader.civ.server.command.Texts;
@@ -45,6 +49,48 @@ public final class ProtectionService {
     /** Ob eine Naturgewalt an diesem Block wirken darf, z. B. ob eine Explosion ihn zerstört. */
     public boolean allows(Hazard hazard, BlockPosition position) {
         return queries.allows(hazard, position);
+    }
+
+    /** Ob Spieler einander hier verletzen dürfen ({@code pvp_allowed}); in der Wildnis immer. */
+    public boolean allowsPvp(BlockPosition position) {
+        return lawAt(position, StandardParameters.PVP_ALLOWED).orElse(true);
+    }
+
+    /** Ob feindliche Monster hier leben dürfen ({@code hostile_mobs_allowed}); in der Wildnis immer. */
+    public boolean allowsHostileMobs(BlockPosition position) {
+        return lawAt(position, StandardParameters.HOSTILE_MOBS_ALLOWED).orElse(true);
+    }
+
+    /**
+     * Ob ein Spieler hier Tiere verletzen darf: Mitglieder der Gemeinde immer, Fremde nur mit
+     * {@code outsiders_may_hurt_animals}; in der Wildnis jeder.
+     */
+    public boolean mayHurtAnimal(PlayerRef player, BlockPosition position) {
+        if (bypassing.contains(player)) {
+            return true;
+        }
+        Optional<PolityView> town = townAt(position);
+        if (town.isEmpty() || town.get().isMember(player)) {
+            return true;
+        }
+        return queries.effectiveLaws(town.get()).valueOf(StandardParameters.OUTSIDERS_MAY_HURT_ANIMALS);
+    }
+
+    /** Ob dieser Spieler hier etwas angreifen darf, das einem anderen Spieler gehört (PvP). */
+    public Optional<Message> checkPvp(PlayerRef attacker, BlockPosition position) {
+        if (bypassing.contains(attacker) || allowsPvp(position)) {
+            return Optional.empty();
+        }
+        return Optional.of(Message.of(MessageKey.PVP_FORBIDDEN, townAt(position).map(town -> town.name().value())
+                .orElse("-")));
+    }
+
+    private Optional<PolityView> townAt(BlockPosition position) {
+        return queries.territory().claimAt(position.chunk()).map(Claim::polity).flatMap(queries::polity);
+    }
+
+    private Optional<Boolean> lawAt(BlockPosition position, ParameterKey<Boolean> key) {
+        return townAt(position).map(town -> queries.effectiveLaws(town).valueOf(key));
     }
 
     /**

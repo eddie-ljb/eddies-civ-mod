@@ -4,6 +4,7 @@ import de.etiennebader.civ.application.support.Aggregates;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.law.EnactedStatute;
 import de.etiennebader.civ.domain.law.ParameterValue;
+import de.etiennebader.civ.domain.law.StandardParameters;
 import de.etiennebader.civ.domain.law.Statute;
 import de.etiennebader.civ.domain.polity.MembershipType;
 import de.etiennebader.civ.domain.polity.Polity;
@@ -45,11 +46,16 @@ public final class AmendLaw {
 
     /**
      * @return die ID des neuen Gesetzes
-     * @throws NotACitizenException wenn der Akteur kein Bürger dieser Gemeinde ist
+     * @throws NotACitizenException              wenn der Akteur kein Bürger dieser Gemeinde ist
+     * @throws ConstitutionRequiresVoteException wenn ein Verfassungsartikel einer ausgerufenen Verfassung geändert
+     *                                           werden soll
      */
     public StatuteId execute(Command command) {
         Polity polity = aggregates.polity(command.polity());
         requireCitizen(polity, command.citizen());
+        if (polity.constitution().proclaimed() && StandardParameters.isConstitutional(command.value().key())) {
+            throw new ConstitutionRequiresVoteException(command.value().key().id());
+        }
         StatuteId statute = apply(polity, command.value(), ids, command.day());
         aggregates.commit(polity);
         return statute;

@@ -3,20 +3,25 @@ package de.etiennebader.civ.server.vote;
 import de.etiennebader.civ.application.CivApplication;
 import de.etiennebader.civ.application.day.Calendar;
 import de.etiennebader.civ.application.polity.CastVote;
+import de.etiennebader.civ.application.polity.Majorities;
 import de.etiennebader.civ.application.polity.ProposeLawChange;
 import de.etiennebader.civ.application.polity.TallyProposals;
 import de.etiennebader.civ.application.polity.VoteOutcome;
 import de.etiennebader.civ.application.query.WorldQueries;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
+import de.etiennebader.civ.domain.law.ParameterKey;
 import de.etiennebader.civ.domain.law.ParameterValue;
 import de.etiennebader.civ.domain.law.StandardParameters;
 import de.etiennebader.civ.domain.polity.MembershipType;
+import de.etiennebader.civ.domain.polity.Motion;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.polity.Proposal;
 import de.etiennebader.civ.domain.polity.Vote;
 import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.DomainException;
+import de.etiennebader.civ.domain.shared.PolityId;
+import de.etiennebader.civ.domain.shared.ProposalId;
 import de.etiennebader.civ.server.Announcement;
 import de.etiennebader.civ.server.Announcements;
 import de.etiennebader.civ.server.command.Caller;
@@ -51,9 +56,9 @@ public final class VotingService {
         this.announcements = Objects.requireNonNull(announcements, "announcements");
     }
 
-    /** Ob Rechtsänderungen in dieser Gemeinde eine Abstimmung brauchen. */
-    public static boolean votingRequired(PolityView town) {
-        return town.laws().valueOf(StandardParameters.LAWS_BY_VOTE);
+    /** Ob die Änderung dieser Regelung eine Abstimmung braucht (Abstimmungspflicht oder Verfassungsartikel). */
+    public static boolean votingRequired(PolityView town, ParameterKey<?> key) {
+        return Majorities.voteRequired(town, key);
     }
 
     /** Stellt einen Antrag; wird aus {@code /civ recht setzen} aufgerufen, wenn abgestimmt werden muss. */
@@ -85,14 +90,29 @@ public final class VotingService {
         if (number < 1 || number > open.size()) {
             return Reply.failure(Message.of(MessageKey.UNKNOWN_PROPOSAL_NUMBER, number));
         }
-        Proposal proposal = open.get(number - 1);
+        return vote(caller, town.get(), open.get(number - 1), inFavour);
+    }
+
+    /** Stimme zu einem Antrag einer bestimmten Gemeinde oder eines Bundes, z. B. aus dem Verfassungsmenü. */
+    public Reply vote(Caller caller, PolityId polity, ProposalId proposalId, boolean inFavour) {
+        Optional<PolityView> town = queries.polity(polity);
+        Optional<Proposal> proposal = town.stream().flatMap(found -> found.proposals().stream())
+                .filter(open -> open.id().equals(proposalId)).findFirst();
+        if (proposal.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.PROPOSALS_NONE, town.map(found -> found.name().value())
+                    .orElse("?")));
+        }
+        return vote(caller, town.get(), proposal.get(), inFavour);
+    }
+
+    private Reply vote(Caller caller, PolityView town, Proposal proposal, boolean inFavour) {
         try {
-            VoteOutcome outcome = app.castVote().execute(new CastVote.Command(town.get().id(), proposal.id(),
+            VoteOutcome outcome = app.castVote().execute(new CastVote.Command(town.id(), proposal.id(),
                     caller.player(), inFavour, calendar.today()));
-            Message law = Message.of(TranslationKeys.law(proposal.change().key()));
-            Object value = texts.lawValue(proposal.change().value());
+            Message law = subject(proposal.motion());
+            Object value = proposed(proposal.motion());
             if (outcome != VoteOutcome.OPEN) {
-                announceResult(town.get(), law, value, outcome == VoteOutcome.ACCEPTED);
+                announceResult(town, law, value, outcome == VoteOutcome.ACCEPTED);
             }
             return Reply.success(Message.of(inFavour ? MessageKey.VOTED_YES : MessageKey.VOTED_NO, law, value));
         } catch (DomainException e) {
@@ -133,9 +153,10 @@ public final class VotingService {
                     .filter(vote -> vote.voter().equals(viewer))
                     .map(Vote::inFavour)
                     .findFirst();
-            views.add(new ProposalView(number++, proposal.id(), Message.of(TranslationKeys.law(proposal.change().key())),
-                    texts.lawValue(proposal.change().value()), texts.actor(proposal.proposer()), proposal.inFavour(),
-                    proposal.against(), electorate, own, proposal.openedOn().plus(voteDays).value()));
+            views.add(new ProposalView(number++, proposal.id(), subject(proposal.motion()),
+                    proposed(proposal.motion()), texts.actor(proposal.proposer()), proposal.inFavour(),
+                    proposal.against(), electorate, own, proposal.openedOn().plus(voteDays).value(),
+                    Majorities.requiredPercent(town, proposal.motion())));
         }
         return views;
     }
@@ -144,9 +165,27 @@ public final class VotingService {
     public void endOfDay(Day day) {
         for (TallyProposals.Tallied tallied : app.tallyProposals().execute(day)) {
             queries.polity(tallied.polity()).ifPresent(town -> announceResult(town,
-                    Message.of(TranslationKeys.law(tallied.proposal().change().key())),
-                    texts.lawValue(tallied.proposal().change().value()), tallied.outcome() == VoteOutcome.ACCEPTED));
+                    subject(tallied.proposal().motion()), proposed(tallied.proposal().motion()),
+                    tallied.outcome() == VoteOutcome.ACCEPTED));
         }
+    }
+
+    /** Worüber abgestimmt wird, z. B. „Fremde dürfen bauen“ oder „§ Hausordnung“. */
+    public static Message subject(Motion motion) {
+        return switch (motion) {
+            case Motion.Change change -> Message.of(TranslationKeys.law(change.change().key()));
+            case Motion.Enact enact -> Message.of(TranslationKeys.MOTION_PARAGRAPH, enact.title());
+            case Motion.Repeal repeal -> Message.of(TranslationKeys.MOTION_PARAGRAPH, repeal.title());
+        };
+    }
+
+    /** Was der Antrag vorschlägt: den neuen Wert, „erlassen“ oder „aufheben“. */
+    public Object proposed(Motion motion) {
+        return switch (motion) {
+            case Motion.Change change -> texts.lawValue(change.change().value());
+            case Motion.Enact enact -> Message.of(TranslationKeys.MOTION_ENACT, enact.values().size());
+            case Motion.Repeal ignored -> Message.of(TranslationKeys.MOTION_REPEAL);
+        };
     }
 
     private void announceResult(PolityView town, Message law, Object value, boolean accepted) {

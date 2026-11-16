@@ -80,6 +80,54 @@ Jede Gemeinde hat drei Ämter: **Bürgermeister**, **Schatzmeister** und **Bauam
 - **Dorfbewohner wählen mit**, wenn `villager_vote_percent` größer 0 ist; ihre Stimme zählt mit diesem Gewicht (100 = wie ein Bürger). Kandidieren können sie nicht. Sie wählen nach ihrer Persönlichkeit das passende Programm; wer unter Steuern leidet, neigt zu „Niedrige Steuern“. Zufriedene halten zum Amtsinhaber, Unzufriedene wählen den Wechsel. Wem kein Kandidat zusagt, bleibt zu Hause.
 - Wer austritt, verliert seine Ämter, seine Kandidatur und seine Stimme.
 
+### Bünde und Ebenen
+Gemeinden schließen sich zu **Bünden** zusammen: Länder, Nationen und eigene Ebenen wie Kreis oder Bund (siehe `federation_levels`). Eingebaut sind Gemeinde (Rang 0), Land (20) und Nation (30); ein Bund steht immer höher als jedes seiner Glieder, also z. B. Gemeinde › Kreis › Land › Nation.
+
+- **Gründen:** Wer eine Gemeinde führt, gründet mit `/civ bund gruenden <Ebene> <Name>` einen Bund darüber; die eigene Gemeinde ist erstes Glied, der Gründer hat den Vorsitz. Wer schon einen Bund führt, gründet so die nächste Ebene darüber.
+- **Aufnehmen:** Der Vorsitz lädt mit `/civ bund einladen <Gemeinde oder Bund>` ein, wer die eingeladene Gemeinde führt, nimmt mit `/civ bund beitreten <Bund>` an. Einladungen gelten bis zum Neustart.
+- **Mitglieder:** Alle Bürger und Dorfbewohner der Glieder gehören automatisch auch zum Bund und allen Bünden darüber; wer einer Gemeinde beitritt oder sie verlässt, tut das auch dort. Einzelne Spieler treten nur Gemeinden bei.
+- **Austreten und auflösen:** `/civ bund austreten` (die oberste Ebene, die du führst, verlässt ihren Bund; das letzte Glied kann nicht austreten), `/civ bund aufloesen` (Glieder werden frei, die Kasse geht an den Vorsitz). Löst sich das letzte Glied eines Bundes auf, verschwindet der Bund mit.
+- **Anzeige:** `/civ bund info [Name]`, im Gemeindehaus-Steckbrief „Gehört zu: …“ und auf der Webseite unter **Bünde**.
+- Wer mehrere Ebenen zugleich führt, handelt mit `/civ bund …` immer für die oberste.
+- Bünde haben eigene Organe: **Vorsitz** (statt Bürgermeister) und **Schatzmeister**, gewählt von allen Bürgern der Glieder. Wahlen und Abstimmungen laufen über das Verfassungsmenü des Bundes, Gesetze über das Gesetzbuch des Bundes.
+
+### Verfassung (Block)
+Jede Gemeinde und jeder Bund hat eine Verfassung. Anfangs ist sie ein **Entwurf**: Die Spitze (Bürgermeister bzw. Vorsitz) legt Präambel und Verfassungsartikel frei fest. Mit dem **Ausrufen** tritt sie in Kraft; danach steht die Präambel fest, und die Artikel ändern sich nur noch durch Abstimmung mit der Verfassungsmehrheit (Standard 66 % = zwei Drittel), auch wenn sonst der Bürgermeister verordnet.
+
+- **Verfassungsartikel:** `laws_by_vote`, `vote_days`, `term_days`, `election_days`, `villager_vote_percent`, `amendment_majority_percent` (50–100), `federal_law_prevails`.
+- **Block „Verfassung“** (Rezept: Goldbarren, Buch und Feder, Feder, Schwarzeichenbretter; auch im Kreativ-Reiter): Rechtsklick zeigt die Verfassung der Gemeinde, in deren Gebiet er steht – Präambel, Artikel, Organe, offene Änderungsanträge, übergeordneter Bund und Glieder, jeweils anklickbar. Die Spitze ruft dort per Umschalt-Klick aus. Auch das Gemeindehaus hat unten in der Mitte einen Knopf **Verfassung**.
+- **Abschrift:** Im Menü „Abschrift nehmen“ gibt ein Item; Rechtsklick damit öffnet diese Verfassung überall, z. B. die des Landes.
+- **Für welche Ebene?** `praeambel`, `artikel` und `ausrufen` ohne Namen gelten für die oberste Ebene, die du führst, sonst für deine Gemeinde. Über die Artikel deiner Gemeinde stimmst du auch mit `/civ recht setzen` ab.
+- **Abstimmung:** Ein Änderungsantrag ist angenommen, sobald die Verfassungsmehrheit aller Bürger zugestimmt hat; abgelehnt, sobald sie nicht mehr erreichbar ist. Am Fristende zählt die Quote der abgegebenen Stimmen.
+
+### Gesetzbuch (Item)
+Neben den Regelungen gibt es **Paragraphen**: Titel plus frei formulierter Text. Was das Spiel im Text erkennt, setzt es als Regelung durch; der Rest gilt als Text und wird später Sache der Gerichte.
+
+- **Erkannt werden** (Deutsch und Englisch, auch ohne Umlaute): Explosionen/TNT, Feuer, was Fremde dürfen (bauen, Türen/Knöpfe/Betten, Truhen/Öfen), Grundsteuer (Zahl = Hundertstel, „0,05 Smaragde“ = 5), steuerfreie Blöcke und Tage, Steuern für Botschaften, Umsatzsteuer in %, Zahl der Außenposten, Amtszeit, Wahl- und Abstimmungsdauer, Wahlrecht der Dorfbewohner, Abstimmungspflicht, Verfassungsmehrheit („zwei Drittel“, „drei Viertel“, „einstimmig“) und Vorrang des Bundesrechts. Beispiele: „Explosionen sind verboten.“, „Fremde dürfen weder bauen noch Truhen öffnen.“, „Die Umsatzsteuer beträgt 10 %.“
+- **Erlassen:** `/civ gesetz erlassen <Titel> | <Text>`, oder Text in ein Buch mit Feder schreiben, in die Hand nehmen und `/civ gesetz erlassen <Titel>` – bzw. im Gesetzbuch-Menü „Paragraph aus Buch und Feder“ (erste Zeile = Titel). `/civ gesetz pruefen <Text>` zeigt vorher, was erkannt würde.
+- **Wer?** Ohne Abstimmungspflicht erlässt die Spitze sofort; mit Abstimmungspflicht oder wenn ein Verfassungsartikel einer ausgerufenen Verfassung berührt ist, wird ein Antrag daraus (mit Verfassungsmehrheit). Aufheben (`/civ gesetz aufheben <Nr>` oder Umschalt-Klick im Menü) folgt denselben Regeln.
+- **Gesetzbuch-Item** (Rezept: Buch, Goldklumpen, roter Farbstoff): Rechtsklick öffnet das Gesetzbuch der Gemeinde, in der du stehst. Außerdem im Gemeindehaus (unten links neben „Verfassung“) und im Verfassungsmenü. Von dort geht es zum Gesetzbuch des übergeordneten Bundes.
+- **Bundesrecht bricht Gemeinderecht:** Regelt ein Bund etwas ausdrücklich und gilt dort `federal_law_prevails` (Standard ja), gilt sein Wert in allen Gliedern – beim Gebietsschutz, bei Explosionen, Feuer, PvP, Monstern und Tieren, bei Grund- und Umsatzsteuer, beim Außenposten-Limit und bei der Zufriedenheit der Dorfbewohner. Verfahrensregeln (Verfassungsartikel) bleiben Sache jeder Ebene. Im Rechtsmenü und bei `/civ recht` steht dann „Bundesrecht von …“.
+
+### Parteien
+Parteien sind Zusammenschlüsse von Personen (Spieler und Dorfbewohner) über alle Gemeinden hinweg. Jede Person gehört höchstens einer Partei an.
+
+- **Richtung:** zwei Achsen von -100 bis 100: Ordnung (− Freiheit, + Ordnung) und Wirtschaft (− niedrige Steuern, + Ausbau). Die stärkere Achse ergibt das Wahlprogramm der Partei.
+- **Befehle:** `/civ partei gruenden <ordnung|freiheit|steuern|ausbau|mitte> <Name>`, `beitreten <Name>`, `austreten`, `info [Name]`, `liste`, `menue`; nur der Vorsitz: `richtung <Ordnung> <Wirtschaft>`, `wappen` (Item in der Hand wird Logo), `aufloesen`. Geht das letzte Mitglied, löst sich die Partei auf.
+- **Menü:** im Gemeindehaus unten rechts „Parteien“: Klick tritt bei, Umschalt-Klick auf die eigene tritt aus.
+- **Wahlen:** Wer ohne eigenes Programm kandidiert, tritt mit dem Programm seiner Partei an; bei Kandidaten steht die Partei dabei (Menü und Webseite). Dorfbewohner wählen bevorzugt Kandidaten ihrer Partei, sonst Parteien, die ihrer Persönlichkeit nahe sind.
+- **Dorfbewohner:** treten täglich mit etwas Glück einer Partei bei, die zu ihrer Persönlichkeit passt (Ordnungsliebe; Sparsamkeit = niedrige Steuern), und verlassen sie, wenn sie sich zu weit entfernt. Finden sich in einer Gemeinde genug parteilose Gleichgesinnte (`villager_party_founders`, Standard 5) ohne passende Partei, gründen sie eine, z. B. „Ordnungspartei Nordhain“; der Heimatverbundenste übernimmt den Vorsitz. Abschaltbar mit `villager_parties=false`.
+
+### Gesetzes-Baukasten
+Alle Regelungen stehen im Rechtsmenü (Gemeindehaus → Recht) als Schalter oder Zahl, gelten nach Bundesrecht-Vorrang und lassen sich auch als Freitext-Paragraph erlassen. Neu als Spielregeln im Gebiet:
+
+| Regel | Wirkung |
+|---|---|
+| `pvp_allowed` (Standard ja) | Spieler können einander im Gebiet nicht verletzen, wenn nein („PvP ist verboten.“) |
+| `hostile_mobs_allowed` (Standard ja) | Feindliche Monster verschwinden im Gebiet alle 5 Sekunden, wenn nein; benannte bleiben („Keine Monster in der Stadt.“) |
+| `outsiders_may_hurt_animals` (Standard nein) | Fremde können Tiere nicht verletzen („Tiere sind geschützt.“) |
+| `federal_levy_percent` (0–10, nur im Bund) | Bundesumlage: jedes Glied zahlt täglich diesen Anteil seiner Kasse an den Bund („Die Bundesumlage beträgt 5 %.“) |
+
 ### Schutz
 Im Gemeindegebiet gilt Folgendes, solange das Recht nichts anderes erlaubt:
 - Explosionen und Feuer zerstören keine Blöcke.
@@ -161,11 +209,28 @@ Der Server stellt eine Webseite bereit, standardmäßig auf Port 8765:
 | `/civ wahl stimmen <Amt> <Spieler>` | wählen |
 | `/civ amt ernennen <Amt> <Spieler>` | Schatzmeister oder Bauamt ernennen (Bürgermeister) |
 | `/civ amt entlassen <Amt>` | Amt frei machen (Bürgermeister) |
+| `/civ bund gruenden <Ebene> <Name>` | Bund über der eigenen Gemeinde (oder dem eigenen Bund) gründen |
+| `/civ bund einladen <Name>` / `beitreten <Bund>` | Gemeinde einladen / Einladung annehmen |
+| `/civ bund austreten` / `aufloesen` | Bund verlassen / auflösen |
+| `/civ bund info [Name]` | Bünde über der eigenen Gemeinde oder ein bestimmter Bund |
+| `/civ verfassung` / `verfassung zeigen <Name>` | Verfassung der eigenen Gemeinde / einer Gemeinde oder eines Bundes |
+| `/civ verfassung menue` | Verfassungsmenü der eigenen Gemeinde |
+| `/civ verfassung praeambel <Text>` | Präambel des Entwurfs (Spitze, höchstens 600 Zeichen) |
+| `/civ verfassung ausrufen [Name]` | Verfassung ausrufen (Spitze, nicht umkehrbar) |
+| `/civ verfassung artikel <Regel> <Wert>` | Verfassungsartikel setzen (Entwurf) bzw. Änderung beantragen (ausgerufen) |
+| `/civ gesetz [liste [Name]]` / `gesetz menue` | Paragraphen der eigenen Gemeinde bzw. einer Gemeinde oder eines Bundes / Gesetzbuch-Menü |
+| `/civ gesetz zeigen <Nr>` / `pruefen <Text>` | einen Paragraphen lesen / Erkennung testen |
+| `/civ gesetz erlassen <Titel> \| <Text>` | Paragraph erlassen oder beantragen (ohne `\|`: Text aus Buch und Feder in der Hand) |
+| `/civ gesetz aufheben <Nr>` | Paragraph aufheben oder Aufhebung beantragen |
+| `/civ partei [liste \| menue \| info [Name]]` | Parteien anzeigen |
+| `/civ partei gruenden <Richtung> <Name>` / `beitreten <Name>` / `austreten` | Partei gründen, beitreten, verlassen |
+| `/civ partei richtung <Ordnung> <Wirtschaft>` / `wappen` / `aufloesen` | Richtung, Logo (Item in der Hand), Auflösung (Vorsitz) |
 
 Nur für Admins:
 - `/civ gruenden <Name>` gründet eine Gemeinde ohne Gemeindehaus.
 - `/civ admin umgehen` schaltet den Gebietsschutz für dich selbst ab und wieder an.
-- `/civ admin aufloesen <Name>` löst eine Gemeinde auf.
+- `/civ admin aufloesen <Name>` löst eine Gemeinde oder einen Bund auf.
+- `/civ admin ebenen` zeigt alle Ebenen mit Rang und Anzahl.
 - `/civ admin tag` beendet den laufenden Tag sofort: Grundsteuer, Einnahmen der Dorfbewohner, fällige Abstimmungen und Wahlen werden abgerechnet. Praktisch zum Testen.
 
 ### Recht
@@ -201,6 +266,8 @@ Der Bürgermeister (oder mit Abstimmungen die Bürger) stellt diese Regelungen i
 | `price_reference_emeralds_per_player` | Geldmenge je Spieler, bei der der Markt Grundpreise zahlt |
 | `villager_income_hundredths_per_day` | Einnahmen je Dorfbewohner und Tag; 100 = 1 Smaragd |
 | `villager_emigration` | ob sehr unzufriedene Dorfbewohner wegziehen (Standard `true`) |
+| `villager_parties`, `villager_party_founders` | ob Dorfbewohner Parteien beitreten und gründen (Standard `true`) und ab wie vielen Gleichgesinnten (Standard 5) |
+| `federation_levels` | eigene Ebenen als `id:Name:Rang`, durch Kommas getrennt, z. B. `kreis:Kreis:10,bund:Bund:40`; eingebaut sind `gemeinde` 0, `land` 20, `nation` 30 |
 | `market_town_inhabitants`, `city_inhabitants`, `metropolis_inhabitants` | Einwohner für die Siedlungsstufen |
 | `web_enabled`, `web_bind`, `web_port` | Webseite ein/aus, Adresse und Port (Standard `true`, `0.0.0.0`, `8765`) |
 | `web_public_url` | Adresse, die `/civ web` den Spielern nennt, z. B. `https://civ.example.org` |

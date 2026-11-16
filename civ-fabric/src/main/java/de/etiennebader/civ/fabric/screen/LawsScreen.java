@@ -94,6 +94,7 @@ final class LawsScreen extends MenuScreen {
                 : civ.texts().lawValue(law.value());
         boolean on = law.isSwitch() ? law.enabled() : law.number() > 0;
         icon.line(GuiKeys.LAW_VALUE.text(value), on ? Icon.GOOD : Icon.INFO);
+        law.federal().ifPresent(federation -> icon.line(GuiKeys.LAW_FEDERAL.text(federation), Icon.HINT));
         icon.hint(GuiKeys.LAW_ID.text(law.id()));
         icon.blank();
         if (!citizen) {

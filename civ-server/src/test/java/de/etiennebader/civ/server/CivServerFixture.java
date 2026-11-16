@@ -75,6 +75,22 @@ public final class CivServerFixture {
         return server.shops();
     }
 
+    public de.etiennebader.civ.server.party.PartyService parties() {
+        return server.parties();
+    }
+
+    public de.etiennebader.civ.server.law.LawBookService lawBooks() {
+        return server.lawBooks();
+    }
+
+    public de.etiennebader.civ.server.constitution.ConstitutionService constitutions() {
+        return server.constitutions();
+    }
+
+    public de.etiennebader.civ.server.federation.FederationService federations() {
+        return server.federations();
+    }
+
     public de.etiennebader.civ.server.office.OfficeService offices() {
         return server.offices();
     }

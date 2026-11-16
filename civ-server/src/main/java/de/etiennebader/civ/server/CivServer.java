@@ -25,9 +25,13 @@ import de.etiennebader.civ.server.command.Message;
 import de.etiennebader.civ.server.command.MessageKey;
 import de.etiennebader.civ.server.command.Reply;
 import de.etiennebader.civ.server.command.Texts;
+import de.etiennebader.civ.server.constitution.ConstitutionService;
+import de.etiennebader.civ.server.federation.FederationService;
+import de.etiennebader.civ.server.law.LawBookService;
 import de.etiennebader.civ.server.market.ItemTraits;
 import de.etiennebader.civ.server.market.MarketService;
 import de.etiennebader.civ.server.office.OfficeService;
+import de.etiennebader.civ.server.party.PartyService;
 import de.etiennebader.civ.server.plot.PlotService;
 import de.etiennebader.civ.server.protection.ProtectionService;
 import de.etiennebader.civ.server.save.AsyncSaver;
@@ -86,6 +90,10 @@ public final class CivServer {
     private final Announcements announcements = new Announcements();
     private final VotingService voting;
     private final OfficeService offices;
+    private final FederationService federations;
+    private final ConstitutionService constitutions;
+    private final LawBookService lawBooks;
+    private final PartyService parties;
     private final TownHallService townHalls;
     private final ShopService shops;
     private final ServerSettings settings;
@@ -112,7 +120,12 @@ public final class CivServer {
         this.protection = new ProtectionService(app.queries(), texts);
         this.voting = new VotingService(app, calendar, texts, announcements);
         this.offices = new OfficeService(app, calendar, players, texts, announcements);
+        this.federations = new FederationService(app, calendar, settings.levels(), texts, announcements);
         this.commands = new CivCommands(app, calendar, settings.currency(), texts, protection, voting);
+        this.parties = new PartyService(app, calendar, settings.currency(), settings.parties(), texts, announcements);
+        this.lawBooks = new LawBookService(app, calendar, texts, announcements, federations);
+        this.constitutions = new ConstitutionService(app, calendar, texts, announcements, commands, offices, voting,
+                federations);
         this.bank = new BankService(app, calendar, settings.currency(), players, texts);
         this.market = new MarketService(app, calendar, settings, players, texts);
         this.territory = new TerritoryWatcher(app.queries(), texts);
@@ -171,6 +184,7 @@ public final class CivServer {
         DayReport report = app.endOfDay().execute(day);
         voting.endOfDay(day);
         offices.endOfDay(day);
+        parties.endOfDay(day);
         villagers.endOfDay(day);
         return report;
     }
@@ -304,6 +318,22 @@ public final class CivServer {
 
     public OfficeService offices() {
         return offices;
+    }
+
+    public PartyService parties() {
+        return parties;
+    }
+
+    public LawBookService lawBooks() {
+        return lawBooks;
+    }
+
+    public ConstitutionService constitutions() {
+        return constitutions;
+    }
+
+    public FederationService federations() {
+        return federations;
     }
 
     public VotingService voting() {

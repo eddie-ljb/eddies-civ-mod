@@ -15,6 +15,7 @@ import de.etiennebader.civ.domain.land.Area;
 import de.etiennebader.civ.domain.land.Plot;
 import de.etiennebader.civ.domain.land.PlotId;
 import de.etiennebader.civ.domain.land.PlotType;
+import de.etiennebader.civ.domain.law.LawView;
 import de.etiennebader.civ.domain.law.StandardParameters;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.shared.DomainException;
@@ -310,8 +311,9 @@ public final class PlotService {
             return Optional.empty();
         }
         PolityView town = queries.polity(view.town()).orElseThrow();
-        long rate = town.laws().valueOf(StandardParameters.LAND_TAX_PER_BLOCK);
-        long free = town.laws().valueOf(StandardParameters.LAND_TAX_FREE_BLOCKS);
+        LawView laws = queries.effectiveLaws(town);
+        long rate = laws.valueOf(StandardParameters.LAND_TAX_PER_BLOCK);
+        long free = laws.valueOf(StandardParameters.LAND_TAX_FREE_BLOCKS);
         long taxed = Math.max(0, view.area().size() - free);
         if (rate == 0 || taxed == 0) {
             return Optional.empty();

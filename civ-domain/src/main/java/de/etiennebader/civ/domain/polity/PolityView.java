@@ -1,5 +1,7 @@
 package de.etiennebader.civ.domain.polity;
 
+import java.util.List;
+
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.actor.PolityRef;
@@ -45,6 +47,23 @@ public interface PolityView {
     LawView laws();
 
     PolityRef asActor();
+
+    /** Richtung und Wappen, wenn es eine Partei ist. */
+    Optional<PartyProfile> partyProfile();
+
+    /** Verfassung: Entwurf oder ausgerufen, mit Präambel. */
+    Constitution constitution();
+
+    /** Schlüssel der Ebene: {@code gemeinde} für Gemeinden, sonst z. B. {@code kreis}, {@code land}, {@code nation}. */
+    String level();
+
+    /** Die Gliedkörperschaften eines Bundes in Reihenfolge ihres Beitritts; leer bei Gemeinden. */
+    default List<PolityRef> constituents() {
+        return members().stream()
+                .filter(membership -> membership.type() == MembershipType.CONSTITUENT)
+                .map(membership -> (PolityRef) membership.member())
+                .toList();
+    }
 
     /** Offene Abstimmungen in Reihenfolge ihrer Eröffnung. */
     Collection<Proposal> proposals();

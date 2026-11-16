@@ -3,6 +3,7 @@ package de.etiennebader.civ.server.command;
 import de.etiennebader.civ.application.CivApplication;
 import de.etiennebader.civ.application.day.Calendar;
 import de.etiennebader.civ.application.day.DayReport;
+import de.etiennebader.civ.application.law.EffectiveLaws;
 import de.etiennebader.civ.application.polity.AmendLaw;
 import de.etiennebader.civ.application.polity.FoundPolity;
 import de.etiennebader.civ.application.polity.JoinPolity;
@@ -168,9 +169,14 @@ public final class CivCommands {
         Function<PolityView, Reply> list = polity -> {
             List<Message> lines = new ArrayList<>();
             lines.add(Message.of(MessageKey.LAWS_HEADER, polity.name().value()));
+            EffectiveLaws effective = queries.effectiveLaws(polity);
             for (ParameterKey<?> key : laws.keys()) {
-                lines.add(Message.of(MessageKey.LAW_ENTRY, Message.of(TranslationKeys.law(key)), key.id(),
-                        texts.lawValue(polity.laws().valueOf(key))));
+                Optional<PolityView> federal = effective.overriddenBy(key);
+                lines.add(federal.isPresent()
+                        ? Message.of(MessageKey.LAW_ENTRY_FEDERAL, Message.of(TranslationKeys.law(key)), key.id(),
+                                texts.lawValue(effective.valueOf(key)), federal.get().name().value())
+                        : Message.of(MessageKey.LAW_ENTRY, Message.of(TranslationKeys.law(key)), key.id(),
+                                texts.lawValue(polity.laws().valueOf(key))));
             }
             return Reply.success(lines);
         };
@@ -186,14 +192,22 @@ public final class CivCommands {
         if (key.isEmpty()) {
             return Reply.failure(Message.of(MessageKey.UNKNOWN_LAW, lawId.strip()));
         }
-        return withMunicipality(caller, polity -> attempt(() -> {
+        return withMunicipality(caller, polity -> amendLaw(caller, polity, key.get(), value));
+    }
+
+    /**
+     * Ändert eine Regelung einer bestimmten Gemeinde oder eines Bundes: per Abstimmung, wenn nötig, sonst als
+     * Verordnung der Spitze.
+     */
+    public Reply amendLaw(Caller caller, PolityView polity, ParameterKey<?> key, String value) {
+        return attempt(() -> {
             ParameterValue<?> parsed;
             try {
-                parsed = laws.decode(key.get().id(), normalizeLawValue(value));
+                parsed = laws.decode(key.id(), normalizeLawValue(value));
             } catch (IllegalArgumentException e) {
-                return Reply.failure(Message.of(MessageKey.INVALID_LAW_VALUE, value.strip(), key.get().id()));
+                return Reply.failure(Message.of(MessageKey.INVALID_LAW_VALUE, value.strip(), key.id()));
             }
-            if (VotingService.votingRequired(polity)) {
+            if (VotingService.votingRequired(polity, key)) {
                 return voting.propose(caller, polity, parsed);
             }
             if (!polity.holds(caller.player(), Office.MAYOR)) {
@@ -201,8 +215,8 @@ public final class CivCommands {
             }
             app.amendLaw().execute(new AmendLaw.Command(polity.id(), caller.player(), parsed, calendar.today()));
             return Reply.success(Message.of(MessageKey.LAW_AMENDED, polity.name().value(),
-                    Message.of(TranslationKeys.law(key.get())), texts.lawValue(parsed.value())));
-        }));
+                    Message.of(TranslationKeys.law(key)), texts.lawValue(parsed.value())));
+        });
     }
 
     /** {@code /civ admin umgehen} (nur Admins): Gebietsschutz für sich selbst ein- oder ausschalten. */
@@ -236,7 +250,7 @@ public final class CivCommands {
     public Reply help() {
         return Reply.success(Message.of(MessageKey.HELP_HEADER), Message.of(MessageKey.HELP_TOWN),
                 Message.of(MessageKey.HELP_JOIN), Message.of(MessageKey.HELP_LAND), Message.of(MessageKey.HELP_LAWS),
-                Message.of(MessageKey.HELP_VOTES), Message.of(MessageKey.HELP_OFFICES), Message.of(MessageKey.HELP_MOOD), Message.of(MessageKey.HELP_PLOTS),
+                Message.of(MessageKey.HELP_VOTES), Message.of(MessageKey.HELP_OFFICES), Message.of(MessageKey.HELP_FEDERATION), Message.of(MessageKey.HELP_CONSTITUTION), Message.of(MessageKey.HELP_LAW_BOOK), Message.of(MessageKey.HELP_PARTIES), Message.of(MessageKey.HELP_MOOD), Message.of(MessageKey.HELP_PLOTS),
                 Message.of(MessageKey.HELP_SHOPS),
                 Message.of(MessageKey.HELP_BANK), Message.of(MessageKey.HELP_MARKET), Message.of(MessageKey.HELP_INFO));
     }

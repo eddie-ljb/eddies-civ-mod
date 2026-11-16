@@ -28,6 +28,9 @@ public final class CivContent {
     public static final Identifier BANK_ID = EddiesCivMod.id("bank");
     public static final Identifier MARKET_ID = EddiesCivMod.id("market");
     public static final Identifier PLOT_WAND_ID = EddiesCivMod.id("plot_wand");
+    public static final Identifier CONSTITUTION_ID = EddiesCivMod.id("constitution");
+    public static final Identifier CONSTITUTION_COPY_ID = EddiesCivMod.id("constitution_copy");
+    public static final Identifier LAW_BOOK_ID = EddiesCivMod.id("law_book");
     public static final Identifier TAB_ID = EddiesCivMod.id("civ");
 
     /** Wie Grundgestein: im Überlebensmodus nicht abbaubar, gegen Explosionen fest. */
@@ -39,13 +42,18 @@ public final class CivContent {
     private final Block bank;
     private final Block market;
     private final Item plotWand;
+    private final Block constitution;
+    private final Item constitutionCopy;
 
-    private CivContent(Block townHall, Item townHallItem, Block bank, Block market, Item plotWand) {
+    private CivContent(Block townHall, Item townHallItem, Block bank, Block market, Item plotWand, Block constitution,
+                       Item constitutionCopy) {
         this.townHall = townHall;
         this.townHallItem = townHallItem;
         this.bank = bank;
         this.market = market;
         this.plotWand = plotWand;
+        this.constitution = constitution;
+        this.constitutionCopy = constitutionCopy;
     }
 
     public static CivContent register(TownHallBlock.PlacementHandler townHallPlacement) {
@@ -72,15 +80,27 @@ public final class CivContent {
         Item plotWand = Registry.register(BuiltInRegistries.ITEM, wandKey,
                 new Item(new Item.Properties().setId(wandKey).stacksTo(1).rarity(Rarity.UNCOMMON)));
 
-        registerTab(townHallItem, bankItem, marketItem, plotWand);
-        return new CivContent(townHall, townHallItem, bank, market, plotWand);
+        Block constitution = simpleBlock(CONSTITUTION_ID, MapColor.WOOD, SoundType.WOOD, 2.5F);
+        Item constitutionItem = blockItem(CONSTITUTION_ID, constitution);
+        ResourceKey<Item> copyKey = ResourceKey.create(Registries.ITEM, CONSTITUTION_COPY_ID);
+        Item constitutionCopy = Registry.register(BuiltInRegistries.ITEM, copyKey,
+                new Item(new Item.Properties().setId(copyKey).stacksTo(1).rarity(Rarity.UNCOMMON)));
+        ConstitutionCopies.init(constitutionCopy);
+        ResourceKey<Item> lawBookKey = ResourceKey.create(Registries.ITEM, LAW_BOOK_ID);
+        Item lawBook = Registry.register(BuiltInRegistries.ITEM, lawBookKey,
+                new Item(new Item.Properties().setId(lawBookKey).stacksTo(1).rarity(Rarity.UNCOMMON)));
+        LawBooks.init(lawBook);
+
+        registerTab(townHallItem, bankItem, marketItem, constitutionItem, lawBook, plotWand);
+        return new CivContent(townHall, townHallItem, bank, market, plotWand, constitution, constitutionCopy);
     }
 
     /**
      * Eigener Reiter im Kreativinventar: zuerst die Blöcke und Werkzeuge des Mods, danach Vanilla-Items,
      * die man zum Ausprobieren braucht (Geld, Ladentruhe, Dorfbewohner, Dinge für den Gebietsschutz).
      */
-    private static void registerTab(Item townHall, Item bank, Item market, Item plotWand) {
+    private static void registerTab(Item townHall, Item bank, Item market, Item constitution, Item lawBook,
+                                    Item plotWand) {
         ResourceKey<CreativeModeTab> key = ResourceKey.create(Registries.CREATIVE_MODE_TAB, TAB_ID);
         Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, key, FabricCreativeModeTab.builder()
                 .title(Component.translatable("itemGroup." + EddiesCivMod.MOD_ID + ".civ"))
@@ -89,6 +109,9 @@ public final class CivContent {
                     output.accept(townHall);
                     output.accept(bank);
                     output.accept(market);
+                    output.accept(constitution);
+                    output.accept(lawBook);
+                    output.accept(Items.WRITABLE_BOOK);
                     output.accept(plotWand);
                     output.accept(Items.EMERALD);
                     output.accept(Items.EMERALD_BLOCK);
@@ -135,6 +158,16 @@ public final class CivContent {
 
     public Block market() {
         return market;
+    }
+
+    /** Zeigt die Verfassung der Gemeinde, in deren Gebiet er steht. */
+    public Block constitution() {
+        return constitution;
+    }
+
+    /** Abschrift einer Verfassung; Rechtsklick öffnet sie. */
+    public Item constitutionCopy() {
+        return constitutionCopy;
     }
 
     /** Werkzeug für Grundstücke: Linksklick setzt Ecke 1, Rechtsklick Ecke 2. */

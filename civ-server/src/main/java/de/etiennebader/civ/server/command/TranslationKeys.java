@@ -11,6 +11,8 @@ import de.etiennebader.civ.domain.population.Trait;
 import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.ErrorCode;
 import de.etiennebader.civ.domain.territory.ClaimType;
+import de.etiennebader.civ.server.federation.Level;
+import de.etiennebader.civ.server.federation.Levels;
 
 import java.util.Arrays;
 import java.util.List;
@@ -28,6 +30,14 @@ public final class TranslationKeys {
     public static final String MONEY = PREFIX + "money";
     /** Zahl mit zwei Nachkommastellen, z. B. „12,05“; das Dezimalzeichen hängt von der Sprache ab. */
     public static final String MONEY_AMOUNT = PREFIX + "money_amount";
+    /** Spitze eines Bundes, statt „Bürgermeister“. */
+    public static final String FEDERATION_HEAD = PREFIX + "office.head";
+    /** Gegenstand eines Antrags über einen Paragraphen: „§ Titel“. */
+    public static final String MOTION_PARAGRAPH = PREFIX + "motion.paragraph";
+    /** Vorschlag „erlassen (n Regelungen)“. */
+    public static final String MOTION_ENACT = PREFIX + "motion.enact";
+    /** Vorschlag „aufheben“. */
+    public static final String MOTION_REPEAL = PREFIX + "motion.repeal";
 
     private TranslationKeys() {
     }
@@ -106,8 +116,10 @@ public final class TranslationKeys {
                         Arrays.stream(Satisfaction.Factor.values()).map(TranslationKeys::moodFactor),
                         Arrays.stream(Satisfaction.Factor.values()).map(TranslationKeys::moodFactorHint),
                         StandardParameters.all().stream().map(TranslationKeys::law),
+                        Levels.DEFAULT.all().stream().map(level -> Level.translationKey(level.id())),
                         Stream.of(yesNo(true), yesNo(false)),
-                        Stream.of(currency(CurrencyId.EMERALD), MONEY, MONEY_AMOUNT))
+                        Stream.of(currency(CurrencyId.EMERALD), MONEY, MONEY_AMOUNT, FEDERATION_HEAD, MOTION_PARAGRAPH,
+                                MOTION_ENACT, MOTION_REPEAL))
                 .flatMap(keys -> keys)
                 .sorted()
                 .toList();

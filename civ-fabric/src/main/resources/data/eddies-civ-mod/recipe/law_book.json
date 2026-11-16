@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "minecraft:book",
+    "minecraft:gold_nugget",
+    "minecraft:red_dye"
+  ],
+  "result": {
+    "id": "eddies-civ-mod:law_book",
+    "count": 1
+  }
+}

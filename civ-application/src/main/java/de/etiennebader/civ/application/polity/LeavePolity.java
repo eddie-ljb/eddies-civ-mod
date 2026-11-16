@@ -1,8 +1,11 @@
 package de.etiennebader.civ.application.polity;
 
+import de.etiennebader.civ.application.federation.Federations;
+import de.etiennebader.civ.application.federation.NotAMunicipalityException;
 import de.etiennebader.civ.application.support.Aggregates;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.polity.Polity;
+import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.PolityId;
 
@@ -30,7 +33,11 @@ public final class LeavePolity {
 
     public void execute(Command command) {
         Polity polity = aggregates.polity(command.polity());
+        if (polity.kind() != PolityKind.TERRITORIAL) {
+            throw new NotAMunicipalityException(polity.name());
+        }
         polity.leave(command.member(), command.day());
         aggregates.commit(polity);
+        Federations.memberLeft(aggregates, polity.id(), command.member(), command.day());
     }
 }

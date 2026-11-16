@@ -1,6 +1,7 @@
 package de.etiennebader.civ.application.population;
 
 import de.etiennebader.civ.domain.actor.PersonRef;
+import de.etiennebader.civ.domain.law.LawView;
 import de.etiennebader.civ.domain.polity.Membership;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.population.Personality;
@@ -34,6 +35,13 @@ public record TownMood(int villagers, int averageScore, int content, int discont
 
     public static TownMood of(PolityView town) {
         Objects.requireNonNull(town, "town");
+        return of(town, town.laws());
+    }
+
+    /** Wie oben, aber mit dem tatsächlich geltenden Recht. */
+    public static TownMood of(PolityView town, LawView laws) {
+        Objects.requireNonNull(town, "town");
+        Objects.requireNonNull(laws, "laws");
         List<PersonRef> villagers = town.members().stream()
                 .map(Membership::member)
                 .filter(PersonRef.class::isInstance)
@@ -48,7 +56,7 @@ public record TownMood(int villagers, int averageScore, int content, int discont
         int atRisk = 0;
         for (PersonRef villager : villagers) {
             Personality personality = Personality.of(villager);
-            Satisfaction satisfaction = Satisfaction.of(personality, town);
+            Satisfaction satisfaction = Satisfaction.of(personality, town, laws);
             int score = satisfaction.score();
             total += score;
             productivity += satisfaction.productivityPercent();

@@ -19,9 +19,11 @@ import de.etiennebader.civ.domain.polity.MembershipType;
 import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.OfficeTerm;
 import de.etiennebader.civ.domain.polity.Platform;
+import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.DomainException;
+import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.server.Announcement;
 import de.etiennebader.civ.server.Announcements;
 import de.etiennebader.civ.server.command.Caller;
@@ -124,13 +126,22 @@ public final class OfficeService {
 
     /** {@code /civ wahl ausrufen <Amt>} */
     public Reply callElection(Caller caller, String officeInput) {
-        return withOffice(caller, officeInput, (town, office) -> attempt(() -> {
+        return withOffice(caller, officeInput, (town, office) -> callElection(caller, town, office));
+    }
+
+    /** Wahl in einer bestimmten Gemeinde oder einem Bund ausrufen, z. B. aus dem Verfassungsmenü. */
+    public Reply callElection(Caller caller, PolityId polity, Office office) {
+        return withPolity(polity, town -> callElection(caller, town, office));
+    }
+
+    private Reply callElection(Caller caller, PolityView town, Office office) {
+        return attempt(() -> {
             app.callElection().execute(new CallElection.Command(town.id(), caller.player(), office, calendar.today()));
             long closesOn = closesOn(town, office);
             announcements.add(Announcement.toTown(town.id(),
-                    Message.of(MessageKey.ELECTION_ANNOUNCED, caller.name(), officeName(office), closesOn)));
-            return Reply.success(Message.of(MessageKey.ELECTION_CALLED, officeName(office), closesOn));
-        }));
+                    Message.of(MessageKey.ELECTION_ANNOUNCED, caller.name(), officeName(town, office), closesOn)));
+            return Reply.success(Message.of(MessageKey.ELECTION_CALLED, officeName(town, office), closesOn));
+        });
     }
 
     /** {@code /civ wahl kandidieren <Amt>} ohne Wahlprogramm. */
@@ -148,14 +159,28 @@ public final class OfficeService {
     }
 
     private Reply stand(Caller caller, String officeInput, Platform platform) {
-        return withElection(caller, officeInput, (town, election) -> attempt(() -> {
+        return withElection(caller, officeInput, (town, election) -> stand(caller, town, election, platform));
+    }
+
+    /** Kandidatur in einer bestimmten Gemeinde oder einem Bund. */
+    public Reply stand(Caller caller, PolityId polity, Office office, Platform platform) {
+        return withPolity(polity, town -> town.electionFor(office)
+                .map(election -> stand(caller, town, election, platform))
+                .orElseGet(() -> Reply.failure(Message.of(MessageKey.NO_ELECTION_FOR, officeName(town, office)))));
+    }
+
+    private Reply stand(Caller caller, PolityView town, Election election, Platform chosen) {
+        Platform platform = chosen != Platform.NONE ? chosen : queries.partyOf(caller.player())
+                .flatMap(PolityView::partyProfile).map(profile -> profile.platform()).orElse(Platform.NONE);
+        return attempt(() -> {
             app.standForElection().execute(new StandForElection.Command(town.id(), election.id(), caller.player(),
                     platform, calendar.today()));
             Message programme = platformName(platform);
+            Message office = officeName(town, election.office());
             announcements.add(Announcement.toTown(town.id(), Message.of(MessageKey.CANDIDACY_ANNOUNCED, caller.name(),
-                    officeName(election.office()), programme)));
-            return Reply.success(Message.of(MessageKey.CANDIDACY_DECLARED, officeName(election.office()), programme));
-        }));
+                    office, programme)));
+            return Reply.success(Message.of(MessageKey.CANDIDACY_DECLARED, office, programme));
+        });
     }
 
     /** {@code /civ wahl stimmen <Amt> <Spieler>} */
@@ -174,16 +199,25 @@ public final class OfficeService {
 
     /** Stimme aus einem Menü oder von der Webseite. */
     public Reply vote(Caller caller, Office office, ActorRef candidate) {
-        return withTown(caller, town -> town.electionFor(office)
+        return withTown(caller, town -> vote(caller, town, office, candidate));
+    }
+
+    /** Stimme in einer bestimmten Gemeinde oder einem Bund. */
+    public Reply vote(Caller caller, PolityId polity, Office office, ActorRef candidate) {
+        return withPolity(polity, town -> vote(caller, town, office, candidate));
+    }
+
+    private Reply vote(Caller caller, PolityView town, Office office, ActorRef candidate) {
+        return town.electionFor(office)
                 .map(election -> vote(caller, town, election, candidate))
-                .orElseGet(() -> Reply.failure(Message.of(MessageKey.NO_ELECTION_FOR, officeName(office)))));
+                .orElseGet(() -> Reply.failure(Message.of(MessageKey.NO_ELECTION_FOR, officeName(town, office))));
     }
 
     private Reply vote(Caller caller, PolityView town, Election election, ActorRef candidate) {
         return attempt(() -> {
             app.castBallot().execute(new CastBallot.Command(town.id(), election.id(), caller.player(), candidate,
                     calendar.today()));
-            return Reply.success(Message.of(MessageKey.BALLOT_CAST, officeName(election.office()),
+            return Reply.success(Message.of(MessageKey.BALLOT_CAST, officeName(town, election.office()),
                     texts.actor(candidate)));
         });
     }
@@ -232,7 +266,7 @@ public final class OfficeService {
             if (town.isEmpty()) {
                 continue;
             }
-            Message office = officeName(outcome.office());
+            Message office = officeName(town.get(), outcome.office());
             Message message = switch (outcome) {
                 case RunElections.Called called ->
                         Message.of(MessageKey.ELECTION_AUTO_CALLED, office, called.closesOn().value());
@@ -254,7 +288,7 @@ public final class OfficeService {
                 .filter(membership -> !(membership.member() instanceof PersonRef))
                 .count();
         List<OfficeView> views = new ArrayList<>();
-        for (Office office : Office.values()) {
+        for (Office office : officesIn(town)) {
             Optional<OfficeTerm> term = town.officeTerm(office);
             Optional<String> holder = term.map(OfficeTerm::holder).map(texts::actor);
             boolean implicit = false;
@@ -265,12 +299,12 @@ public final class OfficeService {
             Optional<ElectionView> election = town.electionFor(office).map(open -> new ElectionView(open.id(),
                     open.closesOn().value(),
                     open.candidates().stream().map(actor -> new ElectionView.Candidate(actor, texts.actor(actor),
-                                    open.platformOf(actor)))
+                                    open.platformOf(actor), queries.partyOf(actor).map(party -> party.name().value())))
                             .toList(),
                     open.ballots().stream().filter(ballot -> ballot.voter().equals(viewer)).map(Ballot::candidate)
                             .findFirst(),
                     open.isCandidate(viewer), open.ballots().size(), electorate));
-            views.add(new OfficeView(office, officeName(office), holder,
+            views.add(new OfficeView(office, officeName(town, office), holder,
                     term.flatMap(OfficeTerm::until).map(Day::value), implicit, election));
         }
         return views;
@@ -282,6 +316,20 @@ public final class OfficeService {
 
     public Message officeName(Office office) {
         return Message.of(TranslationKeys.office(office));
+    }
+
+    /** Wie {@link #officeName(Office)}, aber an der Spitze eines Bundes „Vorsitz“ statt „Bürgermeister“. */
+    public Message officeName(PolityView polity, Office office) {
+        if (polity.kind() == PolityKind.FEDERATION && office == Office.MAYOR) {
+            return Message.of(TranslationKeys.FEDERATION_HEAD);
+        }
+        return officeName(office);
+    }
+
+    /** Ämter, die es in dieser Polity gibt: Bünde haben kein Bauamt, weil sie kein eigenes Gebiet verwalten. */
+    public static List<Office> officesIn(PolityView polity) {
+        return polity.kind() == PolityKind.FEDERATION ? List.of(Office.MAYOR, Office.TREASURER)
+                : List.of(Office.values());
     }
 
     private String result(ElectionCount count) {
@@ -325,6 +373,11 @@ public final class OfficeService {
             return Reply.failure(Message.of(MessageKey.NOT_IN_MUNICIPALITY));
         }
         return action.apply(town.get());
+    }
+
+    private Reply withPolity(PolityId polity, Function<PolityView, Reply> action) {
+        return queries.polity(polity).map(action)
+                .orElseGet(() -> Reply.failure(Message.of(MessageKey.POLITY_GONE)));
     }
 
     private Reply withOffice(Caller caller, String officeInput, OfficeAction action) {

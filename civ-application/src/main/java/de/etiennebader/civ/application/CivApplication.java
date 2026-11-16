@@ -1,5 +1,7 @@
 package de.etiennebader.civ.application;
 
+import de.etiennebader.civ.application.constitution.ChangePreamble;
+import de.etiennebader.civ.application.constitution.ProclaimConstitution;
 import de.etiennebader.civ.application.day.EndOfDay;
 import de.etiennebader.civ.application.economy.CreditTownIncome;
 import de.etiennebader.civ.application.economy.DepositCash;
@@ -7,12 +9,17 @@ import de.etiennebader.civ.application.economy.DepositEmeralds;
 import de.etiennebader.civ.application.economy.TransferFunds;
 import de.etiennebader.civ.application.economy.WithdrawCash;
 import de.etiennebader.civ.application.economy.WithdrawEmeralds;
+import de.etiennebader.civ.application.federation.FoundFederation;
+import de.etiennebader.civ.application.federation.JoinFederation;
+import de.etiennebader.civ.application.federation.LeaveFederation;
 import de.etiennebader.civ.application.land.AssignPlot;
 import de.etiennebader.civ.application.land.BuyPlot;
 import de.etiennebader.civ.application.land.CreatePlot;
 import de.etiennebader.civ.application.land.DissolvePlot;
 import de.etiennebader.civ.application.land.OfferPlot;
 import de.etiennebader.civ.application.land.SellPlot;
+import de.etiennebader.civ.application.law.EnactParagraph;
+import de.etiennebader.civ.application.law.RepealParagraph;
 import de.etiennebader.civ.application.market.BuyFromMarket;
 import de.etiennebader.civ.application.market.SellToMarket;
 import de.etiennebader.civ.application.office.AppointOfficer;
@@ -20,6 +27,10 @@ import de.etiennebader.civ.application.office.CallElection;
 import de.etiennebader.civ.application.office.CastBallot;
 import de.etiennebader.civ.application.office.RunElections;
 import de.etiennebader.civ.application.office.StandForElection;
+import de.etiennebader.civ.application.party.ChangePartyProfile;
+import de.etiennebader.civ.application.party.FoundParty;
+import de.etiennebader.civ.application.party.JoinParty;
+import de.etiennebader.civ.application.party.LeaveParty;
 import de.etiennebader.civ.application.polity.AmendLaw;
 import de.etiennebader.civ.application.polity.CastVote;
 import de.etiennebader.civ.application.polity.ChangeTier;
@@ -30,6 +41,7 @@ import de.etiennebader.civ.application.polity.JoinPolity;
 import de.etiennebader.civ.application.polity.LeavePolity;
 import de.etiennebader.civ.application.polity.MoveSeat;
 import de.etiennebader.civ.application.polity.ProposeLawChange;
+import de.etiennebader.civ.application.polity.ProposeMotion;
 import de.etiennebader.civ.application.polity.RepealStatute;
 import de.etiennebader.civ.application.polity.TallyProposals;
 import de.etiennebader.civ.application.population.PersonalityVoter;
@@ -69,9 +81,16 @@ public final class CivApplication {
     private final BuyPlot buyPlot;
     private final ChangeTier changeTier;
     private final ProposeLawChange proposeLawChange;
+    private final ProposeMotion proposeMotion;
+    private final EnactParagraph enactParagraph;
+    private final RepealParagraph repealParagraph;
     private final CastVote castVote;
     private final TallyProposals tallyProposals;
     private final DissolvePolity dissolvePolity;
+    private final FoundParty foundParty;
+    private final JoinParty joinParty;
+    private final LeaveParty leaveParty;
+    private final ChangePartyProfile changePartyProfile;
     private final MoveSeat moveSeat;
     private final OpenShop openShop;
     private final CloseShop closeShop;
@@ -91,6 +110,11 @@ public final class CivApplication {
     private final CastBallot castBallot;
     private final AppointOfficer appointOfficer;
     private final RunElections runElections;
+    private final FoundFederation foundFederation;
+    private final JoinFederation joinFederation;
+    private final ProclaimConstitution proclaimConstitution;
+    private final ChangePreamble changePreamble;
+    private final LeaveFederation leaveFederation;
     private final WorldQueries queries;
 
     public CivApplication(Repositories repositories, IdGenerator ids, ClaimPolicy claimPolicy,
@@ -121,14 +145,28 @@ public final class CivApplication {
         this.buyPlot = new BuyPlot(aggregates);
         this.changeTier = new ChangeTier(aggregates);
         this.proposeLawChange = new ProposeLawChange(aggregates, ids);
+        this.proposeMotion = new ProposeMotion(aggregates, ids);
+        this.enactParagraph = new EnactParagraph(aggregates, ids, proposeMotion);
+        this.repealParagraph = new RepealParagraph(aggregates, proposeMotion);
         this.castVote = new CastVote(aggregates, ids);
         this.tallyProposals = new TallyProposals(aggregates, ids);
         this.callElection = new CallElection(aggregates, ids);
         this.standForElection = new StandForElection(aggregates);
         this.castBallot = new CastBallot(aggregates);
         this.appointOfficer = new AppointOfficer(aggregates);
-        this.runElections = new RunElections(aggregates, ids, new PersonalityVoter());
+        this.runElections = new RunElections(aggregates, ids, new PersonalityVoter(
+                polity -> new WorldQueries(repositories).effectiveLaws(polity),
+                actor -> new WorldQueries(repositories).partyOf(actor)));
+        this.foundFederation = new FoundFederation(aggregates, ids);
+        this.joinFederation = new JoinFederation(aggregates);
+        this.proclaimConstitution = new ProclaimConstitution(aggregates);
+        this.changePreamble = new ChangePreamble(aggregates);
+        this.leaveFederation = new LeaveFederation(aggregates);
         this.dissolvePolity = new DissolvePolity(aggregates);
+        this.foundParty = new FoundParty(aggregates, ids);
+        this.joinParty = new JoinParty(aggregates);
+        this.leaveParty = new LeaveParty(aggregates, dissolvePolity);
+        this.changePartyProfile = new ChangePartyProfile(aggregates);
         this.moveSeat = new MoveSeat(aggregates);
         this.openShop = new OpenShop(aggregates);
         this.closeShop = new CloseShop(aggregates);
@@ -202,6 +240,18 @@ public final class CivApplication {
         return changeTier;
     }
 
+    public ProposeMotion proposeMotion() {
+        return proposeMotion;
+    }
+
+    public EnactParagraph enactParagraph() {
+        return enactParagraph;
+    }
+
+    public RepealParagraph repealParagraph() {
+        return repealParagraph;
+    }
+
     public ProposeLawChange proposeLawChange() {
         return proposeLawChange;
     }
@@ -232,6 +282,42 @@ public final class CivApplication {
 
     public RunElections runElections() {
         return runElections;
+    }
+
+    public FoundFederation foundFederation() {
+        return foundFederation;
+    }
+
+    public ProclaimConstitution proclaimConstitution() {
+        return proclaimConstitution;
+    }
+
+    public ChangePreamble changePreamble() {
+        return changePreamble;
+    }
+
+    public JoinFederation joinFederation() {
+        return joinFederation;
+    }
+
+    public LeaveFederation leaveFederation() {
+        return leaveFederation;
+    }
+
+    public FoundParty foundParty() {
+        return foundParty;
+    }
+
+    public JoinParty joinParty() {
+        return joinParty;
+    }
+
+    public LeaveParty leaveParty() {
+        return leaveParty;
+    }
+
+    public ChangePartyProfile changePartyProfile() {
+        return changePartyProfile;
     }
 
     public DissolvePolity dissolvePolity() {

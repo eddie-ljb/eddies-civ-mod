@@ -32,6 +32,8 @@ section { display: none; } section.active { display: block; }
 .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 14px; }
 .kv dt { color: var(--muted); } .kv dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
 .members { margin-top: 10px; font-size: 13px; color: var(--muted); }
+.subhead { font-size: 15px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; margin: 28px 0 12px; }
+.town.federation { border-top-style: double; border-top-width: 6px; }
 .mapwrap { position: relative; background: #0f0d0a; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; height: 70vh; }
 canvas { display: block; width: 100%; height: 100%; cursor: grab; } canvas:active { cursor: grabbing; }
 .maptools { position: absolute; top: 12px; left: 12px; display: flex; gap: 8px; }
@@ -88,6 +90,10 @@ code { background: var(--panel2); padding: 2px 6px; border-radius: 4px; }
   <section id="overview" class="active">
     <div class="stats" id="stats"></div>
     <div class="towns" id="towns"></div>
+    <h2 class="subhead" id="fedhead" hidden>Bünde</h2>
+    <div class="towns" id="federations"></div>
+    <h2 class="subhead" id="partyhead" hidden>Parteien</h2>
+    <div class="towns" id="parties"></div>
   </section>
   <section id="map">
     <div class="mapwrap">
@@ -195,11 +201,12 @@ async function loadWorld() {
   $("day").textContent = "Tag " + data.day;
   const residents = data.towns.reduce((sum, t) => sum + t.members.length + t.villagers, 0);
   const chunks = data.towns.reduce((sum, t) => sum + t.chunks, 0);
-  $("stats").replaceChildren(...[["Gemeinden", data.towns.length], ["Einwohner", residents], ["Beanspruchte Chunks", chunks],
+  $("stats").replaceChildren(...[["Gemeinden", data.towns.length], ...((data.federations || []).length ? [["Bünde", data.federations.length]] : []), ...((data.parties || []).length ? [["Parteien", data.parties.length]] : []), ["Einwohner", residents], ["Beanspruchte Chunks", chunks],
     ["Spieler bekannt", data.players], ["Preisniveau", data.priceLevel + " %"]].map(([label, value]) =>
     el("div", { className: "stat" }, el("div", { className: "label", textContent: label }), el("div", { className: "value", textContent: value }))));
   if (!data.towns.length) {
     $("towns").replaceChildren(el("div", { className: "empty", textContent: "Noch keine Gemeinden. Stelle im Spiel ein Gemeindehaus auf!" }));
+    renderFederations([]);
     return;
   }
   $("towns").replaceChildren(...data.towns.map(t => {
@@ -209,11 +216,48 @@ async function loadWorld() {
     for (const [k, v] of [["Bürgermeister", t.mayor], ["Spieler", t.members.length], ["Dorfbewohner", t.villagers],
       ...(t.villagers ? [["Stimmung", moodText(t.mood) + (t.atRisk ? " · " + t.atRisk + " wollen weg" : "")]] : []),
       ["Gebiet", t.chunks + " / " + t.claimLimit + " Chunks"], ["Grundstücke", t.plots + (t.plotsForSale ? " (" + t.plotsForSale + " zu verkaufen)" : "")],
-      ["Kasse", t.treasury + " Smaragde"], ["Abstimmungen", t.votes], ["Gegründet", "Tag " + t.founded]]) {
+      ["Kasse", t.treasury + " Smaragde"], ["Abstimmungen", t.votes], ...(t.partOf ? [["Bund", t.partOf]] : []),
+      ["Verfassung", t.constitution ? "seit Tag " + t.constitution : "Entwurf"], ["Gesetzbuch", (t.paragraphs || 0) + " §"],
+      ["Gegründet", "Tag " + t.founded]]) {
       kv.append(el("dt", { textContent: k }), el("dd", { textContent: v }));
     }
     card.append(el("h3", { textContent: t.name }), el("div", { className: "tier", textContent: t.tier }), kv,
       el("div", { className: "members", textContent: t.members.join(", ") }));
+    return card;
+  }));
+  renderFederations(data.federations || []);
+  renderParties(data.parties || []);
+}
+
+function renderParties(parties) {
+  $("partyhead").hidden = !parties.length;
+  $("parties").replaceChildren(...parties.map(p => {
+    const card = el("div", { className: "town" });
+    card.style.setProperty("--c", colorOf(p.id));
+    const kv = el("dl", { className: "kv" });
+    for (const [k, v] of [["Programm", p.platform], ["Ordnung", p.order], ["Wirtschaft", p.economy], ["Vorsitz", p.chair],
+      ["Spieler", p.players], ["Dorfbewohner", p.villagers], ["Gegründet", "Tag " + p.founded]]) {
+      kv.append(el("dt", { textContent: k }), el("dd", { textContent: v }));
+    }
+    card.append(el("h3", { textContent: p.name }), el("div", { className: "tier", textContent: "Partei" }), kv);
+    return card;
+  }));
+}
+
+function renderFederations(federations) {
+  $("fedhead").hidden = !federations.length;
+  $("federations").replaceChildren(...[...federations].sort((a, b) => b.rank - a.rank || a.name.localeCompare(b.name)).map(f => {
+    const card = el("div", { className: "town federation" });
+    card.style.setProperty("--c", colorOf(f.id));
+    const kv = el("dl", { className: "kv" });
+    for (const [k, v] of [["Vorsitz", f.head], ["Glieder", f.constituents.length], ["Spieler", f.players],
+      ["Dorfbewohner", f.villagers], ...(f.parent ? [["Gehört zu", f.parent]] : []),
+      ["Verfassung", f.constitution ? "seit Tag " + f.constitution : "Entwurf"], ["Gesetzbuch", (f.paragraphs || 0) + " §"],
+      ["Gegründet", "Tag " + f.founded]]) {
+      kv.append(el("dt", { textContent: k }), el("dd", { textContent: v }));
+    }
+    card.append(el("h3", { textContent: f.name }), el("div", { className: "tier", textContent: f.level }), kv,
+      el("div", { className: "members", textContent: f.constituents.join(", ") }));
     return card;
   }));
 }
@@ -392,7 +436,7 @@ function renderOffices(data) {
       const chosen = e.ownChoice === c.id;
       election.append(el("div", { className: "candidate" + (chosen ? " chosen" : "") },
         el("span", { textContent: c.name + (chosen ? " ✓" : ""), title: c.platformName },
-          el("div", { className: "muted", style: "font-size:12px;font-weight:400", textContent: c.platformName })),
+          el("div", { className: "muted", style: "font-size:12px;font-weight:400", textContent: c.platformName + (c.party ? " · " + c.party : "") })),
         el("button", { className: "yes", textContent: chosen ? "Gewählt" : "Wählen", disabled: chosen,
           onclick: () => send("/api/elect", { office: o.office, candidate: c.id }) })));
     });

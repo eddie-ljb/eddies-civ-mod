@@ -73,12 +73,51 @@ public final class StandardParameters {
     public static final ParameterKey<Long> VILLAGER_VOTE_PERCENT =
             ParameterKey.constrained("villager_vote_percent", Long.class, 0L, percent -> percent >= 0 && percent <= 100);
 
+    /** Prozent der Stimmen, die eine Änderung von Verfassungsartikeln braucht, sobald die Verfassung ausgerufen ist; 66 = zwei Drittel. */
+    public static final ParameterKey<Long> AMENDMENT_MAJORITY_PERCENT =
+            ParameterKey.constrained("amendment_majority_percent", Long.class, 66L,
+                    percent -> percent >= 50 && percent <= 100);
+
+    /** Ob Recht eines übergeordneten Bundes dem eigenen Recht vorgeht, wo beide dasselbe regeln. */
+    public static final ParameterKey<Boolean> FEDERAL_LAW_PREVAILS =
+            ParameterKey.of("federal_law_prevails", Boolean.class, true);
+
+    /** Ob Spieler einander im Gebiet Schaden zufügen dürfen. */
+    public static final ParameterKey<Boolean> PVP_ALLOWED =
+            ParameterKey.of("pvp_allowed", Boolean.class, true);
+
+    /** Ob feindliche Monster im Gebiet leben dürfen; sonst verschwinden sie dort. */
+    public static final ParameterKey<Boolean> HOSTILE_MOBS_ALLOWED =
+            ParameterKey.of("hostile_mobs_allowed", Boolean.class, true);
+
+    /** Ob Nicht-Mitglieder Tiere im Gebiet verletzen dürfen. */
+    public static final ParameterKey<Boolean> OUTSIDERS_MAY_HURT_ANIMALS =
+            ParameterKey.of("outsiders_may_hurt_animals", Boolean.class, false);
+
+    /** Bundesumlage: täglicher Anteil der Kasse jedes Glieds in Prozent, der an den Bund geht (nur im Bund). */
+    public static final ParameterKey<Long> FEDERAL_LEVY_PERCENT =
+            ParameterKey.constrained("federal_levy_percent", Long.class, 0L, percent -> percent >= 0 && percent <= 10);
+
     /** Alle Standardparameter in fester Reihenfolge. */
     public static List<ParameterKey<?>> all() {
         return List.of(LAND_TAX_PER_BLOCK, LAND_TAX_FREE_BLOCKS, LAND_TAX_GRACE_DAYS, TAX_EMBASSIES, MAX_OUTPOSTS,
                 OUTSIDERS_MAY_BUILD, OUTSIDERS_MAY_INTERACT, OUTSIDERS_MAY_OPEN_CONTAINERS, EXPLOSIONS_ALLOWED,
                 FIRE_SPREAD_ALLOWED, LAWS_BY_VOTE, VOTE_DAYS, SALES_TAX_PERCENT, TERM_DAYS, ELECTION_DAYS,
-                VILLAGER_VOTE_PERCENT);
+                VILLAGER_VOTE_PERCENT, AMENDMENT_MAJORITY_PERCENT, FEDERAL_LAW_PREVAILS, PVP_ALLOWED, HOSTILE_MOBS_ALLOWED,
+                OUTSIDERS_MAY_HURT_ANIMALS, FEDERAL_LEVY_PERCENT);
+    }
+
+    /**
+     * Verfassungsartikel: wie entschieden und gewählt wird. Nach dem Ausrufen der Verfassung ändern sie sich nur durch
+     * Abstimmung mit {@link #AMENDMENT_MAJORITY_PERCENT}.
+     */
+    public static List<ParameterKey<?>> constitutional() {
+        return List.of(LAWS_BY_VOTE, VOTE_DAYS, TERM_DAYS, ELECTION_DAYS, VILLAGER_VOTE_PERCENT,
+                AMENDMENT_MAJORITY_PERCENT, FEDERAL_LAW_PREVAILS);
+    }
+
+    public static boolean isConstitutional(ParameterKey<?> key) {
+        return constitutional().contains(key);
     }
 
     private StandardParameters() {

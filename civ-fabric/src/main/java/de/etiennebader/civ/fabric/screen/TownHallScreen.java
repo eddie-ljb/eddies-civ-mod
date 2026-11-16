@@ -74,6 +74,7 @@ public final class TownHallScreen extends MenuScreen {
                 .line(GuiKeys.OVERVIEW_VILLAGERS.text(town.villagers(),
                         money(civ.villagers().dailyIncome(civ.queries().polity(this.town).orElseThrow()))))
                 .line(TownService.territorySummary(town))
+                .line(federationLine())
                 .line(GuiKeys.OVERVIEW_TREASURY.text(money(town.treasury())))
                 .line(moodLine())
                 .blank()
@@ -83,6 +84,26 @@ public final class TownHallScreen extends MenuScreen {
             Feedback.click(click.player());
             Screens.open(click.player(), new MoodScreen(civ, player, this.town, town.name(), this));
         });
+
+        canvas.set(38, Icon.of(Items.ENCHANTED_BOOK).name(GuiKeys.LAW_BOOK_OPEN.text(), Icon.TITLE)
+                .hint(GuiKeys.LAW_BOOK_OPEN_HINT.text()).build(), click -> civ.queries().polity(this.town)
+                .ifPresent(polity -> {
+                    Feedback.click(click.player());
+                    Screens.open(click.player(), new LawBookScreen(civ, player, polity, Optional.of(this)));
+                }));
+
+        canvas.set(42, Icon.of(Items.BANNER.purple()).name(GuiKeys.PARTIES.text(), Icon.TITLE)
+                .hint(GuiKeys.PARTIES_HINT.text()).build(), click -> {
+            Feedback.click(click.player());
+            Screens.open(click.player(), new PartiesScreen(civ, player, Optional.of(this)));
+        });
+
+        canvas.set(40, Icon.of(Items.WRITTEN_BOOK).name(GuiKeys.CONSTITUTION_TOWN_HALL.text(), Icon.TITLE)
+                .hint(GuiKeys.CONSTITUTION_TOWN_HALL_HINT.text()).build(), click -> civ.queries().polity(this.town)
+                .ifPresent(polity -> {
+                    Feedback.click(click.player());
+                    Screens.open(click.player(), new ConstitutionScreen(civ, player, polity, Optional.of(this)));
+                }));
 
         canvas.set(19, Icon.of(Items.PLAYER_HEAD).name(GuiKeys.MEMBERS.text(town.members().size()))
                 .hint(GuiKeys.MEMBERS_HINT.text()).count(town.members().size()).build(), click -> {
@@ -194,6 +215,11 @@ public final class TownHallScreen extends MenuScreen {
                     Feedback.click(click.player());
                     Components.send(click.player(), civ.commands().help());
                 });
+    }
+
+    private Message federationLine() {
+        return civ.queries().polity(town).flatMap(polity -> civ.federations().belongsTo(polity))
+                .orElseGet(GuiKeys.OVERVIEW_NO_FEDERATION::text);
     }
 
     private Message moodLine() {

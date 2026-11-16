@@ -53,7 +53,7 @@ public final class ProtectionRules {
             return checkForeignPlot(actor, action, polity, plot.get().holder(), context);
         }
 
-        if (polity.isMember(actor) || polity.laws().valueOf(action.outsiderPermission())) {
+        if (polity.isMember(actor) || context.laws(polity).valueOf(action.outsiderPermission())) {
             return Optional.empty();
         }
         return deny(DenialReason.FOREIGN_TERRITORY, polity, polity.asActor());
@@ -72,7 +72,7 @@ public final class ProtectionRules {
             return true;
         }
         return context.polity(claim.get().polity())
-                .map(polity -> polity.laws().valueOf(hazard.permission()))
+                .map(polity -> context.laws(polity).valueOf(hazard.permission()))
                 .orElse(true);
     }
 

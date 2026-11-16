@@ -1,6 +1,7 @@
 {
   "replace": false,
   "values": [
-    "eddies-civ-mod:market"
+    "eddies-civ-mod:market",
+    "eddies-civ-mod:constitution"
   ]
 }

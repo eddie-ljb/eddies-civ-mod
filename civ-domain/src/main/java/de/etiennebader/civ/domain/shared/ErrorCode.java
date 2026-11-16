@@ -101,6 +101,24 @@ public enum ErrorCode {
     NOT_A_CITIZEN,
     /** Argumente: Akteur, Amt. */
     NOT_OFFICE_HOLDER,
+    /** Argumente: Gliedkörperschaft, Bund, dem sie schon angehört. */
+    ALREADY_IN_FEDERATION,
+    /** Argumente: Polity. */
+    NOT_IN_FEDERATION,
+    /** Argumente: Bund. */
+    LAST_CONSTITUENT,
+    /** Argumente: Polity. */
+    NOT_A_FEDERATION,
+    NOT_A_MUNICIPALITY,
+    CONSTITUTION_ALREADY_PROCLAIMED,
+    PREAMBLE_TOO_LONG,
+    CONSTITUTION_REQUIRES_VOTE,
+    ALREADY_IN_PARTY,
+    NOT_IN_PARTY,
+    NOT_A_PARTY,
+    STATUTE_TEXT_TOO_LONG,
+    /** Argumente: Gliedkörperschaft, Bund. */
+    FEDERATION_CYCLE,
     /** Das Bürgermeisteramt wird nur gewählt, nicht ernannt. */
     MAYOR_NOT_APPOINTABLE,
     /** Argumente: Chunk-X, Chunk-Z. */

@@ -60,7 +60,7 @@ final class VotesScreen extends MenuScreen {
         for (int index = 0; index < Math.min(proposals.size(), SLOTS.length); index++) {
             ProposalView proposal = proposals.get(index);
             canvas.set(SLOTS[index], icon(proposal), click ->
-                    report(click, civ.voting().vote(caller(), proposal.number(), !click.right())));
+                    report(click, civ.voting().vote(caller(), town, proposal.id(), !click.right())));
         }
     }
 
@@ -70,6 +70,9 @@ final class VotesScreen extends MenuScreen {
                 .line(GuiKeys.VOTE_TALLY.text(proposal.inFavour(), proposal.against(), proposal.electorate()))
                 .line(GuiKeys.VOTE_PROPOSER.text(proposal.proposer()))
                 .line(GuiKeys.VOTE_DEADLINE.text(proposal.decidedOn()));
+        if (proposal.requiredPercent() > 50) {
+            icon.line(GuiKeys.VOTE_MAJORITY.text(proposal.requiredPercent()), Icon.HINT);
+        }
         proposal.ownVote().ifPresent(yes -> icon.line(yes ? GuiKeys.VOTE_OWN_YES.text() : GuiKeys.VOTE_OWN_NO.text(),
                 yes ? Icon.GOOD : Icon.BAD));
         return icon.blank().hint(GuiKeys.VOTE_HINT.text()).build();

@@ -11,5 +11,6 @@ public enum TransferReason {
     WAGE,
     TRADE,
     GRANT,
+    LEVY,
     OTHER
 }

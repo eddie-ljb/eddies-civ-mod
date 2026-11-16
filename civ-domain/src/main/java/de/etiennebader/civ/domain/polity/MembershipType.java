@@ -7,5 +7,7 @@ public enum MembershipType {
     /** Bürger mit vollen Rechten. */
     CITIZEN,
     /** Einwohner ohne Bürgerrecht. */
-    RESIDENT
+    RESIDENT,
+    /** Gliedkörperschaft eines Bundes: eine Gemeinde oder ein niedrigerer Bund. Kein Wähler. */
+    CONSTITUENT
 }
