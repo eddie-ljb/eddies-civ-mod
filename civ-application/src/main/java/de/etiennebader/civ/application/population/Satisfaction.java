@@ -1,5 +1,6 @@
 package de.etiennebader.civ.application.population;
 
+import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.law.LawView;
 import de.etiennebader.civ.domain.law.StandardParameters;
 import de.etiennebader.civ.domain.polity.Office;
@@ -19,7 +20,8 @@ import java.util.Objects;
  *   <li><b>Ordnung:</b> Wie streng die Schutzregeln sind (Explosionen, Feuer, Rechte von Fremden). Ordnungsliebende
  *       mögen strenge Regeln, Freigeister lockere; bis ±25.</li>
  *   <li><b>Steuern:</b> Grundsteuer und Umsatzsteuer stören jeden (bis -15), Sparsame stark (bis -53).</li>
- *   <li><b>Mitsprache:</b> ein gewählter Bürgermeister, Abstimmungen über Gesetze und das Wahlrecht für Dorfbewohner.</li>
+ *   <li><b>Mitsprache:</b> ein gewählter Bürgermeister, Abstimmungen über Gesetze, das Wahlrecht für Dorfbewohner und ein
+ *       gewähltes Parlament (mehr, wenn Dorfbewohner darin sitzen).</li>
  *   <li><b>Wohlstand:</b> +5 je Siedlungsstufe.</li>
  * </ul>
  *
@@ -33,7 +35,9 @@ public record Satisfaction(Map<Factor, Integer> factors) {
         ORDER,
         TAXES,
         VOICE,
-        PROSPERITY
+        PROSPERITY,
+        /** Berichte der Zeitungen über die Gemeinde und ihre Führung. */
+        MEDIA
     }
 
     /** Ab hier gilt ein Dorfbewohner als zufrieden bzw. unter dem negativen Wert als unzufrieden. */
@@ -66,9 +70,22 @@ public record Satisfaction(Map<Factor, Integer> factors) {
             voice += 4;
         }
         voice += (int) Math.round(laws.valueOf(StandardParameters.VILLAGER_VOTE_PERCENT) * 0.15);
+        if (town.parliament().seated()) {
+            voice += 4;
+            if (town.parliament().seats().stream().anyMatch(seat -> seat.member() instanceof PersonRef)) {
+                voice += 4;
+            }
+        }
         factors.put(Factor.VOICE, voice);
         factors.put(Factor.PROSPERITY, town.tier().ordinal() * 5);
         return new Satisfaction(factors);
+    }
+
+    /** Mit den Punkten aus der Presse; 0 ohne Berichte. */
+    public Satisfaction withMedia(int points) {
+        Map<Factor, Integer> copy = new EnumMap<>(factors);
+        copy.put(Factor.MEDIA, points);
+        return new Satisfaction(copy);
     }
 
     public int score() {

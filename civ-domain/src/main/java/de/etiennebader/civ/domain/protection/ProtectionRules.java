@@ -50,10 +50,17 @@ public final class ProtectionRules {
         Optional<Plot> plot = context.land(polity.id())
                 .flatMap(land -> plotAt(land, position));
         if (plot.isPresent() && !plot.get().holder().equals(polity.asActor())) {
+            if (context.mayUsePlot(actor, polity.id(), plot.get().id())) {
+                return Optional.empty();
+            }
             return checkForeignPlot(actor, action, polity, plot.get().holder(), context);
         }
 
-        if (polity.isMember(actor) || context.laws(polity).valueOf(action.outsiderPermission())) {
+        if (plot.isPresent() && context.mayUsePlot(actor, polity.id(), plot.get().id())) {
+            return Optional.empty();
+        }
+        if (polity.isMember(actor) || context.isAlly(actor, polity)
+                || context.laws(polity).valueOf(action.outsiderPermission())) {
             return Optional.empty();
         }
         return deny(DenialReason.FOREIGN_TERRITORY, polity, polity.asActor());

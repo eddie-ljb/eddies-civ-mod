@@ -30,6 +30,11 @@ public final class CivContent {
     public static final Identifier PLOT_WAND_ID = EddiesCivMod.id("plot_wand");
     public static final Identifier CONSTITUTION_ID = EddiesCivMod.id("constitution");
     public static final Identifier CONSTITUTION_COPY_ID = EddiesCivMod.id("constitution_copy");
+    public static final Identifier BALLOT_BOX_ID = EddiesCivMod.id("ballot_box");
+    public static final Identifier ELECTION_POSTER_ID = EddiesCivMod.id("election_poster");
+    public static final Identifier MAILBOX_ID = EddiesCivMod.id("mailbox");
+    public static final Identifier NEWSSTAND_ID = EddiesCivMod.id("newsstand");
+    public static final Identifier STOCK_EXCHANGE_ID = EddiesCivMod.id("stock_exchange");
     public static final Identifier LAW_BOOK_ID = EddiesCivMod.id("law_book");
     public static final Identifier TAB_ID = EddiesCivMod.id("civ");
 
@@ -44,9 +49,20 @@ public final class CivContent {
     private final Item plotWand;
     private final Block constitution;
     private final Item constitutionCopy;
+    private final Block ballotBox;
+    private final Block electionPoster;
+    private final Block mailbox;
+    private final Block newsstand;
+    private final Block stockExchange;
 
     private CivContent(Block townHall, Item townHallItem, Block bank, Block market, Item plotWand, Block constitution,
-                       Item constitutionCopy) {
+                       Item constitutionCopy, Block ballotBox, Block electionPoster, Block mailbox, Block newsstand,
+                       Block stockExchange) {
+        this.mailbox = mailbox;
+        this.newsstand = newsstand;
+        this.stockExchange = stockExchange;
+        this.ballotBox = ballotBox;
+        this.electionPoster = electionPoster;
         this.townHall = townHall;
         this.townHallItem = townHallItem;
         this.bank = bank;
@@ -91,8 +107,21 @@ public final class CivContent {
                 new Item(new Item.Properties().setId(lawBookKey).stacksTo(1).rarity(Rarity.UNCOMMON)));
         LawBooks.init(lawBook);
 
-        registerTab(townHallItem, bankItem, marketItem, constitutionItem, lawBook, plotWand);
-        return new CivContent(townHall, townHallItem, bank, market, plotWand, constitution, constitutionCopy);
+        Block ballotBox = simpleBlock(BALLOT_BOX_ID, MapColor.WOOD, SoundType.WOOD, 2.0F);
+        Item ballotBoxItem = blockItem(BALLOT_BOX_ID, ballotBox);
+        Block electionPoster = simpleBlock(ELECTION_POSTER_ID, MapColor.COLOR_GREEN, SoundType.WOOD, 1.0F);
+        Item electionPosterItem = blockItem(ELECTION_POSTER_ID, electionPoster);
+        Block mailbox = simpleBlock(MAILBOX_ID, MapColor.COLOR_YELLOW, SoundType.METAL, 2.0F);
+        Item mailboxItem = blockItem(MAILBOX_ID, mailbox);
+        Block newsstand = simpleBlock(NEWSSTAND_ID, MapColor.WOOD, SoundType.WOOD, 2.0F);
+        Item newsstandItem = blockItem(NEWSSTAND_ID, newsstand);
+        Block stockExchange = simpleBlock(STOCK_EXCHANGE_ID, MapColor.METAL, SoundType.METAL, 3.0F);
+        Item stockExchangeItem = blockItem(STOCK_EXCHANGE_ID, stockExchange);
+
+        registerTab(townHallItem, bankItem, marketItem, constitutionItem, lawBook, plotWand, ballotBoxItem,
+                electionPosterItem, mailboxItem, newsstandItem, stockExchangeItem);
+        return new CivContent(townHall, townHallItem, bank, market, plotWand, constitution, constitutionCopy, ballotBox,
+                electionPoster, mailbox, newsstand, stockExchange);
     }
 
     /**
@@ -100,7 +129,8 @@ public final class CivContent {
      * die man zum Ausprobieren braucht (Geld, Ladentruhe, Dorfbewohner, Dinge für den Gebietsschutz).
      */
     private static void registerTab(Item townHall, Item bank, Item market, Item constitution, Item lawBook,
-                                    Item plotWand) {
+                                    Item plotWand, Item ballotBox, Item electionPoster, Item mailbox,
+                                    Item newsstand, Item stockExchange) {
         ResourceKey<CreativeModeTab> key = ResourceKey.create(Registries.CREATIVE_MODE_TAB, TAB_ID);
         Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, key, FabricCreativeModeTab.builder()
                 .title(Component.translatable("itemGroup." + EddiesCivMod.MOD_ID + ".civ"))
@@ -111,6 +141,11 @@ public final class CivContent {
                     output.accept(market);
                     output.accept(constitution);
                     output.accept(lawBook);
+                    output.accept(ballotBox);
+                    output.accept(electionPoster);
+                    output.accept(mailbox);
+                    output.accept(newsstand);
+                    output.accept(stockExchange);
                     output.accept(Items.WRITABLE_BOOK);
                     output.accept(plotWand);
                     output.accept(Items.EMERALD);
@@ -168,6 +203,28 @@ public final class CivContent {
     /** Abschrift einer Verfassung; Rechtsklick öffnet sie. */
     public Item constitutionCopy() {
         return constitutionCopy;
+    }
+
+    /** Wahlurne: Rechtsklick öffnet die Stimmzettel aller laufenden Wahlen am Ort. */
+    public Block ballotBox() {
+        return ballotBox;
+    }
+
+    /** Wahlplakat (Litfaßsäule): wirbt für den Aufsteller oder seine Partei. */
+    public Block electionPoster() {
+        return electionPoster;
+    }
+
+    public Block mailbox() {
+        return mailbox;
+    }
+
+    public Block newsstand() {
+        return newsstand;
+    }
+
+    public Block stockExchange() {
+        return stockExchange;
     }
 
     /** Werkzeug für Grundstücke: Linksklick setzt Ecke 1, Rechtsklick Ecke 2. */

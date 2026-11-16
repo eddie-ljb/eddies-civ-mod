@@ -17,10 +17,12 @@ import de.etiennebader.civ.domain.shared.ProposalId;
 import de.etiennebader.civ.domain.shared.StatuteId;
 import de.etiennebader.civ.domain.territory.BlockPosition;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -48,6 +50,21 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
     private final LawBook lawBook = new LawBook();
     private Constitution constitution = Constitution.DRAFT;
     private Optional<PartyProfile> party = Optional.empty();
+    private Parliament parliament = Parliament.NONE;
+    private final List<ElectionResult> results = new ArrayList<>();
+    private final List<Promise> promises = new ArrayList<>();
+    private final Map<BlockPosition, Poster> posters = new LinkedHashMap<>();
+    private final Map<String, Street> streets = new LinkedHashMap<>();
+
+    /** So viele Straßen darf eine Gemeinde höchstens haben. */
+    public static final int MAX_STREETS = 100;
+
+    /** So viele Wahlergebnisse bleiben gespeichert, die neuesten. */
+    public static final int KEPT_RESULTS = 10;
+    /** So viele Wahlversprechen bleiben gespeichert, die neuesten. */
+    public static final int KEPT_PROMISES = 40;
+    /** So viele Wahlplakate darf eine Gemeinde höchstens haben. */
+    public static final int MAX_POSTERS = 200;
 
     /** Ebene jeder Gemeinde. */
     public static final String MUNICIPAL_LEVEL = "gemeinde";
@@ -132,6 +149,35 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
         return polity;
     }
 
+    /** Ebenen-Schlüssel aller Firmen. */
+    public static final String COMPANY_LEVEL = "firma";
+
+    /** Ebenen-Schlüssel aller Zeitungen. */
+    public static final String NEWSPAPER_LEVEL = "zeitung";
+
+    /**
+     * Gründet eine Firma oder Zeitung. Der Gründer wird erstes Mitglied und Leitung.
+     *
+     * @param kind {@link PolityKind#COMPANY} oder {@link PolityKind#NEWSPAPER}
+     * @throws IllegalFounderException wenn der Gründer selbst eine Polity ist
+     */
+    public static Polity foundOrganisation(PolityId id, PolityName name, PolityKind kind, ActorRef founder,
+                                           CurrencyId currency, Day day) {
+        Objects.requireNonNull(founder, "founder");
+        if (kind != PolityKind.COMPANY && kind != PolityKind.NEWSPAPER) {
+            throw new IllegalArgumentException("Keine Organisation: " + kind);
+        }
+        if (founder instanceof PolityRef) {
+            throw new IllegalFounderException(founder);
+        }
+        Polity polity = new Polity(id, name, kind, kind == PolityKind.COMPANY ? COMPANY_LEVEL : NEWSPAPER_LEVEL,
+                SettlementTier.MUNICIPALITY, currency, day, Optional.empty());
+        polity.members.put(founder, new Membership(founder, MembershipType.CITIZEN, day));
+        polity.offices.put(Office.MAYOR, new OfficeTerm(Office.MAYOR, founder, day, Optional.empty()));
+        polity.raise(new OrganisationFounded(id, name, kind, founder, day));
+        return polity;
+    }
+
     /** Ändert Richtung oder Wappen einer Partei. */
     public void changePartyProfile(PartyProfile profile, Day day) {
         Objects.requireNonNull(profile, "profile");
@@ -152,6 +198,10 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
         Objects.requireNonNull(level, "level");
         if (!level.matches("[a-z][a-z0-9_]{0,31}")) {
             throw new IllegalArgumentException("Ungültiger Ebenen-Schlüssel: " + level);
+        }
+        if ((kind == PolityKind.COMPANY) != level.equals(COMPANY_LEVEL)
+                || (kind == PolityKind.NEWSPAPER) != level.equals(NEWSPAPER_LEVEL)) {
+            throw new IllegalArgumentException("Ebene " + level + " passt nicht zu " + kind);
         }
         if ((kind == PolityKind.PARTY) != level.equals(PARTY_LEVEL)) {
             throw new IllegalArgumentException("Ebene " + level + " passt nicht zu " + kind);
@@ -237,7 +287,57 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
                                  List<Membership> members, List<EnactedStatute> statutes, List<Proposal> proposals,
                                  List<OfficeTerm> offices, List<Election> elections, Constitution constitution,
                                  Optional<PartyProfile> party) {
+        return restore(id, name, kind, level, tier, currency, foundedOn, seat, members, statutes, proposals, offices,
+                elections, constitution, party, Parliament.NONE);
+    }
+
+    /**
+     * Wie oben, zusätzlich mit dem Parlament.
+     *
+     * @throws IllegalArgumentException wenn die Daten keine gültige Polity ergeben, z. B. ein Abgeordneter kein Mitglied
+     *                                  ist
+     */
+    public static Polity restore(PolityId id, PolityName name, PolityKind kind, String level, SettlementTier tier,
+                                 CurrencyId currency, Day foundedOn, Optional<BlockPosition> seat,
+                                 List<Membership> members, List<EnactedStatute> statutes, List<Proposal> proposals,
+                                 List<OfficeTerm> offices, List<Election> elections, Constitution constitution,
+                                 Optional<PartyProfile> party, Parliament parliament) {
+        return restore(id, name, kind, level, tier, currency, foundedOn, seat, members, statutes, proposals, offices,
+                elections, constitution, party, parliament, List.of(), List.of(), List.of());
+    }
+
+    /**
+     * Wie oben, zusätzlich mit Wahlergebnissen, Wahlversprechen und Wahlplakaten.
+     *
+     * @throws IllegalArgumentException wenn die Daten keine gültige Polity ergeben
+     */
+    public static Polity restore(PolityId id, PolityName name, PolityKind kind, String level, SettlementTier tier,
+                                 CurrencyId currency, Day foundedOn, Optional<BlockPosition> seat,
+                                 List<Membership> members, List<EnactedStatute> statutes, List<Proposal> proposals,
+                                 List<OfficeTerm> offices, List<Election> elections, Constitution constitution,
+                                 Optional<PartyProfile> party, Parliament parliament, List<ElectionResult> results,
+                                 List<Promise> promises, List<Poster> posters) {
+        return restore(id, name, kind, level, tier, currency, foundedOn, seat, members, statutes, proposals, offices,
+                elections, constitution, party, parliament, results, promises, posters, List.of());
+    }
+
+    /**
+     * Wie oben, zusätzlich mit Straßen.
+     *
+     * @throws IllegalArgumentException wenn die Daten keine gültige Polity ergeben
+     */
+    public static Polity restore(PolityId id, PolityName name, PolityKind kind, String level, SettlementTier tier,
+                                 CurrencyId currency, Day foundedOn, Optional<BlockPosition> seat,
+                                 List<Membership> members, List<EnactedStatute> statutes, List<Proposal> proposals,
+                                 List<OfficeTerm> offices, List<Election> elections, Constitution constitution,
+                                 Optional<PartyProfile> party, Parliament parliament, List<ElectionResult> results,
+                                 List<Promise> promises, List<Poster> posters, List<Street> streets) {
+        Objects.requireNonNull(streets, "streets");
         Objects.requireNonNull(party, "party");
+        Objects.requireNonNull(parliament, "parliament");
+        Objects.requireNonNull(results, "results");
+        Objects.requireNonNull(promises, "promises");
+        Objects.requireNonNull(posters, "posters");
         if ((kind == PolityKind.PARTY) != party.isPresent()) {
             throw new IllegalArgumentException("Parteiprofil passt nicht zu " + kind + ": " + id);
         }
@@ -247,6 +347,9 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
         Polity polity = restoreCore(id, name, kind, level, tier, currency, foundedOn, seat, members, statutes,
                 proposals);
         for (OfficeTerm term : offices) {
+            if (!term.office().single()) {
+                throw new IllegalArgumentException("Kein Einzelamt in " + id + ": " + term.office());
+            }
             if (!polity.isMember(term.holder())) {
                 throw new IllegalArgumentException("Amtsinhaber ist kein Mitglied von " + id + ": " + term.holder());
             }
@@ -260,8 +363,18 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
             }
             polity.elections.put(election.id(), election);
         }
+        for (Parliament.Seat member : parliament.seats()) {
+            if (!polity.isMember(member.member())) {
+                throw new IllegalArgumentException("Abgeordneter ist kein Mitglied von " + id + ": " + member.member());
+            }
+        }
         polity.constitution = constitution;
         polity.party = party;
+        polity.parliament = parliament;
+        polity.results.addAll(results);
+        polity.promises.addAll(promises);
+        posters.forEach(poster -> polity.posters.put(poster.position(), poster));
+        streets.forEach(street -> polity.streets.put(key(street.name()), street));
         return polity;
     }
 
@@ -328,6 +441,8 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
             }
         }
         elections.replaceAll((electionId, election) -> election.without(member));
+        parliament = parliament.without(member, this::isMember);
+        promises.removeIf(promise -> promise.candidate().equals(member));
     }
 
     /**
@@ -339,6 +454,9 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
     public void fillOffice(Office office, ActorRef holder, Optional<Day> until, Day day) {
         Objects.requireNonNull(office, "office");
         Objects.requireNonNull(day, "day");
+        if (!office.single()) {
+            throw new IllegalArgumentException("Kein Einzelamt: " + office);
+        }
         if (!isMember(holder)) {
             throw new NotAMemberException(holder);
         }
@@ -442,6 +560,9 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
         Objects.requireNonNull(winner, "winner");
         Objects.requireNonNull(day, "day");
         Election election = requireElection(electionId);
+        if (!election.office().single()) {
+            throw new IllegalArgumentException("Parlamentswahlen enden mit seatParliament: " + electionId);
+        }
         if (winner.isPresent() && !election.isCandidate(winner.get())) {
             throw new NotACandidateException(winner.get());
         }
@@ -449,6 +570,176 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
         raise(new ElectionClosed(id, electionId, election.office(), winner.isPresent(), day));
         winner.ifPresent(elected -> fillOffice(election.office(), elected, until, day));
         return election;
+    }
+
+    /**
+     * Beendet eine Parlamentswahl und setzt das neue Parlament ein. Die Sitzverteilung ermittelt der Aufrufer. Ohne Sitze
+     * (niemand hat kandidiert oder Stimmen bekommen) bleibt das bisherige Parlament.
+     *
+     * @param seats Sitze in Reihenfolge, das Präsidium zuerst; jeder Abgeordnete muss kandidiert haben
+     * @param until letzter Tag der Wahlperiode; leer für unbefristet
+     * @return die beendete Wahl
+     * @throws UnknownElectionException wenn es die Wahl nicht gibt
+     * @throws NotACandidateException   wenn ein Abgeordneter nicht kandidiert hat
+     */
+    public Election seatParliament(ElectionId electionId, List<Parliament.Seat> seats, Optional<Day> until, Day day) {
+        return seatParliament(electionId, seats, List.of(), until, day);
+    }
+
+    /**
+     * Wie oben, mit Nachrückern aus den Parteilisten.
+     *
+     * @param reserves nicht gewählte Kandidaten mit Partei, in der Reihenfolge, in der sie nachrücken
+     */
+    public Election seatParliament(ElectionId electionId, List<Parliament.Seat> seats, List<Parliament.Seat> reserves,
+                                   Optional<Day> until, Day day) {
+        Objects.requireNonNull(seats, "seats");
+        Objects.requireNonNull(reserves, "reserves");
+        Objects.requireNonNull(until, "until");
+        Objects.requireNonNull(day, "day");
+        Election election = requireElection(electionId);
+        if (election.office() != Office.PARLIAMENT) {
+            throw new IllegalArgumentException("Keine Parlamentswahl: " + electionId);
+        }
+        for (Parliament.Seat member : seats) {
+            if (!election.isCandidate(member.member())) {
+                throw new NotACandidateException(member.member());
+            }
+        }
+        elections.remove(electionId);
+        raise(new ElectionClosed(id, electionId, Office.PARLIAMENT, !seats.isEmpty(), day));
+        if (!seats.isEmpty()) {
+            parliament = new Parliament(seats, Optional.of(day), until, reserves);
+            raise(new ParliamentElected(id, electionId, seats.size(), day));
+        }
+        return election;
+    }
+
+    /** Verlängert die Wahlperiode, z. B. wenn bei der Neuwahl niemand kandidiert hat. */
+    public void extendParliament(Optional<Day> until, Day day) {
+        Objects.requireNonNull(until, "until");
+        Objects.requireNonNull(day, "day");
+        if (parliament.seated()) {
+            parliament = parliament.extendedUntil(until);
+        }
+    }
+
+    /**
+     * Löst das Parlament auf, z. B. weil das Recht keine Sitze mehr vorsieht.
+     *
+     * @return ob es ein Parlament gab
+     */
+    public boolean dissolveParliament(Day day) {
+        Objects.requireNonNull(day, "day");
+        if (!parliament.seated()) {
+            return false;
+        }
+        parliament = Parliament.NONE;
+        raise(new ParliamentDissolved(id, day));
+        return true;
+    }
+
+    @Override
+    public Parliament parliament() {
+        return parliament;
+    }
+
+    /** Hält das Ergebnis einer beendeten Wahl fest; ältere Ergebnisse über {@link #KEPT_RESULTS} fallen weg. */
+    public void recordResult(ElectionResult result) {
+        Objects.requireNonNull(result, "result");
+        results.add(result);
+        while (results.size() > KEPT_RESULTS) {
+            results.removeFirst();
+        }
+    }
+
+    @Override
+    public List<ElectionResult> results() {
+        return List.copyOf(results);
+    }
+
+    /**
+     * Ein Kandidat gibt ein Wahlversprechen ab.
+     *
+     * @throws NotACandidateException wenn er bei keiner laufenden Wahl für dieses Amt kandidiert
+     */
+    public void promise(Promise promise) {
+        Objects.requireNonNull(promise, "promise");
+        boolean candidate = electionFor(promise.office()).map(open -> open.isCandidate(promise.candidate()))
+                .orElse(false);
+        if (!candidate) {
+            throw new NotACandidateException(promise.candidate());
+        }
+        promises.add(promise);
+        while (promises.size() > KEPT_PROMISES) {
+            promises.removeFirst();
+        }
+    }
+
+    @Override
+    public List<Promise> promises() {
+        return List.copyOf(promises);
+    }
+
+    /**
+     * Stellt ein Wahlplakat auf; ein Plakat am selben Ort wird ersetzt.
+     *
+     * @return ob es aufgestellt wurde; nicht, wenn schon {@link #MAX_POSTERS} stehen
+     */
+    public boolean putUpPoster(Poster poster) {
+        Objects.requireNonNull(poster, "poster");
+        if (!posters.containsKey(poster.position()) && posters.size() >= MAX_POSTERS) {
+            return false;
+        }
+        posters.put(poster.position(), poster);
+        return true;
+    }
+
+    /** Entfernt das Plakat an dieser Stelle. @return ob dort eines stand */
+    public boolean takeDownPoster(BlockPosition position) {
+        return posters.remove(Objects.requireNonNull(position, "position")) != null;
+    }
+
+    @Override
+    public List<Poster> posters() {
+        return List.copyOf(posters.values());
+    }
+
+    /**
+     * Legt eine Straße an oder vermisst eine gleichnamige neu.
+     *
+     * @return ob es eine neue Straße ist; nicht, wenn schon {@link #MAX_STREETS} bestehen und sie neu wäre
+     */
+    public boolean layStreet(Street street, Day day) {
+        Objects.requireNonNull(street, "street");
+        Objects.requireNonNull(day, "day");
+        boolean known = streets.containsKey(key(street.name()));
+        if (!known && streets.size() >= MAX_STREETS) {
+            return false;
+        }
+        streets.put(key(street.name()), street);
+        raise(new StreetLaid(id, street, day));
+        return !known;
+    }
+
+    /** Hebt eine Straße auf. @return ob es sie gab */
+    public boolean removeStreet(String name, Day day) {
+        Objects.requireNonNull(day, "day");
+        Street removed = streets.remove(key(name));
+        if (removed == null) {
+            return false;
+        }
+        raise(new StreetRemoved(id, removed.name(), day));
+        return true;
+    }
+
+    @Override
+    public List<Street> streets() {
+        return List.copyOf(streets.values());
+    }
+
+    private static String key(String streetName) {
+        return Objects.requireNonNull(streetName, "streetName").strip().toLowerCase(Locale.ROOT);
     }
 
     @Override

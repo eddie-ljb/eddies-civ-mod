@@ -19,20 +19,26 @@ import de.etiennebader.civ.domain.shared.IdGenerator;
 import de.etiennebader.civ.domain.shared.RandomIdGenerator;
 import de.etiennebader.civ.persistence.store.SqliteStateStore;
 import de.etiennebader.civ.server.bank.BankService;
+import de.etiennebader.civ.server.campaign.CampaignService;
+import de.etiennebader.civ.server.civil.CivilService;
 import de.etiennebader.civ.server.command.Caller;
 import de.etiennebader.civ.server.command.CivCommands;
 import de.etiennebader.civ.server.command.Message;
 import de.etiennebader.civ.server.command.MessageKey;
 import de.etiennebader.civ.server.command.Reply;
 import de.etiennebader.civ.server.command.Texts;
+import de.etiennebader.civ.server.community.CommunityService;
+import de.etiennebader.civ.server.company.CompanyService;
 import de.etiennebader.civ.server.constitution.ConstitutionService;
 import de.etiennebader.civ.server.federation.FederationService;
 import de.etiennebader.civ.server.law.LawBookService;
 import de.etiennebader.civ.server.market.ItemTraits;
 import de.etiennebader.civ.server.market.MarketService;
 import de.etiennebader.civ.server.office.OfficeService;
+import de.etiennebader.civ.server.parliament.ParliamentService;
 import de.etiennebader.civ.server.party.PartyService;
 import de.etiennebader.civ.server.plot.PlotService;
+import de.etiennebader.civ.server.press.PressService;
 import de.etiennebader.civ.server.protection.ProtectionService;
 import de.etiennebader.civ.server.save.AsyncSaver;
 import de.etiennebader.civ.server.save.SaveListener;
@@ -94,6 +100,12 @@ public final class CivServer {
     private final ConstitutionService constitutions;
     private final LawBookService lawBooks;
     private final PartyService parties;
+    private final ParliamentService parliaments;
+    private final CampaignService campaigns;
+    private final CivilService civil;
+    private final CommunityService community;
+    private final CompanyService companies;
+    private final PressService press;
     private final TownHallService townHalls;
     private final ShopService shops;
     private final ServerSettings settings;
@@ -124,6 +136,8 @@ public final class CivServer {
         this.commands = new CivCommands(app, calendar, settings.currency(), texts, protection, voting);
         this.parties = new PartyService(app, calendar, settings.currency(), settings.parties(), texts, announcements);
         this.lawBooks = new LawBookService(app, calendar, texts, announcements, federations);
+        this.parliaments = new ParliamentService(app, texts, offices, voting);
+        this.campaigns = new CampaignService(app, calendar, texts, offices);
         this.constitutions = new ConstitutionService(app, calendar, texts, announcements, commands, offices, voting,
                 federations);
         this.bank = new BankService(app, calendar, settings.currency(), players, texts);
@@ -134,6 +148,12 @@ public final class CivServer {
         this.villagers = new VillagerService(app, settings, texts, announcements);
         this.townHalls = new TownHallService(app, calendar, texts, announcements);
         this.shops = new ShopService(app, calendar, settings.currency(), texts);
+        this.civil = new CivilService(app, calendar, players, settings.currency(), texts, announcements,
+                player -> plots.selection(player).area());
+        this.community = new CommunityService(app, calendar, players, texts, announcements, Clock.systemUTC());
+        this.companies = new CompanyService(app, calendar, players, settings.currency(), texts, announcements);
+        this.press = new PressService(app, calendar, players, settings.currency(), texts, announcements);
+        app.pressInfluence().today(calendar.today());
     }
 
     /**
@@ -186,6 +206,11 @@ public final class CivServer {
         offices.endOfDay(day);
         parties.endOfDay(day);
         villagers.endOfDay(day);
+        campaigns.endOfDay(day);
+        civil.endOfDay(day);
+        companies.endOfDay(day);
+        press.endOfDay(day.plus(1));
+        community.endOfDay(day.plus(1));
         return report;
     }
 
@@ -210,12 +235,14 @@ public final class CivServer {
         requireRunning();
         territory.forget(player);
         plots.forget(player);
+        community.left(player);
     }
 
     /** Merkt sich den Namen eines Spielers, der den Server betritt. */
     public void playerJoined(PlayerRef player, String name) {
         requireRunning();
         players.record(player, name);
+        community.joined(player);
     }
 
     /**
@@ -322,6 +349,30 @@ public final class CivServer {
 
     public PartyService parties() {
         return parties;
+    }
+
+    public CivilService civil() {
+        return civil;
+    }
+
+    public CommunityService community() {
+        return community;
+    }
+
+    public CompanyService companies() {
+        return companies;
+    }
+
+    public PressService press() {
+        return press;
+    }
+
+    public CampaignService campaigns() {
+        return campaigns;
+    }
+
+    public ParliamentService parliaments() {
+        return parliaments;
     }
 
     public LawBookService lawBooks() {

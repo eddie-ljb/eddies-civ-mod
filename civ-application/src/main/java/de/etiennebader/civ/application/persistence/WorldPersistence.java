@@ -57,6 +57,10 @@ public final class WorldPersistence {
         repositories.ledger().save(world.ledger());
         repositories.market().save(world.market());
         repositories.shops().save(world.shops());
+        repositories.contracts().save(world.contracts());
+        repositories.community().save(world.community());
+        repositories.exchange().save(world.exchange());
+        repositories.press().save(world.press());
         for (Polity polity : world.polities()) {
             if (repositories.land().findByPolity(polity.id()).isEmpty()) {
                 repositories.land().save(LandRegistry.open(polity.id()));

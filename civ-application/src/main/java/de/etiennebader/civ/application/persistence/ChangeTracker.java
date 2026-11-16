@@ -1,15 +1,19 @@
 package de.etiennebader.civ.application.persistence;
 
 import de.etiennebader.civ.application.port.DomainEventPublisher;
+import de.etiennebader.civ.domain.community.CommunityEvent;
+import de.etiennebader.civ.domain.contract.ContractEvent;
 import de.etiennebader.civ.domain.economy.CashDeposited;
 import de.etiennebader.civ.domain.economy.CashWithdrawn;
 import de.etiennebader.civ.domain.economy.FundsTransferred;
 import de.etiennebader.civ.domain.economy.LedgerEvent;
 import de.etiennebader.civ.domain.economy.MoneyBurned;
 import de.etiennebader.civ.domain.economy.MoneyMinted;
+import de.etiennebader.civ.domain.exchange.ExchangeEvent;
 import de.etiennebader.civ.domain.land.LandEvent;
 import de.etiennebader.civ.domain.market.Commodity;
 import de.etiennebader.civ.domain.market.MarketEvent;
+import de.etiennebader.civ.domain.media.PressEvent;
 import de.etiennebader.civ.domain.polity.PolityEvent;
 import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.DomainEvent;
@@ -41,6 +45,10 @@ public final class ChangeTracker implements DomainEventPublisher {
     private final Set<Commodity> commodities = new LinkedHashSet<>();
     private final Set<BlockPosition> shops = new LinkedHashSet<>();
     private final List<DomainEvent> events = new ArrayList<>();
+    private boolean contracts;
+    private boolean community;
+    private boolean exchange;
+    private boolean press;
 
     @Override
     public void publish(List<? extends DomainEvent> published) {
@@ -58,6 +66,10 @@ public final class ChangeTracker implements DomainEventPublisher {
             case LedgerEvent ledgerEvent -> trackLedger(ledgerEvent);
             case MarketEvent marketEvent -> commodities.add(marketEvent.commodity());
             case ShopEvent shopEvent -> shops.add(shopEvent.position());
+            case ContractEvent ignored -> contracts = true;
+            case CommunityEvent ignored -> community = true;
+            case ExchangeEvent ignored -> exchange = true;
+            case PressEvent ignored -> press = true;
             default -> {
                 // Events anderer Bereiche ändern keinen gespeicherten Zustand, landen aber im Audit-Log.
             }
@@ -97,7 +109,12 @@ public final class ChangeTracker implements DomainEventPublisher {
 
     /** Liefert alle Änderungen seit dem letzten Aufruf und beginnt von vorn. */
     public ChangeSet takeChanges() {
-        ChangeSet changes = new ChangeSet(polities, chunks, plots, accounts, currencies, commodities, shops, events);
+        ChangeSet changes = new ChangeSet(polities, chunks, plots, accounts, currencies, commodities, shops, events,
+                contracts, community, exchange, press);
+        contracts = false;
+        community = false;
+        exchange = false;
+        press = false;
         polities.clear();
         chunks.clear();
         plots.clear();
@@ -121,6 +138,10 @@ public final class ChangeTracker implements DomainEventPublisher {
         currencies.addAll(failed.currencies());
         commodities.addAll(failed.commodities());
         shops.addAll(failed.shops());
+        contracts |= failed.contracts();
+        community |= failed.community();
+        exchange |= failed.exchange();
+        press |= failed.press();
         events.addAll(0, failed.events());
     }
 }

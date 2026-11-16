@@ -22,7 +22,23 @@ import java.util.Set;
  */
 public record ChangeSet(Set<PolityId> polities, Set<ChunkCoord> chunks, Set<PlotKey> plots,
                         Set<AccountKey> accounts, Set<CurrencyId> currencies, Set<Commodity> commodities,
-                        Set<BlockPosition> shops, List<DomainEvent> events) {
+                        Set<BlockPosition> shops, List<DomainEvent> events, boolean contracts, boolean community,
+                        boolean exchange, boolean press) {
+
+    /** Ohne Börse und Presse. */
+    public ChangeSet(Set<PolityId> polities, Set<ChunkCoord> chunks, Set<PlotKey> plots, Set<AccountKey> accounts,
+                     Set<CurrencyId> currencies, Set<Commodity> commodities, Set<BlockPosition> shops,
+                     List<DomainEvent> events, boolean contracts, boolean community) {
+        this(polities, chunks, plots, accounts, currencies, commodities, shops, events, contracts, community, false,
+                false);
+    }
+
+    /** Ohne Verträge und Gemeinschaft. */
+    public ChangeSet(Set<PolityId> polities, Set<ChunkCoord> chunks, Set<PlotKey> plots, Set<AccountKey> accounts,
+                     Set<CurrencyId> currencies, Set<Commodity> commodities, Set<BlockPosition> shops,
+                     List<DomainEvent> events) {
+        this(polities, chunks, plots, accounts, currencies, commodities, shops, events, false, false);
+    }
 
     public ChangeSet {
         polities = ordered(polities, "polities");
@@ -45,6 +61,7 @@ public record ChangeSet(Set<PolityId> polities, Set<ChunkCoord> chunks, Set<Plot
 
     public boolean isEmpty() {
         return polities.isEmpty() && chunks.isEmpty() && plots.isEmpty() && accounts.isEmpty()
-                && currencies.isEmpty() && commodities.isEmpty() && shops.isEmpty() && events.isEmpty();
+                && currencies.isEmpty() && commodities.isEmpty() && shops.isEmpty() && events.isEmpty() && !contracts
+                && !community && !exchange && !press;
     }
 }

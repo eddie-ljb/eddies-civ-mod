@@ -24,6 +24,7 @@ import de.etiennebader.civ.application.market.SellToMarket;
 import de.etiennebader.civ.application.office.AppointOfficer;
 import de.etiennebader.civ.application.office.CallElection;
 import de.etiennebader.civ.application.office.CastBallot;
+import de.etiennebader.civ.application.office.MakePromise;
 import de.etiennebader.civ.application.office.StandForElection;
 import de.etiennebader.civ.application.party.FoundParty;
 import de.etiennebader.civ.application.persistence.ChangeTracker;
@@ -31,6 +32,7 @@ import de.etiennebader.civ.application.persistence.FlushReport;
 import de.etiennebader.civ.application.persistence.PendingSave;
 import de.etiennebader.civ.application.persistence.StateDump;
 import de.etiennebader.civ.application.persistence.WorldPersistence;
+import de.etiennebader.civ.application.polity.AmendLaw;
 import de.etiennebader.civ.application.polity.DissolvePolity;
 import de.etiennebader.civ.application.polity.EnactStatute;
 import de.etiennebader.civ.application.polity.FoundPolity;
@@ -113,6 +115,24 @@ class SqliteStateStoreTest {
         assertTrue(saved.contains("  office|TREASURER|"), saved);
         assertTrue(saved.contains("  election|"), saved);
         assertTrue(saved.contains(":LOW_TAXES"), saved);
+        assertTrue(saved.contains("  parliament|"), saved);
+        assertTrue(saved.contains("  result|"), saved);
+        assertTrue(saved.contains("  promise|"), saved);
+        assertTrue(saved.contains("  poster|"), saved);
+        assertTrue(saved.contains("street|Hauptstraße"), saved);
+        assertTrue(saved.contains("contract|1|"), saved);
+        assertTrue(saved.contains("contract|2|"), saved);
+        assertTrue(saved.contains("letter|"), saved);
+        assertTrue(saved.contains("friends|"), saved);
+        assertTrue(saved.contains("request|"), saved);
+        assertTrue(saved.contains("chat|2|"), saved);
+        assertTrue(saved.contains("listing|"), saved);
+        assertTrue(saved.contains("holding|"), saved);
+        assertTrue(saved.contains("order|"), saved);
+        assertTrue(saved.contains("trade|"), saved);
+        assertTrue(saved.contains("quote|"), saved);
+        assertTrue(saved.contains("dividend|"), saved);
+        assertTrue(saved.contains("article|1|"), saved);
 
         try (Session reloaded = Session.open(file)) {
             reloaded.persistence.restore();
@@ -144,7 +164,8 @@ class SqliteStateStoreTest {
             assertTrue(saved.contains("enact:Fristen:Abstimmungen dauern 4 Tage.:vote_days=4"), saved);
             assertTrue(saved.contains("repeal:"), saved);
             assertTrue(saved.contains("party|60|-10|minecraft:blue_banner"), saved);
-            assertEquals(3, count("SELECT COUNT(*) FROM polity"), "Nordhain, der Bund Westmark und die Ordnungspartei");
+            assertEquals(5, count("SELECT COUNT(*) FROM polity"),
+                    "Nordhain, der Bund Westmark, die Ordnungspartei, die Holz AG und der Nordhainer Bote");
             assertEquals(1, count("SELECT COUNT(*) FROM polity WHERE level = 'land'"));
             assertEquals(0, count("SELECT COUNT(*) FROM plot WHERE type = 'EMBASSY'"));
             assertEquals(1, count("SELECT COUNT(*) FROM shop"));
@@ -397,7 +418,39 @@ class SqliteStateStoreTest {
                     new PartyProfile(60, -10, "minecraft:blue_banner"), EMERALD, List.of(bertram), DAY));
             app.proposeMotion().execute(new ProposeMotion.Command(nordhain, dora,
                     new Motion.Repeal(house, "Hausordnung"), DAY));
+            app.amendLaw().execute(new AmendLaw.Command(eichenfurt, carla,
+                    ParameterValue.of(StandardParameters.ELECTION_DAYS, 1L), DAY));
+            app.amendLaw().execute(new AmendLaw.Command(eichenfurt, carla,
+                    ParameterValue.of(StandardParameters.PARLIAMENT_SEATS, 3L), DAY));
+            ElectionId parliament = app.callElection().execute(new CallElection.Command(eichenfurt, carla,
+                    Office.PARLIAMENT, DAY));
+            app.standForElection().execute(new StandForElection.Command(eichenfurt, parliament, carla, DAY));
+            app.castBallot().execute(new CastBallot.Command(eichenfurt, parliament, carla, carla, DAY));
+            app.makePromise().execute(new MakePromise.Command(nordhain, dora, "Die Umsatzsteuer beträgt 5 %.", DAY));
+            app.putUpPoster().execute(chunk(0, 0).center(64), dora, DAY);
+            app.streets().lay(alice, nordhain, "Hauptstraße", new Area(OVERWORLD, 0, 8, 15, 9), DAY);
+            var lease = app.contracts().offerLease(alice, nordhain, home, dora, money(2), money(5), 10, DAY);
+            app.depositEmeralds().execute(new DepositEmeralds.Command(dora, money(50), DAY));
+            app.contracts().sign(lease.id(), dora, DAY);
+            app.contracts().offerCustom(alice, carla, money(1), money(0), "Holzlieferung", "Jede Woche 64 Holz.", 7, DAY);
+            app.community().send(alice, dora, "Willkommen", "Schön, dass du da bist.\nGruß", DAY);
+            app.community().befriend(alice, dora, DAY);
+            app.community().befriend(dora, alice, DAY);
+            app.community().befriend(carla, alice, DAY);
+            app.community().post(alice, Optional.empty(), "Hallo Welt", 1000, "game", DAY);
+            app.community().post(dora, Optional.of(alice), "Danke!", 2000, "web", DAY);
+            var company = app.companies().foundCompany(alice, PolityName.of("Holz AG"), money(1_000), DAY);
+            app.trading().place(alice, company, de.etiennebader.civ.domain.exchange.Side.SELL, 100, 2, DAY);
+            app.trading().place(dora, company, de.etiennebader.civ.domain.exchange.Side.BUY, 10, 2, DAY);
+            app.trading().place(alice, company, de.etiennebader.civ.domain.exchange.Side.SELL, 50, 5, DAY);
+            app.companies().payDividend(alice, company, money(1_000), DAY);
+            var paper = app.companies().found(alice, PolityName.of("Nordhainer Bote"),
+                    de.etiennebader.civ.domain.polity.PolityKind.NEWSPAPER, EMERALD, DAY);
+            app.companies().admit(alice, paper, de.etiennebader.civ.domain.polity.PolityKind.NEWSPAPER, bertram, DAY);
+            app.press().publish(alice, paper, "Holz AG zahlt Dividende", "Ein Erfolg.",
+                    app.press().analyse("Holz AG zahlt Dividende", "Ein Erfolg.", java.util.Map.of()), DAY);
             app.endOfDay().execute(DAY);
+            app.runElections().execute(DAY.plus(1));
         }
 
         void changeWorld() {

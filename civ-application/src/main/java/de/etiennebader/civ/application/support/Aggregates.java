@@ -2,9 +2,13 @@ package de.etiennebader.civ.application.support;
 
 import de.etiennebader.civ.application.Repositories;
 import de.etiennebader.civ.application.port.DomainEventPublisher;
+import de.etiennebader.civ.domain.community.Community;
+import de.etiennebader.civ.domain.contract.ContractRegistry;
 import de.etiennebader.civ.domain.economy.Ledger;
+import de.etiennebader.civ.domain.exchange.StockExchange;
 import de.etiennebader.civ.domain.land.LandRegistry;
 import de.etiennebader.civ.domain.market.Market;
+import de.etiennebader.civ.domain.media.Press;
 import de.etiennebader.civ.domain.polity.Polity;
 import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.shop.ShopRegistry;
@@ -74,6 +78,42 @@ public final class Aggregates {
     public void commit(Ledger ledger) {
         repositories.ledger().save(ledger);
         publisher.publish(ledger.pullEvents());
+    }
+
+    public ContractRegistry contracts() {
+        return repositories.contracts().load();
+    }
+
+    public void commit(ContractRegistry contracts) {
+        repositories.contracts().save(contracts);
+        publisher.publish(contracts.pullEvents());
+    }
+
+    public StockExchange exchange() {
+        return repositories.exchange().load();
+    }
+
+    public void commit(StockExchange exchange) {
+        repositories.exchange().save(exchange);
+        publisher.publish(exchange.pullEvents());
+    }
+
+    public Press press() {
+        return repositories.press().load();
+    }
+
+    public void commit(Press press) {
+        repositories.press().save(press);
+        publisher.publish(press.pullEvents());
+    }
+
+    public Community community() {
+        return repositories.community().load();
+    }
+
+    public void commit(Community community) {
+        repositories.community().save(community);
+        publisher.publish(community.pullEvents());
     }
 
     public ShopRegistry shops() {

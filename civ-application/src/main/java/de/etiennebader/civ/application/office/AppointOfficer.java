@@ -1,6 +1,7 @@
 package de.etiennebader.civ.application.office;
 
 import de.etiennebader.civ.application.polity.Citizens;
+import de.etiennebader.civ.application.polity.ParliamentNotAppointableException;
 import de.etiennebader.civ.application.support.Aggregates;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.polity.Office;
@@ -43,6 +44,9 @@ public final class AppointOfficer {
     public boolean execute(Command command) {
         if (command.office() == Office.MAYOR) {
             throw new MayorNotAppointableException();
+        }
+        if (!command.office().single()) {
+            throw new ParliamentNotAppointableException();
         }
         Polity polity = aggregates.polity(command.polity());
         if (!polity.holds(command.mayor(), Office.MAYOR)) {

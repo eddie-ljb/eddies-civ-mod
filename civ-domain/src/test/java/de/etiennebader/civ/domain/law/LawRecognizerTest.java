@@ -60,6 +60,15 @@ class LawRecognizerTest {
                 values("Die Verfassung ändert sich nur mit drei Vierteln der Stimmen."));
         assertEquals(List.of(v(FEDERAL_LAW_PREVAILS, true)), values("Bundesrecht bricht Gemeinderecht."));
         assertEquals(List.of(v(StandardParameters.FEDERAL_LEVY_PERCENT, 5L)), values("Die Bundesumlage beträgt 5 %."));
+        assertEquals(List.of(v(StandardParameters.PARLIAMENT_SEATS, 9L)), values("Das Parlament hat 9 Sitze."));
+        assertEquals(List.of(v(StandardParameters.PARLIAMENT_SEATS, 0L)), values("Es gibt kein Parlament."));
+        assertEquals(List.of(v(StandardParameters.PARLIAMENT_SEATS, 15L)),
+                values("The council has 15 seats."));
+        assertEquals(List.of(v(StandardParameters.SESSION_DAYS, 3L)), values("Das Parlament tagt alle 3 Tage."));
+        assertEquals(List.of(v(StandardParameters.BALLOT_BOX_REQUIRED, true)),
+                values("Gewählt wird nur an der Urne."));
+        assertEquals(List.of(v(StandardParameters.BALLOT_BOX_REQUIRED, false)),
+                values("Eine Wahlurne ist nicht nötig."));
     }
 
     @Test

@@ -4,465 +4,1532 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Eddies Civ – Weltatlas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg: #15130f; --panel: #1f1b15; --panel2: #29241c; --line: #3a3328; --text: #ece4d4; --muted: #a89c86;
-  --gold: #e0b04a; --green: #7bd88f; --red: #ff6b5e; --blue: #7fb2e5;
-  --radius: 10px; font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --paper: #eceee8; --surface: #f8f9f6; --sunk: #e2e6e0; --ink: #18222b; --muted: #5b6670; --line: #cdd3cf;
+  --emerald: #127a55; --emerald-soft: #d5ebe1; --brass: #a8771f; --red: #b23a2e; --red-soft: #f3dcd8;
+  --font: "Schibsted Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --r-s: 4px; --r-m: 8px; --r-l: 14px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #11181d; --surface: #182229; --sunk: #0d1317; --ink: #e3e9ea; --muted: #93a1a8; --line: #2a3740;
+    --emerald: #43b388; --emerald-soft: #173a2e; --brass: #d3a54c; --red: #e0705f; --red-soft: #3d1f1b; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #11181d; --surface: #182229; --sunk: #0d1317; --ink: #e3e9ea; --muted: #93a1a8; --line: #2a3740;
+  --emerald: #43b388; --emerald-soft: #173a2e; --brass: #d3a54c; --red: #e0705f; --red-soft: #3d1f1b; color-scheme: dark;
 }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--text); }
-header { display: flex; align-items: center; gap: 16px; padding: 14px 24px; border-bottom: 1px solid var(--line);
-  background: linear-gradient(180deg, #221d15, var(--bg)); position: sticky; top: 0; z-index: 5; flex-wrap: wrap; }
-header h1 { font-size: 20px; margin: 0; letter-spacing: .5px; }
-header h1 span { color: var(--gold); }
-nav { display: flex; gap: 4px; margin-left: auto; flex-wrap: wrap; }
-nav button { background: none; border: 1px solid transparent; color: var(--muted); padding: 8px 14px; border-radius: 8px;
-  cursor: pointer; font-size: 14px; }
-nav button.active, nav button:hover { color: var(--text); border-color: var(--line); background: var(--panel); }
-main { max-width: 1200px; margin: 0 auto; padding: 24px 16px 60px; }
-section { display: none; } section.active { display: block; }
-.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 24px; }
-.stat { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
-.stat .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .8px; }
-.stat .value { font-size: 26px; margin-top: 6px; font-variant-numeric: tabular-nums; }
-.towns { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
-.town { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; border-top: 4px solid var(--c); }
-.town h3 { margin: 0 0 2px; font-size: 18px; } .town .tier { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
-.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 14px; }
-.kv dt { color: var(--muted); } .kv dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
-.members { margin-top: 10px; font-size: 13px; color: var(--muted); }
-.subhead { font-size: 15px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; margin: 28px 0 12px; }
-.town.federation { border-top-style: double; border-top-width: 6px; }
-.mapwrap { position: relative; background: #0f0d0a; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; height: 70vh; }
-canvas { display: block; width: 100%; height: 100%; cursor: grab; } canvas:active { cursor: grabbing; }
-.maptools { position: absolute; top: 12px; left: 12px; display: flex; gap: 8px; }
-.maptools select, .maptools button { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
-.legend { position: absolute; bottom: 12px; left: 12px; background: rgba(31,27,21,.92); border: 1px solid var(--line);
-  border-radius: 8px; padding: 8px 12px; font-size: 13px; max-height: 40%; overflow: auto; }
-.legend div { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
-.swatch { width: 12px; height: 12px; border-radius: 3px; background: var(--c); }
-.tooltip { position: absolute; pointer-events: none; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px;
-  padding: 6px 10px; font-size: 13px; display: none; white-space: nowrap; }
-.toolbar { display: flex; gap: 12px; margin-bottom: 14px; align-items: center; flex-wrap: wrap; }
-input, select { background: var(--panel); border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 9px 12px; font-size: 14px; }
-input:focus { outline: 2px solid var(--gold); outline-offset: -1px; }
-table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
-th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); font-size: 14px; }
-th { color: var(--muted); font-weight: 600; cursor: pointer; user-select: none; background: var(--panel2); }
-td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-tr:last-child td { border-bottom: none; }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
-.card h2 { margin: 0 0 12px; font-size: 18px; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.5 var(--font); font-variant-numeric: tabular-nums; }
+a { color: var(--emerald); }
+:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+h1, h2, h3 { line-height: 1.15; margin: 0; }
+h2 { font-size: 1.6rem; font-weight: 700; letter-spacing: -.01em; }
+h3 { font-size: 1.1rem; font-weight: 650; }
+p { margin: 0 0 .8em; max-width: 68ch; }
+.muted { color: var(--muted); }
+.small { font-size: .875rem; }
+
+/* Kopfzeile */
+.top { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--paper) 88%, transparent);
+  backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+.top-in { max-width: 1240px; margin: 0 auto; padding: 0 20px; display: flex; align-items: center; gap: 18px; height: 60px; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); font-weight: 800; font-size: 1.1rem; white-space: nowrap; }
+.brand svg { width: 26px; height: 30px; }
+.nav { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; flex: 1; }
+.nav::-webkit-scrollbar { display: none; }
+.nav a { position: relative; padding: 8px 11px; border-radius: var(--r-m); color: var(--muted); text-decoration: none; font-weight: 500; white-space: nowrap; font-size: .95rem; }
+.nav a:hover { color: var(--ink); background: var(--sunk); }
+.nav a[aria-current="page"] { color: var(--ink); background: var(--surface); box-shadow: inset 0 -2px 0 var(--emerald); }
+.badge { display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 4px; border-radius: 9px; background: var(--emerald);
+  color: var(--surface); font-size: .72rem; line-height: 18px; text-align: center; font-weight: 700; vertical-align: 1px; }
+.badge:empty { display: none; }
+.who { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.iconbtn { display: grid; place-items: center; background: none; border: 1px solid var(--line); color: var(--muted); border-radius: var(--r-m); width: 36px; height: 36px; cursor: pointer; font-size: 1rem; }
+.iconbtn:hover { color: var(--ink); }
+
+main { max-width: 1240px; margin: 0 auto; padding: 32px 20px 80px; }
+section[data-page] { display: none; }
+section[data-page].on { display: block; }
+.pagehead { display: flex; align-items: end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+.pagehead p { margin: 6px 0 0; color: var(--muted); }
+
+/* Knöpfe und Felder */
+button, input, select, textarea { font: inherit; color: inherit; }
+.btn { display: inline-flex; align-items: center; gap: 6px; border-radius: var(--r-m); padding: 9px 16px; font-weight: 600; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink); text-decoration: none; font-size: .95rem; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--emerald); border-color: var(--emerald); color: var(--surface); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.danger { color: var(--red); }
+.btn.small { padding: 5px 10px; font-size: .85rem; }
+.btn:disabled { opacity: .5; cursor: default; }
+input, select, textarea { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-m); padding: 9px 12px; min-width: 0; }
+textarea { resize: vertical; min-height: 140px; width: 100%; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--emerald); outline-offset: -1px; }
+label.field { display: grid; gap: 4px; font-size: .875rem; color: var(--muted); }
+label.field > input, label.field > select, label.field > textarea { color: var(--ink); font-size: 1rem; }
 .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-button.primary { background: var(--gold); color: #1b1610; border: none; border-radius: 8px; padding: 10px 16px; font-weight: 600; cursor: pointer; }
-button.ghost { background: none; color: var(--muted); border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; cursor: pointer; }
-button.yes { background: #23402b; color: var(--green); border: 1px solid #2f5a3a; border-radius: 8px; padding: 8px 14px; cursor: pointer; }
-button.no { background: #4a2420; color: var(--red); border: 1px solid #6a312b; border-radius: 8px; padding: 8px 14px; cursor: pointer; }
-.balance { font-size: 34px; color: var(--gold); font-variant-numeric: tabular-nums; }
-.muted { color: var(--muted); } .msg { margin-top: 10px; font-size: 14px; white-space: pre-line; } .msg.ok { color: var(--green); } .msg.err { color: var(--red); }
-.proposal { border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-top: 10px; background: var(--panel2); }
-.bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; margin: 8px 0; display: flex; }
-.bar .y { background: var(--green); } .bar .n { background: var(--red); }
-.empty { color: var(--muted); padding: 30px; text-align: center; border: 1px dashed var(--line); border-radius: var(--radius); }
-code { background: var(--panel2); padding: 2px 6px; border-radius: 4px; }
-.offices { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
-.office { border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: var(--panel2); }
-.office h3 { margin: 0 0 4px; font-size: 15px; color: var(--gold); }
-.office .holder { font-size: 17px; margin-bottom: 6px; }
-.office .election { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px; }
-.candidate { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 6px; }
-.candidate.chosen span { color: var(--green); font-weight: 600; }
+.grow { flex: 1; }
+.msg { min-height: 1.4em; margin-top: 10px; font-size: .92rem; white-space: pre-line; }
+.msg:empty { min-height: 0; margin: 0; }
+.msg.ok { color: var(--emerald); } .msg.err { color: var(--red); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-l); padding: 22px; }
+.panel + .panel { margin-top: 16px; }
+.panel > h3 { margin-bottom: 14px; }
+.empty { padding: 28px; text-align: center; color: var(--muted); border: 1px dashed var(--line); border-radius: var(--r-l); }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; background: var(--sunk); font-size: .85rem; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+.dot.on { background: var(--emerald); box-shadow: 0 0 0 3px var(--emerald-soft); }
+.seg { display: inline-flex; background: var(--sunk); border-radius: var(--r-m); padding: 3px; gap: 2px; }
+.seg button { border: none; background: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; color: var(--muted); font-weight: 500; }
+.seg button.on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+
+/* Startseite */
+.hero { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 40px; align-items: center; margin-bottom: 56px; }
+.hero h1 { font-size: clamp(2.4rem, 5.2vw, 4.1rem); font-weight: 800; letter-spacing: -.035em; line-height: 1.02; margin-bottom: 18px; }
+.hero .lead { font-size: 1.15rem; color: var(--muted); max-width: 46ch; margin-bottom: 26px; }
+.hero .row { margin-bottom: 28px; }
+.ledger { display: grid; grid-template-columns: repeat(3, auto); gap: 10px 28px; justify-content: start; }
+.ledger div { display: flex; flex-direction: column; }
+.ledger b { font-size: 1.6rem; font-weight: 700; line-height: 1.1; }
+.ledger span { color: var(--muted); font-size: .875rem; }
+.heromap { position: relative; aspect-ratio: 6 / 5; border-radius: var(--r-l); overflow: hidden; background: var(--sunk); border: 1px solid var(--line); }
+.heromap canvas { width: 100%; height: 100%; display: block; }
+.heromap figcaption { position: absolute; left: 14px; bottom: 12px; right: 14px; display: flex; justify-content: space-between; gap: 10px;
+  font-size: .85rem; color: var(--muted); pointer-events: none; }
+.heromap figcaption a { pointer-events: auto; }
+.features { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; border-top: 1px solid var(--line); margin-bottom: 56px; }
+.feature { padding: 22px 20px 22px 0; border-bottom: 1px solid var(--line); }
+.feature:not(:nth-child(5n)) { border-right: 1px solid var(--line); }
+.feature:not(:nth-child(5n+1)) { padding-left: 20px; }
+.feature svg { width: 28px; height: 28px; color: var(--emerald); margin-bottom: 10px; }
+.feature h3 { margin-bottom: 6px; }
+.feature p { color: var(--muted); font-size: .93rem; margin: 0; }
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; margin-bottom: 40px; }
+.steps { list-style: none; padding: 0; margin: 16px 0 0; counter-reset: step; }
+.steps li { counter-increment: step; display: grid; grid-template-columns: 34px 1fr; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+.steps li::before { content: counter(step); width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid var(--emerald); color: var(--emerald);
+  display: grid; place-items: center; font-weight: 700; font-size: .9rem; }
+.steps b { display: block; }
+.cmds { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--r-l); overflow: hidden; margin-top: 16px; }
+.cmds div { background: var(--surface); padding: 10px 14px; display: grid; grid-template-columns: minmax(0, 13em) 1fr; gap: 12px; font-size: .92rem; }
+.cmds code { color: var(--emerald); font-weight: 600; }
+code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: .88em; }
+
+/* Register (Welt) */
+.toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 18px; }
+.register { border-top: 1px solid var(--line); }
+.entry { display: grid; grid-template-columns: 54px minmax(0, 1.4fr) minmax(0, 2.6fr); gap: 18px; padding: 18px 4px; border-bottom: 1px solid var(--line); align-items: start; }
+.entry .crest { width: 48px; height: 56px; }
+.entry h3 { font-size: 1.2rem; }
+.entry .sub { color: var(--muted); font-size: .9rem; margin-top: 2px; }
+.facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px 20px; margin: 0; }
+.facts div { min-width: 0; }
+.facts dt { color: var(--muted); font-size: .8rem; }
+.facts dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.entry details { grid-column: 2 / -1; }
+.entry summary { cursor: pointer; color: var(--emerald); font-size: .9rem; font-weight: 600; }
+.addr { columns: 2 220px; margin-top: 10px; font-size: .9rem; }
+.addr div { break-inside: avoid; padding: 2px 0; }
+.mood { display: inline-block; width: 60px; height: 6px; border-radius: 3px; background: var(--sunk); vertical-align: middle; margin-left: 6px; position: relative; overflow: hidden; }
+.mood i { position: absolute; top: 0; bottom: 0; left: 50%; background: var(--c); }
+
+/* Karte */
+.mapwrap { position: relative; height: 72vh; min-height: 420px; border-radius: var(--r-l); overflow: hidden; border: 1px solid var(--line); background: var(--sunk); }
+#canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+#canvas:active { cursor: grabbing; }
+.maptools { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; gap: 8px; flex-wrap: wrap; pointer-events: none; }
+.maptools > * { pointer-events: auto; }
+.legend { position: absolute; bottom: 12px; left: 12px; background: color-mix(in srgb, var(--surface) 92%, transparent); border: 1px solid var(--line);
+  border-radius: var(--r-m); padding: 8px 12px; font-size: .85rem; max-height: 40%; max-width: calc(100% - 24px); overflow: auto; }
+.legend div { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
+.swatch { width: 12px; height: 12px; border-radius: 3px; background: var(--c); flex: none; }
+.tooltip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-s);
+  padding: 6px 10px; font-size: .85rem; display: none; white-space: nowrap; box-shadow: 0 4px 14px rgba(0,0,0,.15); }
+
+/* Wahlen */
+.polls { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 36px; }
+.poll { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-l); padding: 18px; border-left: 4px solid var(--c); }
+.poll .sub { color: var(--muted); font-size: .88rem; margin: 2px 0 12px; }
+.bar { height: 8px; background: var(--sunk); border-radius: 4px; overflow: hidden; margin: 3px 0 10px; }
+.bar > span { display: block; height: 100%; background: var(--c); border-radius: 4px; }
+.line { display: flex; justify-content: space-between; gap: 10px; font-size: .93rem; }
+
+/* Tabellen */
+table { width: 100%; border-collapse: collapse; }
+.tablewrap { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-l); overflow: auto; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); font-size: .93rem; }
+th { color: var(--muted); font-weight: 600; cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--surface); }
+td.num, th.num { text-align: right; }
+tr:last-child td { border-bottom: none; }
+
+/* Börse */
+.exchange { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 16px; align-items: start; }
+.tickers { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-l); overflow: hidden; }
+.ticker { display: grid; grid-template-columns: minmax(0, 1fr) 84px auto; gap: 12px; align-items: center; width: 100%;
+  padding: 12px 16px; border: none; border-bottom: 1px solid var(--line); background: none; cursor: pointer; text-align: left; }
+.ticker:last-child { border-bottom: none; }
+.ticker:hover { background: var(--sunk); }
+.ticker.sel { background: var(--emerald-soft); }
+.ticker .n { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ticker .m { color: var(--muted); font-size: .82rem; }
+.ticker .p { text-align: right; font-weight: 650; }
+.up { color: var(--emerald); } .down { color: var(--red); }
+.quote { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin: 4px 0 14px; }
+.quote b { font-size: 2.4rem; font-weight: 800; letter-spacing: -.02em; line-height: 1; }
+.chart { width: 100%; height: auto; aspect-ratio: 640 / 220; display: block; }
+.tradeform .row > * { flex: 1 1 7em; }
+.chart text { font: 11px var(--font); fill: var(--muted); }
+.book { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: .9rem; }
+.book div > div { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px dashed var(--line); }
+.tradeform { display: grid; gap: 10px; }
+/* Presse */
+.press { display: grid; grid-template-columns: minmax(260px, 360px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.stance { display: inline-flex; align-items: center; gap: 6px; font-size: .8rem; color: var(--muted); }
+.stance i { width: 34px; height: 6px; border-radius: 3px; background: var(--sunk); position: relative; overflow: hidden; display: inline-block; }
+.stance i::after { content: ""; position: absolute; top: 0; bottom: 0; left: calc(50% + var(--t) * 25% - 4px); width: 8px; border-radius: 3px; background: var(--c); }
+.article { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-l); padding: 28px 32px; }
+.article .masthead { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-bottom: 12px; margin-bottom: 18px;
+  border-bottom: 3px double var(--ink); font-size: .9rem; }
+.article .masthead b { font-size: 1.05rem; letter-spacing: .02em; }
+.article h3 { font-size: 1.7rem; line-height: 1.15; margin-bottom: 10px; }
+.article .body { white-space: pre-wrap; max-width: 68ch; line-height: 1.7; }
+.article .afoot { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--line); }
+.chart + .facts { margin-top: 14px; }
+
+/* Post */
+.mail { display: grid; grid-template-columns: minmax(250px, 340px) minmax(0, 1fr); gap: 16px; min-height: 520px; }
+.list { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-l); overflow: auto; max-height: 70vh; }
+.list button { display: block; width: 100%; text-align: left; border: none; border-bottom: 1px solid var(--line); background: none; padding: 12px 16px; cursor: pointer; }
+.list button:hover { background: var(--sunk); }
+.list button.sel { background: var(--emerald-soft); }
+.list button .t { display: flex; justify-content: space-between; gap: 10px; font-size: .85rem; color: var(--muted); }
+.list button .s { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list button.unread .s { font-weight: 750; }
+.list button.unread .t span:first-child::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--emerald); margin-right: 6px; vertical-align: 1px; }
+.letter { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-l); padding: 28px 32px; }
+.letter .envelope { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-bottom: 16px; margin-bottom: 18px; border-bottom: 1px solid var(--line); font-size: .9rem; color: var(--muted); }
+.letter h3 { font-size: 1.4rem; margin-bottom: 14px; }
+.letter .body { white-space: pre-wrap; max-width: 68ch; line-height: 1.65; }
+.stamp { border: 2px solid var(--brass); color: var(--brass); border-radius: 4px; padding: 4px 8px; font-weight: 700; font-size: .8rem; transform: rotate(-4deg); align-self: start; text-align: center; line-height: 1.2; }
+.compose { display: grid; gap: 12px; }
+
+/* Chat */
+.chat { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 16px; height: 70vh; min-height: 460px; }
+.channels { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-l); overflow: auto; padding: 8px; }
+.channels button { display: flex; align-items: center; gap: 8px; width: 100%; border: none; background: none; padding: 9px 10px; border-radius: var(--r-m); cursor: pointer; text-align: left; }
+.channels button:hover { background: var(--sunk); }
+.channels button.sel { background: var(--emerald-soft); font-weight: 600; }
+.channels .unread { margin-left: auto; }
+.channels h4 { margin: 12px 10px 4px; font-size: .8rem; color: var(--muted); font-weight: 600; }
+.room { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-l); min-height: 0; }
+.room header { padding: 14px 18px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.feed { flex: 1; overflow-y: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; }
+.bubble { max-width: min(560px, 85%); padding: 8px 12px; border-radius: 12px 12px 12px 3px; background: var(--sunk); align-self: flex-start; overflow-wrap: anywhere; }
+.bubble.mine { align-self: flex-end; background: var(--emerald-soft); border-radius: 12px 12px 3px 12px; }
+.bubble .meta { font-size: .78rem; color: var(--muted); display: flex; gap: 8px; margin-bottom: 2px; }
+.bubble .meta b { color: var(--ink); font-weight: 650; }
+.origin { font-size: .72rem; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+.room form { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--line); }
+.room form input { flex: 1; }
+
+/* Freunde */
+.people { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--r-l); overflow: hidden; }
+.person { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--surface); flex-wrap: wrap; }
+.avatar { width: 36px; height: 36px; border-radius: 8px; image-rendering: pixelated; background: var(--sunk); flex: none; }
+.person .name { font-weight: 650; }
+.person .sub { color: var(--muted); font-size: .85rem; }
+.person .row { margin-left: auto; }
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
+.cols h3 { margin: 0 0 10px; }
+
+/* Mein Bereich */
+.account { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px; align-items: center; }
+.balance { font-size: 2.6rem; font-weight: 800; letter-spacing: -.02em; line-height: 1; }
+.balance small { font-size: 1rem; color: var(--muted); font-weight: 500; margin-left: 6px; }
+.dash { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; margin-top: 16px; align-items: start; }
+.dash .panel + .panel { margin-top: 0; }
+.contract { border-top: 1px solid var(--line); padding: 14px 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
+.contract:first-of-type { border-top: none; padding-top: 0; }
+.contract .head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.status { font-size: .78rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: var(--sunk); color: var(--muted); }
+.status.OFFERED { background: color-mix(in srgb, var(--brass) 20%, transparent); color: var(--brass); }
+.status.ACTIVE { background: var(--emerald-soft); color: var(--emerald); }
+.offices { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.office { border: 1px solid var(--line); border-radius: var(--r-m); padding: 14px; }
+.office .holder { font-size: 1.1rem; font-weight: 650; margin: 2px 0 4px; }
+.candidate { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; }
+.proposal { border-top: 1px solid var(--line); padding: 14px 0; }
+.votebar { display: flex; height: 6px; border-radius: 3px; background: var(--sunk); overflow: hidden; margin: 8px 0; }
+.votebar .y { background: var(--emerald); } .votebar .n { background: var(--red); }
+.login { max-width: 520px; }
+.code { font-size: 1.4rem; letter-spacing: .25em; text-transform: uppercase; width: 9em; font-weight: 700; }
+footer { border-top: 1px solid var(--line); color: var(--muted); font-size: .85rem; }
+footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+@media (max-width: 960px) {
+  .hero, .split, .mail, .cols, .dash, .exchange, .press { grid-template-columns: minmax(0, 1fr); }
+  .features { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .feature, .feature:not(:nth-child(4n+1)) { padding: 18px 16px 18px 0; border-right: none !important; }
+  .feature:nth-child(odd) { border-right: 1px solid var(--line) !important; }
+  .feature:nth-child(even) { padding-left: 16px; }
+  .entry { grid-template-columns: 44px minmax(0, 1fr); }
+  .entry .facts { grid-column: 1 / -1; }
+  .chat { grid-template-columns: minmax(0, 1fr); height: auto; }
+  .channels { display: flex; gap: 4px; overflow-x: auto; padding: 6px; }
+  .channels h4 { display: none; }
+  .channels button { width: auto; white-space: nowrap; }
+  .room { height: 65vh; }
+}
+@media (max-width: 560px) {
+  main { padding: 22px 16px 60px; }
+  .top-in { padding: 0 12px; gap: 10px; }
+  .brand span { display: none; }
+  .features { grid-template-columns: minmax(0, 1fr); }
+  .feature, .feature:nth-child(n) { padding: 16px 0 !important; border-right: none !important; }
+  .ledger { grid-template-columns: repeat(2, auto); }
+  .cmds div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .letter, .article { padding: 20px; }
+  .account { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hero h1, .hero .lead, .hero .row, .ledger { animation: rise .6s cubic-bezier(.2,.7,.2,1) both; }
+  .hero .lead { animation-delay: .06s; } .hero .row { animation-delay: .12s; } .ledger { animation-delay: .18s; }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+}
 </style>
 </head>
 <body>
-<header>
-  <h1>⚑ Eddies <span>Civ</span></h1>
-  <span class="muted" id="day"></span>
-  <nav>
-    <button data-tab="overview" class="active">Übersicht</button>
-    <button data-tab="map">Karte</button>
-    <button data-tab="market">Markt</button>
-    <button data-tab="me">Mein Bereich</button>
-  </nav>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-town" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6M12 5V2m0 0h3"/></symbol>
+  <symbol id="i-law" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 3v18M7 21h10M4 7h16M4 7l-2 6a3 3 0 0 0 4 0L4 7Zm16 0-2 6a3 3 0 0 0 4 0l-2-6Z"/></symbol>
+  <symbol id="i-vote" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4 13h16v8H4zM8 13V4h8v9M10 8l1.5 1.5L14 7"/></symbol>
+  <symbol id="i-coin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 2 4 8l8 14 8-14-8-6ZM4 8h16M12 2l-3 6 3 14 3-14-3-6"/></symbol>
+  <symbol id="i-road" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 21 9 3M18 21 15 3M12 5v2m0 4v2m0 4v2"/></symbol>
+  <symbol id="i-contract" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M6 2h9l4 4v16H6zM14 2v5h5M9 12h7M9 16h4M14 19l2 1 2-3"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M3 6h18v12H3zM3 6l9 7 9-7"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18M5 16l4-5 3 3 6-8M15 6h3v3"/></symbol>
+  <symbol id="i-paper" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4 5h13v14a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2zM17 9h3v10a2 2 0 0 1-2 2M7 9h7M7 13h7M7 17h4"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/></symbol>
+</svg>
+<header class="top">
+  <div class="top-in">
+    <a class="brand" href="#start" aria-label="Eddies Civ, Startseite"><svg id="brandcrest" viewBox="0 0 40 46"></svg><span>Eddies Civ</span></a>
+    <nav class="nav" aria-label="Hauptnavigation">
+      <a href="#start">Start</a>
+      <a href="#welt">Welt</a>
+      <a href="#karte">Karte</a>
+      <a href="#wahlen">Wahlen</a>
+      <a href="#markt">Markt</a>
+      <a href="#boerse">Börse</a>
+      <a href="#presse">Presse</a>
+      <a href="#post">Post<span class="badge" id="b-post"></span></a>
+      <a href="#chat">Chat<span class="badge" id="b-chat"></span></a>
+      <a href="#freunde">Freunde<span class="badge" id="b-friends"></span></a>
+      <a href="#ich">Mein Bereich<span class="badge" id="b-me"></span></a>
+    </nav>
+    <div class="who">
+      <a class="btn small" id="whobtn" href="#ich">Anmelden</a>
+      <button class="iconbtn" id="theme" title="Hell oder dunkel" aria-label="Farbschema wechseln"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16Z" fill="currentColor"/></svg></button>
+    </div>
+  </div>
 </header>
 <main>
-  <section id="overview" class="active">
-    <div class="stats" id="stats"></div>
-    <div class="towns" id="towns"></div>
-    <h2 class="subhead" id="fedhead" hidden>Bünde</h2>
-    <div class="towns" id="federations"></div>
-    <h2 class="subhead" id="partyhead" hidden>Parteien</h2>
-    <div class="towns" id="parties"></div>
+  <section data-page="start">
+    <div class="hero">
+      <div>
+        <h1>Eine Welt, die sich selbst regiert.</h1>
+        <p class="lead">Auf diesem Server gründen Spieler Gemeinden, schreiben Verfassungen, wählen Parlamente und handeln mit Smaragden. Dorfbewohner wählen mit, arbeiten und ziehen weg, wenn es ihnen nicht gefällt.</p>
+        <div class="row">
+          <a class="btn primary" href="#karte">Karte ansehen</a>
+          <a class="btn" href="#ich" id="herologin">Mit Spielcode anmelden</a>
+        </div>
+        <div class="ledger" id="ledger"></div>
+      </div>
+      <figure class="heromap" style="margin:0">
+        <canvas id="herocanvas" aria-label="Gebiete aller Gemeinden in der Oberwelt"></canvas>
+        <figcaption><span id="herocap"></span><a href="#karte">Zur großen Karte</a></figcaption>
+      </figure>
+    </div>
+
+    <div class="features">
+      <div class="feature"><svg><use href="#i-town"/></svg><h3>Gemeinden</h3><p>Ein Gemeindehaus beansprucht Land. Je mehr Bürger, desto mehr Chunks; Grundstücke lassen sich verkaufen und vermieten.</p></div>
+      <div class="feature"><svg><use href="#i-law"/></svg><h3>Verfassung und Gesetze</h3><p>Steuern, Explosionen, Wahlrecht: Gesetze werden im Rathaus beantragt, abgestimmt und gelten sofort im Spiel.</p></div>
+      <div class="feature"><svg><use href="#i-vote"/></svg><h3>Wahlen und Parlament</h3><p>Bürgermeister, Kämmerer, Parlament nach Sainte-Laguë. Wahlkampf mit Reden, Plakaten und Versprechen, Briefwahl am Briefkasten.</p></div>
+      <div class="feature"><svg><use href="#i-coin"/></svg><h3>Wirtschaft</h3><p>Smaragde auf dem Konto, ein Servermarkt mit schwankenden Preisen, Läden der Spieler und Steuern für die Gemeindekasse.</p></div>
+      <div class="feature"><svg><use href="#i-road"/></svg><h3>Straßen und Adressen</h3><p>Das Bauamt legt Straßen an, jedes Grundstück daran bekommt Hausnummer und Postleitzahl.</p></div>
+      <div class="feature"><svg><use href="#i-contract"/></svg><h3>Verträge</h3><p>Miete mit Kaution, Arbeitsverträge mit Spielern und Dorfbewohnern, Bündnisse zwischen Gemeinden. Wer nicht zahlt, bricht den Vertrag.</p></div>
+      <div class="feature"><svg><use href="#i-mail"/></svg><h3>Post</h3><p>Briefe kommen am nächsten Spieltag an, im Spiel am Briefkasten oder hier auf der Webseite.</p></div>
+      <div class="feature"><svg><use href="#i-chart"/></svg><h3>Firmen und Börse</h3><p>Firmen starten mit Kapital und 1.000 Aktien. Kurse entstehen im Orderbuch, Dividenden kommen aus der Firmenkasse, sparsame Dorfbewohner kaufen mit.</p></div>
+      <div class="feature"><svg><use href="#i-paper"/></svg><h3>Presse</h3><p>Zeitungen berichten mit Haltung. Wer welche Artikel liest, entscheidet mit über Stimmung und Wahlen; Dorfbewohner schreiben selbst.</p></div>
+      <div class="feature"><svg><use href="#i-chat"/></svg><h3>Chat und Freunde</h3><p>Der Spielchat erscheint hier live. Freunden schreibst du Direktnachrichten, egal ob sie im Spiel oder im Browser sind.</p></div>
+    </div>
+
+    <div class="split">
+      <div>
+        <h2>So steigst du ein</h2>
+        <ol class="steps">
+          <li><div><b>Gemeinde finden oder gründen</b><span class="muted">Tritt mit <code>/civ beitreten &lt;Name&gt;</code> bei oder stelle selbst ein Gemeindehaus auf.</span></div></li>
+          <li><div><b>Konto füllen</b><span class="muted">Zahle Smaragde an der Bank ein und verkaufe Waren am Markt-Block.</span></div></li>
+          <li><div><b>Hier anmelden</b><span class="muted">Tippe im Spiel <code>/civ web</code> und gib den sechsstelligen Code unter „Mein Bereich“ ein.</span></div></li>
+          <li><div><b>Mitreden</b><span class="muted">Stimme über Gesetze ab, kandidiere bei Wahlen, schreibe Briefe und Verträge.</span></div></li>
+        </ol>
+      </div>
+      <div>
+        <h2>Wichtige Befehle</h2>
+        <div class="cmds">
+          <div><code>/civ menue</code><span>Rathaus mit allen Menüs</span></div>
+          <div><code>/civ web</code><span>Anmeldecode für diese Seite</span></div>
+          <div><code>/civ post</code><span>Postfach; Briefe mit <code>/civ brief</code></span></div>
+          <div><code>/civ freund &lt;Spieler&gt;</code><span>Freundschaft anfragen oder annehmen</span></div>
+          <div><code>/civ vertrag</code><span>Miete, Arbeit, Bündnis, freie Verträge</span></div>
+          <div><code>/civ strasse anlegen</code><span>Straße aus der Stab-Auswahl (Bauamt)</span></div>
+          <div><code>/civ adresse</code><span>Deine Anschrift</span></div>
+          <div><code>/civ boerse</code><span>Kurse, kaufen und verkaufen, Depot</span></div>
+          <div><code>/civ zeitung</code><span>Zeitungen gründen, schreiben, lesen</span></div>
+          <div><code>/civ hilfe</code><span>Alle Befehle</span></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <h2 style="margin-bottom:12px">Gerade online</h2>
+      <div class="chips" id="online"></div>
+    </div>
   </section>
-  <section id="map">
+
+  <section data-page="welt">
+    <div class="pagehead">
+      <div><h2>Welt</h2><p id="worldsub">Alle Gemeinden, Bünde und Parteien mit ihren Kennzahlen.</p></div>
+      <div class="toolbar" style="margin:0">
+        <div class="seg" id="worldkind" role="tablist">
+          <button class="on" data-kind="towns">Gemeinden</button><button data-kind="federations">Bünde</button><button data-kind="parties">Parteien</button><button data-kind="companies">Firmen</button><button data-kind="newspapers">Zeitungen</button>
+        </div>
+        <input id="worldsearch" type="search" placeholder="Suchen" aria-label="Suchen">
+      </div>
+    </div>
+    <div class="register" id="register"></div>
+  </section>
+
+  <section data-page="karte">
+    <div class="pagehead"><div><h2>Karte</h2><p>Ziehen zum Verschieben, Mausrad oder zwei Finger zum Zoomen. Ein Feld ist ein Chunk (16 × 16 Blöcke).</p></div></div>
     <div class="mapwrap">
       <canvas id="canvas"></canvas>
       <div class="maptools">
-        <select id="dim">
+        <select id="dim" aria-label="Dimension">
           <option value="minecraft:overworld">Oberwelt</option>
           <option value="minecraft:the_nether">Nether</option>
           <option value="minecraft:the_end">Ende</option>
         </select>
-        <button id="recenter">Zentrieren</button>
+        <select id="mapmode" aria-label="Ansicht"><option value="">Gebiete</option></select>
+        <label class="btn small" style="background:var(--surface)"><input type="checkbox" id="showstreets" checked style="padding:0"> Straßen</label>
+        <button class="btn small" id="recenter">Zentrieren</button>
       </div>
       <div class="legend" id="legend"></div>
       <div class="tooltip" id="tooltip"></div>
     </div>
-    <p class="muted">Ziehen zum Verschieben, Mausrad zum Zoomen. Jedes Feld ist ein Chunk (16 × 16 Blöcke); Außenposten sind gestreift, ★ markiert das Gemeindehaus.</p>
+    <p class="muted small" style="margin-top:10px">Außenposten sind schraffiert, ein Stern markiert das Gemeindehaus. In der Wahlkarte färbt sich jede Gemeinde nach dem Führenden ihres Wahlbezirks.</p>
   </section>
-  <section id="market">
-    <div class="toolbar">
-      <input id="search" placeholder="Ware suchen …" size="28">
-      <span class="muted" id="level"></span>
+
+  <section data-page="wahlen">
+    <div class="pagehead">
+      <div><h2>Wahlen</h2><p>Umfragen befragen die Dorfbewohner, auch ohne Wahlrecht. Die Stimmen der Spieler bleiben geheim.</p></div>
+      <div class="toolbar" style="margin:0">
+        <select id="elevel" aria-label="Ebene"><option value="">Alle Ebenen</option></select>
+        <select id="eparty" aria-label="Partei"><option value="">Alle Parteien</option></select>
+      </div>
     </div>
-    <table>
-      <thead><tr><th data-sort="name">Ware</th><th class="num" data-sort="stock">Lager</th><th class="num" data-sort="buyUnits">Kaufen</th><th class="num" data-sort="sell">Verkaufen</th></tr></thead>
-      <tbody id="offers"></tbody>
-    </table>
-    <p class="muted">Preise in Smaragden. Verkaufen und kaufen kannst du am Markt-Block im Spiel. Viel Lager drückt den Preis; das Lager schrumpft jeden Tag.</p>
-    <h2 style="margin-top:32px">Läden der Spieler</h2>
-    <table>
-      <thead><tr><th>Ware</th><th class="num">Preis je Stück</th><th>Inhaber</th><th>Ort</th></tr></thead>
-      <tbody id="shops"></tbody>
-    </table>
+    <h3 id="pollhead" style="margin-bottom:12px">Laufende Wahlen</h3>
+    <div class="polls" id="polls"></div>
+    <h3 style="margin-bottom:12px">Ergebnisse</h3>
+    <div class="polls" id="results"></div>
   </section>
-  <section id="me">
-    <div id="login" class="card">
-      <h2>Anmelden</h2>
-      <p class="muted">Tippe im Spiel <code>/civ web</code> und gib den Code hier ein. Er gilt 10 Minuten.</p>
-      <div class="row"><input id="code" placeholder="Code, z. B. K7M2QX" maxlength="6" autocomplete="off"><button class="primary" id="loginbtn">Anmelden</button></div>
-      <div class="msg" id="loginmsg"></div>
+
+  <section data-page="markt">
+    <div class="pagehead">
+      <div><h2>Markt</h2><p id="level">Preise in Smaragden. Viel Lager drückt den Preis; das Lager schrumpft jeden Tag.</p></div>
+      <input id="search" type="search" placeholder="Ware suchen" aria-label="Ware suchen">
     </div>
-    <div id="account" style="display:none">
-      <div class="card">
-        <div class="row" style="justify-content:space-between">
-          <div><div class="muted" id="who"></div><div class="balance" id="balance"></div></div>
-          <button class="ghost" id="logout">Abmelden</button>
+    <div class="tablewrap" style="max-height:60vh">
+      <table>
+        <thead><tr><th data-sort="name">Ware</th><th class="num" data-sort="stock">Lager</th><th class="num" data-sort="buyUnits">Kaufen</th><th class="num" data-sort="sell">Verkaufen</th></tr></thead>
+        <tbody id="offers"></tbody>
+      </table>
+    </div>
+    <h3 style="margin:32px 0 12px">Läden der Spieler</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Ware</th><th class="num">Preis je Stück</th><th>Inhaber</th><th>Ort</th></tr></thead>
+        <tbody id="shops"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section data-page="boerse">
+    <div class="pagehead">
+      <div><h2>Börse</h2><p>Kurse in Smaragden je Aktie. Orders warten bis zu 7 Tage im Orderbuch; sparsame Dorfbewohner kaufen und verkaufen mit.</p></div>
+    </div>
+    <div class="exchange">
+      <div>
+        <div class="tickers" id="tickers"></div>
+        <h3 style="margin:24px 0 10px">Letzte Geschäfte</h3>
+        <div class="tablewrap"><table><thead><tr><th>Firma</th><th class="num">Stück</th><th class="num">Kurs</th><th>Käufer</th><th>Verkäufer</th></tr></thead><tbody id="trades"></tbody></table></div>
+      </div>
+      <div id="stock"></div>
+    </div>
+  </section>
+
+  <section data-page="presse">
+    <div class="pagehead">
+      <div><h2>Presse</h2><p>Jeder Artikel hat einen Gegenstand, eine Haltung und ein Thema. Dorfbewohner, die ihn lesen, ändern drei Tage lang ihre Stimmung und ihre Wahlentscheidung.</p></div>
+      <div class="row">
+        <select id="paperfilter" aria-label="Zeitung"><option value="">Alle Zeitungen</option></select>
+        <button class="btn primary" id="newarticle" hidden>Artikel schreiben</button>
+      </div>
+    </div>
+    <div class="press">
+      <div class="list" id="articles"></div>
+      <div id="articleview"></div>
+    </div>
+    <h3 style="margin:32px 0 12px">Zeitungen</h3>
+    <div class="register" id="papers"></div>
+  </section>
+
+  <section data-page="post">
+    <div class="pagehead">
+      <div><h2>Post</h2><p>Briefe kommen am nächsten Spieltag an. Im Spiel liest du sie am Briefkasten oder mit <code>/civ post</code>.</p></div>
+      <div class="row">
+        <div class="seg" id="mailbox"><button class="on" data-box="inbox">Eingang</button><button data-box="sent">Gesendet</button></div>
+        <button class="btn primary" id="newletter">Brief schreiben</button>
+      </div>
+    </div>
+    <div data-locked></div>
+    <div class="mail" data-unlocked>
+      <div class="list" id="letters"></div>
+      <div id="reader"></div>
+    </div>
+  </section>
+
+  <section data-page="chat">
+    <div class="pagehead"><div><h2>Chat</h2><p>Der allgemeine Chat ist mit dem Spiel verbunden. Direktnachrichten gehen an Freunde.</p></div></div>
+    <div data-locked></div>
+    <div class="chat" data-unlocked>
+      <nav class="channels" id="channels" aria-label="Unterhaltungen"></nav>
+      <div class="room">
+        <header><h3 id="roomname">Allgemein</h3><span class="muted small" id="roomsub"></span></header>
+        <div class="feed" id="feed" aria-live="polite"></div>
+        <form id="chatform"><input id="chatinput" maxlength="256" autocomplete="off" placeholder="Nachricht schreiben" aria-label="Nachricht"><button class="btn primary">Senden</button></form>
+      </div>
+    </div>
+    <div class="msg err" id="chatmsg"></div>
+  </section>
+
+  <section data-page="freunde">
+    <div class="pagehead">
+      <div><h2>Freunde</h2><p>Eine Anfrage wird zur Freundschaft, sobald beide Seiten zugestimmt haben.</p></div>
+      <form class="row" id="friendform" data-unlocked>
+        <input id="friendname" list="playerlist" placeholder="Spielername" aria-label="Spielername" autocomplete="off">
+        <button class="btn primary">Anfrage senden</button>
+      </form>
+    </div>
+    <datalist id="playerlist"></datalist>
+    <div data-locked></div>
+    <div class="msg" id="friendmsg"></div>
+    <div class="cols" data-unlocked>
+      <div><h3>Freunde</h3><div id="friendlist"></div></div>
+      <div><h3>Anfragen</h3><div id="requestlist"></div></div>
+    </div>
+  </section>
+
+  <section data-page="ich">
+    <div data-locked></div>
+    <div data-unlocked>
+      <div class="panel account">
+        <div>
+          <div class="muted" id="who"></div>
+          <div class="balance" id="balance"></div>
+          <div class="muted small" id="address" style="margin-top:8px"></div>
+        </div>
+        <button class="btn" id="logout">Abmelden</button>
+      </div>
+      <div class="dash">
+        <div class="panel">
+          <h3>Überweisen</h3>
+          <div class="row">
+            <input id="to" class="grow" list="playerlist" placeholder="Spieler oder Gemeinde" aria-label="Empfänger">
+            <input id="amount" placeholder="Betrag, z. B. 2,5" size="12" aria-label="Betrag">
+            <button class="btn primary" id="send">Überweisen</button>
+          </div>
+          <div class="msg" id="sendmsg"></div>
+        </div>
+        <div class="panel">
+          <h3>Vertrag anbieten</h3>
+          <div class="compose">
+            <div class="row">
+              <select id="ckind" aria-label="Vertragsart"><option value="custom">Freier Vertrag</option><option value="employment">Arbeit (Lohn je Tag)</option></select>
+              <input id="cto" class="grow" list="playerlist" placeholder="Mit wem" aria-label="Vertragspartner">
+            </div>
+            <div class="row" id="ccustom">
+              <input id="ctitle" class="grow" maxlength="40" placeholder="Titel" aria-label="Titel">
+              <input id="conce" size="9" placeholder="Einmalig" aria-label="Einmalige Zahlung">
+            </div>
+            <div class="row">
+              <input id="cdaily" size="9" placeholder="Je Tag" aria-label="Zahlung je Tag">
+              <input id="cdays" size="9" type="number" min="0" placeholder="Tage, 0 = unbefristet" aria-label="Laufzeit in Tagen" class="grow">
+            </div>
+            <textarea id="ctext" maxlength="500" placeholder="Was vereinbart ist" aria-label="Vertragstext" style="min-height:70px"></textarea>
+            <div><button class="btn primary" id="coffer">Anbieten</button></div>
+          </div>
+          <p class="muted small" style="margin-top:10px">Du zahlst die vereinbarten Beträge. Miete bietest du im Spiel auf deinem Grundstück an: <code>/civ vertrag miete</code>.</p>
+          <div class="msg" id="cmsg"></div>
         </div>
       </div>
-      <div class="card">
-        <h2>Überweisen</h2>
-        <div class="row">
-          <input id="to" placeholder="Spieler oder Gemeinde">
-          <input id="amount" placeholder="Betrag, z. B. 2,5" size="12">
-          <button class="primary" id="send">Überweisen</button>
-        </div>
-        <div class="msg" id="sendmsg"></div>
-      </div>
-      <div class="card">
-        <h2>Ämter und Wahlen</h2>
-        <div id="offices" class="offices"></div>
-        <div class="msg" id="officemsg"></div>
-      </div>
-      <div class="card">
-        <h2>Abstimmungen in deiner Gemeinde</h2>
-        <div id="proposals"></div>
-        <div class="msg" id="votemsg"></div>
-      </div>
+      <div class="panel" style="margin-top:16px"><h3>Verträge</h3><div id="contracts"></div><div class="msg" id="contractmsg"></div></div>
+      <div class="panel"><h3>Ämter und Wahlen</h3><div id="offices" class="offices"></div><div class="msg" id="officemsg"></div></div>
+      <div class="panel"><h3>Abstimmungen in deiner Gemeinde</h3><div id="proposals"></div><div class="msg" id="votemsg"></div></div>
     </div>
   </section>
 </main>
+<footer><div><span>Eddies Civ Mod, Weltatlas des Servers</span><span id="foot"></span></div></footer>
+<template id="logintpl">
+  <div class="panel login">
+    <h3>Anmelden</h3>
+    <p class="muted">Tippe im Spiel <code>/civ web</code> und gib den Code hier ein. Er gilt 10 Minuten.</p>
+    <form class="row"><input class="code" maxlength="6" autocomplete="off" placeholder="K7M2QX" aria-label="Anmeldecode"><button class="btn primary">Anmelden</button></form>
+    <div class="msg"></div>
+  </div>
+</template>
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
 const el = (tag, props = {}, ...children) => {
   const node = Object.assign(document.createElement(tag), props);
-  for (const child of children) node.append(child);
+  for (const child of children) if (child !== null && child !== undefined && child !== false) node.append(child);
   return node;
 };
-const moodText = m => (m >= 20 ? "zufrieden" : m < -20 ? "unzufrieden" : "gleichgültig") + " (" + (m > 0 ? "+" : "") + m + ")";
-const palette = ["#e0b04a", "#7bd88f", "#7fb2e5", "#ff8f6b", "#c792ea", "#5fd3c6", "#f07178", "#c3e88d", "#ffcb6b", "#89ddff"];
-const colorOf = id => {
-  const index = world.towns.findIndex(t => t.id === id);
-  if (index >= 0) return palette[index % palette.length];
-  let h = 0; for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0; return palette[h % palette.length];
-};
+const SVG = "http://www.w3.org/2000/svg";
+const svg = (tag, attrs = {}) => { const n = document.createElementNS(SVG, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); return n; };
 async function api(path, body) {
   const options = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
-  const response = await fetch(path, options);
-  const data = await response.json().catch(() => ({}));
-  return { ok: response.ok, status: response.status, data };
-}
-let world = { towns: [] };
-
-document.querySelectorAll("nav button").forEach(button => button.addEventListener("click", () => {
-  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("active", b === button));
-  document.querySelectorAll("section").forEach(s => s.classList.toggle("active", s.id === button.dataset.tab));
-  if (button.dataset.tab === "map") { resize(); loadMap().then(() => { if (!centered) { centered = true; recenter(); } }); }
-  if (button.dataset.tab === "market") loadMarket();
-  if (button.dataset.tab === "me") loadMe();
-}));
-
-async function loadWorld() {
-  const { ok, data } = await api("/api/world");
-  if (!ok) return;
-  world = data;
-  $("day").textContent = "Tag " + data.day;
-  const residents = data.towns.reduce((sum, t) => sum + t.members.length + t.villagers, 0);
-  const chunks = data.towns.reduce((sum, t) => sum + t.chunks, 0);
-  $("stats").replaceChildren(...[["Gemeinden", data.towns.length], ...((data.federations || []).length ? [["Bünde", data.federations.length]] : []), ...((data.parties || []).length ? [["Parteien", data.parties.length]] : []), ["Einwohner", residents], ["Beanspruchte Chunks", chunks],
-    ["Spieler bekannt", data.players], ["Preisniveau", data.priceLevel + " %"]].map(([label, value]) =>
-    el("div", { className: "stat" }, el("div", { className: "label", textContent: label }), el("div", { className: "value", textContent: value }))));
-  if (!data.towns.length) {
-    $("towns").replaceChildren(el("div", { className: "empty", textContent: "Noch keine Gemeinden. Stelle im Spiel ein Gemeindehaus auf!" }));
-    renderFederations([]);
-    return;
+  try {
+    const response = await fetch(path, options);
+    const data = await response.json().catch(() => ({}));
+    return { ok: response.ok, status: response.status, data };
+  } catch (e) {
+    return { ok: false, status: 0, data: { error: "Server nicht erreichbar." } };
   }
-  $("towns").replaceChildren(...data.towns.map(t => {
-    const card = el("div", { className: "town" });
-    card.style.setProperty("--c", colorOf(t.id));
-    const kv = el("dl", { className: "kv" });
-    for (const [k, v] of [["Bürgermeister", t.mayor], ["Spieler", t.members.length], ["Dorfbewohner", t.villagers],
-      ...(t.villagers ? [["Stimmung", moodText(t.mood) + (t.atRisk ? " · " + t.atRisk + " wollen weg" : "")]] : []),
-      ["Gebiet", t.chunks + " / " + t.claimLimit + " Chunks"], ["Grundstücke", t.plots + (t.plotsForSale ? " (" + t.plotsForSale + " zu verkaufen)" : "")],
-      ["Kasse", t.treasury + " Smaragde"], ["Abstimmungen", t.votes], ...(t.partOf ? [["Bund", t.partOf]] : []),
-      ["Verfassung", t.constitution ? "seit Tag " + t.constitution : "Entwurf"], ["Gesetzbuch", (t.paragraphs || 0) + " §"],
-      ["Gegründet", "Tag " + t.founded]]) {
-      kv.append(el("dt", { textContent: k }), el("dd", { textContent: v }));
-    }
-    card.append(el("h3", { textContent: t.name }), el("div", { className: "tier", textContent: t.tier }), kv,
-      el("div", { className: "members", textContent: t.members.join(", ") }));
-    return card;
-  }));
-  renderFederations(data.federations || []);
-  renderParties(data.parties || []);
+}
+function say(id, text, ok) { const m = $(id); m.textContent = text || ""; m.className = "msg " + (ok ? "ok" : "err"); }
+const hash = s => { let h = 2166136261; for (const c of String(s)) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0; return h; };
+
+/* Farben und Wappen */
+const palette = ["#127a55", "#2f6db5", "#b0542b", "#7a4bb0", "#a8771f", "#1f8c8c", "#b23a5a", "#5a7d1a", "#c2852c", "#3f5aa8"];
+let world = { towns: [], federations: [], parties: [] };
+const colorOf = id => {
+  const index = (world.towns || []).findIndex(t => t.id === id);
+  return palette[(index >= 0 ? index : hash(id)) % palette.length];
+};
+const tinctures = ["#f2ead3", "#d9b44a", "#e4e7e9", "#1d2a33"];
+function crest(id, name, kind) {
+  const h = hash(id), field = colorOf(id), metal = tinctures[(h >>> 4) % tinctures.length];
+  const s = svg("svg", { viewBox: "0 0 40 46", class: "crest", role: "img", "aria-label": "Wappen " + name });
+  const shape = kind === "party" ? "M4 3h32v28L20 43 4 31Z" : kind === "federation" ? "M3 3h34v20c0 11-8 18-17 21C11 41 3 34 3 23Z"
+    : kind === "company" ? "M5 5h30v36H5Z" : kind === "newspaper" ? "M4 4h32v34l-4 4H4Z" : "M4 3h32v18c0 12-7 19-16 22C11 40 4 33 4 21Z";
+  const clip = "c" + h.toString(36) + kind[0];
+  const defs = svg("defs"); const cp = svg("clipPath", { id: clip }); cp.append(svg("path", { d: shape })); defs.append(cp); s.append(defs);
+  const g = svg("g", { "clip-path": "url(#" + clip + ")" });
+  g.append(svg("rect", { x: 0, y: 0, width: 40, height: 46, fill: field }));
+  const division = h % 6;
+  const parts = ["M20 0h20v46H20Z", "M0 23h40v23H0Z", "M0 0L40 46H0Z", "M20 0h20v23H20ZM0 23h20v23H0Z", "M0 46L20 18 40 46Z", "M0 16h40v12H0Z"];
+  g.append(svg("path", { d: parts[division], fill: metal, opacity: ".92" }));
+  s.append(g);
+  s.append(svg("path", { d: shape, fill: "none", stroke: "currentColor", "stroke-opacity": ".35", "stroke-width": "1.5" }));
+  const letter = svg("text", { x: 20, y: 28, "text-anchor": "middle", "font-size": 17, "font-weight": 800, "font-family": "inherit",
+    fill: "#fff", stroke: "#000", "stroke-opacity": ".35", "stroke-width": ".6", "paint-order": "stroke" });
+  letter.textContent = (name || "?").trim().charAt(0).toUpperCase();
+  s.append(letter);
+  return s;
+}
+const head = name => el("img", { className: "avatar", alt: "", loading: "lazy", src: "https://mc-heads.net/avatar/" + encodeURIComponent(name) + "/36",
+  onerror() { this.replaceWith(el("span", { className: "avatar", style: "display:grid;place-items:center;font-weight:700", textContent: name.charAt(0).toUpperCase() })); } });
+
+/* Farbschema */
+(function () {
+  let saved = null; try { saved = localStorage.getItem("civ-theme"); } catch (e) { /* egal */ }
+  if (saved) document.documentElement.dataset.theme = saved;
+  $("theme").addEventListener("click", () => {
+    const dark = getComputedStyle(document.documentElement).colorScheme === "dark";
+    const next = dark ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem("civ-theme", next); } catch (e) { /* egal */ }
+    drawHero(); draw();
+  });
+  $("brandcrest").replaceWith(Object.assign(crest("eddies-civ", "E", "town"), { id: "brandcrest" }));
+})();
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+/* Seiten */
+const pages = ["start", "welt", "karte", "wahlen", "markt", "boerse", "presse", "post", "chat", "freunde", "ich"];
+let page = "start";
+function route() {
+  const wanted = location.hash.slice(1).split("/")[0];
+  page = pages.includes(wanted) ? wanted : "start";
+  document.querySelectorAll("section[data-page]").forEach(s => s.classList.toggle("on", s.dataset.page === page));
+  document.querySelectorAll(".nav a").forEach(a => { if (a.getAttribute("href") === "#" + page) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+  const loaders = { start: loadStart, welt: loadWorld, karte: openMap, wahlen: loadElections, markt: loadMarket,
+    boerse: loadExchange, presse: loadPress, post: loadLetters,
+    chat: openChat, freunde: loadFriends, ich: loadMe };
+  loaders[page]();
+  if (page !== "chat") stopChat();
+}
+window.addEventListener("hashchange", () => { route(); window.scrollTo(0, 0); });
+
+/* Anmeldung */
+let me = null;
+function locked(section, isLocked) {
+  const s = document.querySelector('section[data-page="' + section + '"]');
+  s.querySelectorAll("[data-unlocked]").forEach(n => n.style.display = isLocked ? "none" : "");
+  const slot = s.querySelector("[data-locked]");
+  if (!isLocked) { slot.replaceChildren(); return; }
+  if (slot.firstChild) return;
+  const form = $("logintpl").content.cloneNode(true);
+  const panel = form.querySelector(".panel"), input = form.querySelector("input"), msg = form.querySelector(".msg");
+  form.querySelector("form").addEventListener("submit", async e => {
+    e.preventDefault();
+    const r = await api("/api/login", { code: input.value.trim() });
+    if (r.ok) { input.value = ""; await refreshMe(); route(); } else { msg.textContent = r.data.error; msg.className = "msg err"; }
+  });
+  slot.append(panel);
+}
+async function refreshMe() {
+  const r = await api("/api/me");
+  me = r.ok ? r.data : null;
+  $("whobtn").textContent = me ? me.name : "Anmelden";
+  $("herologin").hidden = !!me;
+  $("b-post").textContent = me && me.unread ? me.unread : "";
+  $("b-friends").textContent = me && me.friendRequests ? me.friendRequests : "";
+  $("b-me").textContent = me && me.openContracts ? me.openContracts : "";
+  return me;
 }
 
-function renderParties(parties) {
-  $("partyhead").hidden = !parties.length;
-  $("parties").replaceChildren(...parties.map(p => {
-    const card = el("div", { className: "town" });
-    card.style.setProperty("--c", colorOf(p.id));
-    const kv = el("dl", { className: "kv" });
-    for (const [k, v] of [["Programm", p.platform], ["Ordnung", p.order], ["Wirtschaft", p.economy], ["Vorsitz", p.chair],
-      ["Spieler", p.players], ["Dorfbewohner", p.villagers], ["Gegründet", "Tag " + p.founded]]) {
-      kv.append(el("dt", { textContent: k }), el("dd", { textContent: v }));
-    }
-    card.append(el("h3", { textContent: p.name }), el("div", { className: "tier", textContent: "Partei" }), kv);
-    return card;
-  }));
+/* Start */
+let stats = null;
+async function loadStart() {
+  const [s] = await Promise.all([api("/api/stats"), world.towns.length ? null : fetchWorld(), heroMap()]);
+  if (!s.ok) return;
+  stats = s.data;
+  $("foot").textContent = "Spieltag " + stats.day;
+  const facts = [[stats.towns, stats.towns === 1 ? "Gemeinde" : "Gemeinden"], [stats.players, "Spieler"], [stats.villagers, "Dorfbewohner in Gemeinden"],
+    [stats.online, "gerade online"], [stats.companies, stats.companies === 1 ? "Firma an der Börse" : "Firmen an der Börse"], ["Tag " + stats.day, "Preisniveau " + stats.priceLevel + " %"]];
+  $("ledger").replaceChildren(...facts.map(([v, l]) => el("div", {}, el("b", { textContent: v }), el("span", { textContent: l }))));
+  $("online").replaceChildren(...(stats.onlineNames.length ? stats.onlineNames.map(n => el("span", { className: "chip" }, el("span", { className: "dot on" }), n))
+    : [el("span", { className: "muted", textContent: "Gerade ist niemand im Spiel." })]));
 }
-
-function renderFederations(federations) {
-  $("fedhead").hidden = !federations.length;
-  $("federations").replaceChildren(...[...federations].sort((a, b) => b.rank - a.rank || a.name.localeCompare(b.name)).map(f => {
-    const card = el("div", { className: "town federation" });
-    card.style.setProperty("--c", colorOf(f.id));
-    const kv = el("dl", { className: "kv" });
-    for (const [k, v] of [["Vorsitz", f.head], ["Glieder", f.constituents.length], ["Spieler", f.players],
-      ["Dorfbewohner", f.villagers], ...(f.parent ? [["Gehört zu", f.parent]] : []),
-      ["Verfassung", f.constitution ? "seit Tag " + f.constitution : "Entwurf"], ["Gesetzbuch", (f.paragraphs || 0) + " §"],
-      ["Gegründet", "Tag " + f.founded]]) {
-      kv.append(el("dt", { textContent: k }), el("dd", { textContent: v }));
-    }
-    card.append(el("h3", { textContent: f.name }), el("div", { className: "tier", textContent: f.level }), kv,
-      el("div", { className: "members", textContent: f.constituents.join(", ") }));
-    return card;
-  }));
+let heroData = null;
+async function heroMap() {
+  const r = await api("/api/map?dim=minecraft:overworld");
+  if (r.ok) heroData = r.data;
+  drawHero();
 }
+function drawHero() {
+  const c = $("herocanvas"); if (!c || !c.offsetParent) return;
+  const rect = c.getBoundingClientRect();
+  c.width = rect.width * devicePixelRatio; c.height = rect.height * devicePixelRatio;
+  const g = c.getContext("2d");
+  g.fillStyle = css("--sunk"); g.fillRect(0, 0, c.width, c.height);
+  const chunks = heroData ? heroData.chunks : [];
+  $("herocap").textContent = chunks.length ? chunks.length + " Chunks beansprucht, " + world.towns.length + " Gemeinden" : "Noch ist alles Wildnis.";
+  const step = 18 * devicePixelRatio;
+  g.strokeStyle = css("--line"); g.lineWidth = 1; g.beginPath();
+  for (let x = 0; x < c.width; x += step) { g.moveTo(x, 0); g.lineTo(x, c.height); }
+  for (let y = 0; y < c.height; y += step) { g.moveTo(0, y); g.lineTo(c.width, y); }
+  g.stroke();
+  if (!chunks.length) return;
+  const xs = chunks.map(k => k.x), zs = chunks.map(k => k.z);
+  const minX = Math.min(...xs) - 3, maxX = Math.max(...xs) + 4, minZ = Math.min(...zs) - 3, maxZ = Math.max(...zs) + 4;
+  const s = Math.min(c.width / (maxX - minX), c.height / (maxZ - minZ), 40 * devicePixelRatio);
+  const ox = (c.width - (maxX - minX) * s) / 2, oz = (c.height - (maxZ - minZ) * s) / 2;
+  for (const k of chunks) {
+    g.fillStyle = colorOf(k.town); g.globalAlpha = k.outpost ? .45 : .85;
+    g.fillRect(ox + (k.x - minX) * s, oz + (k.z - minZ) * s, s + .5, s + .5);
+  }
+  g.globalAlpha = 1;
+  g.font = "700 " + (13 * devicePixelRatio) + "px " + css("--font"); g.textAlign = "center";
+  for (const seat of heroData.seats) {
+    const px = ox + (seat.x / 16 - minX) * s, pz = oz + (seat.z / 16 - minZ) * s;
+    g.fillStyle = css("--ink"); g.beginPath(); g.arc(px, pz, 3.5 * devicePixelRatio, 0, 7); g.fill();
+    g.lineWidth = 3 * devicePixelRatio; g.strokeStyle = css("--surface"); g.strokeText(seat.name, px, pz - 9 * devicePixelRatio);
+    g.fillText(seat.name, px, pz - 9 * devicePixelRatio);
+  }
+}
+window.addEventListener("resize", () => { if (page === "start") drawHero(); });
 
-// Karte
+/* Welt */
+let streetsData = { towns: [] }, worldKind = "towns";
+async function fetchWorld() {
+  const r = await api("/api/world");
+  if (r.ok) { world = r.data; $("foot").textContent = "Spieltag " + world.day; }
+  return r;
+}
+let exchangeData = { listings: [], trades: [] }, pressData = { newspapers: [], articles: [] };
+async function loadWorld() {
+  const [r, s, x, p] = await Promise.all([fetchWorld(), api("/api/streets"), api("/api/exchange"), api("/api/press")]);
+  if (s.ok) streetsData = s.data;
+  if (x.ok) exchangeData = x.data;
+  if (p.ok) pressData = p.data;
+  if (r.ok) renderWorld();
+}
+const moodText = m => m >= 20 ? "zufrieden" : m < -20 ? "unzufrieden" : "gleichgültig";
+function facts(pairs) {
+  const dl = el("dl", { className: "facts" });
+  for (const [k, v] of pairs) if (v !== "" && v !== null && v !== undefined) dl.append(el("div", {}, el("dt", { textContent: k }), el("dd", {}, v)));
+  return dl;
+}
+function renderWorld() {
+  const q = $("worldsearch").value.toLowerCase().trim();
+  const match = (...texts) => !q || texts.some(t => String(t || "").toLowerCase().includes(q));
+  const counts = { towns: world.towns.length, federations: (world.federations || []).length, parties: (world.parties || []).length,
+    companies: exchangeData.listings.length, newspapers: pressData.newspapers.length };
+  const labels = { towns: "Gemeinden", federations: "Bünde", parties: "Parteien", companies: "Firmen", newspapers: "Zeitungen" };
+  document.querySelectorAll("#worldkind button").forEach(b => b.textContent = labels[b.dataset.kind] + " " + counts[b.dataset.kind]);
+  let rows = [];
+  if (worldKind === "towns") {
+    rows = world.towns.filter(t => match(t.name, t.mayor, t.members.join(" "), t.partOf)).map(t => {
+      const st = streetsData.towns.find(x => x.id === t.id);
+      const mood = el("span", {}, moodText(t.mood));
+      const bar = el("span", { className: "mood" }); const i = el("i");
+      i.style.setProperty("--c", t.mood >= 0 ? "var(--emerald)" : "var(--red)");
+      i.style.left = t.mood >= 0 ? "50%" : (50 + t.mood / 2) + "%"; i.style.width = Math.abs(t.mood) / 2 + "%";
+      bar.append(i); mood.append(bar);
+      const info = el("div", {}, el("h3", { textContent: t.name }), el("div", { className: "sub", textContent: t.tier + (t.partOf ? ", gehört zu " + t.partOf : "") }),
+        st ? el("div", { className: "sub", textContent: "PLZ " + st.postalCode + (st.streets.length ? ", " + st.streets.length + (st.streets.length === 1 ? " Straße" : " Straßen") : "") }) : null);
+      const entry = el("div", { className: "entry" }, crest(t.id, t.name, "town"), info, facts([
+        ["Bürgermeister", t.mayor], ["Spieler", t.members.length], ["Dorfbewohner", t.villagers],
+        ["Stimmung", t.villagers ? mood : ""], ["Gebiet", t.chunks + " von " + t.claimLimit + " Chunks"],
+        ["Grundstücke", t.plots + (t.plotsForSale ? ", " + t.plotsForSale + " zu verkaufen" : "")], ["Kasse", t.treasury + " Smaragde"],
+        ["Abstimmungen", t.votes], ["Verfassung", t.constitution ? "seit Tag " + t.constitution : "Entwurf"],
+        ["Gesetzbuch", (t.paragraphs || 0) + " Paragrafen"], ["Parlament", t.parliament], ["Gegründet", "Tag " + t.founded]]));
+      if (t.members.length || (st && st.addresses.length)) {
+        const d = el("details", {}, el("summary", { textContent: "Einwohner und Adressen" }));
+        if (t.members.length) d.append(el("p", { className: "small", style: "margin-top:8px", textContent: "Spieler: " + t.members.join(", ") }));
+        if (st && st.addresses.length) d.append(el("div", { className: "addr" }, ...st.addresses.map(a => el("div", { textContent: a.line }))));
+        entry.append(d);
+      }
+      return entry;
+    });
+  } else if (worldKind === "federations") {
+    rows = [...(world.federations || [])].sort((a, b) => b.rank - a.rank || a.name.localeCompare(b.name))
+      .filter(f => match(f.name, f.head, f.constituents.join(" "))).map(f => el("div", { className: "entry" }, crest(f.id, f.name, "federation"),
+        el("div", {}, el("h3", { textContent: f.name }), el("div", { className: "sub", textContent: f.level + (f.parent ? ", gehört zu " + f.parent : "") })),
+        facts([["Vorsitz", f.head], ["Glieder", f.constituents.join(", ")], ["Spieler", f.players], ["Dorfbewohner", f.villagers],
+          ["Verfassung", f.constitution ? "seit Tag " + f.constitution : "Entwurf"], ["Gesetzbuch", (f.paragraphs || 0) + " Paragrafen"],
+          ["Parlament", f.parliament], ["Gegründet", "Tag " + f.founded]])));
+  } else if (worldKind === "companies") {
+    rows = exchangeData.listings.filter(c => match(c.name, c.head)).map(c => el("div", { className: "entry" }, crest(c.id, c.name, "company"),
+      el("div", {}, el("h3", { textContent: c.name }), el("div", { className: "sub", textContent: "Firma, Leitung " + c.head }),
+        el("a", { href: "#boerse", className: "small", textContent: "An der Börse ansehen", onclick: () => { selectedStock = c.id; } })),
+      facts([["Kurs", c.price + " (" + pct(c.change) + ")"], ["Börsenwert", c.marketCap], ["Kasse", c.treasury], ["Buchwert je Aktie", c.bookValue],
+        ["Aktien", c.shares], ["Angestellte", c.employees], ["Dividendenrendite", c.dividendYield + " %"], ["Größter Aktionär", c.holders.length ? c.holders[0].name + " (" + c.holders[0].percent + " %)" : ""]])));
+  } else if (worldKind === "newspapers") {
+    rows = pressData.newspapers.filter(n => match(n.name, n.head, n.editors.join(" "))).map(n => el("div", { className: "entry" }, crest(n.id, n.name, "newspaper"),
+      el("div", {}, el("h3", { textContent: n.name }), el("div", { className: "sub", textContent: "Zeitung, Chefredaktion " + n.head })),
+      facts([["Redaktion", n.editors.join(", ")], ["Dorfbewohner darin", n.villagerEditors], ["Erscheint in", n.towns.join(", ") || "noch nirgends"],
+        ["Artikel", n.articles], ["Leser bisher", n.readers], ["Gegründet", "Tag " + n.founded]])));
+  } else {
+    rows = (world.parties || []).filter(p => match(p.name, p.chair, p.platform)).map(p => el("div", { className: "entry" }, crest(p.id, p.name, "party"),
+      el("div", {}, el("h3", { textContent: p.name }), el("div", { className: "sub", textContent: p.platform })),
+      facts([["Vorsitz", p.chair], ["Ordnung", p.order], ["Wirtschaft", p.economy], ["Spieler", p.players], ["Dorfbewohner", p.villagers], ["Gegründet", "Tag " + p.founded]])));
+  }
+  const empty = { towns: "Noch keine Gemeinde. Stelle im Spiel ein Gemeindehaus auf, um die erste zu gründen.",
+    federations: "Noch kein Bund. Gemeinden schließen sich mit /civ bund gruenden zusammen.", parties: "Noch keine Partei. Gründe eine mit /civ partei gruenden.",
+    companies: "Noch keine Firma. Gründe eine mit /civ firma gruenden <Kapital> <Name>.", newspapers: "Noch keine Zeitung. Gründe eine mit /civ zeitung gruenden <Name>." };
+  $("register").replaceChildren(...(rows.length ? rows : [el("div", { className: "empty", textContent: q ? "Nichts gefunden." : empty[worldKind] })]));
+}
+document.querySelectorAll("#worldkind button").forEach(b => b.addEventListener("click", () => {
+  worldKind = b.dataset.kind; document.querySelectorAll("#worldkind button").forEach(x => x.classList.toggle("on", x === b)); renderWorld();
+}));
+$("worldsearch").addEventListener("input", renderWorld);
+
+/* Karte */
 const canvas = $("canvas"), ctx = canvas.getContext("2d");
 let view = { x: 0, z: 0, scale: 12 }, mapData = { chunks: [], seats: [] }, drag = null, centered = false;
+let electionData = { results: [], polls: [] };
+async function openMap() {
+  if (!world.towns.length) await fetchWorld();
+  if (!streetsData.towns.length) { const s = await api("/api/streets"); if (s.ok) streetsData = s.data; }
+  resize();
+  await loadMap();
+  if (!centered) { centered = true; recenter(); }
+}
 function resize() {
   const rect = canvas.getBoundingClientRect();
   canvas.width = rect.width * devicePixelRatio; canvas.height = rect.height * devicePixelRatio;
   draw();
 }
-window.addEventListener("resize", resize);
+window.addEventListener("resize", () => { if (page === "karte") resize(); });
 async function loadMap() {
+  if (!electionData.results.length) { const r = await api("/api/elections"); if (r.ok) { electionData = r.data; fillModes(); } }
   const { ok, data } = await api("/api/map?dim=" + encodeURIComponent($("dim").value));
   if (!ok) return;
   mapData = data;
-  const names = Object.fromEntries(world.towns.map(t => [t.id, t.name]));
-  const present = [...new Set(data.chunks.map(c => c.town))];
-  $("legend").replaceChildren(...(present.length ? present.map(id => {
-    const swatch = el("span", { className: "swatch" }); swatch.style.setProperty("--c", colorOf(id));
-    return el("div", {}, swatch, names[id] || "?");
-  }) : [el("div", { textContent: "Hier ist noch kein Land beansprucht." })]));
+  const result = electionResult();
+  if (result) {
+    const leaders = result.districts.filter(d => d.town);
+    $("legend").replaceChildren(...(leaders.length ? [...new Map(leaders.map(d => [d.key, d])).values()].map(d => {
+      const sw = el("span", { className: "swatch" }); sw.style.setProperty("--c", colorOf(d.key));
+      return el("div", {}, sw, (d.party || d.leader) + ": " + leaders.filter(x => x.key === d.key).map(x => x.name).join(", "));
+    }) : [el("div", { textContent: "Keine Bezirke." })]));
+  } else {
+    const names = Object.fromEntries(world.towns.map(t => [t.id, t.name]));
+    const present = [...new Set(data.chunks.map(c => c.town))];
+    $("legend").replaceChildren(...(present.length ? present.map(id => {
+      const sw = el("span", { className: "swatch" }); sw.style.setProperty("--c", colorOf(id));
+      return el("div", {}, sw, names[id] || "?");
+    }) : [el("div", { textContent: "Hier ist noch kein Land beansprucht." })]));
+  }
   draw();
 }
+function fillModes() {
+  const mode = $("mapmode"), current = mode.value;
+  mode.replaceChildren(el("option", { value: "", textContent: "Gebiete" }),
+    ...electionData.results.map((r, i) => el("option", { value: String(i), textContent: "Wahlkarte: " + r.polityName + ", " + r.officeName + " (Tag " + r.day + ")" })));
+  mode.value = current && electionData.results[+current] ? current : "";
+}
 function recenter() {
-  if (!mapData.chunks.length) { view.x = 0; view.z = 0; draw(); return; }
-  view.x = mapData.chunks.reduce((s, c) => s + c.x, 0) / mapData.chunks.length;
-  view.z = mapData.chunks.reduce((s, c) => s + c.z, 0) / mapData.chunks.length;
-  const xs = mapData.chunks.map(c => c.x), zs = mapData.chunks.map(c => c.z);
-  const span = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs)) + 4;
   const rect = canvas.getBoundingClientRect();
-  view.scale = Math.min(48, Math.max(2, Math.min(rect.width, rect.height) / span));
+  if (!mapData.chunks.length) { view.x = 0; view.z = 0; draw(); return; }
+  const xs = mapData.chunks.map(c => c.x), zs = mapData.chunks.map(c => c.z);
+  view.x = (Math.min(...xs) + Math.max(...xs) + 1) / 2; view.z = (Math.min(...zs) + Math.max(...zs) + 1) / 2;
+  const span = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs)) + 4;
+  view.scale = Math.min(64, Math.max(2, Math.min(rect.width, rect.height) / span));
   draw();
 }
 function toScreen(cx, cz) {
   const s = view.scale * devicePixelRatio;
   return [canvas.width / 2 + (cx - view.x) * s, canvas.height / 2 + (cz - view.z) * s, s];
 }
+function electionResult() { const m = $("mapmode").value; return m === "" ? null : electionData.results[+m] || null; }
+function chunkColor(c) {
+  const result = electionResult();
+  if (!result) return colorOf(c.town);
+  const d = result.districts.find(x => x.town === c.town);
+  const party = $("eparty").value;
+  if (!d || (party && d.party !== party)) return css("--line");
+  return colorOf(d.key);
+}
 function draw() {
-  ctx.fillStyle = "#0f0d0a"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (!canvas.width) return;
+  ctx.fillStyle = css("--sunk"); ctx.fillRect(0, 0, canvas.width, canvas.height);
   const s = view.scale * devicePixelRatio;
   if (view.scale >= 6) {
-    ctx.strokeStyle = "#1d1912"; ctx.lineWidth = 1; ctx.beginPath();
-    const startX = Math.floor(view.x - canvas.width / 2 / s), startZ = Math.floor(view.z - canvas.height / 2 / s);
-    for (let x = startX; x < startX + canvas.width / s + 2; x++) { const [px] = toScreen(x, 0); ctx.moveTo(px, 0); ctx.lineTo(px, canvas.height); }
-    for (let z = startZ; z < startZ + canvas.height / s + 2; z++) { const [, pz] = toScreen(0, z); ctx.moveTo(0, pz); ctx.lineTo(canvas.width, pz); }
-    ctx.stroke();
+    ctx.strokeStyle = css("--line"); ctx.globalAlpha = .6; ctx.lineWidth = 1; ctx.beginPath();
+    const sx = Math.floor(view.x - canvas.width / 2 / s), sz = Math.floor(view.z - canvas.height / 2 / s);
+    for (let x = sx; x < sx + canvas.width / s + 2; x++) { const [px] = toScreen(x, 0); ctx.moveTo(px, 0); ctx.lineTo(px, canvas.height); }
+    for (let z = sz; z < sz + canvas.height / s + 2; z++) { const [, pz] = toScreen(0, z); ctx.moveTo(0, pz); ctx.lineTo(canvas.width, pz); }
+    ctx.stroke(); ctx.globalAlpha = 1;
   }
   for (const c of mapData.chunks) {
     const [px, pz] = toScreen(c.x, c.z);
-    ctx.fillStyle = colorOf(c.town);
-    ctx.globalAlpha = c.outpost ? .45 : .8;
+    ctx.fillStyle = chunkColor(c); ctx.globalAlpha = c.outpost ? .4 : .78;
     ctx.fillRect(px, pz, s + .5, s + .5);
-    if (c.outpost && s > 8) {
-      ctx.globalAlpha = .9; ctx.strokeStyle = colorOf(c.town); ctx.beginPath();
-      ctx.moveTo(px, pz + s); ctx.lineTo(px + s, pz); ctx.stroke();
-    }
+    if (c.outpost && s > 8) { ctx.globalAlpha = .9; ctx.strokeStyle = chunkColor(c); ctx.beginPath(); ctx.moveTo(px, pz + s); ctx.lineTo(px + s, pz); ctx.stroke(); }
   }
   ctx.globalAlpha = 1;
-  const [ox, oz] = toScreen(0, 0);
-  ctx.fillStyle = "#a89c86"; ctx.fillRect(ox - 2, oz - 2, 4, 4);
-  ctx.font = (12 * devicePixelRatio) + "px system-ui"; ctx.textAlign = "center";
+  if ($("showstreets").checked && $("dim").value === "minecraft:overworld" && view.scale >= 8) {
+    ctx.font = "600 " + (11 * devicePixelRatio) + "px " + css("--font"); ctx.textAlign = "center";
+    for (const t of streetsData.towns) for (const st of t.streets) {
+      const [x1, z1] = toScreen(st.minX / 16, st.minZ / 16), [x2, z2] = toScreen((st.maxX + 1) / 16, (st.maxZ + 1) / 16);
+      ctx.fillStyle = css("--surface"); ctx.globalAlpha = .9; ctx.fillRect(x1, z1, Math.max(2, x2 - x1), Math.max(2, z2 - z1));
+      ctx.globalAlpha = 1;
+      if (view.scale >= 16) {
+        ctx.save(); ctx.translate((x1 + x2) / 2, (z1 + z2) / 2);
+        if (z2 - z1 > x2 - x1) ctx.rotate(Math.PI / 2);
+        ctx.fillStyle = css("--ink"); ctx.fillText(st.name, 0, 4 * devicePixelRatio); ctx.restore();
+      }
+    }
+  }
+  ctx.font = "700 " + (12 * devicePixelRatio) + "px " + css("--font"); ctx.textAlign = "center";
   for (const seat of mapData.seats) {
     const [px, pz] = toScreen(seat.x / 16, seat.z / 16);
-    ctx.fillStyle = "#fff"; ctx.fillText("★", px, pz + 4 * devicePixelRatio);
-    if (view.scale >= 5) { ctx.fillStyle = "#ece4d4"; ctx.fillText(seat.name, px, pz - 8 * devicePixelRatio); }
+    ctx.fillStyle = css("--ink"); ctx.fillText("★", px, pz + 4 * devicePixelRatio);
+    if (view.scale >= 4) {
+      ctx.lineWidth = 3 * devicePixelRatio; ctx.strokeStyle = css("--surface"); ctx.strokeText(seat.name, px, pz - 9 * devicePixelRatio);
+      ctx.fillText(seat.name, px, pz - 9 * devicePixelRatio);
+    }
   }
 }
-canvas.addEventListener("mousedown", e => drag = { x: e.clientX, y: e.clientY, vx: view.x, vz: view.z });
-window.addEventListener("mouseup", () => drag = null);
-canvas.addEventListener("mousemove", e => {
-  if (drag) {
-    view.x = drag.vx - (e.clientX - drag.x) / view.scale; view.z = drag.vz - (e.clientY - drag.y) / view.scale; draw();
+const pointers = new Map();
+canvas.addEventListener("pointerdown", e => { canvas.setPointerCapture(e.pointerId); pointers.set(e.pointerId, e); drag = { x: e.clientX, y: e.clientY, vx: view.x, vz: view.z, dist: 0 }; });
+canvas.addEventListener("pointerup", e => { pointers.delete(e.pointerId); drag = null; });
+canvas.addEventListener("pointercancel", e => { pointers.delete(e.pointerId); drag = null; });
+canvas.addEventListener("pointermove", e => {
+  if (pointers.has(e.pointerId)) pointers.set(e.pointerId, e);
+  if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    if (drag && drag.dist) { view.scale = Math.min(64, Math.max(1, view.scale * dist / drag.dist)); draw(); }
+    if (drag) drag.dist = dist;
+    return;
   }
+  if (drag) { view.x = drag.vx - (e.clientX - drag.x) / view.scale; view.z = drag.vz - (e.clientY - drag.y) / view.scale; draw(); }
   const rect = canvas.getBoundingClientRect();
-  const cx = Math.floor(view.x + (e.clientX - rect.left - rect.width / 2) / view.scale);
-  const cz = Math.floor(view.z + (e.clientY - rect.top - rect.height / 2) / view.scale);
+  const bx = view.x + (e.clientX - rect.left - rect.width / 2) / view.scale, bz = view.z + (e.clientY - rect.top - rect.height / 2) / view.scale;
+  const cx = Math.floor(bx), cz = Math.floor(bz);
   const hit = mapData.chunks.find(c => c.x === cx && c.z === cz);
-  const name = hit ? (world.towns.find(t => t.id === hit.town) || {}).name : "Wildnis";
+  let text = hit ? (world.towns.find(t => t.id === hit.town) || {}).name || "?" : "Wildnis";
+  if (hit && hit.outpost) text += " (Außenposten)";
+  const result = electionResult();
+  if (hit && result) { const d = result.districts.find(x => x.town === hit.town); if (d) text += ", vorn: " + d.leader + (d.party ? " (" + d.party + ")" : ""); }
+  const street = streetsData.towns.flatMap(t => t.streets).find(st => bx * 16 >= st.minX && bx * 16 <= st.maxX + 1 && bz * 16 >= st.minZ && bz * 16 <= st.maxZ + 1);
+  if (street) text += ", " + street.name;
   const tip = $("tooltip");
-  tip.textContent = name + (hit && hit.outpost ? " (Außenposten)" : "") + " · Chunk " + cx + ", " + cz + " · Blöcke " + cx * 16 + ", " + cz * 16;
-  tip.style.display = "block"; tip.style.left = (e.clientX - rect.left + 14) + "px"; tip.style.top = (e.clientY - rect.top + 14) + "px";
+  tip.textContent = text + "  |  Block " + Math.floor(bx * 16) + ", " + Math.floor(bz * 16);
+  tip.style.display = e.pointerType === "mouse" ? "block" : "none";
+  tip.style.left = Math.min(e.clientX - rect.left + 14, rect.width - tip.offsetWidth - 8) + "px"; tip.style.top = (e.clientY - rect.top + 14) + "px";
 });
-canvas.addEventListener("mouseleave", () => $("tooltip").style.display = "none");
-canvas.addEventListener("wheel", e => { e.preventDefault(); view.scale = Math.min(48, Math.max(1, view.scale * (e.deltaY < 0 ? 1.15 : 1 / 1.15))); draw(); }, { passive: false });
+canvas.addEventListener("pointerleave", () => $("tooltip").style.display = "none");
+canvas.addEventListener("wheel", e => { e.preventDefault(); view.scale = Math.min(64, Math.max(1, view.scale * (e.deltaY < 0 ? 1.15 : 1 / 1.15))); draw(); }, { passive: false });
 $("dim").addEventListener("change", () => loadMap().then(recenter));
+$("mapmode").addEventListener("change", loadMap);
+$("showstreets").addEventListener("change", draw);
 $("recenter").addEventListener("click", recenter);
 
-// Markt
-let offers = [], sortKey = "name", sortDir = 1;
-async function loadMarket() {
-  const { ok, data } = await api("/api/market");
+/* Wahlen */
+async function loadElections() {
+  if (!world.towns.length) await fetchWorld();
+  const { ok, data } = await api("/api/elections");
   if (!ok) return;
-  offers = data.offers; $("level").textContent = "Preisniveau " + data.priceLevel + " %"; renderOffers();
-  const shops = await api("/api/shops");
-  if (shops.ok) shopList = shops.data.shops;
+  electionData = data;
+  const fill = (id, values, label) => {
+    const select = $(id), current = select.value;
+    select.replaceChildren(el("option", { value: "", textContent: label }), ...values.map(v => el("option", { value: v, textContent: v })));
+    select.value = values.includes(current) ? current : "";
+  };
+  const all = [...data.results, ...data.polls];
+  fill("elevel", [...new Set(all.map(e => e.level))].sort(), "Alle Ebenen");
+  fill("eparty", [...new Set([...data.results.flatMap(r => r.totals.map(t => t.party)), ...data.polls.flatMap(p => p.entries.map(e => e.party))].filter(Boolean))].sort(), "Alle Parteien");
+  fillModes();
+  renderElections();
+}
+function renderElections() {
+  const level = $("elevel").value, party = $("eparty").value;
+  const polls = electionData.polls.filter(p => (!level || p.level === level) && (!party || p.entries.some(e => e.party === party)));
+  $("polls").replaceChildren(...(polls.length ? polls.map(p => {
+    const card = el("div", { className: "poll" }); card.style.setProperty("--c", colorOf(p.polity));
+    card.append(el("h3", { textContent: p.polityName + ": " + p.officeName }),
+      el("div", { className: "sub", textContent: p.level + ", Wahl bis Tag " + p.closesOn + ", " + p.sample + " Dorfbewohner befragt" + (p.undecided ? ", " + p.undecided + " unentschieden" : "") }));
+    if (!p.sample) card.append(el("div", { className: "muted small", textContent: "Keine Dorfbewohner zum Befragen." }));
+    for (const e of p.entries) {
+      const bar = el("div", { className: "bar" }), fillBar = el("span"); fillBar.style.width = e.percent + "%";
+      fillBar.style.setProperty("--c", colorOf(e.party || e.name)); bar.append(fillBar);
+      card.append(el("div", { className: "line" }, el("span", { textContent: e.name + (e.party ? " (" + e.party + ")" : "") }), el("b", { textContent: e.percent + " %" })), bar);
+    }
+    if (p.lists.length) card.append(el("div", { className: "muted small", textContent: "Sitzprognose: " + p.lists.map(l => l.name + " " + l.seats).join(", ") }));
+    return card;
+  }) : [el("div", { className: "empty", textContent: "Gerade läuft keine Wahl. Ausrufen kann sie der Bürgermeister im Rathaus." })]));
+  const results = electionData.results.filter(r => (!level || r.level === level) && (!party || r.totals.some(t => t.party === party)));
+  $("results").replaceChildren(...(results.length ? [...results].reverse().map(r => {
+    const card = el("div", { className: "poll" }); card.style.setProperty("--c", colorOf(r.polity));
+    card.append(el("h3", { textContent: r.polityName + ": " + r.officeName }), el("div", { className: "sub", textContent: r.level + ", ausgezählt an Tag " + r.day }));
+    for (const t of r.totals) {
+      const bar = el("div", { className: "bar" }), fillBar = el("span"); fillBar.style.width = t.percent + "%";
+      fillBar.style.setProperty("--c", colorOf(t.party || t.name)); bar.append(fillBar);
+      card.append(el("div", { className: "line" }, el("span", { textContent: t.name + (t.party ? " (" + t.party + ")" : "") + (r.winners.includes(t.name) ? " ✓" : "") }),
+        el("span", { textContent: t.votes + " Stimmen, " + t.percent + " %" })), bar);
+    }
+    if (r.districts.length > 1) card.append(el("div", { className: "muted small", textContent: "Bezirke: " + r.districts.map(d => d.name + " " + d.leader).join(", ") }));
+    return card;
+  }) : [el("div", { className: "empty", textContent: "Noch keine Wahl ausgezählt." })]));
+}
+$("elevel").addEventListener("change", renderElections);
+$("eparty").addEventListener("change", () => { renderElections(); draw(); });
+
+/* Markt */
+let offers = [], shopList = [], sortKey = "name", sortDir = 1;
+async function loadMarket() {
+  const [m, s] = await Promise.all([api("/api/market"), api("/api/shops")]);
+  if (m.ok) { offers = m.data.offers; $("level").textContent = "Preise in Smaragden, Preisniveau " + m.data.priceLevel + " %. Viel Lager drückt den Preis; das Lager schrumpft jeden Tag."; }
+  if (s.ok) shopList = s.data.shops;
   renderOffers();
 }
-let shopList = [];
 function renderOffers() {
   const q = $("search").value.toLowerCase();
   const rows = offers.filter(o => o.name.toLowerCase().includes(q) || o.id.includes(q))
     .sort((a, b) => (a[sortKey] > b[sortKey] ? 1 : a[sortKey] < b[sortKey] ? -1 : 0) * sortDir);
-  $("offers").replaceChildren(...(rows.length ? rows.map(o => el("tr", {},
-    el("td", { textContent: o.name, title: o.id }), el("td", { className: "num", textContent: o.stock }),
-    el("td", { className: "num", textContent: o.buy }), el("td", { className: "num", textContent: o.sell })))
+  $("offers").replaceChildren(...(rows.length ? rows.map(o => el("tr", {}, el("td", { textContent: o.name, title: o.id }),
+    el("td", { className: "num", textContent: o.stock }), el("td", { className: "num", textContent: o.buy }), el("td", { className: "num", textContent: o.sell })))
     : [el("tr", {}, el("td", { colSpan: 4, className: "muted", textContent: offers.length ? "Nichts gefunden." : "Das Lager ist leer. Verkaufe Waren am Markt-Block, um es zu füllen." }))]));
   const shopRows = shopList.filter(s => s.name.toLowerCase().includes(q) || s.id.includes(q)).sort((a, b) => a.priceUnits - b.priceUnits);
-  $("shops").replaceChildren(...(shopRows.length ? shopRows.map(s => el("tr", {},
-    el("td", { textContent: s.name, title: s.id }), el("td", { className: "num", textContent: s.price }),
-    el("td", { textContent: s.owner }), el("td", { textContent: (s.town ? s.town + " · " : "") + s.x + ", " + s.y + ", " + s.z })))
+  $("shops").replaceChildren(...(shopRows.length ? shopRows.map(s => el("tr", {}, el("td", { textContent: s.name, title: s.id }),
+    el("td", { className: "num", textContent: s.price }), el("td", { textContent: s.owner }), el("td", { textContent: (s.town ? s.town + ", " : "") + s.x + " " + s.y + " " + s.z })))
     : [el("tr", {}, el("td", { colSpan: 4, className: "muted", textContent: "Keine Läden gefunden. Eröffne einen mit /civ laden eroeffnen <Preis>." }))]));
 }
 $("search").addEventListener("input", renderOffers);
-document.querySelectorAll("th[data-sort]").forEach(th => th.addEventListener("click", () => {
-  sortDir = sortKey === th.dataset.sort ? -sortDir : 1; sortKey = th.dataset.sort; renderOffers();
+document.querySelectorAll("th[data-sort]").forEach(th => th.addEventListener("click", () => { sortDir = sortKey === th.dataset.sort ? -sortDir : 1; sortKey = th.dataset.sort; renderOffers(); }));
+
+/* Börse */
+const pct = v => (v > 0 ? "+" : v < 0 ? "−" : "±") + Math.abs(v).toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " %";
+const euro = u => (u / 100).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+let selectedStock = null, depotData = null;
+async function loadExchange() {
+  const [x, user] = await Promise.all([api("/api/exchange"), refreshMe()]);
+  if (x.ok) exchangeData = x.data;
+  depotData = null;
+  if (user) { const d = await api("/api/depot"); if (d.ok) depotData = d.data; }
+  renderExchange();
+}
+function sparkline(quotes, w = 84, h = 26) {
+  const s = svg("svg", { viewBox: "0 0 " + w + " " + h, width: w, height: h, "aria-hidden": "true" });
+  const closes = quotes.slice(-30).map(q => q.close);
+  if (closes.length < 2) return s;
+  const min = Math.min(...closes), max = Math.max(...closes), span = Math.max(1, max - min);
+  const pts = closes.map((c, i) => (i * (w - 2) / (closes.length - 1) + 1).toFixed(1) + "," + (h - 2 - (c - min) * (h - 4) / span).toFixed(1)).join(" ");
+  s.append(svg("polyline", { points: pts, fill: "none", stroke: closes[closes.length - 1] >= closes[0] ? "var(--emerald)" : "var(--red)", "stroke-width": 1.6, "stroke-linejoin": "round" }));
+  return s;
+}
+function chart(quotes) {
+  const w = 640, h = 220, pad = 36, data = quotes.slice(-60);
+  const s = svg("svg", { viewBox: "0 0 " + w + " " + h, class: "chart", role: "img", "aria-label": "Kursverlauf" });
+  if (!data.length) return s;
+  const highs = data.map(q => q.high), lows = data.map(q => q.low);
+  const max = Math.max(...highs), min = Math.min(...lows), span = Math.max(1, max - min);
+  const vmax = Math.max(1, ...data.map(q => q.volume));
+  const x = i => pad + (data.length === 1 ? (w - pad - 8) / 2 : i * (w - pad - 8) / (data.length - 1));
+  const y = v => 12 + (max - v) * (h - 60) / span;
+  for (const v of [max, (max + min) / 2, min]) {
+    s.append(svg("line", { x1: pad, x2: w - 8, y1: y(v), y2: y(v), stroke: "var(--line)", "stroke-dasharray": "3 4" }));
+    const t = svg("text", { x: 2, y: y(v) + 4 }); t.textContent = euro(v); s.append(t);
+  }
+  data.forEach((q, i) => {
+    const bh = q.volume * 30 / vmax;
+    s.append(svg("rect", { x: x(i) - 3, y: h - 14 - bh, width: 6, height: bh, fill: "var(--line)" }));
+  });
+  const area = data.map((q, i) => x(i) + "," + y(q.close)).join(" ");
+  const up = data[data.length - 1].close >= data[0].open;
+  s.append(svg("polygon", { points: x(0) + "," + (h - 46) + " " + area + " " + x(data.length - 1) + "," + (h - 46), fill: up ? "var(--emerald-soft)" : "var(--red-soft)", opacity: ".7" }));
+  s.append(svg("polyline", { points: area, fill: "none", stroke: up ? "var(--emerald)" : "var(--red)", "stroke-width": 2, "stroke-linejoin": "round" }));
+  const first = svg("text", { x: pad, y: h - 1 }); first.textContent = "Tag " + data[0].day; s.append(first);
+  const last = svg("text", { x: w - 8, y: h - 1, "text-anchor": "end" }); last.textContent = "Tag " + data[data.length - 1].day; s.append(last);
+  return s;
+}
+function renderExchange() {
+  const list = exchangeData.listings;
+  if (!selectedStock || !list.some(l => l.id === selectedStock)) selectedStock = list.length ? list[0].id : null;
+  $("tickers").replaceChildren(...(list.length ? list.map(l => el("button", { className: "ticker" + (l.id === selectedStock ? " sel" : ""), onclick: () => { selectedStock = l.id; renderExchange(); } },
+    el("div", {}, el("div", { className: "n", textContent: l.name }), el("div", { className: "m", textContent: "Börsenwert " + l.marketCap })),
+    sparkline(l.quotes),
+    el("div", { className: "p" }, el("div", { textContent: l.price }), el("div", { className: "m " + (l.change >= 0 ? "up" : "down"), textContent: pct(l.change) }))))
+    : [el("div", { className: "empty", style: "border:none", textContent: "Noch keine Firma an der Börse. Gründe eine im Spiel mit /civ firma gruenden <Kapital> <Name>." })]));
+  $("trades").replaceChildren(...(exchangeData.trades.length ? exchangeData.trades.map(t => el("tr", {}, el("td", { textContent: t.company }),
+    el("td", { className: "num", textContent: t.quantity }), el("td", { className: "num", textContent: t.price }), el("td", { textContent: t.buyer }), el("td", { textContent: t.seller })))
+    : [el("tr", {}, el("td", { colSpan: 5, className: "muted", textContent: "Noch kein Handel." }))]));
+  renderStock(list.find(l => l.id === selectedStock));
+}
+async function renderStock(l) {
+  if (!l) { $("stock").replaceChildren(); return; }
+  const panel = el("div", { className: "panel" },
+    el("div", { className: "row", style: "justify-content:space-between" }, el("h3", { textContent: l.name }), el("span", { className: "muted small", textContent: "Leitung " + l.head })),
+    el("div", { className: "quote" }, el("b", { textContent: l.price }), el("span", { className: l.change >= 0 ? "up" : "down", textContent: pct(l.change) + " zum Vortag" }),
+      el("span", { className: "muted small", textContent: "heute " + l.volume + " Stück gehandelt" })),
+    chart(l.quotes),
+    facts([["Börsenwert", l.marketCap], ["Kasse", l.treasury], ["Buchwert je Aktie", l.bookValue], ["Aktien", l.shares], ["Streubesitz", l.freeFloat],
+      ["Dividendenrendite 30 Tage", l.dividendYield.toLocaleString("de-DE") + " %"], ["Angestellte", l.employees]]));
+  if (l.holders.length) panel.append(el("h3", { style: "margin:18px 0 8px", textContent: "Aktionäre" }),
+    el("div", { className: "chips" }, ...l.holders.map(h => el("span", { className: "chip", textContent: h.name + " " + h.percent + " %" }))));
+  const book = el("div", { className: "book" }, el("div", {}, el("b", { textContent: "Kauf" })), el("div", {}, el("b", { textContent: "Verkauf" })));
+  panel.append(el("h3", { style: "margin:18px 0 8px", textContent: "Orderbuch" }), book);
+  const ownHolding = depotData ? depotData.holdings.find(h => h.companyId === l.id) : null;
+  if (me) {
+    const side = el("select", { ariaLabel: "Kauf oder Verkauf" }, el("option", { value: "buy", textContent: "Kaufen" }), el("option", { value: "sell", textContent: "Verkaufen" }));
+    const qty = el("input", { type: "number", min: 1, value: 1, ariaLabel: "Anzahl", style: "width:7em" });
+    const limit = el("input", { placeholder: "Limit, leer = ±10 %", ariaLabel: "Limit je Aktie", className: "grow" });
+    const msg = el("div", { className: "msg" });
+    const form = el("form", { className: "tradeform" }, el("div", { className: "row" }, side, qty, limit, el("button", { className: "btn primary", textContent: "Order aufgeben" })),
+      el("div", { className: "muted small", textContent: (ownHolding ? "Du hast " + ownHolding.shares + " Aktien (" + ownHolding.free + " frei). " : "") + "Kontostand " + me.balance }), msg);
+    form.addEventListener("submit", async e => {
+      e.preventDefault();
+      const r = await api("/api/exchange", { action: side.value, company: l.name, quantity: qty.value, limit: limit.value.trim() });
+      msg.textContent = r.data.message || r.data.error; msg.className = "msg " + (r.ok ? "ok" : "err");
+      if (r.ok) { await loadExchange(); }
+    });
+    panel.append(el("h3", { style: "margin:18px 0 8px", textContent: "Handeln" }), form);
+  } else {
+    panel.append(el("p", { className: "muted small", style: "margin-top:16px" }, "Zum Handeln ", el("a", { href: "#ich", textContent: "anmelden" }), "."));
+  }
+  const children = [panel];
+  if (depotData && (depotData.holdings.length || depotData.orders.length)) {
+    const dp = el("div", { className: "panel" }, el("div", { className: "row", style: "justify-content:space-between" }, el("h3", { textContent: "Dein Depot" }), el("b", { textContent: depotData.value + " Smaragde" })));
+    if (depotData.holdings.length) dp.append(el("div", { className: "tablewrap", style: "border:none" }, el("table", {}, el("thead", {}, el("tr", {}, el("th", { textContent: "Firma" }), el("th", { className: "num", textContent: "Aktien" }), el("th", { className: "num", textContent: "Kurs" }), el("th", { className: "num", textContent: "Wert" }))),
+      el("tbody", {}, ...depotData.holdings.map(h => el("tr", {}, el("td", { textContent: h.company }), el("td", { className: "num", textContent: h.shares }), el("td", { className: "num", textContent: h.price }), el("td", { className: "num", textContent: h.value })))))));
+    depotData.orders.forEach(o => dp.append(el("div", { className: "row", style: "margin-top:8px" },
+      el("span", { className: "grow small", textContent: "#" + o.number + " " + (o.side === "BUY" ? "Kauf" : "Verkauf") + " " + o.remaining + " " + o.company + " bis " + o.limit + ", seit Tag " + o.placedOn }),
+      el("button", { className: "btn small", textContent: "Streichen", onclick: async () => { const r = await api("/api/exchange", { action: "cancel", number: o.number }); if (r.ok) loadExchange(); } }))));
+    children.push(dp);
+  }
+  $("stock").replaceChildren(...children);
+  const r = await api("/api/exchange/book?company=" + encodeURIComponent(l.id));
+  if (!r.ok) return;
+  const bids = r.data.orders.filter(o => o.side === "BUY").sort((a, b) => b.units - a.units).slice(0, 6);
+  const asks = r.data.orders.filter(o => o.side === "SELL").sort((a, b) => a.units - b.units).slice(0, 6);
+  const line = o => el("div", {}, el("span", { textContent: o.remaining + (o.mine ? " (du)" : "") }), el("b", { textContent: o.limit }));
+  book.children[0].append(...(bids.length ? bids.map(line) : [el("span", { className: "muted", textContent: "keine" })]));
+  book.children[1].append(...(asks.length ? asks.map(line) : [el("span", { className: "muted", textContent: "keine" })]));
+}
+
+/* Presse */
+let openArticle = null, writing = false;
+async function loadPress() {
+  const [p, user] = await Promise.all([api("/api/press"), refreshMe()]);
+  if (p.ok) pressData = p.data;
+  depotData = null;
+  if (user) { const d = await api("/api/depot"); if (d.ok) depotData = d.data; }
+  $("newarticle").hidden = !(depotData && depotData.papers.length);
+  const sel = $("paperfilter"), cur = sel.value;
+  sel.replaceChildren(el("option", { value: "", textContent: "Alle Zeitungen" }), ...pressData.newspapers.map(n => el("option", { value: n.id, textContent: n.name })));
+  sel.value = pressData.newspapers.some(n => n.id === cur) ? cur : "";
+  renderPress();
+}
+const stance = a => {
+  const i = el("i"); i.style.setProperty("--t", a.tendency); i.style.setProperty("--c", a.tendency > 0 ? "var(--emerald)" : a.tendency < 0 ? "var(--red)" : "var(--muted)");
+  return el("span", { className: "stance", title: a.tendencyWord }, i, a.subject ? a.tendencyWord + " über " + a.subject : "Bericht");
+};
+function renderPress() {
+  const filter = $("paperfilter").value;
+  const list = pressData.articles.filter(a => !filter || a.newspaperId === filter);
+  $("articles").replaceChildren(...(list.length ? list.map(a => el("button", { className: openArticle === a.number ? "sel" : "", onclick: () => { writing = false; openArticle = a.number; renderPress(); } },
+    el("div", { className: "t" }, el("span", { textContent: a.newspaper }), el("span", { textContent: "Tag " + a.day })),
+    el("div", { className: "s", textContent: a.title }), stance(a)))
+    : [el("div", { className: "empty", style: "border:none", textContent: "Noch keine Artikel. Zeitung gründen: /civ zeitung gruenden <Name>." })]));
+  if (writing) return;
+  const current = list.find(a => a.number === openArticle) || list[0];
+  if (current) { openArticle = current.number; showArticle(current); }
+  else $("articleview").replaceChildren();
+  $("papers").replaceChildren(...(pressData.newspapers.length ? pressData.newspapers.map(n => el("div", { className: "entry" }, crest(n.id, n.name, "newspaper"),
+    el("div", {}, el("h3", { textContent: n.name }), el("div", { className: "sub", textContent: "Chefredaktion " + n.head })),
+    facts([["Redaktion", n.editors.join(", ")], ["Erscheint in", n.towns.join(", ") || "noch nirgends"], ["Artikel", n.articles], ["Leser bisher", n.readers]])))
+    : [el("div", { className: "empty", textContent: "Noch keine Zeitung." })]));
+}
+function showArticle(a) {
+  $("articleview").replaceChildren(el("article", { className: "article" },
+    el("div", { className: "masthead" }, el("b", { textContent: a.newspaper }), el("span", { className: "muted", textContent: "Tag " + a.day + ", Nr. " + a.number })),
+    el("h3", { textContent: a.title }),
+    el("div", { className: "muted small", style: "margin-bottom:16px", textContent: "Von " + a.author }),
+    el("div", { className: "body", textContent: a.body || "(ohne Text)" }),
+    el("div", { className: "afoot" }, facts([["Haltung", stance(a)], ["Thema", a.topic], ["Erscheint in", a.towns.join(", ") || "–"], ["Gelesen von", a.readers + " Dorfbewohnern"]]))));
+}
+function writeArticle() {
+  writing = true;
+  const paper = el("select", { ariaLabel: "Zeitung" }, ...depotData.papers.map(n => el("option", { value: n, textContent: n })));
+  const title = el("input", { maxLength: 64, required: true, ariaLabel: "Titel" });
+  const body = el("textarea", { maxLength: 4000, rows: 12, ariaLabel: "Text" });
+  const analysis = el("div", { className: "muted small", textContent: "Gegenstand, Haltung und Thema erkennt der Mod beim Schreiben." });
+  const msg = el("div", { className: "msg" });
+  let timer = null;
+  const preview = () => { clearTimeout(timer); timer = setTimeout(async () => {
+    if (!title.value.trim()) return;
+    const r = await api("/api/press/preview", { title: title.value, body: body.value });
+    if (r.ok) analysis.textContent = "Erkannt: " + (r.data.subject ? r.data.tendencyWord + " über " + r.data.subject : "kein Gegenstand, neutral") + ", Thema " + r.data.topic + ".";
+  }, 400); };
+  title.addEventListener("input", preview); body.addEventListener("input", preview);
+  const form = el("form", { className: "article compose" }, el("h3", { textContent: "Neuer Artikel" }),
+    el("label", { className: "field" }, "Zeitung", paper), el("label", { className: "field" }, "Titel", title), el("label", { className: "field" }, "Text", body),
+    analysis, el("div", { className: "row" }, el("button", { className: "btn primary", textContent: "Veröffentlichen" }),
+      el("button", { type: "button", className: "btn", textContent: "Verwerfen", onclick: () => { writing = false; renderPress(); } })), msg);
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    const r = await api("/api/press", { paper: paper.value, title: title.value, body: body.value });
+    msg.textContent = r.data.message || r.data.error; msg.className = "msg " + (r.ok ? "ok" : "err");
+    if (r.ok) { writing = false; openArticle = null; await loadPress(); }
+  });
+  $("articleview").replaceChildren(form);
+  title.focus();
+}
+$("newarticle").addEventListener("click", writeArticle);
+$("paperfilter").addEventListener("change", () => { openArticle = null; renderPress(); });
+
+/* Spielerliste für Eingaben */
+let players = [];
+async function loadPlayers() {
+  const r = await api("/api/friends");
+  if (!r.ok) return r;
+  players = r.data.players;
+  $("playerlist").replaceChildren(...players.map(n => el("option", { value: n })));
+  return r;
+}
+
+/* Post */
+let letters = { inbox: [], sent: [], today: 0 }, box = "inbox", openLetter = null, composing = false;
+async function loadLetters() {
+  const user = await refreshMe();
+  locked("post", !user);
+  $("newletter").hidden = !user; $("mailbox").hidden = !user;
+  if (!user) return;
+  const [r] = await Promise.all([api("/api/letters"), players.length ? null : loadPlayers()]);
+  if (!r.ok) return;
+  letters = r.data;
+  renderLetters();
+}
+function renderLetters() {
+  const list = letters[box];
+  $("letters").replaceChildren(...(list.length ? list.map(l => el("button", {
+    className: (box === "inbox" && !l.read ? "unread " : "") + (openLetter === l.id ? "sel" : ""),
+    onclick: () => showLetter(l) },
+    el("div", { className: "t" }, el("span", { textContent: box === "inbox" ? l.from : "an " + l.to }),
+      el("span", { textContent: box === "sent" && l.deliverOn > letters.today ? "kommt Tag " + l.deliverOn : "Tag " + l.sentOn })),
+    el("div", { className: "s", textContent: l.subject })))
+    : [el("div", { className: "empty", style: "border:none", textContent: box === "inbox" ? "Dein Postfach ist leer." : "Du hast noch keinen Brief geschrieben." })]));
+  if (composing) return;
+  const current = list.find(l => l.id === openLetter);
+  if (current) showLetter(current, true);
+  else $("reader").replaceChildren(el("div", { className: "empty", style: "height:100%;display:grid;place-items:center", textContent: list.length ? "Wähle links einen Brief." : "Schreib den ersten Brief." }));
+}
+async function showLetter(l, quiet) {
+  composing = false; openLetter = l.id;
+  const reply = box === "inbox" ? el("button", { className: "btn", textContent: "Antworten", onclick: () => compose(l.from, "Re: " + l.subject) }) : null;
+  $("reader").replaceChildren(el("article", { className: "letter" },
+    el("div", { className: "envelope" },
+      el("div", {}, el("div", { textContent: "Von " + l.from }), el("div", { textContent: "An " + l.to + (l.address ? ", " + l.address : "") })),
+      el("div", { className: "stamp" }, "Tag", el("br"), String(l.sentOn))),
+    el("h3", { textContent: l.subject }),
+    el("div", { className: "body", textContent: l.body || "(ohne Text)" }),
+    reply ? el("div", { style: "margin-top:24px" }, reply) : null));
+  if (!quiet) document.querySelectorAll("#letters button").forEach((b, i) => b.classList.toggle("sel", letters[box][i] && letters[box][i].id === l.id));
+  if (box === "inbox" && !l.read) {
+    l.read = true;
+    await api("/api/letters/read", { id: l.id });
+    renderLetters(); refreshMe();
+  }
+}
+function compose(to = "", subject = "") {
+  composing = true; openLetter = null;
+  const toI = el("input", { value: to, required: true, autocomplete: "off" }); toI.setAttribute("list", "playerlist");
+  const subI = el("input", { value: subject.slice(0, 48), maxLength: 48, required: true });
+  const bodyI = el("textarea", { maxLength: 2000, rows: 10 });
+  const msg = el("div", { className: "msg", id: "lettermsg" });
+  const form = el("form", { className: "letter compose" },
+    el("h3", { textContent: "Neuer Brief" }),
+    el("label", { className: "field" }, "An", toI), el("label", { className: "field" }, "Betreff", subI), el("label", { className: "field" }, "Text", bodyI),
+    el("div", { className: "row" }, el("button", { className: "btn primary", textContent: "Einwerfen" }), el("button", { type: "button", className: "btn", textContent: "Verwerfen", onclick: () => { composing = false; renderLetters(); } })),
+    msg);
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    const r = await api("/api/letters", { to: toI.value.trim(), subject: subI.value, body: bodyI.value });
+    msg.textContent = r.data.message || r.data.error; msg.className = "msg " + (r.ok ? "ok" : "err");
+    if (r.ok) { bodyI.value = ""; const l = await api("/api/letters"); if (l.ok) { letters = l.data; } box = "sent";
+      document.querySelectorAll("#mailbox button").forEach(b => b.classList.toggle("on", b.dataset.box === box)); composing = true; renderLetters(); }
+  });
+  $("reader").replaceChildren(form);
+  (to ? bodyI : toI).focus();
+}
+$("newletter").addEventListener("click", () => compose());
+document.querySelectorAll("#mailbox button").forEach(b => b.addEventListener("click", () => {
+  box = b.dataset.box; openLetter = null; composing = false; document.querySelectorAll("#mailbox button").forEach(x => x.classList.toggle("on", x === b)); renderLetters();
 }));
 
-// Mein Bereich
-function message(id, text, ok) { const m = $(id); m.textContent = text; m.className = "msg " + (ok ? "ok" : "err"); }
+/* Chat */
+let chat = [], lastSeq = 0, channel = "", chatTimer = null, friendList = [], seen = {};
+try { seen = JSON.parse(localStorage.getItem("civ-chat-seen") || "{}"); } catch (e) { seen = {}; }
+const channelOf = m => m.to ? (m.mine ? m.to : m.from) : "";
+async function openChat() {
+  const user = await refreshMe();
+  locked("chat", !user);
+  if (!user) return;
+  const f = await api("/api/friends");
+  if (f.ok) friendList = f.data.friends.filter(x => x.state === "friend");
+  if (!chatTimer) { chat = []; lastSeq = 0; }
+  await pollChat();
+  stopChat();
+  chatTimer = setInterval(pollChat, 3000);
+  $("chatinput").focus();
+}
+function stopChat() { if (chatTimer && page !== "chat") { clearInterval(chatTimer); chatTimer = null; } }
+async function pollChat() {
+  const r = await api("/api/chat?after=" + lastSeq);
+  if (!r.ok) return;
+  const fresh = r.data.messages;
+  if (fresh.length) { chat.push(...fresh); lastSeq = fresh[fresh.length - 1].seq; if (chat.length > 600) chat = chat.slice(-600); }
+  $("roomsub").textContent = r.data.online.length + " im Spiel";
+  renderChannels(r.data.online);
+  if (fresh.length || !$("feed").childElementCount) renderFeed();
+}
+function renderChannels(online) {
+  const names = new Set(friendList.map(f => f.name));
+  chat.filter(m => m.to).forEach(m => names.add(channelOf(m)));
+  const unread = key => chat.filter(m => channelOf(m) === key && !m.mine && m.seq > (seen[key] || 0)).length;
+  const item = (key, label, dot) => el("button", { className: channel === key ? "sel" : "", onclick: () => { channel = key; renderChannels(online); renderFeed(); $("chatinput").focus(); } },
+    dot === undefined ? null : el("span", { className: "dot" + (dot ? " on" : "") }), label,
+    channel !== key && unread(key) ? el("span", { className: "badge unread", textContent: unread(key) }) : null);
+  $("channels").replaceChildren(item("", "# Allgemein"), el("h4", { textContent: "Direktnachrichten" }),
+    ...[...names].sort((a, b) => a.localeCompare(b)).map(n => item(n, n, online.includes(n))),
+    ...(names.size ? [] : [el("div", { className: "muted small", style: "padding:6px 10px", textContent: "Füge Freunde hinzu, um ihnen direkt zu schreiben." })]));
+  const total = [...names].reduce((s, n) => s + (n === channel ? 0 : unread(n)), 0);
+  $("b-chat").textContent = total || "";
+}
+function renderFeed() {
+  const feed = $("feed"), atBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 60;
+  const msgs = chat.filter(m => channelOf(m) === channel);
+  $("roomname").textContent = channel ? channel : "Allgemein";
+  feed.replaceChildren(...(msgs.length ? msgs.map(m => el("div", { className: "bubble" + (m.mine ? " mine" : "") },
+    el("div", { className: "meta" }, el("b", { textContent: m.mine ? "Du" : m.from }),
+      el("span", { textContent: new Date(m.at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) }),
+      el("span", { className: "origin", textContent: m.origin === "web" ? "Web" : "Spiel" })),
+    el("div", { textContent: m.text })))
+    : [el("div", { className: "muted", style: "margin:auto", textContent: channel ? "Noch keine Nachrichten mit " + channel + "." : "Noch ist es still. Schreib die erste Nachricht." })]));
+  if (atBottom || msgs.length) feed.scrollTop = feed.scrollHeight;
+  if (msgs.length) { seen[channel] = msgs[msgs.length - 1].seq; try { localStorage.setItem("civ-chat-seen", JSON.stringify(seen)); } catch (e) { /* egal */ } }
+}
+$("chatform").addEventListener("submit", async e => {
+  e.preventDefault();
+  const text = $("chatinput").value.trim();
+  if (!text) return;
+  const r = await api("/api/chat", channel ? { text, to: channel } : { text });
+  if (r.ok) { $("chatinput").value = ""; say("chatmsg", "", true); pollChat(); } else say("chatmsg", r.data.message || r.data.error, false);
+});
+
+/* Freunde */
+async function loadFriends() {
+  const user = await refreshMe();
+  locked("freunde", !user);
+  if (!user) return;
+  const r = await loadPlayers();
+  if (!r || !r.ok) return;
+  const all = r.data.friends;
+  const act = async (action, name) => { const x = await api("/api/friends", { action, name }); say("friendmsg", x.data.message || x.data.error, x.ok); loadFriends(); };
+  const person = (f, buttons) => el("div", { className: "person" }, head(f.name),
+    el("div", {}, el("div", { className: "name" }, f.state === "friend" ? el("span", { className: "dot" + (f.online ? " on" : ""), style: "display:inline-block;margin-right:7px" }) : null, f.name),
+      el("div", { className: "sub", textContent: [f.state === "friend" ? (f.online ? "online" : "offline") : "", f.town].filter(Boolean).join(", ") || "ohne Gemeinde" })),
+    el("div", { className: "row" }, ...buttons));
+  const friends = all.filter(f => f.state === "friend");
+  $("friendlist").replaceChildren(friends.length ? el("div", { className: "people" }, ...friends.map(f => person(f, [
+    el("a", { className: "btn small", href: "#chat", textContent: "Nachricht", onclick: () => { channel = f.name; } }),
+    el("button", { className: "btn small", textContent: "Brief", onclick: () => { location.hash = "#post"; setTimeout(() => compose(f.name), 150); } }),
+    el("button", { className: "btn small danger", textContent: "Entfernen", onclick: () => act("remove", f.name) })])))
+    : el("div", { className: "empty", textContent: "Noch keine Freunde. Schick oben eine Anfrage." }));
+  const incoming = all.filter(f => f.state === "incoming"), outgoing = all.filter(f => f.state === "outgoing");
+  $("requestlist").replaceChildren(incoming.length || outgoing.length ? el("div", { className: "people" },
+    ...incoming.map(f => person(Object.assign({}, f, { town: "möchte mit dir befreundet sein" }), [
+      el("button", { className: "btn small primary", textContent: "Annehmen", onclick: () => act("accept", f.name) }),
+      el("button", { className: "btn small", textContent: "Ablehnen", onclick: () => act("remove", f.name) })])),
+    ...outgoing.map(f => person(Object.assign({}, f, { town: "Anfrage gesendet" }), [
+      el("button", { className: "btn small", textContent: "Zurückziehen", onclick: () => act("remove", f.name) })])))
+    : el("div", { className: "empty", textContent: "Keine offenen Anfragen." }));
+}
+$("friendform").addEventListener("submit", async e => {
+  e.preventDefault();
+  const name = $("friendname").value.trim(); if (!name) return;
+  const r = await api("/api/friends", { action: "request", name });
+  say("friendmsg", r.data.message || r.data.error, r.ok);
+  if (r.ok) { $("friendname").value = ""; loadFriends(); }
+});
+
+/* Mein Bereich */
 async function loadMe() {
-  const { ok, data } = await api("/api/me");
-  $("login").style.display = ok ? "none" : "block";
-  $("account").style.display = ok ? "block" : "none";
-  if (!ok) return;
-  $("who").textContent = data.name + (data.town ? " · " + data.town : " · ohne Gemeinde");
-  $("balance").textContent = data.balance + " Smaragde";
+  const data = await refreshMe();
+  locked("ich", !data);
+  if (!data) return;
+  if (!players.length) loadPlayers();
+  $("who").textContent = data.name + (data.town ? ", Bürger von " + data.town : ", ohne Gemeinde");
+  $("balance").replaceChildren(data.balance, el("small", { textContent: "Smaragde" }));
+  $("address").textContent = data.address ? "Anschrift: " + data.address : "Noch keine Anschrift. Sie entsteht, wenn dein Grundstück an einer Straße liegt.";
   renderOffices(data);
+  renderProposals(data);
+  loadContracts();
+}
+async function loadContracts() {
+  const r = await api("/api/contracts");
+  if (!r.ok) return;
+  const list = r.data.contracts.filter(c => c.status === "OFFERED" || c.status === "ACTIVE").concat(r.data.contracts.filter(c => c.status !== "OFFERED" && c.status !== "ACTIVE").slice(0, 5));
+  const act = async (action, number) => { const x = await api("/api/contracts", { action, number }); say("contractmsg", x.data.message || x.data.error, x.ok); loadMe(); };
+  $("contracts").replaceChildren(...(list.length ? list.map(c => {
+    const terms = [c.perDay !== "0,00" ? (c.pays ? "du zahlst " : "du bekommst ") + c.perDay + " am Tag" : "",
+      c.once !== "0,00" ? "einmalig " + c.once : "", c.deposit !== "0,00" ? "Kaution " + c.deposit : "",
+      c.termDays ? c.termDays + " Tage" : "unbefristet", c.endsOn !== null ? "endet an Tag " + c.endsOn : ""].filter(Boolean).join(", ");
+    return el("div", { className: "contract" },
+      el("div", {},
+        el("div", { className: "head" }, el("b", { textContent: "#" + c.number + " " + c.title }), el("span", { className: "status " + c.status, textContent: c.statusName }),
+          el("span", { className: "muted small", textContent: c.kindName + " mit " + c.other })),
+        el("div", { className: "small", style: "margin-top:4px", textContent: terms }),
+        c.address ? el("div", { className: "muted small", textContent: c.address }) : null,
+        c.text ? el("div", { className: "muted small", style: "margin-top:4px", textContent: c.text }) : null),
+      el("div", { className: "row", style: "align-self:start" },
+        c.canSign ? el("button", { className: "btn small primary", textContent: "Unterschreiben", onclick: () => act("sign", c.number) }) : null,
+        c.canDecline ? el("button", { className: "btn small", textContent: c.canSign ? "Ablehnen" : "Zurückziehen", onclick: () => act("decline", c.number) }) : null,
+        c.canNotice ? el("button", { className: "btn small danger", textContent: "Kündigen", onclick: () => act("notice", c.number) }) : null));
+  }) : [el("div", { className: "empty", textContent: "Keine Verträge. Biete rechts einen an oder miete im Spiel ein Grundstück." })]));
+}
+$("ckind").addEventListener("change", () => { const custom = $("ckind").value === "custom"; $("ccustom").style.display = custom ? "" : "none"; $("ctext").style.display = custom ? "" : "none"; });
+$("coffer").addEventListener("click", async () => {
+  const custom = $("ckind").value === "custom";
+  const body = custom ? { action: "custom", to: $("cto").value.trim(), title: $("ctitle").value.trim(), text: $("ctext").value.trim(),
+    once: $("conce").value.trim() || "0", perDay: $("cdaily").value.trim() || "0", days: $("cdays").value || "0" }
+    : { action: "employment", to: $("cto").value.trim(), perDay: $("cdaily").value.trim(), days: $("cdays").value || "0" };
+  const r = await api("/api/contracts", body);
+  say("cmsg", r.data.message || r.data.error, r.ok);
+  if (r.ok) { ["cto", "ctitle", "ctext", "conce", "cdaily", "cdays"].forEach(id => $(id).value = ""); loadContracts(); }
+});
+function renderProposals(data) {
   const list = $("proposals");
   if (!data.town) { list.replaceChildren(el("div", { className: "empty", textContent: "Tritt einer Gemeinde bei, um abzustimmen." })); return; }
   if (!data.proposals.length) { list.replaceChildren(el("div", { className: "empty", textContent: "Gerade läuft keine Abstimmung." })); return; }
   list.replaceChildren(...data.proposals.map(p => {
-    const bar = el("div", { className: "bar" });
-    const y = el("div", { className: "y" }), n = el("div", { className: "n" });
+    const bar = el("div", { className: "votebar" }), y = el("div", { className: "y" }), n = el("div", { className: "n" });
     y.style.width = (100 * p.inFavour / Math.max(1, p.electorate)) + "%"; n.style.width = (100 * p.against / Math.max(1, p.electorate)) + "%";
     bar.append(y, n);
-    const vote = yes => async () => {
-      const r = await api("/api/vote", { number: p.number, yes });
-      message("votemsg", r.data.message || r.data.error, r.ok); loadMe();
-    };
+    const vote = yes => async () => { const r = await api("/api/vote", { number: p.number, yes }); say("votemsg", r.data.message || r.data.error, r.ok); loadMe(); };
     return el("div", { className: "proposal" },
-      el("strong", { textContent: "Nr. " + p.number + ": " + p.law + " → " + p.value }),
-      el("div", { className: "muted", textContent: "Beantragt von " + p.proposer + " · Auszählung an Tag " + p.decidedOn
-        + (p.ownVote ? " · deine Stimme: " + (p.ownVote === "yes" ? "dafür" : "dagegen") : "") }),
+      el("b", { textContent: "Nr. " + p.number + ": " + p.law + " wird " + p.value }),
+      el("div", { className: "muted small", textContent: "Beantragt von " + p.proposer + ", Auszählung an Tag " + p.decidedOn + (p.ownVote ? ". Deine Stimme: " + (p.ownVote === "yes" ? "dafür" : "dagegen") : "") }),
       bar,
-      el("div", { className: "muted", textContent: p.inFavour + " dafür, " + p.against + " dagegen von " + p.electorate + " Bürgern" }),
-      el("div", { className: "row", style: "margin-top:8px" }, el("button", { className: "yes", textContent: "Dafür", onclick: vote(true) }),
-        el("button", { className: "no", textContent: "Dagegen", onclick: vote(false) })));
+      el("div", { className: "row" }, el("span", { className: "muted small grow", textContent: p.inFavour + " dafür, " + p.against + " dagegen, " + p.electorate + " Bürger" }),
+        el("button", { className: "btn small primary", textContent: "Dafür", onclick: vote(true) }),
+        el("button", { className: "btn small danger", textContent: "Dagegen", onclick: vote(false) })));
   }));
 }
 function renderOffices(data) {
   const box = $("offices");
   if (!data.town) { box.replaceChildren(el("div", { className: "empty", textContent: "Tritt einer Gemeinde bei, um zu wählen." })); return; }
-  const send = async (path, body) => {
-    const r = await api(path, body);
-    message("officemsg", r.data.message || r.data.error, r.ok); loadMe();
-  };
+  const send = async (path, body) => { const r = await api(path, body); say("officemsg", r.data.message || r.data.error, r.ok); loadMe(); };
   box.replaceChildren(...data.offices.map(o => {
-    const card = el("div", { className: "office" },
-      el("h3", { textContent: o.title }),
+    const card = el("div", { className: "office" }, el("div", { className: "muted small", textContent: o.title }),
       el("div", { className: "holder", textContent: o.holder || "frei" }),
-      el("div", { className: "muted", textContent: o.implicit ? "kommissarisch, nie gewählt"
-        : o.until !== null ? "Amtszeit bis Tag " + o.until : o.holder ? "unbefristet" : "" }));
+      el("div", { className: "muted small", textContent: o.implicit ? "kommissarisch, nie gewählt" : o.until !== null ? "Amtszeit bis Tag " + o.until : o.holder ? "unbefristet" : "" }));
     const e = o.election;
-    if (!e) {
-      card.append(el("div", { className: "muted", style: "margin-top:8px",
-        textContent: "Keine Wahl. Ausrufen im Spiel: /civ wahl ausrufen" }));
-      return card;
-    }
-    const election = el("div", { className: "election" },
-      el("strong", { textContent: "Wahl läuft bis Tag " + e.closesOn }),
-      el("div", { className: "muted", textContent: e.ballots + " von " + e.electorate + " Bürgern haben gewählt" }));
-    if (!e.candidates.length) election.append(el("div", { className: "muted", style: "margin-top:6px", textContent: "Noch keine Kandidaten." }));
+    if (!e) { card.append(el("div", { className: "muted small", style: "margin-top:8px", textContent: "Keine Wahl angesetzt." })); return card; }
+    const election = el("div", { style: "border-top:1px solid var(--line);margin-top:10px;padding-top:10px" },
+      el("b", { textContent: "Wahl bis Tag " + e.closesOn }), el("div", { className: "muted small", textContent: e.ballots + " von " + e.electorate + " haben gewählt" }));
+    if (!e.candidates.length) election.append(el("div", { className: "muted small", style: "margin-top:6px", textContent: "Noch keine Kandidaten." }));
     e.candidates.forEach(c => {
       const chosen = e.ownChoice === c.id;
-      election.append(el("div", { className: "candidate" + (chosen ? " chosen" : "") },
-        el("span", { textContent: c.name + (chosen ? " ✓" : ""), title: c.platformName },
-          el("div", { className: "muted", style: "font-size:12px;font-weight:400", textContent: c.platformName + (c.party ? " · " + c.party : "") })),
-        el("button", { className: "yes", textContent: chosen ? "Gewählt" : "Wählen", disabled: chosen,
-          onclick: () => send("/api/elect", { office: o.office, candidate: c.id }) })));
+      election.append(el("div", { className: "candidate" },
+        el("div", {}, el("div", { textContent: c.name + (chosen ? " ✓" : "") }), el("div", { className: "muted small", textContent: c.platformName + (c.party ? ", " + c.party : "") })),
+        el("button", { className: "btn small" + (chosen ? "" : " primary"), textContent: chosen ? "Gewählt" : "Wählen", disabled: chosen, onclick: () => send("/api/elect", { office: o.office, candidate: c.id }) })));
     });
     if (!e.ownCandidacy) {
-      const programme = el("select", {}, ...data.platforms.map(p => el("option", { value: p.id, textContent: p.name })));
+      const programme = el("select", { ariaLabel: "Programm" }, ...data.platforms.map(p => el("option", { value: p.id, textContent: p.name })));
       election.append(el("div", { className: "row", style: "margin-top:10px" }, programme,
-        el("button", { className: "ghost", textContent: "Kandidieren",
-          onclick: () => send("/api/stand", { office: o.office, platform: programme.value }) })));
+        el("button", { className: "btn small", textContent: "Kandidieren", onclick: () => send("/api/stand", { office: o.office, platform: programme.value }) })));
     }
     card.append(election);
     return card;
   }));
 }
-$("loginbtn").addEventListener("click", async () => {
-  const r = await api("/api/login", { code: $("code").value });
-  if (r.ok) { $("code").value = ""; message("loginmsg", "", true); loadMe(); } else message("loginmsg", r.data.error, false);
-});
-$("code").addEventListener("keydown", e => { if (e.key === "Enter") $("loginbtn").click(); });
-$("logout").addEventListener("click", async () => { await api("/api/logout", {}); loadMe(); });
+$("logout").addEventListener("click", async () => { await api("/api/logout", {}); me = null; players = []; route(); refreshMe(); });
 $("send").addEventListener("click", async () => {
   const r = await api("/api/transfer", { to: $("to").value, amount: $("amount").value });
-  message("sendmsg", r.data.message || r.data.error, r.ok); if (r.ok) { $("amount").value = ""; loadMe(); }
+  say("sendmsg", r.data.message || r.data.error, r.ok); if (r.ok) { $("amount").value = ""; loadMe(); }
 });
 
-loadWorld();
-setInterval(loadWorld, 30000);
+/* Start */
+fetchWorld().then(() => { refreshMe(); route(); });
+setInterval(() => { refreshMe(); if (page === "start") loadStart(); }, 20000);
 </script>
 </body>
 </html>

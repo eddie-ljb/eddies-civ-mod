@@ -1,8 +1,7 @@
 package de.etiennebader.civ.domain.polity;
 
 /**
- * Grundart einer Polity. In Phase 0 gibt es nur Gebietskörperschaften; Parteien, Firmen,
- * Gewerkschaften, Medienhäuser und Religionen folgen später.
+ * Grundart einer Polity: Gebietskörperschaften, Bünde, Parteien, Firmen und Zeitungen.
  */
 public enum PolityKind {
     /** Gemeinde mit eigenem Gebiet und Gemeindehaus. */
@@ -10,5 +9,9 @@ public enum PolityKind {
     /** Bund aus Gemeinden oder anderen Bünden, z. B. Kreis, Land, Nation; ohne eigenes Gebiet. */
     FEDERATION,
     /** Partei: Mitglieder sind Personen überall, mit politischer Richtung und Vorsitz; ohne Gebiet und Recht. */
-    PARTY
+    PARTY,
+    /** Firma: Konto, Leitung (Geschäftsführung), Aktien an der Börse, Angestellte über Arbeitsverträge. */
+    COMPANY,
+    /** Zeitung: Redaktion als Mitglieder, Chefredaktion als Leitung, Artikel in der Presse. */
+    NEWSPAPER
 }

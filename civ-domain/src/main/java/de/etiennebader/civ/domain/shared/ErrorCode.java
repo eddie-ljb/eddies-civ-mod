@@ -123,6 +123,37 @@ public enum ErrorCode {
     MAYOR_NOT_APPOINTABLE,
     /** Argumente: Chunk-X, Chunk-Z. */
     CHUNK_HAS_PLOTS,
+    /** Argumente: Akteur. Mit gewähltem Parlament stimmen nur Abgeordnete ab. */
+    NOT_IN_PARLIAMENT,
+    /** Das Recht sieht kein Parlament vor ({@code parliament_seats} ist 0). */
+    NO_PARLIAMENT_PROVIDED,
+    /** Mit gewähltem Parlament braucht jede Rechtsänderung seine Zustimmung. */
+    PARLIAMENT_DECIDES,
+    /** Das Parlament wird gewählt, nicht ernannt. */
+    PARLIAMENT_NOT_APPOINTABLE,
+    /** Das Recht schreibt die Stimmabgabe an einer Wahlurne vor. */
+    BALLOT_BOX_REQUIRED,
+    /** Nur wer bei einer laufenden Wahl kandidiert, kann etwas versprechen. */
+    NOT_RUNNING,
+    /** Argumente: Vertrag. */
+    UNKNOWN_CONTRACT,
+    /** Argumente: Vertragsnummer. */
+    CONTRACT_NOT_POSSIBLE,
+    /** Argumente: Spieler. */
+    NOT_FRIENDS,
+    /** Das Grundstück gehört nicht dem Vermieter oder ist schon vermietet. */
+    PLOT_NOT_LEASABLE,
+    /** Der Dorfbewohner arbeitet schon oder lehnt den Lohn ab. */
+    VILLAGER_DECLINES,
+    /** Argumente: Name. */
+    UNKNOWN_STREET,
+    NOT_ENOUGH_SHARES,
+    UNKNOWN_ORDER,
+    NOT_LISTED,
+    INVALID_ORDER,
+    NOT_AN_ORGANISATION,
+    NOT_AN_EDITOR,
+    PRESS_LIMIT,
 
     // Markt
     INVALID_COMMODITY,

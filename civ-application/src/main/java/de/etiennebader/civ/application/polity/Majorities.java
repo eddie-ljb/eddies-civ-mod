@@ -1,8 +1,10 @@
 package de.etiennebader.civ.application.polity;
 
+import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.law.ParameterKey;
 import de.etiennebader.civ.domain.law.ParameterValue;
 import de.etiennebader.civ.domain.law.StandardParameters;
+import de.etiennebader.civ.domain.polity.MembershipType;
 import de.etiennebader.civ.domain.polity.Motion;
 import de.etiennebader.civ.domain.polity.PolityView;
 
@@ -12,6 +14,17 @@ import java.util.List;
  * Welche Mehrheit eine Rechtsänderung braucht.
  */
 public final class Majorities {
+
+    /** Wer über Anträge abstimmt: die Abgeordneten, wenn ein Parlament gewählt ist, sonst die Bürger ohne Dorfbewohner. */
+    public static long electorate(PolityView polity) {
+        if (polity.parliament().seated()) {
+            return polity.parliament().size();
+        }
+        return polity.members().stream()
+                .filter(membership -> membership.type() == MembershipType.CITIZEN)
+                .filter(membership -> !(membership.member() instanceof PersonRef))
+                .count();
+    }
 
     /** Einfache Mehrheit. */
     public static final long SIMPLE = 50;
@@ -38,9 +51,12 @@ public final class Majorities {
         return affected(polity, motion).stream().mapToLong(key -> requiredPercent(polity, key)).max().orElse(SIMPLE);
     }
 
-    /** Ob dieser Antrag eine Abstimmung braucht, statt von der Spitze verordnet zu werden. */
+    /**
+     * Ob dieser Antrag eine Abstimmung braucht, statt von der Spitze verordnet zu werden: bei Abstimmungspflicht, mit
+     * gewähltem Parlament immer, sonst bei Verfassungsartikeln einer ausgerufenen Verfassung.
+     */
     public static boolean voteRequired(PolityView polity, Motion motion) {
-        if (polity.laws().valueOf(StandardParameters.LAWS_BY_VOTE)) {
+        if (polity.laws().valueOf(StandardParameters.LAWS_BY_VOTE) || polity.parliament().seated()) {
             return true;
         }
         return affected(polity, motion).stream().anyMatch(key -> voteRequired(polity, key));
@@ -59,7 +75,7 @@ public final class Majorities {
 
     /** Ob die Änderung dieser Regelung eine Abstimmung braucht, statt verordnet zu werden. */
     public static boolean voteRequired(PolityView polity, ParameterKey<?> key) {
-        return polity.laws().valueOf(StandardParameters.LAWS_BY_VOTE)
+        return polity.laws().valueOf(StandardParameters.LAWS_BY_VOTE) || polity.parliament().seated()
                 || polity.constitution().proclaimed() && StandardParameters.isConstitutional(key);
     }
 }

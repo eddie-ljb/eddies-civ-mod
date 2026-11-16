@@ -2,11 +2,14 @@ package de.etiennebader.civ.server.shop;
 
 import de.etiennebader.civ.application.CivApplication;
 import de.etiennebader.civ.application.day.Calendar;
+import de.etiennebader.civ.application.query.WorldQueries;
 import de.etiennebader.civ.application.shop.BuyFromShop;
 import de.etiennebader.civ.application.shop.CloseShop;
 import de.etiennebader.civ.application.shop.OpenShop;
-import de.etiennebader.civ.application.query.WorldQueries;
+import de.etiennebader.civ.domain.actor.ActorRef;
+import de.etiennebader.civ.domain.actor.PolityRef;
 import de.etiennebader.civ.domain.market.Commodity;
+import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.protection.ProtectedAction;
 import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.DomainException;
@@ -62,6 +65,14 @@ public final class ShopService {
 
     /** Eröffnet einen Laden an einer Kiste oder ändert den eigenen. */
     public Reply open(Caller caller, BlockPosition chest, ItemTraits item, String priceInput) {
+        return open(caller, chest, item, priceInput, caller.player());
+    }
+
+    /**
+     * Wie oben, für einen anderen Inhaber, z. B. eine Firma, die der Spieler leitet. Die Einnahmen gehen an den
+     * Inhaber.
+     */
+    public Reply open(Caller caller, BlockPosition chest, ItemTraits item, String priceInput, ActorRef owner) {
         if (item.modified()) {
             return Reply.failure(Message.of(MessageKey.MARKET_MODIFIED_ITEM, Message.of(item.translationKey())));
         }
@@ -76,7 +87,7 @@ public final class ShopService {
         }
         try {
             Money price = Money.of(units, currency);
-            app.openShop().execute(new OpenShop.Command(chest, caller.player(), Commodity.of(item.id()), price,
+            app.openShop().execute(new OpenShop.Command(chest, owner, Commodity.of(item.id()), price,
                     calendar.today()));
             return Reply.success(Message.of(MessageKey.SHOP_OPENED, Message.of(item.translationKey()), texts.money(price)));
         } catch (DomainException e) {
@@ -87,7 +98,11 @@ public final class ShopService {
     /** Der Inhaber schließt seinen Laden; die Kiste bleibt. */
     public Reply close(Caller caller, BlockPosition chest) {
         try {
-            app.closeShop().execute(new CloseShop.Command(chest, Optional.of(caller.player()), calendar.today()));
+            ActorRef owner = queries.shops().shopAt(chest).map(Shop::owner)
+                    .filter(found -> found instanceof PolityRef company && queries.polity(company.id())
+                            .map(polity -> polity.holds(caller.player(), Office.MAYOR)).orElse(false))
+                    .orElse(caller.player());
+            app.closeShop().execute(new CloseShop.Command(chest, Optional.of(owner), calendar.today()));
             return Reply.success(Message.of(MessageKey.SHOP_CLOSED));
         } catch (DomainException e) {
             return Reply.failure(texts.error(e));

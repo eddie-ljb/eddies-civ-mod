@@ -53,6 +53,9 @@ public final class AmendLaw {
     public StatuteId execute(Command command) {
         Polity polity = aggregates.polity(command.polity());
         requireCitizen(polity, command.citizen());
+        if (polity.parliament().seated()) {
+            throw new ParliamentDecidesException();
+        }
         if (polity.constitution().proclaimed() && StandardParameters.isConstitutional(command.value().key())) {
             throw new ConstitutionRequiresVoteException(command.value().key().id());
         }

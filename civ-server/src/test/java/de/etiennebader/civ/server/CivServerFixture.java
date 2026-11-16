@@ -91,6 +91,30 @@ public final class CivServerFixture {
         return server.federations();
     }
 
+    public de.etiennebader.civ.server.civil.CivilService civil() {
+        return server.civil();
+    }
+
+    public de.etiennebader.civ.server.company.CompanyService companies() {
+        return server.companies();
+    }
+
+    public de.etiennebader.civ.server.press.PressService press() {
+        return server.press();
+    }
+
+    public de.etiennebader.civ.server.community.CommunityService community() {
+        return server.community();
+    }
+
+    public de.etiennebader.civ.server.campaign.CampaignService campaigns() {
+        return server.campaigns();
+    }
+
+    public de.etiennebader.civ.server.parliament.ParliamentService parliaments() {
+        return server.parliaments();
+    }
+
     public de.etiennebader.civ.server.office.OfficeService offices() {
         return server.offices();
     }

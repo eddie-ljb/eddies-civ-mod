@@ -12,5 +12,10 @@ public enum TransferReason {
     TRADE,
     GRANT,
     LEVY,
+    RENT,
+    DEPOSIT,
+    SALARY,
+    DIVIDEND,
+    CAPITAL,
     OTHER
 }

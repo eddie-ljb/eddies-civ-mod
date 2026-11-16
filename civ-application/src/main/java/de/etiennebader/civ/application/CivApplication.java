@@ -1,5 +1,13 @@
 package de.etiennebader.civ.application;
 
+import de.etiennebader.civ.application.civil.Addresses;
+import de.etiennebader.civ.application.civil.CommunityUseCases;
+import de.etiennebader.civ.application.civil.ContractUseCases;
+import de.etiennebader.civ.application.civil.RunContracts;
+import de.etiennebader.civ.application.civil.StreetUseCases;
+import de.etiennebader.civ.application.company.CompanyUseCases;
+import de.etiennebader.civ.application.company.Trading;
+import de.etiennebader.civ.application.company.VillagerInvestors;
 import de.etiennebader.civ.application.constitution.ChangePreamble;
 import de.etiennebader.civ.application.constitution.ProclaimConstitution;
 import de.etiennebader.civ.application.day.EndOfDay;
@@ -22,11 +30,16 @@ import de.etiennebader.civ.application.law.EnactParagraph;
 import de.etiennebader.civ.application.law.RepealParagraph;
 import de.etiennebader.civ.application.market.BuyFromMarket;
 import de.etiennebader.civ.application.market.SellToMarket;
+import de.etiennebader.civ.application.media.PressInfluence;
+import de.etiennebader.civ.application.media.PressUseCases;
 import de.etiennebader.civ.application.office.AppointOfficer;
 import de.etiennebader.civ.application.office.CallElection;
 import de.etiennebader.civ.application.office.CastBallot;
+import de.etiennebader.civ.application.office.MakePromise;
+import de.etiennebader.civ.application.office.PutUpPoster;
 import de.etiennebader.civ.application.office.RunElections;
 import de.etiennebader.civ.application.office.StandForElection;
+import de.etiennebader.civ.application.office.VillagerVoter;
 import de.etiennebader.civ.application.party.ChangePartyProfile;
 import de.etiennebader.civ.application.party.FoundParty;
 import de.etiennebader.civ.application.party.JoinParty;
@@ -40,10 +53,13 @@ import de.etiennebader.civ.application.polity.FoundPolity;
 import de.etiennebader.civ.application.polity.JoinPolity;
 import de.etiennebader.civ.application.polity.LeavePolity;
 import de.etiennebader.civ.application.polity.MoveSeat;
+import de.etiennebader.civ.application.polity.ParliamentSession;
 import de.etiennebader.civ.application.polity.ProposeLawChange;
 import de.etiennebader.civ.application.polity.ProposeMotion;
 import de.etiennebader.civ.application.polity.RepealStatute;
 import de.etiennebader.civ.application.polity.TallyProposals;
+import de.etiennebader.civ.application.population.Campaign;
+import de.etiennebader.civ.application.population.PersonalityLegislator;
 import de.etiennebader.civ.application.population.PersonalityVoter;
 import de.etiennebader.civ.application.port.DomainEventPublisher;
 import de.etiennebader.civ.application.query.WorldQueries;
@@ -54,10 +70,16 @@ import de.etiennebader.civ.application.support.Aggregates;
 import de.etiennebader.civ.application.support.ClaimWeighting;
 import de.etiennebader.civ.application.territory.ClaimChunk;
 import de.etiennebader.civ.application.territory.ReleaseChunk;
+import de.etiennebader.civ.domain.actor.ActorRef;
+import de.etiennebader.civ.domain.law.LawView;
+import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.shared.IdGenerator;
+import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.territory.ClaimPolicy;
 
 import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * Einstiegspunkt der Application-Schicht: verdrahtet alle Use Cases mit Repositories,
@@ -86,7 +108,21 @@ public final class CivApplication {
     private final RepealParagraph repealParagraph;
     private final CastVote castVote;
     private final TallyProposals tallyProposals;
+    private final ParliamentSession parliamentSession;
+    private final Campaign campaign;
+    private final ContractUseCases contracts;
+    private final RunContracts runContracts;
+    private final StreetUseCases streets;
+    private final CommunityUseCases community;
+    private final VillagerVoter villagerVoter;
+    private final MakePromise makePromise;
+    private final PutUpPoster putUpPoster;
     private final DissolvePolity dissolvePolity;
+    private final Trading trading;
+    private final CompanyUseCases companies;
+    private final PressUseCases press;
+    private final PressInfluence pressInfluence;
+    private final VillagerInvestors villagerInvestors;
     private final FoundParty foundParty;
     private final JoinParty joinParty;
     private final LeaveParty leaveParty;
@@ -154,15 +190,36 @@ public final class CivApplication {
         this.standForElection = new StandForElection(aggregates);
         this.castBallot = new CastBallot(aggregates);
         this.appointOfficer = new AppointOfficer(aggregates);
-        this.runElections = new RunElections(aggregates, ids, new PersonalityVoter(
-                polity -> new WorldQueries(repositories).effectiveLaws(polity),
-                actor -> new WorldQueries(repositories).partyOf(actor)));
+        Function<PolityView, LawView> effectiveLaws = polity -> new WorldQueries(repositories).effectiveLaws(polity);
+        Function<ActorRef, Optional<PolityView>> partyOf = actor -> new WorldQueries(repositories).partyOf(actor);
+        Function<ActorRef, Optional<PolityId>> homeOf = actor -> new WorldQueries(repositories).municipalityOf(actor)
+                .map(PolityView::id);
+        this.campaign = new Campaign(partyOf, actor -> new WorldQueries(repositories).municipalityOf(actor),
+                effectiveLaws);
+        this.pressInfluence = new PressInfluence(() -> new WorldQueries(repositories).press(),
+                actor -> new WorldQueries(repositories).municipalityOf(actor), partyOf);
+        this.villagerVoter = new PersonalityVoter(effectiveLaws, partyOf,
+                (villager, candidate, election, polity) -> campaign.bonus(villager, candidate, election, polity)
+                        + pressInfluence.bonus(villager, candidate, election, polity));
+        this.runElections = new RunElections(aggregates, ids, villagerVoter, partyOf, homeOf);
+        this.contracts = new ContractUseCases(aggregates, ids);
+        this.runContracts = new RunContracts(aggregates);
+        this.streets = new StreetUseCases(aggregates);
+        this.community = new CommunityUseCases(aggregates, ids);
+        this.makePromise = new MakePromise(aggregates);
+        this.putUpPoster = new PutUpPoster(aggregates);
+        this.parliamentSession = new ParliamentSession(aggregates, ids,
+                new PersonalityLegislator(effectiveLaws, partyOf));
         this.foundFederation = new FoundFederation(aggregates, ids);
         this.joinFederation = new JoinFederation(aggregates);
         this.proclaimConstitution = new ProclaimConstitution(aggregates);
         this.changePreamble = new ChangePreamble(aggregates);
         this.leaveFederation = new LeaveFederation(aggregates);
         this.dissolvePolity = new DissolvePolity(aggregates);
+        this.trading = new Trading(aggregates, ids);
+        this.companies = new CompanyUseCases(aggregates, ids, trading, dissolvePolity);
+        this.press = new PressUseCases(aggregates, ids);
+        this.villagerInvestors = new VillagerInvestors(() -> new WorldQueries(repositories), trading);
         this.foundParty = new FoundParty(aggregates, ids);
         this.joinParty = new JoinParty(aggregates);
         this.leaveParty = new LeaveParty(aggregates, dissolvePolity);
@@ -260,6 +317,48 @@ public final class CivApplication {
         return castVote;
     }
 
+    /** Wie Dorfbewohner wählen, z. B. für Umfragen. */
+    public VillagerVoter villagerVoter() {
+        return villagerVoter;
+    }
+
+    public ContractUseCases contracts() {
+        return contracts;
+    }
+
+    public RunContracts runContracts() {
+        return runContracts;
+    }
+
+    public StreetUseCases streets() {
+        return streets;
+    }
+
+    public CommunityUseCases community() {
+        return community;
+    }
+
+    /** Hausnummern und Wohnsitze. */
+    public Addresses addresses() {
+        return new Addresses(queries);
+    }
+
+    public Campaign campaign() {
+        return campaign;
+    }
+
+    public MakePromise makePromise() {
+        return makePromise;
+    }
+
+    public PutUpPoster putUpPoster() {
+        return putUpPoster;
+    }
+
+    public ParliamentSession parliamentSession() {
+        return parliamentSession;
+    }
+
     public TallyProposals tallyProposals() {
         return tallyProposals;
     }
@@ -318,6 +417,26 @@ public final class CivApplication {
 
     public ChangePartyProfile changePartyProfile() {
         return changePartyProfile;
+    }
+
+    public Trading trading() {
+        return trading;
+    }
+
+    public CompanyUseCases companies() {
+        return companies;
+    }
+
+    public PressUseCases press() {
+        return press;
+    }
+
+    public PressInfluence pressInfluence() {
+        return pressInfluence;
+    }
+
+    public VillagerInvestors villagerInvestors() {
+        return villagerInvestors;
     }
 
     public DissolvePolity dissolvePolity() {

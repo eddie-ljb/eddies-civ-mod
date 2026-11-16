@@ -12,6 +12,7 @@ import de.etiennebader.civ.fabric.gui.Icon;
 import de.etiennebader.civ.fabric.gui.Screen;
 import de.etiennebader.civ.fabric.gui.Screens;
 import de.etiennebader.civ.server.CivServer;
+import de.etiennebader.civ.server.campaign.CampaignService;
 import de.etiennebader.civ.server.command.GuiKeys;
 import de.etiennebader.civ.server.command.Message;
 import de.etiennebader.civ.server.command.TranslationKeys;
@@ -30,7 +31,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Ämter und Wahlen. Drei Spalten, je Amt: oben das Amt mit Inhaber und laufender Wahl, darunter die Kandidaten.
+ * Ämter und Wahlen; das Parlament hat ein eigenes Menü ({@link ParliamentScreen}). Drei Spalten, je Amt: oben das Amt mit Inhaber und laufender Wahl, darunter die Kandidaten.
  * Klick aufs Amt: bei laufender Wahl kandidieren, sonst mit Umschalt eine Wahl ausrufen. Klick auf einen Kandidaten:
  * ihn wählen.
  */
@@ -69,7 +70,9 @@ final class OfficesScreen extends MenuScreen {
             return;
         }
         canvas.set(40, rules(polity.get()));
-        List<OfficeView> offices = civ.offices().officesOf(polity.get(), Players.ref(player));
+        List<OfficeView> offices = civ.offices().officesOf(polity.get(), Players.ref(player)).stream()
+                .filter(office -> office.office().single())
+                .toList();
         for (int index = 0; index < offices.size(); index++) {
             renderOffice(canvas, offices.get(index), FIRST_COLUMN[index]);
         }
@@ -108,6 +111,9 @@ final class OfficesScreen extends MenuScreen {
                     .line(GuiKeys.OFFICE_CANDIDATE_FOR.text(office.name()), Icon.INFO)
                     .line(GuiKeys.OFFICE_PLATFORM.text(Message.of(TranslationKeys.platform(candidate.platform()))));
             candidate.party().ifPresent(party -> icon.line(GuiKeys.OFFICE_PARTY.text(party), Icon.HINT));
+            civ.queries().polity(town).ifPresent(current -> civ.campaigns().promisesOf(current, candidate.actor())
+                    .forEach(promise -> icon.line(GuiKeys.CANDIDATE_PROMISE.text(promise.text(),
+                            CampaignService.statusMessage(promise.kept())), Icon.INFO)));
             if (chosen) {
                 icon.line(GuiKeys.OFFICE_OWN_CHOICE.text(), Icon.GOOD).glint();
             }
@@ -149,6 +155,7 @@ final class OfficesScreen extends MenuScreen {
             case MAYOR -> Items.GOLDEN_HELMET;
             case TREASURER -> Items.GOLD_INGOT;
             case PLANNER -> Items.BRICKS;
+            case PARLIAMENT -> Items.LECTERN;
         };
     }
 

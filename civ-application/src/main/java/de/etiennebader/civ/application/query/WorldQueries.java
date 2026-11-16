@@ -4,11 +4,19 @@ import de.etiennebader.civ.application.Repositories;
 import de.etiennebader.civ.application.federation.Federations;
 import de.etiennebader.civ.application.law.EffectiveLaws;
 import de.etiennebader.civ.domain.actor.ActorRef;
+import de.etiennebader.civ.domain.actor.PolityRef;
+import de.etiennebader.civ.domain.community.CommunityView;
+import de.etiennebader.civ.domain.contract.Contract;
+import de.etiennebader.civ.domain.contract.ContractKind;
+import de.etiennebader.civ.domain.contract.ContractRegistryView;
 import de.etiennebader.civ.domain.economy.LedgerView;
+import de.etiennebader.civ.domain.exchange.StockExchangeView;
 import de.etiennebader.civ.domain.land.LandView;
+import de.etiennebader.civ.domain.land.PlotId;
 import de.etiennebader.civ.domain.law.LawView;
 import de.etiennebader.civ.domain.market.MarketView;
 import de.etiennebader.civ.domain.market.PriceLevel;
+import de.etiennebader.civ.domain.media.PressView;
 import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.protection.Denial;
@@ -22,6 +30,7 @@ import de.etiennebader.civ.domain.shop.ShopRegistryView;
 import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.domain.territory.TerritoryView;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -54,7 +63,95 @@ public final class WorldQueries {
         public LawView laws(PolityView polity) {
             return effectiveLaws(polity);
         }
+
+        @Override
+        public boolean mayUsePlot(ActorRef actor, PolityId polity, PlotId plot) {
+            return isTenant(actor, polity, plot);
+        }
+
+        @Override
+        public boolean isAlly(ActorRef actor, PolityView polity) {
+            return WorldQueries.this.isAlly(actor, polity);
+        }
     };
+
+    /** Alle Verträge. */
+    public ContractRegistryView contracts() {
+        return repositories.contracts().load();
+    }
+
+    /** Aktien, Orders und Kurse. */
+    public StockExchangeView exchange() {
+        return repositories.exchange().load();
+    }
+
+    /** Alle Zeitungsartikel. */
+    public PressView press() {
+        return repositories.press().load();
+    }
+
+    /** Alle Firmen, in Gründungsreihenfolge. */
+    public List<PolityView> companies() {
+        return polities().stream().filter(polity -> polity.kind() == PolityKind.COMPANY).toList();
+    }
+
+    /** Alle Zeitungen, in Gründungsreihenfolge. */
+    public List<PolityView> newspapers() {
+        return polities().stream().filter(polity -> polity.kind() == PolityKind.NEWSPAPER).toList();
+    }
+
+    /** Briefe, Freundschaften und Chat. */
+    public CommunityView community() {
+        return repositories.community().load();
+    }
+
+    /** Ob der Akteur ein Grundstück per geltendem Mietvertrag nutzt. */
+    public boolean isTenant(ActorRef actor, PolityId polity, PlotId plot) {
+        Contract.PlotRef ref = new Contract.PlotRef(polity, plot);
+        return contracts().active().stream()
+                .anyMatch(contract -> contract.kind() == ContractKind.LEASE && contract.payer().equals(actor)
+                        && contract.plot().filter(ref::equals).isPresent());
+    }
+
+    /** Der geltende Mietvertrag eines Grundstücks. */
+    public Optional<Contract> leaseOf(PolityId polity, PlotId plot) {
+        Contract.PlotRef ref = new Contract.PlotRef(polity, plot);
+        return contracts().active().stream()
+                .filter(contract -> contract.kind() == ContractKind.LEASE && contract.plot().filter(ref::equals).isPresent())
+                .findFirst();
+    }
+
+    /**
+     * Ob der Akteur in dieser Polity über ein Bündnis nicht als Fremder gilt: Er gehört einer Gemeinde oder einem Bund
+     * an, der mit ihr oder einem ihrer Bünde verbündet ist.
+     */
+    public boolean isAlly(ActorRef actor, PolityView polity) {
+        List<PolityId> protectedSide = new ArrayList<>();
+        protectedSide.add(polity.id());
+        ancestorsOf(polity.id()).forEach(ancestor -> protectedSide.add(ancestor.id()));
+        List<Contract> alliances = contracts().active().stream()
+                .filter(contract -> contract.kind() == ContractKind.ALLIANCE)
+                .toList();
+        if (alliances.isEmpty()) {
+            return false;
+        }
+        Optional<PolityView> home = municipalityOf(actor);
+        if (home.isEmpty()) {
+            return false;
+        }
+        List<PolityId> actorSide = new ArrayList<>();
+        actorSide.add(home.get().id());
+        ancestorsOf(home.get().id()).forEach(ancestor -> actorSide.add(ancestor.id()));
+        for (Contract alliance : alliances) {
+            if (alliance.offeror() instanceof PolityRef one && alliance.counterparty() instanceof PolityRef other) {
+                if (protectedSide.contains(one.id()) && actorSide.contains(other.id())
+                        || protectedSide.contains(other.id()) && actorSide.contains(one.id())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 
     public WorldQueries(Repositories repositories) {
         this.repositories = Objects.requireNonNull(repositories, "repositories");

@@ -1,6 +1,7 @@
 package de.etiennebader.civ.application.office;
 
 import de.etiennebader.civ.application.polity.Citizens;
+import de.etiennebader.civ.application.polity.NoParliamentProvidedException;
 import de.etiennebader.civ.application.support.Aggregates;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.law.StandardParameters;
@@ -15,7 +16,8 @@ import java.util.Objects;
 
 /**
  * Ruft eine Wahl für ein Amt aus. Der Bürgermeister darf das jederzeit; jeder andere Bürger nur, wenn das Amt frei ist
- * oder seine Amtszeit abgelaufen ist. Die Wahl läuft {@link StandardParameters#ELECTION_DAYS} Tage.
+ * oder seine Amtszeit abgelaufen ist; beim Parlament, wenn keines sitzt oder seine Wahlperiode abgelaufen ist. Die
+ * Wahl läuft {@link StandardParameters#ELECTION_DAYS} Tage.
  */
 public final class CallElection {
 
@@ -46,7 +48,15 @@ public final class CallElection {
     public ElectionId execute(Command command) {
         Polity polity = aggregates.polity(command.polity());
         Citizens.require(polity, command.citizen());
-        boolean open = polity.officeTerm(command.office()).map(term -> term.expiredOn(command.day())).orElse(true);
+        boolean open;
+        if (command.office() == Office.PARLIAMENT) {
+            if (polity.laws().valueOf(StandardParameters.PARLIAMENT_SEATS) <= 0) {
+                throw new NoParliamentProvidedException();
+            }
+            open = !polity.parliament().seated() || polity.parliament().expiredOn(command.day());
+        } else {
+            open = polity.officeTerm(command.office()).map(term -> term.expiredOn(command.day())).orElse(true);
+        }
         if (!open && !polity.holds(command.citizen(), Office.MAYOR)) {
             throw new NotOfficeHolderException(command.citizen(), Office.MAYOR);
         }

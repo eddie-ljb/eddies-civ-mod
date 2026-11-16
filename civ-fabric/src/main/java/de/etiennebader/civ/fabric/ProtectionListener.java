@@ -8,6 +8,10 @@ import de.etiennebader.civ.fabric.content.CivContent;
 import de.etiennebader.civ.fabric.content.ConstitutionCopies;
 import de.etiennebader.civ.fabric.content.LawBooks;
 import de.etiennebader.civ.fabric.gui.Screens;
+import de.etiennebader.civ.fabric.screen.BallotBoxScreen;
+import de.etiennebader.civ.fabric.screen.ExchangeScreen;
+import de.etiennebader.civ.fabric.screen.MailScreen;
+import de.etiennebader.civ.fabric.screen.PressScreen;
 import de.etiennebader.civ.fabric.screen.ShopScreen;
 import de.etiennebader.civ.server.CivServer;
 import de.etiennebader.civ.server.command.Message;
@@ -99,6 +103,11 @@ public final class ProtectionListener {
         });
         PlayerBlockBreakEvents.AFTER.register((level, player, pos, state, blockEntity) ->
                 host.current().ifPresent(civ -> civ.shops().removeAt(Players.position(level, pos))));
+        PlayerBlockBreakEvents.AFTER.register((level, player, pos, state, blockEntity) -> {
+            if (state.is(content.electionPoster())) {
+                host.current().ifPresent(civ -> civ.campaigns().posterRemoved(Players.position(level, pos)));
+            }
+        });
         UseItemCallback.EVENT.register((player, level, hand) -> readCopy(player, hand));
         AttackEntityCallback.EVENT.register((player, level, hand, entity, hit) -> onEntity(player, level, entity, true));
         UseEntityCallback.EVENT.register((player, level, hand, entity, hit) -> onEntity(player, level, entity, false));
@@ -144,6 +153,30 @@ public final class ProtectionListener {
             host.current().ifPresent(civ -> MenuOpener.constitution(civ, serverPlayer, Players.position(level, pos)));
             return InteractionResult.SUCCESS;
         }
+        if (usesBlock && state.is(content.ballotBox())) {
+            host.current().ifPresent(civ -> Screens.open(serverPlayer,
+                    new BallotBoxScreen(civ, serverPlayer, Players.position(level, pos))));
+            return InteractionResult.SUCCESS;
+        }
+        if (usesBlock && state.is(content.newsstand())) {
+            host.current().ifPresent(civ -> Screens.open(serverPlayer, new PressScreen(civ, serverPlayer,
+                    Optional.empty())));
+            return InteractionResult.SUCCESS;
+        }
+        if (usesBlock && state.is(content.stockExchange())) {
+            host.current().ifPresent(civ -> Screens.open(serverPlayer, new ExchangeScreen(civ, serverPlayer,
+                    Optional.empty())));
+            return InteractionResult.SUCCESS;
+        }
+        if (usesBlock && state.is(content.mailbox())) {
+            host.current().ifPresent(civ -> Screens.open(serverPlayer, new MailScreen(civ, serverPlayer)));
+            return InteractionResult.SUCCESS;
+        }
+        if (usesBlock && state.is(content.electionPoster())) {
+            host.current().ifPresent(civ -> Feedback.reply(serverPlayer,
+                    civ.campaigns().posterInfo(Players.position(level, pos))));
+            return InteractionResult.SUCCESS;
+        }
         if (usesBlock && state.is(content.bank())) {
             host.current().ifPresent(civ -> MenuOpener.bank(civ, serverPlayer));
             return InteractionResult.SUCCESS;
@@ -162,6 +195,19 @@ public final class ProtectionListener {
             return result(allowed(serverPlayer, ProtectedAction.BUILD, level, pos));
         }
         Item item = stack.getItem();
+        if (stack.is(content.electionPoster().asItem())) {
+            BlockPos target = state.canBeReplaced() ? pos : pos.relative(hit.getDirection());
+            InteractionResult placement = result(allowed(serverPlayer, ProtectedAction.BUILD, level, target));
+            if (placement != InteractionResult.FAIL && level instanceof ServerLevel serverLevel) {
+                serverLevel.getServer().execute(() -> {
+                    if (serverLevel.getBlockState(target).is(content.electionPoster())) {
+                        host.current().ifPresent(civ -> Feedback.reply(serverPlayer, civ.campaigns().posterPlaced(
+                                Players.caller(serverPlayer), Players.position(level, target))));
+                    }
+                });
+            }
+            return placement;
+        }
         if (item instanceof BlockItem || item instanceof BucketItem) {
             BlockPos target = state.canBeReplaced() ? pos : pos.relative(hit.getDirection());
             if (stack.is(Items.HOPPER) && underForeignShop(serverPlayer, level, target)) {

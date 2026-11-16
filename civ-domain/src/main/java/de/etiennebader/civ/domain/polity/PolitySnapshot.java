@@ -20,11 +20,44 @@ import java.util.Optional;
  * @param offices   besetzte Ämter
  * @param elections laufende Wahlen in Reihenfolge ihrer Ausrufung
  * @param constitution Verfassung (Entwurf oder ausgerufen)
+ * @param parliament   gewähltes Parlament oder {@link Parliament#NONE}
  */
 public record PolitySnapshot(PolityId id, PolityName name, PolityKind kind, String level, SettlementTier tier,
                              CurrencyId currency, Day foundedOn, Optional<BlockPosition> seat, List<Membership> members,
                              List<EnactedStatute> statutes, List<Proposal> proposals, List<OfficeTerm> offices,
-                             List<Election> elections, Constitution constitution, Optional<PartyProfile> party) {
+                             List<Election> elections, Constitution constitution, Optional<PartyProfile> party,
+                             Parliament parliament, List<ElectionResult> results, List<Promise> promises,
+                             List<Poster> posters, List<Street> streets) {
+
+    /** Ohne Straßen. */
+    public PolitySnapshot(PolityId id, PolityName name, PolityKind kind, String level, SettlementTier tier,
+                          CurrencyId currency, Day foundedOn, Optional<BlockPosition> seat, List<Membership> members,
+                          List<EnactedStatute> statutes, List<Proposal> proposals, List<OfficeTerm> offices,
+                          List<Election> elections, Constitution constitution, Optional<PartyProfile> party,
+                          Parliament parliament, List<ElectionResult> results, List<Promise> promises,
+                          List<Poster> posters) {
+        this(id, name, kind, level, tier, currency, foundedOn, seat, members, statutes, proposals, offices, elections,
+                constitution, party, parliament, results, promises, posters, List.of());
+    }
+
+    /** Ohne Wahlergebnisse, Versprechen und Plakate. */
+    public PolitySnapshot(PolityId id, PolityName name, PolityKind kind, String level, SettlementTier tier,
+                          CurrencyId currency, Day foundedOn, Optional<BlockPosition> seat, List<Membership> members,
+                          List<EnactedStatute> statutes, List<Proposal> proposals, List<OfficeTerm> offices,
+                          List<Election> elections, Constitution constitution, Optional<PartyProfile> party,
+                          Parliament parliament) {
+        this(id, name, kind, level, tier, currency, foundedOn, seat, members, statutes, proposals, offices, elections,
+                constitution, party, parliament, List.of(), List.of(), List.of(), List.of());
+    }
+
+    /** Ohne Parlament. */
+    public PolitySnapshot(PolityId id, PolityName name, PolityKind kind, String level, SettlementTier tier,
+                          CurrencyId currency, Day foundedOn, Optional<BlockPosition> seat, List<Membership> members,
+                          List<EnactedStatute> statutes, List<Proposal> proposals, List<OfficeTerm> offices,
+                          List<Election> elections, Constitution constitution, Optional<PartyProfile> party) {
+        this(id, name, kind, level, tier, currency, foundedOn, seat, members, statutes, proposals, offices, elections,
+                constitution, party, Parliament.NONE);
+    }
 
     /** Ohne Parteiprofil. */
     public PolitySnapshot(PolityId id, PolityName name, PolityKind kind, String level, SettlementTier tier,
@@ -69,6 +102,11 @@ public record PolitySnapshot(PolityId id, PolityName name, PolityKind kind, Stri
         elections = List.copyOf(Objects.requireNonNull(elections, "elections"));
         Objects.requireNonNull(constitution, "constitution");
         Objects.requireNonNull(party, "party");
+        Objects.requireNonNull(parliament, "parliament");
+        results = List.copyOf(Objects.requireNonNull(results, "results"));
+        promises = List.copyOf(Objects.requireNonNull(promises, "promises"));
+        posters = List.copyOf(Objects.requireNonNull(posters, "posters"));
+        streets = List.copyOf(Objects.requireNonNull(streets, "streets"));
     }
 
     public static PolitySnapshot of(PolityView polity) {
@@ -76,7 +114,8 @@ public record PolitySnapshot(PolityId id, PolityName name, PolityKind kind, Stri
         return new PolitySnapshot(polity.id(), polity.name(), polity.kind(), polity.level(), polity.tier(),
                 polity.currency(), polity.foundedOn(), polity.seat(), List.copyOf(polity.members()), polity.laws().inForce(),
                 List.copyOf(polity.proposals()), List.copyOf(polity.offices()), List.copyOf(polity.elections()),
-                polity.constitution(), polity.partyProfile());
+                polity.constitution(), polity.partyProfile(), polity.parliament(), polity.results(), polity.promises(),
+                polity.posters(), polity.streets());
     }
 
     /**
@@ -86,6 +125,6 @@ public record PolitySnapshot(PolityId id, PolityName name, PolityKind kind, Stri
      */
     public Polity restore() {
         return Polity.restore(id, name, kind, level, tier, currency, foundedOn, seat, members, statutes, proposals,
-                offices, elections, constitution, party);
+                offices, elections, constitution, party, parliament, results, promises, posters, streets);
     }
 }

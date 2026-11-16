@@ -1,5 +1,6 @@
 package de.etiennebader.civ.application.polity;
 
+import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.law.ParameterKey;
 import de.etiennebader.civ.domain.law.StandardParameters;
@@ -14,7 +15,8 @@ import de.etiennebader.civ.domain.shared.IdGenerator;
 import de.etiennebader.civ.domain.shared.StatuteId;
 
 /**
- * Auszählung: Stimmberechtigt sind alle Bürger, Personen wie Dorfbewohner nicht.
+ * Auszählung: Stimmberechtigt sind alle Bürger, Personen wie Dorfbewohner nicht. Ist ein Parlament gewählt, stimmen
+ * stattdessen nur seine Abgeordneten ab, auch Dorfbewohner mit Sitz.
  *
  * <ul>
  *     <li>Angenommen, sobald mehr als die Hälfte der Bürger dafür gestimmt hat (bei Verfassungsartikeln einer
@@ -29,10 +31,30 @@ final class Ballots {
     }
 
     static long electorate(Polity polity) {
-        return polity.members().stream()
-                .filter(membership -> membership.type() == MembershipType.CITIZEN)
-                .filter(membership -> !(membership.member() instanceof PersonRef))
-                .count();
+        return Majorities.electorate(polity);
+    }
+
+    /** Ob der Akteur über Anträge abstimmen darf: im Parlament die Abgeordneten, sonst die Bürger. */
+    static boolean mayVote(Polity polity, ActorRef actor) {
+        if (polity.parliament().seated()) {
+            return polity.parliament().holdsSeat(actor);
+        }
+        return !(actor instanceof PersonRef) && polity.membershipOf(actor)
+                .filter(membership -> membership.type() == MembershipType.CITIZEN).isPresent();
+    }
+
+    /**
+     * @throws NotInParliamentException wenn ein Parlament gewählt ist und der Akteur keinen Sitz hat
+     * @throws NotACitizenException     ohne Parlament, wenn der Akteur kein Bürger ist
+     */
+    static void requireVoter(Polity polity, ActorRef actor) {
+        if (polity.parliament().seated()) {
+            if (!polity.parliament().holdsSeat(actor)) {
+                throw new NotInParliamentException(actor);
+            }
+            return;
+        }
+        AmendLaw.requireCitizen(polity, actor);
     }
 
     static long requiredPercent(PolityView polity, ParameterKey<?> key) {

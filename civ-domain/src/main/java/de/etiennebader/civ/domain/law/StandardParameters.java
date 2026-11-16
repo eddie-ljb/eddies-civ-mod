@@ -98,13 +98,43 @@ public final class StandardParameters {
     public static final ParameterKey<Long> FEDERAL_LEVY_PERCENT =
             ParameterKey.constrained("federal_levy_percent", Long.class, 0L, percent -> percent >= 0 && percent <= 10);
 
+    /**
+     * Sitze im Parlament; 0 heißt kein Parlament. Mit einem gewählten Parlament stimmen nur noch die Abgeordneten über
+     * Anträge ab, und jede Rechtsänderung braucht ihre Zustimmung.
+     */
+    public static final ParameterKey<Long> PARLIAMENT_SEATS =
+            ParameterKey.constrained("parliament_seats", Long.class, 0L, seats -> seats >= 0 && seats <= 99);
+
+    /** Ob Stimmen bei Wahlen nur an einer Wahlurne (Block) abgegeben werden dürfen, nicht per Menü oder Befehl. */
+    public static final ParameterKey<Boolean> BALLOT_BOX_REQUIRED =
+            ParameterKey.of("ballot_box_required", Boolean.class, false);
+
+    /**
+     * Alle wie viele Tage das Parlament tagt: Nur an Sitzungstagen stimmen Dorfbewohner-Abgeordnete ab, stellen Anträge
+     * und werden fällige Anträge ausgezählt.
+     */
+    public static final ParameterKey<Long> SESSION_DAYS =
+            ParameterKey.constrained("session_days", Long.class, 1L, days -> days >= 1 && days <= 7);
+
+    /** Ob Bürger per Brief wählen dürfen: Stimmzettel am Briefkasten, auch wo sonst nur die Wahlurne zählt. */
+    public static final ParameterKey<Boolean> POSTAL_VOTE_ALLOWED =
+            ParameterKey.of("postal_vote_allowed", Boolean.class, false);
+
+    /**
+     * Tägliches Gehalt aus der Kasse für jeden Amtsinhaber und Abgeordneten, in kleinster Währungseinheit
+     * (100 = ein Smaragd). Reicht die Kasse nicht, fällt es aus.
+     */
+    public static final ParameterKey<Long> OFFICE_SALARY =
+            ParameterKey.constrained("office_salary", Long.class, 0L, salary -> salary >= 0 && salary <= 10_000);
+
     /** Alle Standardparameter in fester Reihenfolge. */
     public static List<ParameterKey<?>> all() {
         return List.of(LAND_TAX_PER_BLOCK, LAND_TAX_FREE_BLOCKS, LAND_TAX_GRACE_DAYS, TAX_EMBASSIES, MAX_OUTPOSTS,
                 OUTSIDERS_MAY_BUILD, OUTSIDERS_MAY_INTERACT, OUTSIDERS_MAY_OPEN_CONTAINERS, EXPLOSIONS_ALLOWED,
                 FIRE_SPREAD_ALLOWED, LAWS_BY_VOTE, VOTE_DAYS, SALES_TAX_PERCENT, TERM_DAYS, ELECTION_DAYS,
                 VILLAGER_VOTE_PERCENT, AMENDMENT_MAJORITY_PERCENT, FEDERAL_LAW_PREVAILS, PVP_ALLOWED, HOSTILE_MOBS_ALLOWED,
-                OUTSIDERS_MAY_HURT_ANIMALS, FEDERAL_LEVY_PERCENT);
+                OUTSIDERS_MAY_HURT_ANIMALS, FEDERAL_LEVY_PERCENT, PARLIAMENT_SEATS, SESSION_DAYS, BALLOT_BOX_REQUIRED,
+                POSTAL_VOTE_ALLOWED, OFFICE_SALARY);
     }
 
     /**
@@ -113,7 +143,8 @@ public final class StandardParameters {
      */
     public static List<ParameterKey<?>> constitutional() {
         return List.of(LAWS_BY_VOTE, VOTE_DAYS, TERM_DAYS, ELECTION_DAYS, VILLAGER_VOTE_PERCENT,
-                AMENDMENT_MAJORITY_PERCENT, FEDERAL_LAW_PREVAILS);
+                AMENDMENT_MAJORITY_PERCENT, FEDERAL_LAW_PREVAILS, PARLIAMENT_SEATS, SESSION_DAYS, BALLOT_BOX_REQUIRED,
+                POSTAL_VOTE_ALLOWED);
     }
 
     public static boolean isConstitutional(ParameterKey<?> key) {

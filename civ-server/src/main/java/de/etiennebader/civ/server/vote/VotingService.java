@@ -4,16 +4,15 @@ import de.etiennebader.civ.application.CivApplication;
 import de.etiennebader.civ.application.day.Calendar;
 import de.etiennebader.civ.application.polity.CastVote;
 import de.etiennebader.civ.application.polity.Majorities;
+import de.etiennebader.civ.application.polity.ParliamentSession;
 import de.etiennebader.civ.application.polity.ProposeLawChange;
 import de.etiennebader.civ.application.polity.TallyProposals;
 import de.etiennebader.civ.application.polity.VoteOutcome;
 import de.etiennebader.civ.application.query.WorldQueries;
 import de.etiennebader.civ.domain.actor.ActorRef;
-import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.law.ParameterKey;
 import de.etiennebader.civ.domain.law.ParameterValue;
 import de.etiennebader.civ.domain.law.StandardParameters;
-import de.etiennebader.civ.domain.polity.MembershipType;
 import de.etiennebader.civ.domain.polity.Motion;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.polity.Proposal;
@@ -141,10 +140,7 @@ public final class VotingService {
 
     /** Offene Abstimmungen einer Gemeinde, nummeriert in Eröffnungsreihenfolge. */
     public List<ProposalView> proposalsOf(PolityView town, ActorRef viewer) {
-        long electorate = town.members().stream()
-                .filter(membership -> membership.type() == MembershipType.CITIZEN)
-                .filter(membership -> !(membership.member() instanceof PersonRef))
-                .count();
+        long electorate = Majorities.electorate(town);
         long voteDays = town.laws().valueOf(StandardParameters.VOTE_DAYS);
         List<ProposalView> views = new ArrayList<>();
         int number = 1;
@@ -161,8 +157,35 @@ public final class VotingService {
         return views;
     }
 
-    /** Tagesende: abgelaufene Abstimmungen auszählen und das Ergebnis den Mitgliedern melden. */
+    /**
+     * Tagesende: Dorfbewohner im Parlament stellen Anträge und stimmen ab, dann werden abgelaufene Abstimmungen
+     * ausgezählt; die Mitglieder erfahren das Ergebnis.
+     */
     public void endOfDay(Day day) {
+        for (ParliamentSession.Outcome outcome : app.parliamentSession().execute(day)) {
+            Optional<PolityView> polity = queries.polity(outcome.polity());
+            if (polity.isEmpty()) {
+                continue;
+            }
+            String name = polity.get().name().value();
+            switch (outcome) {
+                case ParliamentSession.Session session -> {
+                    if (session.agenda() > 0) {
+                        announcements.add(Announcement.toTown(outcome.polity(),
+                                Message.of(MessageKey.PARLIAMENT_SESSION, name, session.agenda())));
+                    }
+                }
+                case ParliamentSession.Tabled tabled -> announcements.add(Announcement.toTown(outcome.polity(),
+                        Message.of(MessageKey.PARLIAMENT_MOTION_TABLED, name, texts.actor(tabled.member()),
+                                subject(tabled.motion()), proposed(tabled.motion()))));
+                case ParliamentSession.Voted voted -> announcements.add(Announcement.toTown(outcome.polity(),
+                        Message.of(MessageKey.PARLIAMENT_VILLAGERS_VOTED, name, subject(voted.proposal().motion()),
+                                voted.inFavour(), voted.against())));
+                case ParliamentSession.Decided decided -> announceResult(polity.get(),
+                        subject(decided.proposal().motion()), proposed(decided.proposal().motion()),
+                        decided.outcome() == VoteOutcome.ACCEPTED);
+            }
+        }
         for (TallyProposals.Tallied tallied : app.tallyProposals().execute(day)) {
             queries.polity(tallied.polity()).ifPresent(town -> announceResult(town,
                     subject(tallied.proposal().motion()), proposed(tallied.proposal().motion()),

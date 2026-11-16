@@ -1,6 +1,7 @@
 package de.etiennebader.civ.application.economy;
 
 import de.etiennebader.civ.application.support.Aggregates;
+import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.economy.Ledger;
 import de.etiennebader.civ.domain.economy.SupplyChange;
 import de.etiennebader.civ.domain.polity.Polity;
@@ -40,6 +41,21 @@ public final class CreditTownIncome {
         }
         Ledger ledger = aggregates.ledger();
         ledger.mint(polity.asActor(), command.amount(), SupplyChange.VILLAGER_ECONOMY, command.day());
+        aggregates.commit(ledger);
+    }
+
+    /**
+     * Arbeitsertrag eines angestellten Dorfbewohners: Er geht an den Arbeitgeber statt an die Gemeinde.
+     *
+     * @param employer wer den Dorfbewohner beschäftigt
+     */
+    public void creditEmployer(ActorRef employer, Money amount, Day day) {
+        Objects.requireNonNull(employer, "employer");
+        if (!amount.isPositive()) {
+            return;
+        }
+        Ledger ledger = aggregates.ledger();
+        ledger.mint(employer, amount, SupplyChange.VILLAGER_ECONOMY, day);
         aggregates.commit(ledger);
     }
 }

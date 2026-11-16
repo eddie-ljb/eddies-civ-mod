@@ -98,6 +98,46 @@ public final class TownHallScreen extends MenuScreen {
             Screens.open(click.player(), new PartiesScreen(civ, player, Optional.of(this)));
         });
 
+        canvas.set(37, Icon.of(Items.SPYGLASS).name(GuiKeys.ELECTIONS_OPEN.text(), Icon.TITLE)
+                .hint(GuiKeys.ELECTIONS_OPEN_HINT.text()).build(), click -> civ.queries().polity(this.town)
+                .ifPresent(polity -> {
+                    Feedback.click(click.player());
+                    Screens.open(click.player(), new ElectionsScreen(civ, player, polity, Optional.of(this)));
+                }));
+
+        canvas.set(41, Icon.of(Items.LECTERN).name(GuiKeys.PARLIAMENT_OPEN.text(), Icon.TITLE)
+                .hint(GuiKeys.PARLIAMENT_OPEN_HINT.text()).build(), click -> civ.queries().polity(this.town)
+                .ifPresent(polity -> {
+                    Feedback.click(click.player());
+                    Screens.open(click.player(), new ParliamentScreen(civ, player, polity, Optional.of(this)));
+                }));
+
+        canvas.set(1, Icon.of(Items.EMERALD).name(GuiKeys.EXCHANGE_OPEN.text(), Icon.TITLE)
+                .hint(GuiKeys.EXCHANGE_OPEN_HINT.text()).build(), click -> {
+                    Feedback.click(click.player());
+                    Screens.open(click.player(), new ExchangeScreen(civ, player, Optional.of(this)));
+                });
+        canvas.set(7, Icon.of(Items.PAPER).name(GuiKeys.PRESS_OPEN.text(), Icon.TITLE)
+                .hint(GuiKeys.PRESS_OPEN_HINT.text()).build(), click -> {
+                    Feedback.click(click.player());
+                    Screens.open(click.player(), new PressScreen(civ, player, Optional.of(this)));
+                });
+        canvas.set(2, Icon.of(Items.WRITABLE_BOOK).name(GuiKeys.MAIL_OPEN.text(), Icon.TITLE)
+                .hint(GuiKeys.MAIL_OPEN_HINT.text()).build(), click -> {
+                    Feedback.click(click.player());
+                    Screens.open(click.player(), new MailScreen(civ, player, Optional.of(this)));
+                });
+        canvas.set(6, Icon.of(Items.PLAYER_HEAD).name(GuiKeys.FRIENDS_OPEN.text(), Icon.TITLE)
+                .hint(GuiKeys.FRIENDS_OPEN_HINT.text()).build(), click -> {
+                    Feedback.click(click.player());
+                    Screens.open(click.player(), new FriendsScreen(civ, player, Optional.of(this)));
+                });
+        canvas.set(39, Icon.of(Items.FILLED_MAP).name(GuiKeys.CONTRACTS_OPEN.text(), Icon.TITLE)
+                .hint(GuiKeys.CONTRACTS_OPEN_HINT.text()).build(), click -> {
+                    Feedback.click(click.player());
+                    Screens.open(click.player(), new ContractsScreen(civ, player, Optional.of(this)));
+                });
+
         canvas.set(40, Icon.of(Items.WRITTEN_BOOK).name(GuiKeys.CONSTITUTION_TOWN_HALL.text(), Icon.TITLE)
                 .hint(GuiKeys.CONSTITUTION_TOWN_HALL_HINT.text()).build(), click -> civ.queries().polity(this.town)
                 .ifPresent(polity -> {
@@ -173,7 +213,7 @@ public final class TownHallScreen extends MenuScreen {
             canvas.set(30, Icon.of(Items.GRASS_BLOCK).name(GuiKeys.CLAIM_HERE.text())
                     .hint(GuiKeys.CLAIM_HERE_HINT.text(town.chunks(), town.claimLimit())).build(), click ->
                     report(click, civ.commands().claim(caller(), ClaimType.CORE)));
-            canvas.set(40, Icon.of(Items.IRON_DOOR).name(GuiKeys.LEAVE.text(), Icon.BAD)
+            canvas.set(43, Icon.of(Items.IRON_DOOR).name(GuiKeys.LEAVE.text(), Icon.BAD)
                     .hint(GuiKeys.LEAVE_HINT.text(town.name())).build(), click -> {
                 if (click.shift()) {
                     report(click, civ.commands().leave(caller()));

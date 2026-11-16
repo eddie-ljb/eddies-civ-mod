@@ -118,6 +118,30 @@ Parteien sind Zusammenschlüsse von Personen (Spieler und Dorfbewohner) über al
 - **Wahlen:** Wer ohne eigenes Programm kandidiert, tritt mit dem Programm seiner Partei an; bei Kandidaten steht die Partei dabei (Menü und Webseite). Dorfbewohner wählen bevorzugt Kandidaten ihrer Partei, sonst Parteien, die ihrer Persönlichkeit nahe sind.
 - **Dorfbewohner:** treten täglich mit etwas Glück einer Partei bei, die zu ihrer Persönlichkeit passt (Ordnungsliebe; Sparsamkeit = niedrige Steuern), und verlassen sie, wenn sie sich zu weit entfernt. Finden sich in einer Gemeinde genug parteilose Gleichgesinnte (`villager_party_founders`, Standard 5) ohne passende Partei, gründen sie eine, z. B. „Ordnungspartei Nordhain“; der Heimatverbundenste übernimmt den Vorsitz. Abschaltbar mit `villager_parties=false`.
 
+### Parlament
+Gemeinden und Bünde können ein Parlament haben. Die Regelung `parliament_seats` (Sitze im Parlament, 0–99; Verfassungsartikel) legt fest, wie viele Sitze es hat; 0 heißt kein Parlament.
+
+- **Wahl:** Sieht das Recht Sitze vor und sitzt noch kein Parlament (oder ist die Wahlperiode `term_days` um), wird am Tagesende automatisch eine Parlamentswahl ausgerufen; per Hand mit `/civ wahl ausrufen parlament`. Kandidieren: `/civ wahl kandidieren parlament [Programm]`, wählen: `/civ wahl stimmen parlament <Name>`, oder alles im Menü **Parlament** (Gemeindehaus unten Mitte, Verfassungsmenü).
+- **Verhältniswahl:** Jede Stimme zählt für den Kandidaten und seine Partei. Die Sitze gehen nach Sainte-Laguë an die Parteien, innerhalb einer Partei an die Kandidaten mit den meisten Stimmen; Parteilose treten einzeln an. Das Präsidium bekommt der stärkste Kandidat der stärksten Partei.
+- **Gesetzgebung:** Sobald ein Parlament sitzt, gibt es keine Verordnungen mehr. Jede Rechtsänderung wird ein Antrag (stellen darf ihn jeder Bürger), abstimmen dürfen nur die Abgeordneten, je Sitz eine Stimme. Mehr als die Hälfte der Sitze entscheidet sofort, sonst die abgegebenen Stimmen nach `vote_days`; Verfassungsartikel brauchen weiter die Verfassungsmehrheit.
+- **Dorfbewohner:** Haben Dorfbewohner Wahlrecht, kandidieren Parteimitglieder unter ihnen für ihre Partei (je Partei höchstens so viele, wie es Sitze gibt). Gewählte Dorfbewohner stimmen am Tagesende nach Persönlichkeit und Parteilinie ab und stellen an etwa jedem dritten Tag selbst Anträge, z. B. Schutzregeln lockern oder Steuern senken. Ein Parlament hebt ihre Zufriedenheit (Mitsprache), mehr noch, wenn Dorfbewohner darin sitzen.
+- **Auflösen:** Setzt das Parlament `parliament_seats` auf 0, löst es sich am Tagesende auf.
+- **Nachrücken:** Verlässt ein Abgeordneter mit Partei die Gemeinde, rückt der nächste nicht gewählte Kandidat derselben Partei nach; der Sitz eines Parteilosen bleibt frei.
+- **Sitzungen:** Das Parlament tagt alle `session_days` Tage (Standard: täglich). Nur an Sitzungstagen stimmen Dorfbewohner-Abgeordnete ab, stellen Anträge und werden fällige Anträge ausgezählt; der Chat kündigt die Sitzung mit der Tagesordnung an.
+
+### Wahlurne, Wahlbezirke und Wahlkarte
+- **Wahlurne** (Block): Rechtsklick zeigt alle laufenden Wahlen der Gemeinde am Ort und ihrer Bünde mit den Kandidaten; Klick wählt. Mit `ballot_box_required` zählen nur Stimmen an der Urne, nicht per Menü, Befehl oder Webseite.
+- **Wahlbezirke:** Jede Stimme zählt in der Gemeinde des Wählers. Bei Wahlen eines Bundes meldet der Chat, wer in welchem Bezirk vorn lag. Die letzten 10 Ergebnisse jeder Gemeinde und jedes Bundes bleiben gespeichert: `/civ wahlergebnis [Name | menue]`.
+- **Umfragen:** `/civ umfrage [Name]` fragt alle Dorfbewohner, wen sie bei laufenden Wahlen wählen würden (auch ohne Wahlrecht; Spielerstimmen bleiben geheim). Beim Parlament steht eine Sitzprognose nach Sainte-Laguë dabei.
+- **Menü „Wahlen und Umfragen“** (Gemeindehaus unten links, Parlamentsmenü unten rechts): Umfragen und Ergebnisse je Bezirk.
+- **Webseite:** Reiter „Wahlen“ mit Umfragen und Ergebnissen, filterbar nach Ebene und Partei. Auf der Karte färbt die Ansicht „Wahlkarte“ jede Gemeinde nach dem Führenden ihres Bezirks; der Parteifilter hebt die Bezirke einer Partei hervor.
+
+### Wahlkampf
+- **Reden:** `/civ rede <Text>`: Spieler in 32 Blöcken lesen mit. Kandidierst du gerade, reagieren Dorfbewohner in Hörweite drei Tage lang: Das Thema (Ordnung, Freiheit, Steuern, Ausbau; aus Stichworten erkannt) zieht passende Persönlichkeiten an und stößt andere ab. Eine wirksame Rede pro Tag.
+- **Wahlversprechen:** `/civ versprechen geben <Text>` als Kandidat; das Gesetzbuch erkennt Messbares wie „Die Umsatzsteuer beträgt 5 %.“ `/civ versprechen [liste [Name]]` zeigt alle Versprechen mit Bilanz (gehalten, gebrochen, teilweise, nicht messbar). Wer wieder antritt, wird von Dorfbewohnern an seiner Bilanz gemessen. Kandidaten-Tooltips in Ämter-, Parlaments- und Urnenmenü zeigen die Versprechen.
+- **Wahlplakate (Litfaßsäule):** Aufstellen im Gemeindegebiet wirbt für dich, wenn du kandidierst, sonst für deine Partei: Jedes Plakat zieht die Dorfbewohner der Gemeinde etwas zum Beworbenen (bis zu drei zählen). Rechtsklick zeigt, wofür es wirbt.
+- `/civ parlament [zeigen <Name> | menue]` zeigt Sitzverteilung, Fraktionen, Präsidium, Wahlperiode und Tagesordnung.
+
 ### Gesetzes-Baukasten
 Alle Regelungen stehen im Rechtsmenü (Gemeindehaus → Recht) als Schalter oder Zahl, gelten nach Bundesrecht-Vorrang und lassen sich auch als Freitext-Paragraph erlassen. Neu als Spielregeln im Gebiet:
 
@@ -135,6 +159,52 @@ Im Gemeindegebiet gilt Folgendes, solange das Recht nichts anderes erlaubt:
 - Endermen nehmen keine Blöcke auf.
 - Fremde dürfen nicht bauen, Türen benutzen oder Behälter öffnen.
 - Fremde dürfen Rüstungsständer, Rahmen und Bilder nicht verändern und Tiere sowie Dorfbewohner nicht angreifen. Handeln mit Dorfbewohnern bleibt erlaubt.
+
+### Straßen und Adressen
+- Bürgermeister oder Bauamt markieren eine Straße mit dem Grundstücksstab (zwei Ecken) und legen sie mit `/civ strasse anlegen <Name>` an; `aufheben <Name>` und `liste` gibt es auch.
+- Jede Gemeinde hat eine feste Postleitzahl. Grundstücke bis 12 Blöcke neben einer Straße bekommen Hausnummern: ungerade auf der einen, gerade auf der anderen Seite, aufsteigend entlang der Straße.
+- `/civ adresse [Spieler]` zeigt die Anschrift (Wohngrundstück, sonst gemietetes, sonst eigenes Grundstück); `/civ adressen` listet die Straßen der Gemeinde. Dorfbewohner nennen ihre Anschrift beim Anklicken.
+
+### Verträge
+`/civ vertrag` (oder Gemeindehaus → Verträge, oder die Webseite) verwaltet alle Verträge. Ein Angebot gilt, sobald die Gegenseite unterschreibt; für eine Gemeinde unterschreibt der Bürgermeister.
+
+| Art | Anbieten | Wirkung |
+|---|---|---|
+| Miete | `/civ vertrag miete <Spieler> <Preis/Tag> [Kaution] [Tage]` auf dem eigenen oder (als Bürgermeister/Bauamt) einem Gemeindegrundstück | Kaution beim Unterschreiben, Miete täglich. Der Mieter darf das Grundstück nutzen wie der Eigentümer. Kaution zurück bei Ablauf oder Kündigung |
+| Arbeit | `/civ vertrag arbeit <Spieler> <Lohn/Tag> [Tage]` oder `arbeit dorfbewohner <Lohn>` (nächster Dorfbewohner) | Lohn täglich. Dorfbewohner arbeiten ab 0,25 Smaragden am Tag; ihr Anteil am Gemeindeeinkommen geht dann an den Arbeitgeber |
+| Frei | `/civ vertrag frei <Spieler> <einmalig> <täglich> <Titel> \| <Text>` | eigene Vereinbarung, der Anbieter zahlt |
+| Bündnis | `/civ vertrag buendnis <Gemeinde oder Bund>` (Bürgermeister) | Bürger der Verbündeten dürfen im Gebiet bauen wie Mitglieder |
+
+`liste`, `zeigen <Nr>`, `annehmen <Nr>`, `ablehnen <Nr>`, `kuendigen <Nr>` (endet am nächsten Tag). Kann eine Rate nicht gezahlt werden, endet der Vertrag als Vertragsbruch und die Kaution verfällt. Verliert der Vermieter das Grundstück, wird der Mietvertrag gegenstandslos.
+
+Gesetz `office_salary` („Das Gehalt beträgt 2 Smaragde.“): Bürgermeister, Amtsträger und Abgeordnete bekommen es täglich aus der Gemeindekasse.
+
+### Post und Briefkasten (Block)
+Rezept: Eisen, Papier, Truhe (`III / IPI / ICI`).
+
+- Briefe kommen am nächsten Spieltag an. Schreiben: `/civ brief <Spieler> <Betreff> | <Text>`, am Briefkasten mit einem Buch mit Feder in der Hand (erste Zeile = Betreff) und Klick auf einen Freund, oder auf der Webseite.
+- `/civ post` zeigt das Postfach, `/civ post lesen <Nr>` einen Brief. Wer online ist, bekommt bei Ankunft eine Nachricht.
+- **Briefwahl:** Erlaubt das Gesetz `postal_vote_allowed` („Briefwahl ist erlaubt.“), wählt man am Briefkasten; die Stimme zählt wie an der Urne.
+
+### Freunde und Chat
+- `/civ freund <Spieler>` fragt an; fragt die andere Seite zurück, seid ihr befreundet. `/civ freund entfernen <Spieler>`, `/civ freunde`.
+- `/civ nachricht <Freund> <Text>` schickt eine Direktnachricht, auch an Freunde, die gerade auf der Webseite sind.
+- Der allgemeine Chat im Spiel erscheint auf der Webseite; was dort geschrieben wird, erscheint im Spiel mit „[Web]“.
+
+### Firmen und Börse
+- `/civ firma gruenden <Kapital> <Name>`: Das Kapital (mindestens 10 Smaragde) geht vom Gründer in die Firmenkasse. Die Firma hat 1.000 Aktien, die alle dem Gründer gehören; Ausgabepreis = Kapital / 1.000. Der Gründer hat die Leitung und handelt für die Firma.
+- Firmen verdienen über eigene Läden (`/civ laden eroeffnen <Preis> <Firma>`, Einnahmen in die Firmenkasse), Aufträge (freie Verträge mit der Firma) und angestellte Dorfbewohner (`/civ firma einstellen <Firma> dorfbewohner <Lohn>`: ihr Anteil am Gemeindeeinkommen geht an die Firma).
+- `dividende <Firma> <Betrag>` schüttet aus der Kasse an alle Aktionäre aus, je Aktie gleich viel. `ausgeben <Firma> <Anzahl> <Preis>` gibt neue Aktien aus und bietet sie an; der Erlös geht in die Kasse. `aufloesen <Firma>` verteilt die Kasse anteilig an die Aktionäre.
+- **Börse:** `/civ boerse` zeigt alle Kurse, `kaufen|verkaufen <Firma> <Anzahl> [Limit]` gibt eine Limit-Order auf (ohne Limit bis 10 % über bzw. unter dem letzten Kurs). Orders werden sofort gegen das Orderbuch ausgeführt, beste Preise zuerst, zum Preis der wartenden Order; der Rest wartet bis zu 7 Tage. `depot`, `buch <Firma>`, `streichen <Nr>`. Menü: Gemeindehaus → Börse oder Block **Börsenterminal** (Rezept `GRG / IEI / III`).
+- **Dorfbewohner investieren:** Sie sparen ein Zehntel ihres Anteils am Gemeindeeinkommen (bis 50 Smaragde). Sparsame kaufen Aktien mit gutem Verhältnis aus Buchwert, Dividende und Kurs; Ordnungsliebende meiden schwankende Kurse, Freiheitsliebende mögen steigende; Ausgabefreudige verkaufen nach und nach.
+
+### Presse
+- `/civ zeitung gruenden <Name>`; `redakteur <Zeitung> <Spieler|dorfbewohner>` nimmt in die Redaktion auf. Die Zeitung erscheint in den Gemeinden ihrer Redaktion.
+- Schreiben: `/civ zeitung schreiben <Zeitung> <Titel> | <Text>`, mit Buch und Feder in der Hand `veroeffentlichen <Zeitung>` (erste Zeile = Titel) oder auf der Webseite. Höchstens 5 Artikel je Zeitung und Tag.
+- Der Mod erkennt **Gegenstand** (häufigster bekannter Name: Spieler, Partei, Gemeinde, Firma), **Haltung** (scharf kritisch bis lobend, aus lobenden und kritischen Wörtern) und **Thema** (Framing: Ordnung, Freiheit, Steuern, Ausbau).
+- **Wirkung:** Dorfbewohner der Erscheinungsgemeinden lesen einen Artikel mit 15–65 % Wahrscheinlichkeit (je nach Zugehörigkeitsgefühl). Drei Tage lang verschiebt er ihre Wahl (Kandidat ±0,08 × Haltung, Partei ±0,05, zusammen höchstens ±0,3) und, bei Berichten über die Gemeinde oder ihre Führung, ihre Zufriedenheit (neuer Faktor „Presse“, höchstens ±6). Passt das Thema zur Persönlichkeit, wirkt er bis 50 % stärker.
+- **Dorfbewohner-Redakteure** schreiben etwa jeden dritten Tag aus Vorlagen: über Kandidaten laufender Wahlen (Haltung nach Programm und eigener Persönlichkeit) oder die Stimmung in der Gemeinde.
+- Lesen: `/civ zeitung lesen [Zeitung]` gibt die aktuelle Ausgabe als Buch, `artikel <Nr>` zeigt einen Artikel. Block **Zeitungskiosk** (Rezept `PPP / BGB / WWW`) zeigt die neuesten Artikel. Neue Artikel erscheinen als Schlagzeile im Chat der Gemeinde.
 
 ### Bank (Block)
 Rezept: Gold, Eisen, Smaragd, Steinziegel (`GIG / IEI / SSS`).
@@ -156,11 +226,19 @@ So entstehen die Preise:
 - Verzauberte, umbenannte oder beschädigte Items kauft der Markt nicht an.
 
 ### Webseite
-Der Server stellt eine Webseite bereit, standardmäßig auf Port 8765:
-- **Übersicht** mit allen Gemeinden, Einwohnern, Kassen und Grundstücken
-- **Karte** aller beanspruchten Chunks je Dimension, zum Verschieben und Zoomen
-- **Markt** mit aktuellen Preisen und Lagerbeständen sowie allen Läden der Spieler
-- **Mein Bereich:** Mit `/civ web` holst du dir im Spiel einen Code. Mit ihm meldest du dich an und siehst deinen Kontostand, überweist Geld, stimmst ab, kandidierst und wählst.
+Der Server stellt eine Webseite bereit, standardmäßig auf Port 8765, hell und dunkel, auch auf dem Handy:
+- **Start:** Live-Karte aller Gemeinden, Kennzahlen, wer gerade online ist, Einstieg und wichtige Befehle
+- **Welt:** Register aller Gemeinden (mit generiertem Wappen, Postleitzahl, Straßen und Adressen), Bünde, Parteien, Firmen und Zeitungen mit Suche
+- **Karte:** alle beanspruchten Chunks je Dimension mit Straßen, Wahlkarte nach Bezirken
+- **Wahlen** mit Umfragen und Ergebnissen, **Markt** mit Preisen und Läden der Spieler
+- **Börse:** Kursliste mit Verlauf, Chart mit Umsatz, Kennzahlen, Aktionäre, Orderbuch, Handeln und Depot
+- **Presse:** Artikel mit Haltung und Thema, Zeitungen mit Redaktion und Verbreitung, Artikel schreiben mit Live-Erkennung
+- **Post:** Postfach, gesendete Briefe, Briefe schreiben und beantworten
+- **Chat:** allgemeiner Chat (mit dem Spiel verbunden) und Direktnachrichten an Freunde
+- **Freunde:** Anfragen senden, annehmen, ablehnen; wer online ist
+- **Mein Bereich:** Kontostand, Anschrift, Überweisen, Verträge unterschreiben, anbieten und kündigen, Ämter, Wahlen und Abstimmungen
+
+Anmelden: Mit `/civ web` holst du dir im Spiel einen Code und gibst ihn auf der Webseite ein.
 
 ### Befehle
 | Befehl | Wirkung |
@@ -225,6 +303,19 @@ Der Server stellt eine Webseite bereit, standardmäßig auf Port 8765:
 | `/civ partei [liste \| menue \| info [Name]]` | Parteien anzeigen |
 | `/civ partei gruenden <Richtung> <Name>` / `beitreten <Name>` / `austreten` | Partei gründen, beitreten, verlassen |
 | `/civ partei richtung <Ordnung> <Wirtschaft>` / `wappen` / `aufloesen` | Richtung, Logo (Item in der Hand), Auflösung (Vorsitz) |
+| `/civ parlament [zeigen <Name> \| menue]` | Parlament anzeigen; Wahl über `/civ wahl … parlament` |
+| `/civ rede <Text>` | Wahlkampfrede an Spieler und Dorfbewohner in Hörweite |
+| `/civ versprechen geben <Text>` / `versprechen [liste [Name]]` | Wahlversprechen geben bzw. mit Bilanz anzeigen |
+| `/civ umfrage [Name]` / `/civ wahlergebnis [Name \| menue]` | Umfrage unter Dorfbewohnern, letztes Wahlergebnis je Bezirk |
+| `/civ strasse anlegen\|aufheben <Name>` / `strasse liste` | Straßen der Gemeinde (Bürgermeister, Bauamt) |
+| `/civ adresse [Spieler]` / `/civ adressen` | Anschrift, Straßen und Hausnummern |
+| `/civ vertrag …` / `vertrag menue` | Verträge, siehe oben |
+| `/civ post [lesen <Nr> \| menue]` / `/civ brief <Spieler> <Betreff> \| <Text>` | Post |
+| `/civ freund [entfernen] <Spieler>` / `/civ freunde [menue]` | Freunde |
+| `/civ nachricht <Freund> <Text>` | Direktnachricht |
+| `/civ firma gruenden\|info\|liste\|aufnehmen\|entlassen\|einstellen\|dividende\|ausgeben\|aufloesen` | Firmen, siehe oben |
+| `/civ boerse [kaufen\|verkaufen\|depot\|buch\|streichen\|menue]` | Börse |
+| `/civ zeitung gruenden\|redakteur\|entlassen\|schreiben\|veroeffentlichen\|lesen\|artikel\|liste\|menue\|aufloesen` | Presse |
 
 Nur für Admins:
 - `/civ gruenden <Name>` gründet eine Gemeinde ohne Gemeindehaus.
@@ -254,6 +345,9 @@ Der Bürgermeister (oder mit Abstimmungen die Bürger) stellt diese Regelungen i
 | Amtszeit gewählter Ämter in Tagen (`term_days`) | 0 = unbefristet (Standard) |
 | Dauer einer Wahl in Tagen (`election_days`) | Standard 2 |
 | Stimmgewicht von Dorfbewohnern in Prozent (`villager_vote_percent`) | 0 = kein Wahlrecht (Standard) |
+| Sitze im Parlament (`parliament_seats`) | 0 = kein Parlament (Standard), bis 99 |
+| Sitzungen alle … Tage (`session_days`) | 1 bis 7, Standard 1 |
+| Gewählt wird nur an der Wahlurne (`ballot_box_required`) | ja/nein, Standard nein |
 
 ## Für Server-Admins
 `config/eddies-civ-mod.properties` wird beim ersten Start angelegt:

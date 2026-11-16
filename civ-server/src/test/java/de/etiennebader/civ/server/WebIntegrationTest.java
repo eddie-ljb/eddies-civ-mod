@@ -81,6 +81,9 @@ class WebIntegrationTest {
             assertEquals(200, world.status());
             assertTrue(world.body().contains("\"name\":\"Nordhain\""));
             assertTrue(request(base + "/", null, null).body().contains("Eddies"));
+            Response elections = request(base + "/api/elections", null, null);
+            assertEquals(200, elections.status());
+            assertTrue(elections.body().contains("\"results\":[") && elections.body().contains("\"polls\":["));
 
             assertEquals(401, request(base + "/api/me", null, null).status());
             assertEquals(401, request(base + "/api/login", "{\"code\":\"FALSCH\"}", null).status());
@@ -101,6 +104,101 @@ class WebIntegrationTest {
             assertTrue(request(base + "/api/me", null, cookie).body().contains("\"balance\":\"7,50\""));
             assertEquals(422, request(base + "/api/transfer", "{\"to\":\"Niemand\",\"amount\":\"1\"}", cookie).status());
             assertEquals(404, request(base + "/api/unbekannt", null, null).status());
+        } finally {
+            running.set(false);
+            gameThread.join();
+            civ.stop();
+        }
+    }
+
+    @Test
+    @DisplayName("Webseite: Startseiten-Kennzahlen, Freunde, Chat, Briefe und Verträge")
+    void communityEndpoints() throws Exception {
+        SeededIdGenerator ids = new SeededIdGenerator(62);
+        PlayerRef alice = new PlayerRef(PlayerId.generate(ids));
+        PlayerRef bob = new PlayerRef(PlayerId.generate(ids));
+        CivServer civ = CivServer.start(new MemoryStateStore(), withWeb(ServerSettings.withDayLength(1_200)), ids,
+                SaveListener.NONE);
+        Caller aliceCaller = new Caller(alice, "Alice", new ChunkCoord(DimensionId.OVERWORLD, 0, 0).center(64));
+        civ.playerJoined(alice, "Alice");
+        civ.playerJoined(bob, "Bob");
+        civ.commands().found(aliceCaller, "Nordhain");
+        civ.bank().deposit(aliceCaller, 10);
+        int port = civ.startWeb(id -> Optional.empty(), command -> { }).orElseThrow();
+        String code = String.valueOf(civ.webLogin(aliceCaller).lines().getFirst().args().getFirst());
+        civ.bank().deposit(aliceCaller, 20);
+        assertTrue(civ.companies().found(aliceCaller, "10", "Holz AG").success());
+        assertTrue(civ.press().found(aliceCaller, "Bote").success());
+        AtomicBoolean running = new AtomicBoolean(true);
+        Thread gameThread = new Thread(() -> {
+            while (running.get()) {
+                civ.tick();
+                Thread.onSpinWait();
+            }
+        });
+        gameThread.start();
+        try {
+            String base = "http://127.0.0.1:" + port;
+            Response stats = request(base + "/api/stats", null, null);
+            assertTrue(stats.body().contains("\"towns\":1") && stats.body().contains("\"online\":2"), stats.body());
+            assertTrue(request(base + "/api/streets", null, null).body().contains("\"postalCode\""));
+            assertEquals(401, request(base + "/api/chat", null, null).status());
+            String cookie = request(base + "/api/login", "{\"code\":\"" + code + "\"}", null).cookie().split(";")[0];
+
+            assertEquals(200, request(base + "/api/friends", "{\"action\":\"request\",\"name\":\"Bob\"}", cookie).status());
+            Response friends = request(base + "/api/friends", null, cookie);
+            assertTrue(friends.body().contains("\"state\":\"outgoing\"") && friends.body().contains("\"players\":[\"Bob\"]"),
+                    friends.body());
+            assertEquals(422, request(base + "/api/chat", "{\"text\":\"psst\",\"to\":\"Bob\"}", cookie).status(),
+                    "Direktnachricht nur an Freunde");
+            Response pub = request(base + "/api/chat", "{\"text\":\"Hallo aus dem Browser\"}", cookie);
+            assertEquals(200, pub.status(), pub.body());
+            Response chat = request(base + "/api/chat?after=0", null, cookie);
+            assertTrue(chat.body().contains("Hallo aus dem Browser") && chat.body().contains("\"origin\":\"web\""), chat.body());
+            assertTrue(request(base + "/api/chat?after=999", null, cookie).body().contains("\"messages\":[]"));
+
+            Response letter = request(base + "/api/letters",
+                    "{\"to\":\"Bob\",\"subject\":\"Einladung\",\"body\":\"Zeile 1\\nZeile 2\"}", cookie);
+            assertEquals(200, letter.status(), letter.body());
+            assertTrue(request(base + "/api/letters", null, cookie).body().contains("\"subject\":\"Einladung\""));
+            assertEquals(422, request(base + "/api/letters", "{\"to\":\"Bob\",\"subject\":\"\"}", cookie).status());
+
+            Response offer = request(base + "/api/contracts", "{\"action\":\"custom\",\"to\":\"Bob\",\"title\":\"Holz\","
+                    + "\"text\":\"64 Stämme\",\"once\":\"1\",\"perDay\":\"0\",\"days\":\"3\"}", cookie);
+            assertEquals(200, offer.status(), offer.body());
+            Response contracts = request(base + "/api/contracts", null, cookie);
+            assertTrue(contracts.body().contains("\"title\":\"Holz\"") && contracts.body().contains("\"canDecline\":true"),
+                    contracts.body());
+            assertEquals(200, request(base + "/api/contracts", "{\"action\":\"decline\",\"number\":\"1\"}", cookie).status());
+            assertEquals(400, request(base + "/api/contracts", "{\"action\":\"zaubern\"}", cookie).status());
+            Response me = request(base + "/api/me", null, cookie);
+            assertTrue(me.body().contains("\"unread\":0") && me.body().contains("\"friendRequests\":0"), me.body());
+
+            Response exchange = request(base + "/api/exchange", null, null);
+            assertTrue(exchange.body().contains("\"name\":\"Holz AG\"") && exchange.body().contains("\"quotes\":[{"),
+                    exchange.body());
+            Response sell = request(base + "/api/exchange",
+                    "{\"action\":\"sell\",\"company\":\"Holz AG\",\"quantity\":\"10\",\"limit\":\"0,01\"}", cookie);
+            assertTrue(sell.body().contains("#1"), sell.body());
+            Response depot = request(base + "/api/depot", null, cookie);
+            assertTrue(depot.body().contains("\"shares\":1000") && depot.body().contains("\"papers\":[\"Bote\"]"),
+                    depot.body());
+            int idStart = exchange.body().indexOf("\"id\":\"") + 6;
+            String companyId = exchange.body().substring(idStart, exchange.body().indexOf('"', idStart));
+            Response book = request(base + "/api/exchange/book?company=" + companyId, null, null);
+            assertTrue(book.status() == 200 && book.body().startsWith("{\"orders\":["), book.body());
+            assertEquals(400, request(base + "/api/exchange", "{\"action\":\"zaubern\"}", cookie).status());
+            Response preview = request(base + "/api/press/preview",
+                    "{\"title\":\"Holz AG ist großartig\",\"body\":\"Ein Erfolg.\"}", cookie);
+            assertTrue(preview.body().contains("\"subject\":\"Holz AG\"") && preview.body().contains("wohlwollend"),
+                    preview.body());
+            assertEquals(200, request(base + "/api/press",
+                    "{\"paper\":\"Bote\",\"title\":\"Holz AG ist großartig\",\"body\":\"Ein Erfolg.\"}", cookie).status());
+            Response press = request(base + "/api/press", null, null);
+            assertTrue(press.body().contains("\"title\":\"Holz AG ist großartig\"")
+                    && press.body().contains("\"tendencyWord\":\"wohlwollend\""), press.body());
+            Response stats2 = request(base + "/api/stats", null, null);
+            assertTrue(stats2.body().contains("\"companies\":1"), stats2.body());
         } finally {
             running.set(false);
             gameThread.join();

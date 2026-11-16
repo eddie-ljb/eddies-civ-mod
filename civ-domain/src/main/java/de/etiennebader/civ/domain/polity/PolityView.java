@@ -1,7 +1,5 @@
 package de.etiennebader.civ.domain.polity;
 
-import java.util.List;
-
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.actor.PolityRef;
@@ -12,6 +10,7 @@ import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.territory.BlockPosition;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -73,6 +72,40 @@ public interface PolityView {
 
     /** Alle besetzten Ämter in der Reihenfolge von {@link Office}. */
     Collection<OfficeTerm> offices();
+
+    /** Das gewählte Parlament; {@link Parliament#NONE}, solange keines gewählt ist. */
+    default Parliament parliament() {
+        return Parliament.NONE;
+    }
+
+    /** Ergebnisse beendeter Wahlen, das neueste zuletzt. */
+    default List<ElectionResult> results() {
+        return List.of();
+    }
+
+    /** Wahlversprechen, das neueste zuletzt. */
+    default List<Promise> promises() {
+        return List.of();
+    }
+
+    /** Straßen im Gebiet einer Gemeinde. */
+    default List<Street> streets() {
+        return List.of();
+    }
+
+    /**
+     * Postleitzahl der Gemeinde: fünfstellig, fest aus ihrer Kennung abgeleitet. Bünde und Parteien haben keine, sie
+     * gilt aber für Vergleiche ebenso.
+     */
+    default String postalCode() {
+        long bits = id().value().getMostSignificantBits() ^ id().value().getLeastSignificantBits();
+        return Long.toString(10_000 + Math.floorMod(bits, 90_000L));
+    }
+
+    /** Wahlplakate im Gebiet. */
+    default List<Poster> posters() {
+        return List.of();
+    }
 
     /** Laufende Wahlen in Reihenfolge ihrer Ausrufung. */
     Collection<Election> elections();

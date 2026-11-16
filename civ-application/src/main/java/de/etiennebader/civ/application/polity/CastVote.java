@@ -12,7 +12,7 @@ import de.etiennebader.civ.domain.shared.ProposalId;
 import java.util.Objects;
 
 /**
- * Ein Bürger stimmt ab oder ändert seine Stimme. Steht danach die Mehrheit fest, wird sofort entschieden.
+ * Ein Bürger (mit Parlament: ein Abgeordneter) stimmt ab oder ändert seine Stimme. Steht danach die Mehrheit fest, wird sofort entschieden.
  */
 public final class CastVote {
 
@@ -36,7 +36,7 @@ public final class CastVote {
 
     public VoteOutcome execute(Command command) {
         Polity polity = aggregates.polity(command.polity());
-        AmendLaw.requireCitizen(polity, command.citizen());
+        Ballots.requireVoter(polity, command.citizen());
         polity.vote(command.proposal(), command.citizen(), command.inFavour(), command.day());
         Proposal proposal = ProposeLawChange.proposalOf(polity, command.proposal());
         VoteOutcome outcome = Ballots.settle(polity, proposal, Ballots.evaluate(polity, proposal), ids, command.day());

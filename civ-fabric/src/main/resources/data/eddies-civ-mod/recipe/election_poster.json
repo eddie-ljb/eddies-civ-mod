@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "PPP",
+    "PLP",
+    "PPP"
+  ],
+  "key": {
+    "P": "minecraft:paper",
+    "L": "minecraft:oak_log"
+  },
+  "result": {
+    "id": "eddies-civ-mod:election_poster",
+    "count": 2
+  }
+}

@@ -11,6 +11,7 @@ import de.etiennebader.civ.server.ServerSettings;
 import de.etiennebader.civ.server.save.SaveListener;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -48,6 +49,20 @@ public final class CivServerHost {
         villagers.register();
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> playerJoined(handler.getPlayer()));
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> playerLeft(handler.getPlayer()));
+        ServerMessageEvents.CHAT_MESSAGE.register((message, sender, params) -> chatted(sender,
+                message.signedContent()));
+    }
+
+    /** Schreibt den allgemeinen Chat mit, damit die Webseite ihn zeigt. */
+    private void chatted(ServerPlayer sender, String text) {
+        if (civ == null) {
+            return;
+        }
+        try {
+            civ.community().gameChat(Players.ref(sender), text);
+        } catch (RuntimeException e) {
+            LOGGER.warn("Chatnachricht konnte nicht mitgeschrieben werden: {}", e.getMessage());
+        }
     }
 
     /** Die Zivilisation der laufenden Welt; leer, solange kein Server läuft. */
@@ -128,6 +143,13 @@ public final class CivServerHost {
     }
 
     private static void announce(MinecraftServer server, CivServer civ, Announcement announcement) {
+        if (announcement.recipient().isPresent()) {
+            ServerPlayer player = server.getPlayerList().getPlayer(announcement.recipient().get().uuid());
+            if (player != null) {
+                player.sendSystemMessage(Components.prefixed(Components.of(announcement.message()), true));
+            }
+            return;
+        }
         if (announcement.town().isEmpty()) {
             Components.broadcast(server, announcement.message());
             return;

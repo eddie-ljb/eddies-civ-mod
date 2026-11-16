@@ -11,6 +11,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.ToIntFunction;
 
 /**
  * Die Stimmung aller Dorfbewohner einer Gemeinde.
@@ -40,7 +41,17 @@ public record TownMood(int villagers, int averageScore, int content, int discont
 
     /** Wie oben, aber mit dem tatsächlich geltenden Recht. */
     public static TownMood of(PolityView town, LawView laws) {
+        return of(town, laws, villager -> 0);
+    }
+
+    /**
+     * Wie oben, zusätzlich mit dem Einfluss der Presse.
+     *
+     * @param media Zufriedenheitspunkte eines Dorfbewohners aus Zeitungsberichten
+     */
+    public static TownMood of(PolityView town, LawView laws, ToIntFunction<PersonRef> media) {
         Objects.requireNonNull(town, "town");
+        Objects.requireNonNull(media, "media");
         Objects.requireNonNull(laws, "laws");
         List<PersonRef> villagers = town.members().stream()
                 .map(Membership::member)
@@ -56,7 +67,7 @@ public record TownMood(int villagers, int averageScore, int content, int discont
         int atRisk = 0;
         for (PersonRef villager : villagers) {
             Personality personality = Personality.of(villager);
-            Satisfaction satisfaction = Satisfaction.of(personality, town, laws);
+            Satisfaction satisfaction = Satisfaction.of(personality, town, laws).withMedia(media.applyAsInt(villager));
             int score = satisfaction.score();
             total += score;
             productivity += satisfaction.productivityPercent();

@@ -8,6 +8,8 @@ import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.ElectionId;
 import de.etiennebader.civ.domain.shared.PolityId;
 
+import de.etiennebader.civ.domain.law.StandardParameters;
+
 import java.util.Objects;
 
 /**
@@ -15,7 +17,17 @@ import java.util.Objects;
  */
 public final class CastBallot {
 
-    public record Command(PolityId polity, ElectionId election, ActorRef citizen, ActorRef candidate, Day day) {
+    /**
+     * @param atBallotBox ob die Stimme an einer Wahlurne abgegeben wird; schreibt das Recht die Urne vor
+     *                    ({@link StandardParameters#BALLOT_BOX_REQUIRED}), zählt nur diese
+     */
+    public record Command(PolityId polity, ElectionId election, ActorRef citizen, ActorRef candidate, Day day,
+                          boolean atBallotBox) {
+
+        /** Stimme per Menü, Befehl oder Webseite. */
+        public Command(PolityId polity, ElectionId election, ActorRef citizen, ActorRef candidate, Day day) {
+            this(polity, election, citizen, candidate, day, false);
+        }
 
         public Command {
             Objects.requireNonNull(polity, "polity");
@@ -35,6 +47,9 @@ public final class CastBallot {
     public void execute(Command command) {
         Polity polity = aggregates.polity(command.polity());
         Citizens.require(polity, command.citizen());
+        if (!command.atBallotBox() && polity.laws().valueOf(StandardParameters.BALLOT_BOX_REQUIRED)) {
+            throw new BallotBoxRequiredException();
+        }
         polity.castBallot(command.election(), command.citizen(), command.candidate(), command.day());
         aggregates.commit(polity);
     }

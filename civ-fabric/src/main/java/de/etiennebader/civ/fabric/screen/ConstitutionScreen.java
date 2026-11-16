@@ -33,7 +33,7 @@ import java.util.Optional;
  */
 public final class ConstitutionScreen extends MenuScreen {
 
-    private static final int[] ARTICLE_SLOTS = {10, 11, 12, 13, 14, 15, 16};
+    private static final int[] ARTICLE_SLOTS = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25};
     private static final int[] CONSTITUENT_SLOTS = {39, 40, 41, 42, 43};
     private static final int LINE_LENGTH = 40;
     private static final int MAX_PREAMBLE_LINES = 8;
@@ -72,6 +72,7 @@ public final class ConstitutionScreen extends MenuScreen {
         renderArticles(canvas, view);
         renderOrgans(canvas, view);
         renderAmendments(canvas, view, found.get());
+        renderParliament(canvas, found.get());
         renderProclaim(canvas, view);
         canvas.set(35, Icon.of(Items.PAPER).name(GuiKeys.CONSTITUTION_COPY.text(), Icon.TITLE)
                 .hint(GuiKeys.CONSTITUTION_COPY_HINT.text()).build(), click -> {
@@ -131,6 +132,14 @@ public final class ConstitutionScreen extends MenuScreen {
             }
             canvas.set(ARTICLE_SLOTS[index], icon.build());
         }
+    }
+
+    private void renderParliament(Canvas canvas, PolityView polity) {
+        canvas.set(49, Icon.of(Items.LECTERN).name(GuiKeys.PARLIAMENT_OPEN.text(), Icon.TITLE)
+                .hint(GuiKeys.PARLIAMENT_OPEN_HINT.text()).build(), click -> {
+            Feedback.click(click.player());
+            Screens.open(click.player(), new ParliamentScreen(civ, player, polity, Optional.of(this)));
+        });
     }
 
     private void renderOrgans(Canvas canvas, ConstitutionView view) {

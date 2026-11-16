@@ -46,6 +46,8 @@ public final class SqliteStateStore implements StateStore, AutoCloseable {
     private final CalendarTable calendarTable = new CalendarTable();
     private final MarketTable marketTable = new MarketTable();
     private final ShopTable shopTable = new ShopTable();
+    private final CivilTables civilTables = new CivilTables();
+    private final MarketPressTables marketPressTables = new MarketPressTables();
 
     public SqliteStateStore(SqliteDatabase database, ParameterCatalog catalog) {
         this.database = Objects.requireNonNull(database, "database");
@@ -85,7 +87,9 @@ public final class SqliteStateStore implements StateStore, AutoCloseable {
             Ledger ledger = Ledger.restore(ledgerTable.loadBalances(connection), ledgerTable.loadTotals(connection));
             return new StoredWorld(polities, territory, land, ledger,
                     marketTable.load(connection, MARKET_CURRENCY), shopTable.load(connection), playerTable.loadAll(connection),
-                    calendarTable.load(connection));
+                    calendarTable.load(connection), civilTables.loadContracts(connection),
+                    civilTables.loadCommunity(connection), marketPressTables.loadExchange(connection),
+                    marketPressTables.loadPress(connection));
         } catch (IllegalArgumentException e) {
             throw new PersistenceException("Gespeicherter Zustand ist ungültig: " + e.getMessage(), e);
         }
@@ -112,6 +116,18 @@ public final class SqliteStateStore implements StateStore, AutoCloseable {
             ledgerTable.writeTotals(connection, delta.currencies());
             marketTable.write(connection, MARKET_CURRENCY, delta.commodities());
             shopTable.write(connection, delta.shops());
+            if (delta.contracts().isPresent()) {
+                civilTables.writeContracts(connection, delta.contracts().get());
+            }
+            if (delta.community().isPresent()) {
+                civilTables.writeCommunity(connection, delta.community().get());
+            }
+            if (delta.exchange().isPresent()) {
+                marketPressTables.writeExchange(connection, delta.exchange().get());
+            }
+            if (delta.press().isPresent()) {
+                marketPressTables.writePress(connection, delta.press().get());
+            }
             eventTable.append(connection, delta.events());
             playerTable.write(connection, delta.players());
             calendarTable.write(connection, delta.calendar());

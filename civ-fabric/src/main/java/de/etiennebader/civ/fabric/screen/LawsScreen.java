@@ -20,6 +20,7 @@ import net.minecraft.world.item.Items;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.IntStream;
 
 /**
  * Die Regelungen einer Gemeinde. Bürger schalten Ja/Nein-Regelungen per Klick um und verstellen Zahlen
@@ -38,7 +39,8 @@ final class LawsScreen extends MenuScreen {
             "outsiders_may_open_containers", Items.CHEST);
     private static final Map<String, Long> STEPS = Map.of("land_tax_free_blocks", 16L);
     private static final String MONEY_LAW = "land_tax_per_block";
-    private static final int[] SLOTS = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34};
+    /** Drei volle Reihen: Platz für 27 Regelungen. */
+    private static final int[] SLOTS = IntStream.rangeClosed(9, 35).toArray();
 
     private final PolityId town;
 

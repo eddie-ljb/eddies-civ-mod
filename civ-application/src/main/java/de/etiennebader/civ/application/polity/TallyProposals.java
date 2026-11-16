@@ -13,7 +13,8 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Zählt am Tagesende alle Abstimmungen aus, deren Frist ({@link StandardParameters#VOTE_DAYS}) abgelaufen ist.
+ * Zählt am Tagesende alle Abstimmungen aus, deren Frist ({@link StandardParameters#VOTE_DAYS}) abgelaufen ist; mit
+ * Parlament nur an Sitzungstagen ({@link StandardParameters#SESSION_DAYS}).
  */
 public final class TallyProposals {
 
@@ -33,6 +34,9 @@ public final class TallyProposals {
         Objects.requireNonNull(day, "day");
         List<Tallied> tallied = new ArrayList<>();
         for (Polity polity : aggregates.repositories().polities().findAll()) {
+            if (polity.parliament().seated() && !ParliamentSession.isSessionDay(polity, day)) {
+                continue;
+            }
             long voteDays = polity.laws().valueOf(StandardParameters.VOTE_DAYS);
             boolean changed = false;
             for (Proposal proposal : polity.proposals()) {

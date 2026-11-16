@@ -10,7 +10,8 @@ public sealed interface PolityEvent extends DomainEvent
         permits PolityFounded, MemberAdmitted, MemberLeft, StatuteEnacted, StatuteRepealed,
         TierChanged, ProposalOpened, VoteCast, ProposalClosed, SeatMoved, PolityDissolved, OfficeFilled,
         OfficeVacated, ElectionCalled, CandidacyDeclared, BallotCast, ElectionClosed, FederationFounded,
-        ConstitutionProclaimed, PreambleChanged, PartyFounded, PartyProfileChanged {
+        ConstitutionProclaimed, PreambleChanged, PartyFounded, PartyProfileChanged, ParliamentElected,
+        ParliamentDissolved, StreetLaid, StreetRemoved, OrganisationFounded {
 
     PolityId polity();
 }

@@ -10,12 +10,26 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import de.etiennebader.civ.EddiesCivMod;
+import de.etiennebader.civ.domain.actor.ActorRef;
+import de.etiennebader.civ.domain.actor.PersonRef;
+import de.etiennebader.civ.domain.exchange.Side;
 import de.etiennebader.civ.domain.polity.Office;
+import de.etiennebader.civ.domain.polity.PolityView;
+import de.etiennebader.civ.domain.shared.PersonId;
 import de.etiennebader.civ.domain.territory.ClaimType;
 import de.etiennebader.civ.fabric.content.LawBooks;
+import de.etiennebader.civ.fabric.content.Newspapers;
 import de.etiennebader.civ.fabric.gui.Screens;
+import de.etiennebader.civ.fabric.screen.ContractsScreen;
+import de.etiennebader.civ.fabric.screen.ElectionsScreen;
+import de.etiennebader.civ.fabric.screen.ExchangeScreen;
+import de.etiennebader.civ.fabric.screen.FriendsScreen;
+import de.etiennebader.civ.fabric.screen.MailScreen;
+import de.etiennebader.civ.fabric.screen.ParliamentScreen;
 import de.etiennebader.civ.fabric.screen.PartiesScreen;
+import de.etiennebader.civ.fabric.screen.PressScreen;
 import de.etiennebader.civ.server.CivServer;
+import de.etiennebader.civ.server.campaign.CampaignService;
 import de.etiennebader.civ.server.command.Caller;
 import de.etiennebader.civ.server.command.CivCommands;
 import de.etiennebader.civ.server.command.Message;
@@ -31,11 +45,14 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Prediction;
+import net.minecraft.world.entity.npc.villager.Villager;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.AABB;
 
 import java.util.List;
 import java.util.Optional;
@@ -90,6 +107,17 @@ import java.util.function.Function;
  * /civ grundstueck kaufen           angebotenes Grundstück kaufen
  * /civ grundstueck vergeben &lt;Spieler&gt;  Gemeindeland verschenken (Bürger)
  * /civ grundstueck aufloesen        Gemeindeland-Grundstück auflösen (Bürger)
+ * /civ firma gruenden &lt;Kapital&gt; &lt;Name&gt;  Firma mit Aktien an der Börse; info, liste, aufnehmen, entlassen,
+ *                                   einstellen, dividende, ausgeben, aufloesen
+ * /civ boerse [kaufen|verkaufen &lt;Firma&gt; &lt;Anzahl&gt; [Limit] | depot | buch | streichen | menue]
+ * /civ zeitung gruenden|redakteur|entlassen|schreiben|veroeffentlichen|lesen|artikel|liste|menue|aufloesen
+ * /civ laden eroeffnen &lt;Preis&gt; [Firma]  Laden für sich oder eine geleitete Firma
+ * /civ strasse anlegen|aufheben &lt;Name&gt;  Straße aus der Stab-Auswahl anlegen (Bürgermeister, Bauamt)
+ * /civ adresse [Spieler]            Anschrift; /civ adressen: Straßen und Hausnummern
+ * /civ vertrag …                    Verträge: liste, zeigen, annehmen, ablehnen, kuendigen, miete, arbeit, frei, buendnis
+ * /civ post [lesen &lt;Nr&gt;]           Postfach; /civ brief &lt;Spieler&gt; &lt;Betreff&gt; | &lt;Text&gt;
+ * /civ freund [entfernen] &lt;Spieler&gt;  Freundschaft anfragen, annehmen, beenden; /civ freunde
+ * /civ nachricht &lt;Freund&gt; &lt;Text&gt;   Direktnachricht, auch an Freunde auf der Webseite
  *
  * Nur Admins:
  * /civ gruenden &lt;Name&gt;              Gemeinde ohne Gemeindehaus-Block gründen, Sitz ist der eigene Standort
@@ -118,6 +146,10 @@ public final class CivCommandTree {
     private static final String LEVEL = "ebene";
     private static final String ARTICLE = "artikel";
     private static final String TEXT = "text";
+    private static final String NUMBER = "nr";
+    private static final String DEPOSIT = "kaution";
+    private static final String DAYS = "tage";
+    private static final int VILLAGER_REACH = 6;
     private static final String ORDER_AXIS = "ordnung";
     private static final String ECONOMY_AXIS = "wirtschaft";
     private static final List<String> YES_NO = List.of("ja", "nein");
@@ -178,7 +210,12 @@ public final class CivCommandTree {
                         .then(Commands.literal("eroeffnen")
                                 .then(Commands.argument(PRICE, StringArgumentType.word())
                                         .executes(context -> withCiv(context, (civ, player) -> openShop(civ, player,
-                                                StringArgumentType.getString(context, PRICE))))))
+                                                StringArgumentType.getString(context, PRICE), Optional.empty())))
+                                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                                                .suggests(this::suggestOwnCompanies)
+                                                .executes(context -> withCiv(context, (civ, player) -> openShop(civ,
+                                                        player, StringArgumentType.getString(context, PRICE),
+                                                        Optional.of(name(context))))))))
                         .then(Commands.literal("schliessen")
                                 .executes(context -> withCiv(context, (civ, player) -> ShopChests.lookedAt(player)
                                         .map(pos -> civ.shops().close(Players.caller(player), Players.position(player.level(), pos)))
@@ -244,6 +281,39 @@ public final class CivCommandTree {
                 .then(constitutionCommands())
                 .then(lawBookCommands())
                 .then(partyCommands())
+                .then(parliamentCommands())
+                .then(campaignCommands())
+                .then(promiseCommands())
+                .then(pollCommands())
+                .then(resultCommands())
+                .then(companyCommands())
+                .then(exchangeCommands())
+                .then(pressCommands())
+                .then(streetCommands())
+                .then(addressCommands())
+                .then(Commands.literal("adressen")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.civil().listStreets(
+                                Players.caller(player)))))
+                .then(contractCommands())
+                .then(mailCommands())
+                .then(letterCommands())
+                .then(friendCommands())
+                .then(Commands.literal("freunde")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.community().showFriends(
+                                Players.caller(player))))
+                        .then(Commands.literal("menue")
+                                .executes(context -> withCiv(context, (civ, player) -> {
+                                    Screens.open(player, new FriendsScreen(civ, player, Optional.empty()));
+                                    return null;
+                                }))))
+                .then(Commands.literal("nachricht")
+                        .then(Commands.argument(PLAYER, StringArgumentType.word())
+                                .suggests(this::suggestFriends)
+                                .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.community().direct(
+                                                Players.ref(player), Players.name(player),
+                                                StringArgumentType.getString(context, PLAYER),
+                                                StringArgumentType.getString(context, TEXT)))))))
                 .then(Commands.literal("hilfe")
                         .executes(context -> run(context.getSource(), CivCommands::help)))
                 .then(Commands.literal("menue")
@@ -447,6 +517,93 @@ public final class CivCommandTree {
                 .orElseGet(() -> Reply.failure(Message.of(MessageKey.PARAGRAPH_NEEDS_TEXT)));
     }
 
+    private LiteralArgumentBuilder<CommandSourceStack> parliamentCommands() {
+        return Commands.literal("parlament")
+                .executes(context -> withCiv(context, (civ, player) -> civ.parliaments().info(Players.caller(player),
+                        Optional.empty())))
+                .then(Commands.literal("zeigen")
+                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                                .suggests(this::suggestPolityNames)
+                                .executes(context -> withCiv(context, (civ, player) -> civ.parliaments().info(
+                                        Players.caller(player), Optional.of(name(context)))))))
+                .then(Commands.literal("menue")
+                        .executes(context -> withCiv(context, (civ, player) -> {
+                            civ.parliaments().target(Players.caller(player), Optional.empty()).ifPresentOrElse(
+                                    polity -> Screens.open(player, new ParliamentScreen(civ, player, polity,
+                                            Optional.empty())),
+                                    () -> Feedback.reply(player, Reply.failure(Message.of(MessageKey.NOT_IN_MUNICIPALITY))));
+                            return null;
+                        })));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> campaignCommands() {
+        return Commands.literal("rede")
+                .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                        .executes(context -> withCiv(context, (civ, player) -> speak(civ, player,
+                                StringArgumentType.getString(context, TEXT)))));
+    }
+
+    /** Eine Rede: geht an Spieler in Hörweite, wirkt auf Dorfbewohner in Hörweite. */
+    private static Reply speak(CivServer civ, ServerPlayer player, String text) {
+        String speech = text.length() > CampaignService.MAX_SPEECH ? text.substring(0, CampaignService.MAX_SPEECH) : text;
+        AABB range = player.getBoundingBox().inflate(CampaignService.SPEECH_RANGE);
+        List<PersonRef> listeners = player.level().getEntitiesOfClass(Villager.class, range).stream()
+                .map(villager -> new PersonRef(new PersonId(villager.getUUID())))
+                .toList();
+        Component line = Components.of(Message.of(MessageKey.SPEECH_BROADCAST, Players.name(player), speech));
+        double maxDistance = (double) CampaignService.SPEECH_RANGE * CampaignService.SPEECH_RANGE;
+        for (ServerPlayer other : player.level().getServer().getPlayerList().getPlayers()) {
+            if (other.level() == player.level() && other.distanceToSqr(player) <= maxDistance) {
+                other.sendSystemMessage(line);
+            }
+        }
+        return civ.campaigns().speak(Players.caller(player), speech, listeners);
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> promiseCommands() {
+        return Commands.literal("versprechen")
+                .executes(context -> withCiv(context, (civ, player) -> civ.campaigns().listPromises(
+                        Players.caller(player), Optional.empty())))
+                .then(Commands.literal("liste")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.campaigns().listPromises(
+                                Players.caller(player), Optional.empty())))
+                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                                .suggests(this::suggestPolityNames)
+                                .executes(context -> withCiv(context, (civ, player) -> civ.campaigns().listPromises(
+                                        Players.caller(player), Optional.of(name(context)))))))
+                .then(Commands.literal("geben")
+                        .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.campaigns().promise(
+                                        Players.caller(player), StringArgumentType.getString(context, TEXT))))));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> pollCommands() {
+        return Commands.literal("umfrage")
+                .executes(context -> withCiv(context, (civ, player) -> civ.campaigns().poll(Players.caller(player),
+                        Optional.empty())))
+                .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                        .suggests(this::suggestPolityNames)
+                        .executes(context -> withCiv(context, (civ, player) -> civ.campaigns().poll(
+                                Players.caller(player), Optional.of(name(context))))));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> resultCommands() {
+        return Commands.literal("wahlergebnis")
+                .executes(context -> withCiv(context, (civ, player) -> civ.campaigns().lastResult(
+                        Players.caller(player), Optional.empty())))
+                .then(Commands.literal("menue")
+                        .executes(context -> withCiv(context, (civ, player) -> {
+                            civ.queries().municipalityOf(Players.ref(player)).ifPresentOrElse(
+                                    town -> Screens.open(player, new ElectionsScreen(civ, player, town, Optional.empty())),
+                                    () -> Feedback.reply(player, Reply.failure(Message.of(MessageKey.NOT_IN_MUNICIPALITY))));
+                            return null;
+                        })))
+                .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                        .suggests(this::suggestPolityNames)
+                        .executes(context -> withCiv(context, (civ, player) -> civ.campaigns().lastResult(
+                                Players.caller(player), Optional.of(name(context))))));
+    }
+
     private LiteralArgumentBuilder<CommandSourceStack> constitutionCommands() {
         return Commands.literal("verfassung")
                 .executes(context -> withCiv(context, (civ, player) -> civ.constitutions().show(Players.caller(player),
@@ -629,14 +786,24 @@ public final class CivCommandTree {
         return reply;
     }
 
-    private static Reply openShop(CivServer civ, ServerPlayer player, String price) {
+    private static Reply openShop(CivServer civ, ServerPlayer player, String price, Optional<String> companyName) {
         Optional<ItemStack> held = inHand(player);
         if (held.isEmpty()) {
             return nothingInHand();
         }
+        ActorRef owner = Players.ref(player);
+        if (companyName.isPresent()) {
+            Optional<PolityView> company = civ.companies().company(companyName.get())
+                    .filter(found -> found.holds(Players.ref(player), Office.MAYOR));
+            if (company.isEmpty()) {
+                return Reply.failure(Message.of(MessageKey.COMPANY_UNKNOWN, companyName.get()));
+            }
+            owner = company.get().asActor();
+        }
+        ActorRef shopOwner = owner;
         return ShopChests.lookedAt(player)
                 .map(pos -> civ.shops().open(Players.caller(player), Players.position(player.level(), pos),
-                        Goods.traits(held.get()), price))
+                        Goods.traits(held.get()), price, shopOwner))
                 .orElseGet(() -> Reply.failure(Message.of(MessageKey.SHOP_NO_CHEST)));
     }
 
@@ -763,6 +930,485 @@ public final class CivCommandTree {
                 .map(civ -> civ.market().offers(200).stream().map(offer -> offer.commodity().id()).toList())
                 .orElse(List.of());
         return SharedSuggestionProvider.suggest(ids, builder);
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> streetCommands() {
+        return Commands.literal("strasse")
+                .executes(context -> withCiv(context, (civ, player) -> civ.civil().listStreets(Players.caller(player))))
+                .then(Commands.literal("liste")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.civil().listStreets(
+                                Players.caller(player)))))
+                .then(Commands.literal("anlegen")
+                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.civil().layStreet(
+                                        Players.caller(player), name(context))))))
+                .then(Commands.literal("aufheben")
+                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                                .suggests(this::suggestStreets)
+                                .executes(context -> withCiv(context, (civ, player) -> civ.civil().removeStreet(
+                                        Players.caller(player), name(context))))));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> addressCommands() {
+        return Commands.literal("adresse")
+                .executes(context -> withCiv(context, (civ, player) -> civ.civil().address(Players.caller(player),
+                        Optional.empty())))
+                .then(Commands.argument(PLAYER, StringArgumentType.word())
+                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                context.getSource().getOnlinePlayerNames(), builder))
+                        .executes(context -> withCiv(context, (civ, player) -> civ.civil().address(
+                                Players.caller(player), Optional.of(StringArgumentType.getString(context, PLAYER))))));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> contractCommands() {
+        return Commands.literal("vertrag")
+                .executes(context -> withCiv(context, (civ, player) -> civ.civil().list(Players.caller(player))))
+                .then(Commands.literal("liste")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.civil().list(Players.caller(player)))))
+                .then(Commands.literal("menue")
+                        .executes(context -> withCiv(context, (civ, player) -> {
+                            Screens.open(player, new ContractsScreen(civ, player, Optional.empty()));
+                            return null;
+                        })))
+                .then(contractAction("zeigen", (civ, player, number) -> civ.civil().show(Players.caller(player), number)))
+                .then(contractAction("annehmen", (civ, player, number) -> civ.civil().sign(Players.caller(player), number)))
+                .then(contractAction("ablehnen", (civ, player, number) -> civ.civil().decline(Players.caller(player),
+                        number)))
+                .then(contractAction("kuendigen", (civ, player, number) -> civ.civil().giveNotice(
+                        Players.caller(player), number)))
+                .then(Commands.literal("miete")
+                        .then(Commands.argument(PLAYER, StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                        context.getSource().getOnlinePlayerNames(), builder))
+                                .then(Commands.argument(PRICE, StringArgumentType.word())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.civil().offerLease(
+                                                Players.caller(player), StringArgumentType.getString(context, PLAYER),
+                                                StringArgumentType.getString(context, PRICE), Optional.empty(), 0)))
+                                        .then(Commands.argument(DEPOSIT, StringArgumentType.word())
+                                                .executes(context -> withCiv(context, (civ, player) -> civ.civil()
+                                                        .offerLease(Players.caller(player),
+                                                                StringArgumentType.getString(context, PLAYER),
+                                                                StringArgumentType.getString(context, PRICE),
+                                                                Optional.of(StringArgumentType.getString(context, DEPOSIT)),
+                                                                0)))
+                                                .then(Commands.argument(DAYS, IntegerArgumentType.integer(0, 3650))
+                                                        .executes(context -> withCiv(context, (civ, player) -> civ
+                                                                .civil().offerLease(Players.caller(player),
+                                                                        StringArgumentType.getString(context, PLAYER),
+                                                                        StringArgumentType.getString(context, PRICE),
+                                                                        Optional.of(StringArgumentType.getString(
+                                                                                context, DEPOSIT)),
+                                                                        IntegerArgumentType.getInteger(context,
+                                                                                DAYS)))))))))
+                .then(Commands.literal("arbeit")
+                        .then(Commands.literal("dorfbewohner")
+                                .then(Commands.argument(PRICE, StringArgumentType.word())
+                                        .executes(context -> withCiv(context, (civ, player) -> hireVillager(civ, player,
+                                                StringArgumentType.getString(context, PRICE))))))
+                        .then(Commands.argument(PLAYER, StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                        context.getSource().getOnlinePlayerNames(), builder))
+                                .then(Commands.argument(PRICE, StringArgumentType.word())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.civil()
+                                                .offerEmployment(Players.caller(player),
+                                                        StringArgumentType.getString(context, PLAYER),
+                                                        StringArgumentType.getString(context, PRICE), 0)))
+                                        .then(Commands.argument(DAYS, IntegerArgumentType.integer(0, 3650))
+                                                .executes(context -> withCiv(context, (civ, player) -> civ.civil()
+                                                        .offerEmployment(Players.caller(player),
+                                                                StringArgumentType.getString(context, PLAYER),
+                                                                StringArgumentType.getString(context, PRICE),
+                                                                IntegerArgumentType.getInteger(context, DAYS))))))))
+                .then(Commands.literal("frei")
+                        .then(Commands.argument(RECIPIENT, StringArgumentType.string())
+                                .suggests(this::suggestRecipients)
+                                .then(Commands.argument(AMOUNT, StringArgumentType.word())
+                                        .then(Commands.argument(PRICE, StringArgumentType.word())
+                                                .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                                                        .executes(context -> withCiv(context, (civ, player) -> civ
+                                                                .civil().offerCustom(Players.caller(player),
+                                                                        StringArgumentType.getString(context, RECIPIENT),
+                                                                        StringArgumentType.getString(context, AMOUNT),
+                                                                        StringArgumentType.getString(context, PRICE),
+                                                                        StringArgumentType.getString(context, TEXT),
+                                                                        0))))))))
+                .then(Commands.literal("buendnis")
+                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                                .suggests(this::suggestPolityNames)
+                                .executes(context -> withCiv(context, (civ, player) -> civ.civil().offerAlliance(
+                                        Players.caller(player), name(context),
+                                        civ.queries().municipalityOf(Players.ref(player)))))));
+    }
+
+    private interface ContractAction {
+        Reply execute(CivServer civ, ServerPlayer player, int number);
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> contractAction(String literal, ContractAction action) {
+        return Commands.literal(literal)
+                .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                        .executes(context -> withCiv(context, (civ, player) -> action.execute(civ, player,
+                                IntegerArgumentType.getInteger(context, NUMBER)))));
+    }
+
+    /** Stellt den nächsten Dorfbewohner in Reichweite ein. */
+    private static Reply hireVillager(CivServer civ, ServerPlayer player, String wage) {
+        AABB range = player.getBoundingBox().inflate(VILLAGER_REACH);
+        return player.level().getEntitiesOfClass(Villager.class, range).stream()
+                .min(java.util.Comparator.comparingDouble(villager -> villager.distanceToSqr(player)))
+                .map(villager -> civ.civil().offerEmployment(Players.caller(player),
+                        new PersonRef(new PersonId(villager.getUUID())), wage, 0))
+                .orElseGet(() -> Reply.failure(Message.of(MessageKey.VILLAGER_NONE_NEAR)));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> mailCommands() {
+        return Commands.literal("post")
+                .executes(context -> withCiv(context, (civ, player) -> civ.community().showInbox(Players.caller(player))))
+                .then(Commands.literal("lesen")
+                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.community().readLetter(
+                                        Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))))
+                .then(Commands.literal("menue")
+                        .executes(context -> withCiv(context, (civ, player) -> {
+                            Screens.open(player, new MailScreen(civ, player));
+                            return null;
+                        })));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> letterCommands() {
+        return Commands.literal("brief")
+                .then(Commands.argument(PLAYER, StringArgumentType.word())
+                        .suggests(this::suggestFriends)
+                        .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.community().sendLetter(
+                                        Players.caller(player), StringArgumentType.getString(context, PLAYER),
+                                        StringArgumentType.getString(context, TEXT))))));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> friendCommands() {
+        return Commands.literal("freund")
+                .then(Commands.literal("entfernen")
+                        .then(Commands.argument(PLAYER, StringArgumentType.word())
+                                .suggests(this::suggestFriends)
+                                .executes(context -> withCiv(context, (civ, player) -> civ.community().unfriend(
+                                        Players.ref(player), StringArgumentType.getString(context, PLAYER))))))
+                .then(Commands.argument(PLAYER, StringArgumentType.word())
+                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                context.getSource().getOnlinePlayerNames(), builder))
+                        .executes(context -> withCiv(context, (civ, player) -> civ.community().befriend(
+                                Players.ref(player), Players.name(player),
+                                StringArgumentType.getString(context, PLAYER)))));
+    }
+
+    private CompletableFuture<Suggestions> suggestFriends(CommandContext<CommandSourceStack> context,
+                                                          SuggestionsBuilder builder) {
+        List<String> names = new java.util.ArrayList<>();
+        ServerPlayer player = context.getSource().getPlayer();
+        host.current().ifPresent(civ -> {
+            if (player != null) {
+                civ.community().friends(Players.ref(player)).stream()
+                        .filter(friend -> friend.state().equals("friend"))
+                        .forEach(friend -> names.add(friend.name()));
+            }
+        });
+        if (names.isEmpty()) {
+            names.addAll(context.getSource().getOnlinePlayerNames());
+        }
+        return SharedSuggestionProvider.suggest(names, builder);
+    }
+
+    private CompletableFuture<Suggestions> suggestStreets(CommandContext<CommandSourceStack> context,
+                                                          SuggestionsBuilder builder) {
+        List<String> names = new java.util.ArrayList<>();
+        ServerPlayer player = context.getSource().getPlayer();
+        host.current().ifPresent(civ -> {
+            if (player != null) {
+                civ.queries().municipalityOf(Players.ref(player))
+                        .ifPresent(town -> town.streets().forEach(street -> names.add(street.name())));
+            }
+        });
+        return SharedSuggestionProvider.suggest(names, builder);
+    }
+
+    private static final String COMPANY = "firma";
+    private static final String PAPER = "zeitung";
+    private static final String LIMIT = "limit";
+
+    private LiteralArgumentBuilder<CommandSourceStack> companyCommands() {
+        return Commands.literal("firma")
+                .executes(context -> withCiv(context, (civ, player) -> civ.companies().info(Players.caller(player),
+                        Optional.empty())))
+                .then(Commands.literal("liste")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.companies().list())))
+                .then(Commands.literal("info")
+                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                                .suggests(this::suggestCompanies)
+                                .executes(context -> withCiv(context, (civ, player) -> civ.companies().info(
+                                        Players.caller(player), Optional.of(name(context)))))))
+                .then(Commands.literal("gruenden")
+                        .then(Commands.argument(AMOUNT, StringArgumentType.word())
+                                .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.companies().found(
+                                                Players.caller(player), StringArgumentType.getString(context, AMOUNT),
+                                                name(context)))))))
+                .then(companyMemberCommand("aufnehmen", true))
+                .then(companyMemberCommand("entlassen", false))
+                .then(Commands.literal("einstellen")
+                        .then(Commands.argument(COMPANY, StringArgumentType.string())
+                                .suggests(this::suggestOwnCompanies)
+                                .then(Commands.literal("dorfbewohner")
+                                        .then(Commands.argument(PRICE, StringArgumentType.word())
+                                                .executes(context -> withCiv(context, (civ, player) -> nearestVillager(
+                                                        player).map(villager -> civ.companies().hire(
+                                                                Players.caller(player),
+                                                                StringArgumentType.getString(context, COMPANY), villager,
+                                                                StringArgumentType.getString(context, PRICE)))
+                                                        .orElseGet(() -> Reply.failure(Message.of(
+                                                                MessageKey.VILLAGER_NONE_NEAR)))))))
+                                .then(Commands.argument(PLAYER, StringArgumentType.word())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                context.getSource().getOnlinePlayerNames(), builder))
+                                        .then(Commands.argument(PRICE, StringArgumentType.word())
+                                                .executes(context -> withCiv(context, (civ, player) -> civ.companies()
+                                                        .hire(Players.caller(player),
+                                                                StringArgumentType.getString(context, COMPANY),
+                                                                StringArgumentType.getString(context, PLAYER),
+                                                                StringArgumentType.getString(context, PRICE))))))))
+                .then(Commands.literal("dividende")
+                        .then(Commands.argument(COMPANY, StringArgumentType.string())
+                                .suggests(this::suggestOwnCompanies)
+                                .then(Commands.argument(AMOUNT, StringArgumentType.word())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.companies()
+                                                .dividend(Players.caller(player),
+                                                        StringArgumentType.getString(context, COMPANY),
+                                                        StringArgumentType.getString(context, AMOUNT)))))))
+                .then(Commands.literal("ausgeben")
+                        .then(Commands.argument(COMPANY, StringArgumentType.string())
+                                .suggests(this::suggestOwnCompanies)
+                                .then(Commands.argument(COUNT, IntegerArgumentType.integer(1, 1_000_000))
+                                        .then(Commands.argument(PRICE, StringArgumentType.word())
+                                                .executes(context -> withCiv(context, (civ, player) -> civ.companies()
+                                                        .issue(Players.caller(player),
+                                                                StringArgumentType.getString(context, COMPANY),
+                                                                IntegerArgumentType.getInteger(context, COUNT),
+                                                                StringArgumentType.getString(context, PRICE))))))))
+                .then(Commands.literal("aufloesen")
+                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                                .suggests(this::suggestOwnCompanies)
+                                .executes(context -> withCiv(context, (civ, player) -> civ.companies().dissolve(
+                                        Players.caller(player), name(context))))));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> companyMemberCommand(String literal, boolean admit) {
+        return Commands.literal(literal)
+                .then(Commands.argument(COMPANY, StringArgumentType.string())
+                        .suggests(this::suggestOwnCompanies)
+                        .then(Commands.argument(PLAYER, StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                        context.getSource().getOnlinePlayerNames(), builder))
+                                .executes(context -> withCiv(context, (civ, player) -> admit
+                                        ? civ.companies().admit(Players.caller(player),
+                                        StringArgumentType.getString(context, COMPANY),
+                                        StringArgumentType.getString(context, PLAYER))
+                                        : civ.companies().dismiss(Players.caller(player),
+                                        StringArgumentType.getString(context, COMPANY),
+                                        StringArgumentType.getString(context, PLAYER))))));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> exchangeCommands() {
+        return Commands.literal("boerse")
+                .executes(context -> withCiv(context, (civ, player) -> civ.companies().list()))
+                .then(Commands.literal("liste")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.companies().list())))
+                .then(Commands.literal("menue")
+                        .executes(context -> withCiv(context, (civ, player) -> {
+                            Screens.open(player, new ExchangeScreen(civ, player, Optional.empty()));
+                            return null;
+                        })))
+                .then(tradeCommand("kaufen", Side.BUY))
+                .then(tradeCommand("verkaufen", Side.SELL))
+                .then(Commands.literal("depot")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.companies().depot(
+                                Players.caller(player)))))
+                .then(Commands.literal("buch")
+                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                                .suggests(this::suggestCompanies)
+                                .executes(context -> withCiv(context, (civ, player) -> civ.companies().book(
+                                        name(context))))))
+                .then(Commands.literal("streichen")
+                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.companies().cancel(
+                                        Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> tradeCommand(String literal, Side side) {
+        return Commands.literal(literal)
+                .then(Commands.argument(COMPANY, StringArgumentType.string())
+                        .suggests(this::suggestCompanies)
+                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(1, 1_000_000))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.companies().trade(
+                                        Players.caller(player), side, StringArgumentType.getString(context, COMPANY),
+                                        IntegerArgumentType.getInteger(context, COUNT), Optional.empty())))
+                                .then(Commands.argument(LIMIT, StringArgumentType.word())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.companies().trade(
+                                                Players.caller(player), side,
+                                                StringArgumentType.getString(context, COMPANY),
+                                                IntegerArgumentType.getInteger(context, COUNT),
+                                                Optional.of(StringArgumentType.getString(context, LIMIT))))))));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> pressCommands() {
+        return Commands.literal("zeitung")
+                .executes(context -> withCiv(context, (civ, player) -> civ.press().list()))
+                .then(Commands.literal("liste")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.press().list())))
+                .then(Commands.literal("menue")
+                        .executes(context -> withCiv(context, (civ, player) -> {
+                            Screens.open(player, new PressScreen(civ, player, Optional.empty()));
+                            return null;
+                        })))
+                .then(Commands.literal("gruenden")
+                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.press().found(
+                                        Players.caller(player), name(context))))))
+                .then(Commands.literal("redakteur")
+                        .then(Commands.argument(PAPER, StringArgumentType.string())
+                                .suggests(this::suggestOwnPapers)
+                                .then(Commands.literal("dorfbewohner")
+                                        .executes(context -> withCiv(context, (civ, player) -> nearestVillager(player)
+                                                .map(villager -> civ.press().addEditor(Players.caller(player),
+                                                        StringArgumentType.getString(context, PAPER), villager))
+                                                .orElseGet(() -> Reply.failure(Message.of(
+                                                        MessageKey.VILLAGER_NONE_NEAR))))))
+                                .then(Commands.argument(PLAYER, StringArgumentType.word())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                context.getSource().getOnlinePlayerNames(), builder))
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.press().addEditor(
+                                                Players.caller(player), StringArgumentType.getString(context, PAPER),
+                                                StringArgumentType.getString(context, PLAYER)))))))
+                .then(Commands.literal("entlassen")
+                        .then(Commands.argument(PAPER, StringArgumentType.string())
+                                .suggests(this::suggestOwnPapers)
+                                .then(Commands.argument(PLAYER, StringArgumentType.word())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.press().removeEditor(
+                                                Players.caller(player), StringArgumentType.getString(context, PAPER),
+                                                StringArgumentType.getString(context, PLAYER)))))))
+                .then(Commands.literal("schreiben")
+                        .then(Commands.argument(PAPER, StringArgumentType.string())
+                                .suggests(this::suggestMyPapers)
+                                .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.press().write(
+                                                Players.caller(player), StringArgumentType.getString(context, PAPER),
+                                                StringArgumentType.getString(context, TEXT)))))))
+                .then(Commands.literal("veroeffentlichen")
+                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                                .suggests(this::suggestMyPapers)
+                                .executes(context -> withCiv(context, (civ, player) -> publishBook(civ, player,
+                                        name(context))))))
+                .then(Commands.literal("lesen")
+                        .executes(context -> withCiv(context, (civ, player) -> giveEdition(civ, player,
+                                Optional.empty())))
+                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                                .suggests(this::suggestPapers)
+                                .executes(context -> withCiv(context, (civ, player) -> giveEdition(civ, player,
+                                        Optional.of(name(context)))))))
+                .then(Commands.literal("artikel")
+                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.press().show(
+                                        IntegerArgumentType.getInteger(context, NUMBER))))))
+                .then(Commands.literal("aufloesen")
+                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                                .suggests(this::suggestOwnPapers)
+                                .executes(context -> withCiv(context, (civ, player) -> civ.press().dissolve(
+                                        Players.caller(player), name(context))))));
+    }
+
+    /** Veröffentlicht das Buch mit Feder in der Hand; die erste Zeile ist der Titel. */
+    private static Reply publishBook(CivServer civ, ServerPlayer player, String paper) {
+        Optional<LawBooks.Draft> draft = LawBooks.draftOf(player.getMainHandItem());
+        if (draft.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.ARTICLE_FROM_BOOK));
+        }
+        String title = draft.get().title();
+        String body = draft.get().text().equals(title) ? "" : draft.get().text();
+        if (body.startsWith(title)) {
+            body = body.substring(title.length()).strip();
+        }
+        Reply reply = civ.press().publish(Players.ref(player), paper, title, body);
+        if (reply.success()) {
+            player.getMainHandItem().shrink(1);
+        }
+        return reply;
+    }
+
+    private static Reply giveEdition(CivServer civ, ServerPlayer player, Optional<String> paper) {
+        return civ.press().edition(paper).map(edition -> {
+            player.getInventory().placeItemBackInInventory(Newspapers.edition(edition), Prediction.SERVER_ONLY);
+            return Reply.success(Message.of(MessageKey.EDITION_GIVEN));
+        }).orElseGet(() -> Reply.failure(Message.of(MessageKey.EDITION_NONE)));
+    }
+
+    /** Der nächste Dorfbewohner in Reichweite. */
+    private static Optional<ActorRef> nearestVillager(ServerPlayer player) {
+        AABB range = player.getBoundingBox().inflate(VILLAGER_REACH);
+        return player.level().getEntitiesOfClass(Villager.class, range).stream()
+                .min(java.util.Comparator.comparingDouble(villager -> villager.distanceToSqr(player)))
+                .map(villager -> new PersonRef(new PersonId(villager.getUUID())));
+    }
+
+    private CompletableFuture<Suggestions> suggestCompanies(CommandContext<CommandSourceStack> context,
+                                                            SuggestionsBuilder builder) {
+        List<String> names = new java.util.ArrayList<>();
+        host.current().ifPresent(civ -> civ.queries().companies().forEach(c -> names.add(quoted(c.name().value()))));
+        return SharedSuggestionProvider.suggest(names, builder);
+    }
+
+    private CompletableFuture<Suggestions> suggestOwnCompanies(CommandContext<CommandSourceStack> context,
+                                                               SuggestionsBuilder builder) {
+        List<String> names = new java.util.ArrayList<>();
+        ServerPlayer player = context.getSource().getPlayer();
+        host.current().ifPresent(civ -> {
+            if (player != null) {
+                civ.companies().led(Players.ref(player)).forEach(c -> names.add(quoted(c.name().value())));
+            }
+        });
+        return SharedSuggestionProvider.suggest(names, builder);
+    }
+
+    private CompletableFuture<Suggestions> suggestPapers(CommandContext<CommandSourceStack> context,
+                                                         SuggestionsBuilder builder) {
+        List<String> names = new java.util.ArrayList<>();
+        host.current().ifPresent(civ -> civ.queries().newspapers().forEach(p -> names.add(quoted(p.name().value()))));
+        return SharedSuggestionProvider.suggest(names, builder);
+    }
+
+    private CompletableFuture<Suggestions> suggestOwnPapers(CommandContext<CommandSourceStack> context,
+                                                            SuggestionsBuilder builder) {
+        List<String> names = new java.util.ArrayList<>();
+        ServerPlayer player = context.getSource().getPlayer();
+        host.current().ifPresent(civ -> {
+            if (player != null) {
+                civ.press().led(Players.ref(player)).forEach(p -> names.add(quoted(p.name().value())));
+            }
+        });
+        return SharedSuggestionProvider.suggest(names, builder);
+    }
+
+    private CompletableFuture<Suggestions> suggestMyPapers(CommandContext<CommandSourceStack> context,
+                                                           SuggestionsBuilder builder) {
+        List<String> names = new java.util.ArrayList<>();
+        ServerPlayer player = context.getSource().getPlayer();
+        host.current().ifPresent(civ -> {
+            if (player != null) {
+                civ.press().papersOf(Players.ref(player)).forEach(p -> names.add(quoted(p.name().value())));
+            }
+        });
+        return SharedSuggestionProvider.suggest(names, builder);
+    }
+
+    /** Namen mit Leerzeichen für {@link StringArgumentType#string()} in Anführungszeichen. */
+    private static String quoted(String name) {
+        return name.contains(" ") ? "\"" + name + "\"" : name;
     }
 
     private static String name(CommandContext<CommandSourceStack> context) {

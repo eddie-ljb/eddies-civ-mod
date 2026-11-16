@@ -25,6 +25,7 @@ import java.util.function.Function;
  *       spürbare Steuerlast jeden zu niedrigen Steuern, solange er nicht großzügig ist.</li>
  *   <li><b>Amtsinhaber:</b> Zufriedene halten zum Inhaber (bei Heimatverbundenen stärker), Unzufriedene wollen Wechsel;
  *       bis ±0,9.</li>
+ *   <li><b>Wahlkampf:</b> Reden, Plakate und die Bilanz der Versprechen ({@link CampaignInfluence}).</li>
  *   <li><b>Zufall:</b> eine feste kleine Vorliebe je Paar aus Dorfbewohner und Kandidat (±0,15), damit nicht alle
  *       gleich wählen.</li>
  * </ul>
@@ -38,17 +39,25 @@ public final class PersonalityVoter implements VillagerVoter {
 
     private final Function<PolityView, LawView> lawsOf;
     private final Function<ActorRef, Optional<PolityView>> partyOf;
+    private final CampaignInfluence campaign;
 
     /** Ohne Bundesrecht und Parteien, z. B. für Tests. */
     public PersonalityVoter() {
         this(PolityView::laws, actor -> Optional.empty());
     }
 
+    /** Ohne Wahlkampf. */
+    public PersonalityVoter(Function<PolityView, LawView> lawsOf, Function<ActorRef, Optional<PolityView>> partyOf) {
+        this(lawsOf, partyOf, CampaignInfluence.NONE);
+    }
+
     /**
      * @param lawsOf  das tatsächlich geltende Recht einer Polity
      * @param partyOf die Partei eines Akteurs
      */
-    public PersonalityVoter(Function<PolityView, LawView> lawsOf, Function<ActorRef, Optional<PolityView>> partyOf) {
+    public PersonalityVoter(Function<PolityView, LawView> lawsOf, Function<ActorRef, Optional<PolityView>> partyOf,
+                            CampaignInfluence campaign) {
+        this.campaign = Objects.requireNonNull(campaign, "campaign");
         this.lawsOf = Objects.requireNonNull(lawsOf, "lawsOf");
         this.partyOf = Objects.requireNonNull(partyOf, "partyOf");
     }
@@ -61,13 +70,16 @@ public final class PersonalityVoter implements VillagerVoter {
         Optional<ActorRef> incumbent = election.office() == Office.MAYOR
                 ? polity.mayor()
                 : polity.officeTerm(election.office()).map(term -> term.holder());
+        boolean parliament = election.office() == Office.PARLIAMENT;
         ActorRef best = null;
         double bestUtility = Double.NEGATIVE_INFINITY;
         for (ActorRef candidate : election.candidates()) {
             Optional<PolityView> party = partyOf.apply(candidate);
             double utility = utility(personality, satisfaction, election.platformOf(candidate),
-                    incumbent.filter(candidate::equals).isPresent(), villager, candidate)
-                    + partyAffinity(personality, ownParty, party);
+                    parliament ? polity.parliament().holdsSeat(candidate) : incumbent.filter(candidate::equals).isPresent(),
+                    villager, candidate)
+                    + partyAffinity(personality, ownParty, party)
+                    + campaign.bonus(villager, candidate, election, polity);
             if (utility > bestUtility) {
                 bestUtility = utility;
                 best = candidate;

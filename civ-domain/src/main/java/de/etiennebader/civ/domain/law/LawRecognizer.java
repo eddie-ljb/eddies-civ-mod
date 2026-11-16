@@ -107,6 +107,13 @@ public final class LawRecognizer {
             "\\btier|vieh|\\bkuh|kuehe|schaf|schwein|huhn|huehner|pferd|animal|cattle|livestock");
     private static final Pattern PROTECTED = Pattern.compile("geschuetzt|schutz|protected");
     private static final Pattern LEVY = Pattern.compile("umlage|abgabe an den bund|levy|federal contribution");
+    private static final Pattern PARLIAMENT = Pattern.compile(
+            "parlament|landtag|bundestag|gemeinderat|stadtrat|volksvertretung|abgeordnet|parliament|council|assembly");
+    private static final Pattern SEATS = Pattern.compile("\\bsitz|mandat|abgeordnet|mitglieder|\\bseat|member");
+    private static final Pattern SESSION = Pattern.compile("\\btagt|sitzung|\\bsession|\\bmeets?\\b|convene");
+    private static final Pattern BALLOT_BOX = Pattern.compile("\\burne|wahlurne|wahllokal|ballot box|polling station");
+    private static final Pattern POSTAL = Pattern.compile("briefwahl|per brief|postal vot|by mail|mail.in");
+    private static final Pattern SALARY = Pattern.compile("gehalt|diaet|besoldung|salary|stipend");
     private static final Pattern PREVAILS = Pattern.compile("bricht|geht vor|vorrang|prevail|takes precedence|overrides");
 
     private LawRecognizer() {
@@ -165,6 +172,37 @@ public final class LawRecognizer {
                 return value(StandardParameters.TERM_DAYS, 0L);
             }
             return days(clause).flatMap(days -> value(StandardParameters.TERM_DAYS, days));
+        }
+        if (PARLIAMENT.matcher(clause).find() && SESSION.matcher(clause).find() && DAYS.matcher(clause).find()) {
+            if (clause.contains("taeglich") || clause.contains("jeden tag") || clause.contains("every day")
+                    || clause.contains("daily")) {
+                return value(StandardParameters.SESSION_DAYS, 1L);
+            }
+            return days(clause).flatMap(days -> value(StandardParameters.SESSION_DAYS, days));
+        }
+        if (POSTAL.matcher(clause).find()) {
+            return value(StandardParameters.POSTAL_VOTE_ALLOWED, allowed);
+        }
+        if (SALARY.matcher(clause).find()) {
+            if (!allowed && number(clause).isEmpty()) {
+                return value(StandardParameters.OFFICE_SALARY, 0L);
+            }
+            boolean emeralds = EMERALD.matcher(clause).find();
+            return number(clause).flatMap(amount -> value(StandardParameters.OFFICE_SALARY,
+                    Math.round(emeralds ? amount * 100 : amount)));
+        }
+        if (BALLOT_BOX.matcher(clause).find() && (ELECTION.matcher(clause).find() || VOTING.matcher(clause).find()
+                || clause.contains("gewaehlt") || clause.contains("stimm"))) {
+            boolean optional = clause.contains("ohne urne") || clause.contains("nicht noetig")
+                    || clause.contains("nicht erforderlich") || clause.contains("not required")
+                    || clause.contains("without");
+            return value(StandardParameters.BALLOT_BOX_REQUIRED, !optional);
+        }
+        if (PARLIAMENT.matcher(clause).find() && (SEATS.matcher(clause).find() || !allowed)) {
+            if (!allowed && number(clause).isEmpty()) {
+                return value(StandardParameters.PARLIAMENT_SEATS, 0L);
+            }
+            return number(clause).flatMap(seats -> value(StandardParameters.PARLIAMENT_SEATS, Math.round(seats)));
         }
         if (ELECTION.matcher(clause).find() && DAYS.matcher(clause).find() && !VILLAGERS.matcher(clause).find()) {
             return days(clause).flatMap(days -> value(StandardParameters.ELECTION_DAYS, days));

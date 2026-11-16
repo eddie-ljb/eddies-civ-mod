@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "PPP",
+    "BGB",
+    "WWW"
+  ],
+  "key": {
+    "P": "minecraft:paper",
+    "B": "minecraft:book",
+    "G": "minecraft:glass_pane",
+    "W": "#minecraft:planks"
+  },
+  "result": {
+    "id": "eddies-civ-mod:newsstand",
+    "count": 1
+  }
+}

@@ -10,7 +10,11 @@ import de.etiennebader.civ.application.population.Emigration;
 import de.etiennebader.civ.application.population.Satisfaction;
 import de.etiennebader.civ.application.population.TownMood;
 import de.etiennebader.civ.application.query.WorldQueries;
+import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
+import de.etiennebader.civ.domain.contract.Contract;
+import de.etiennebader.civ.domain.contract.ContractKind;
+import de.etiennebader.civ.domain.polity.Membership;
 import de.etiennebader.civ.domain.polity.MembershipType;
 import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.polity.PolityView;
@@ -39,6 +43,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.ToIntFunction;
 
 /**
  * Dorfbewohner werden Einwohner der Gemeinde, in deren Gebiet sie sich aufhalten.
@@ -60,6 +65,13 @@ public final class VillagerService {
     private final Announcements announcements;
     /** Wer abgewandert ist, aber im Spiel noch steht; das Spiel bringt ihn weg ({@link #takeDeparture}). */
     private final Map<PersonRef, PendingDeparture> departures = new HashMap<>();
+    private final Map<PersonRef, BlockPosition> lastSeen = new HashMap<>();
+    /**
+     * Dorfbewohner sparen zusätzlich ein Zehntel ihres Anteils am Gemeindeeinkommen, bis 50 Smaragde; davon kaufen
+     * sparsame Aktien.
+     */
+    private static final int SAVINGS_DIVISOR = 10;
+    private static final long SAVINGS_CAP = 5_000;
 
     /**
      * Ein abgewanderter Dorfbewohner, den das Spiel noch fortbringen muss.
@@ -92,6 +104,7 @@ public final class VillagerService {
         if (departures.containsKey(villager)) {
             return false;
         }
+        lastSeen.put(villager, position);
         Optional<PolityId> here = queries.territory().sovereignOf(position.chunk())
                 .filter(id -> queries.polity(id).map(polity -> polity.kind() == PolityKind.TERRITORIAL).orElse(false));
         if (here.isEmpty()) {
@@ -113,6 +126,7 @@ public final class VillagerService {
     /** Ein Dorfbewohner ist gestorben oder verschwunden. */
     public void gone(PersonRef villager, Day day) {
         departures.remove(villager);
+        lastSeen.remove(villager);
         queries.municipalityOf(villager).ifPresent(town -> {
             try {
                 app.leavePolity().execute(new LeavePolity.Command(town.id(), villager, day));
@@ -132,19 +146,20 @@ public final class VillagerService {
      * bis 50 % mehr, unzufriedene bis 50 % weniger ({@link TownMood#productivity()}).
      */
     public Money dailyIncome(PolityView town) {
-        long units = settings.villagerIncome().amount() * TownMood.of(town, queries.effectiveLaws(town)).productivity() / 100;
+        long units = settings.villagerIncome().amount() * TownMood.of(town, queries.effectiveLaws(town), media(town)).productivity() / 100;
         return Money.of(units, town.currency());
     }
 
     /** Die Stimmung der Dorfbewohner einer Gemeinde. */
     public TownMood moodOf(PolityView town) {
-        return TownMood.of(town, queries.effectiveLaws(town));
+        return TownMood.of(town, queries.effectiveLaws(town), media(town));
     }
 
     /** Zufriedenheit eines Dorfbewohners mit seiner Gemeinde; leer, wenn er zu keiner gehört. */
     public Optional<Satisfaction> satisfactionOf(PersonRef villager) {
         return queries.municipalityOf(villager)
-                .map(town -> Satisfaction.of(Personality.of(villager), town, queries.effectiveLaws(town)));
+                .map(town -> Satisfaction.of(Personality.of(villager), town, queries.effectiveLaws(town))
+                        .withMedia(app.pressInfluence().satisfactionPoints(villager, town)));
     }
 
     /** Auskunft über einen Dorfbewohner, z. B. beim Anschauen mit Schleichen und Rechtsklick. */
@@ -156,8 +171,9 @@ public final class VillagerService {
             return Reply.success(Message.of(MessageKey.VILLAGER_HOMELESS, trait, personality.order(),
                     personality.thrift(), personality.belonging()));
         }
-        Satisfaction satisfaction = Satisfaction.of(personality, town.get(), queries.effectiveLaws(town.get()));
-        return Reply.success(
+        Satisfaction satisfaction = Satisfaction.of(personality, town.get(), queries.effectiveLaws(town.get()))
+                .withMedia(app.pressInfluence().satisfactionPoints(villager, town.get()));
+        List<Message> lines = new ArrayList<>(List.of(
                 Message.of(MessageKey.VILLAGER_INFO, town.get().name().value(), trait, personality.order(),
                         personality.thrift(), personality.belonging()),
                 Message.of(MessageKey.VILLAGER_MOOD, moodWord(satisfaction.score()), satisfaction.score(),
@@ -165,7 +181,15 @@ public final class VillagerService {
                         signed(satisfaction.points(Satisfaction.Factor.TAXES)),
                         signed(satisfaction.points(Satisfaction.Factor.VOICE)),
                         signed(satisfaction.points(Satisfaction.Factor.PROSPERITY)),
-                        satisfaction.productivityPercent()));
+                        satisfaction.productivityPercent())));
+        lastSeen(villager).flatMap(position -> app.addresses().at(position))
+                .ifPresent(address -> lines.add(Message.of(MessageKey.VILLAGER_ADDRESS, address.line())));
+        queries.contracts().active().stream()
+                .filter(contract -> contract.kind() == ContractKind.EMPLOYMENT && contract.counterparty().equals(villager))
+                .findFirst()
+                .ifPresent(contract -> lines.add(Message.of(MessageKey.VILLAGER_EMPLOYED,
+                        texts.actor(contract.offeror()), contract.number())));
+        return Reply.success(lines);
     }
 
     /** {@code /civ stimmung}: Stimmung der Dorfbewohner der eigenen Gemeinde. */
@@ -174,7 +198,7 @@ public final class VillagerService {
         if (town.isEmpty()) {
             return Reply.failure(Message.of(MessageKey.NOT_IN_MUNICIPALITY));
         }
-        TownMood mood = TownMood.of(town.get(), queries.effectiveLaws(town.get()));
+        TownMood mood = TownMood.of(town.get(), queries.effectiveLaws(town.get()), media(town.get()));
         if (mood.villagers() == 0) {
             return Reply.success(Message.of(MessageKey.MOOD_NONE, town.get().name().value()));
         }
@@ -186,7 +210,8 @@ public final class VillagerService {
                         signed(mood.averageFactors().get(Satisfaction.Factor.ORDER)),
                         signed(mood.averageFactors().get(Satisfaction.Factor.TAXES)),
                         signed(mood.averageFactors().get(Satisfaction.Factor.VOICE)),
-                        signed(mood.averageFactors().get(Satisfaction.Factor.PROSPERITY))),
+                        signed(mood.averageFactors().get(Satisfaction.Factor.PROSPERITY)),
+                        signed(mood.averageFactors().getOrDefault(Satisfaction.Factor.MEDIA, 0))),
                 Message.of(MessageKey.MOOD_TRAITS, Arrays.stream(Trait.values())
                         .map(trait -> (Object) mood.traits().getOrDefault(trait, 0)).toArray()),
                 Message.of(MessageKey.MOOD_INCOME, mood.productivity() / Math.max(1, mood.villagers()),
@@ -221,7 +246,7 @@ public final class VillagerService {
             }
             Money income = dailyIncome(town);
             if (income.isPositive() && income.currency().equals(settings.villagerIncome().currency())) {
-                app.creditTownIncome().execute(new CreditTownIncome.Command(town.id(), income, day));
+                creditIncome(town, income, day);
             }
             SettlementTier before = town.tier();
             SettlementTier tier = settings.tiers().tierFor(town.memberCount());
@@ -236,6 +261,51 @@ public final class VillagerService {
             emigrate(day);
         }
         return changes;
+    }
+
+    /**
+     * Teilt die Einnahmen auf: Angestellte Dorfbewohner erarbeiten ihren Anteil für den Arbeitgeber, der Rest geht an
+     * die Gemeinde.
+     */
+    private void creditIncome(PolityView town, Money income, Day day) {
+        int villagers = villagersOf(town);
+        Map<ActorRef, Long> employers = new HashMap<>();
+        if (villagers > 0) {
+            long share = income.amount() / villagers;
+            for (Contract contract : queries.contracts().active()) {
+                if (contract.kind() == ContractKind.EMPLOYMENT && contract.counterparty() instanceof PersonRef worker
+                        && town.isMember(worker)) {
+                    employers.merge(contract.offeror(), share, Long::sum);
+                }
+            }
+        }
+        long toEmployers = employers.values().stream().mapToLong(Long::longValue).sum();
+        employers.forEach((employer, amount) -> app.creditTownIncome().creditEmployer(employer,
+                Money.of(amount, income.currency()), day));
+        long rest = income.amount() - toEmployers;
+        if (rest > 0) {
+            app.creditTownIncome().execute(new CreditTownIncome.Command(town.id(), Money.of(rest, income.currency()),
+                    day));
+        }
+        if (villagers > 0) {
+            long savings = income.amount() / villagers / SAVINGS_DIVISOR;
+            for (Membership member : town.members()) {
+                if (savings > 0 && member.member() instanceof PersonRef villager
+                        && queries.ledger().balanceOf(villager, income.currency()).amount() < SAVINGS_CAP) {
+                    app.creditTownIncome().creditEmployer(villager, Money.of(savings, income.currency()), day);
+                }
+            }
+        }
+    }
+
+    /** Zufriedenheitspunkte aus der Presse für die Dorfbewohner einer Gemeinde. */
+    private ToIntFunction<PersonRef> media(PolityView town) {
+        return villager -> app.pressInfluence().satisfactionPoints(villager, town);
+    }
+
+    /** Wo ein Dorfbewohner zuletzt gesehen wurde; daraus ergibt sich seine Anschrift. */
+    public Optional<BlockPosition> lastSeen(PersonRef villager) {
+        return Optional.ofNullable(lastSeen.get(villager));
     }
 
     /** Ob noch Abgewanderte im Spiel stehen. */

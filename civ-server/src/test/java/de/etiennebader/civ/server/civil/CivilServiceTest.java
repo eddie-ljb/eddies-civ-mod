@@ -1,0 +1,115 @@
+package de.etiennebader.civ.server.civil;
+
+import de.etiennebader.civ.domain.actor.PlayerRef;
+import de.etiennebader.civ.domain.shared.Day;
+import de.etiennebader.civ.domain.shared.PlayerId;
+import de.etiennebader.civ.domain.shared.SeededIdGenerator;
+import de.etiennebader.civ.domain.territory.BlockPosition;
+import de.etiennebader.civ.domain.territory.DimensionId;
+import de.etiennebader.civ.server.Announcement;
+import de.etiennebader.civ.server.CivServerFixture;
+import de.etiennebader.civ.server.command.Caller;
+import de.etiennebader.civ.server.command.MessageKey;
+import de.etiennebader.civ.server.command.Reply;
+import de.etiennebader.civ.server.community.ChatView;
+import de.etiennebader.civ.server.community.FriendView;
+import de.etiennebader.civ.server.plot.PlotService;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class CivilServiceTest {
+
+    private final SeededIdGenerator ids = new SeededIdGenerator(73);
+    private final CivServerFixture server = CivServerFixture.start(ids);
+    private final PlayerRef alice = new PlayerRef(PlayerId.generate(ids));
+    private final PlayerRef bob = new PlayerRef(PlayerId.generate(ids));
+
+    private static Caller at(PlayerRef player, String name, int x, int z) {
+        return new Caller(player, name, new BlockPosition(DimensionId.OVERWORLD, x, 64, z));
+    }
+
+    private void setUpTown() {
+        server.playerJoined(alice, "Alice");
+        server.playerJoined(bob, "Bob");
+        assertTrue(server.commands().found(at(alice, "Alice", 8, 8), "Nordhain").success());
+        assertTrue(server.commands().join(at(bob, "Bob", 8, 8), "Nordhain").success());
+    }
+
+    private static boolean has(Reply reply, MessageKey key) {
+        return reply.lines().stream().anyMatch(line -> line.key().equals(key.key()));
+    }
+
+    @Test
+    @DisplayName("Straße anlegen, Grundstück vermieten, unterschreiben: der Mieter hat eine Anschrift")
+    void streetLeaseAddress() {
+        setUpTown();
+        Caller mayor = at(alice, "Alice", 1, 1);
+        assertTrue(has(server.civil().layStreet(mayor, "Hauptstraße"), MessageKey.STREET_NEEDS_SELECTION));
+        server.plots().selectCorner(at(alice, "Alice", 0, 8), 1);
+        server.plots().selectCorner(at(alice, "Alice", 15, 9), 2);
+        assertTrue(server.civil().layStreet(mayor, "Hauptstraße").success());
+        server.plots().selectCorner(at(alice, "Alice", 0, 0), 1);
+        server.plots().selectCorner(at(alice, "Alice", 3, 3), 2);
+        assertTrue(server.plots().createFromSelection(mayor, PlotService.typeNames().getFirst()).success());
+        server.takeAnnouncements();
+
+        Reply offered = server.civil().offerLease(mayor, "Bob", "1", Optional.of("2"), 0);
+        assertTrue(offered.success(), offered.toString());
+        List<Announcement> notices = server.takeAnnouncements();
+        assertTrue(notices.stream().anyMatch(a -> a.recipient().equals(Optional.of(bob))
+                && a.message().key().equals(MessageKey.CONTRACT_OFFERED_TO_YOU.key())), notices.toString());
+
+        Caller tenant = at(bob, "Bob", 8, 8);
+        assertFalse(server.civil().sign(tenant, 1).success(), "ohne Geld keine Kaution");
+        server.bank().deposit(tenant, 10);
+        assertTrue(server.civil().sign(tenant, 1).success());
+        ContractView view = server.civil().contractsOf(bob).getFirst();
+        assertTrue(view.pays() && view.canNotice() && view.address().orElseThrow().contains("Hauptstraße"));
+        assertTrue(has(server.civil().address(tenant, Optional.empty()), MessageKey.ADDRESS_OF));
+        assertTrue(has(server.civil().listStreets(mayor), MessageKey.STREET_ENTRY));
+        assertTrue(server.civil().giveNotice(tenant, 1).success());
+        server.civil().endOfDay(Day.of(10));
+        assertTrue(server.takeAnnouncements().stream()
+                .anyMatch(a -> a.message().key().equals(MessageKey.CONTRACT_ENDED.key())));
+        assertFalse(server.civil().show(tenant, 99).success());
+    }
+
+    @Test
+    @DisplayName("Briefe, Freunde, Direktnachrichten und Chat zwischen Spiel und Webseite")
+    void community() {
+        setUpTown();
+        Caller sender = at(alice, "Alice", 8, 8);
+        assertTrue(server.community().sendLetter(sender, "Bob", "Einladung | Komm heute zum Rathaus.").success());
+        assertFalse(server.community().sendLetter(sender, "Niemand", "x | y").success());
+        assertTrue(server.community().inbox(bob).isEmpty(), "kommt erst morgen an");
+        server.community().endOfDay(Day.of(2));
+
+        assertFalse(server.community().direct(alice, "Alice", "Bob", "Hi").success(), "nur an Freunde");
+        assertTrue(has(server.community().befriend(alice, "Alice", "Bob"), MessageKey.FRIEND_REQUEST_SENT));
+        assertEquals("incoming", server.community().friends(bob).getFirst().state());
+        assertTrue(has(server.community().befriend(bob, "Bob", "Alice"), MessageKey.FRIEND_ACCEPTED));
+        FriendView friend = server.community().friends(alice).getFirst();
+        assertEquals("friend", friend.state());
+        assertTrue(friend.online());
+
+        server.takeAnnouncements();
+        assertTrue(server.community().direct(alice, "Alice", "Bob", "Hi Bob").success());
+        server.community().gameChat(bob, "Hallo zusammen");
+        ChatView web = server.community().webPost(alice, Optional.empty(), "Gruß von der Webseite");
+        assertTrue(web.mine());
+        assertTrue(server.takeAnnouncements().stream().anyMatch(a -> a.message().key().equals(MessageKey.WEB_CHAT.key())));
+        assertEquals(3, server.community().chat(bob, 0).size());
+        assertEquals(1, server.community().chat(bob, web.seq() - 1).size());
+
+        server.community().left(bob);
+        assertFalse(server.community().friends(alice).getFirst().online());
+        assertTrue(server.community().unfriend(alice, "Bob").success());
+    }
+}

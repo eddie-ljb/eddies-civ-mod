@@ -14,7 +14,8 @@ import java.util.Objects;
 
 /**
  * Ein Bürger stellt einen Antrag: eine Regelung ändern, einen Paragraphen erlassen oder aufheben. Er stimmt selbst
- * dafür; reicht das schon für die Mehrheit, gilt der Antrag sofort als angenommen.
+ * dafür, wenn er stimmberechtigt ist (mit Parlament nur Abgeordnete); reicht das schon für die Mehrheit, gilt der
+ * Antrag sofort als angenommen.
  */
 public final class ProposeMotion {
 
@@ -48,7 +49,9 @@ public final class ProposeMotion {
         AmendLaw.requireCitizen(polity, command.citizen());
         ProposalId id = ProposalId.generate(ids);
         polity.openProposal(id, command.motion(), command.citizen(), command.day());
-        polity.vote(id, command.citizen(), true, command.day());
+        if (Ballots.mayVote(polity, command.citizen())) {
+            polity.vote(id, command.citizen(), true, command.day());
+        }
         Proposal proposal = polity.proposals().stream().filter(open -> open.id().equals(id)).findFirst().orElseThrow();
         VoteOutcome outcome = Ballots.settle(polity, proposal, Ballots.evaluate(polity, proposal), ids, command.day());
         aggregates.commit(polity);

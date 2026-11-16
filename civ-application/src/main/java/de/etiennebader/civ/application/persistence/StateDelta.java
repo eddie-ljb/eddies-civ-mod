@@ -3,13 +3,26 @@ package de.etiennebader.civ.application.persistence;
 import de.etiennebader.civ.application.day.CalendarState;
 import de.etiennebader.civ.application.directory.KnownPlayer;
 import de.etiennebader.civ.application.query.WorldQueries;
+import de.etiennebader.civ.domain.actor.PlayerRef;
+import de.etiennebader.civ.domain.community.ChatMessage;
+import de.etiennebader.civ.domain.community.CommunityView;
+import de.etiennebader.civ.domain.community.Letter;
+import de.etiennebader.civ.domain.contract.Contract;
 import de.etiennebader.civ.domain.economy.CurrencyTotals;
 import de.etiennebader.civ.domain.economy.LedgerView;
+import de.etiennebader.civ.domain.exchange.Dividend;
+import de.etiennebader.civ.domain.exchange.Holding;
+import de.etiennebader.civ.domain.exchange.Listing;
+import de.etiennebader.civ.domain.exchange.Order;
+import de.etiennebader.civ.domain.exchange.Quote;
+import de.etiennebader.civ.domain.exchange.StockExchangeView;
+import de.etiennebader.civ.domain.exchange.Trade;
 import de.etiennebader.civ.domain.land.Plot;
 import de.etiennebader.civ.domain.land.PlotSnapshot;
 import de.etiennebader.civ.domain.market.Commodity;
 import de.etiennebader.civ.domain.market.CommodityStock;
 import de.etiennebader.civ.domain.market.MarketView;
+import de.etiennebader.civ.domain.media.Article;
 import de.etiennebader.civ.domain.polity.PolitySnapshot;
 import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.DomainEvent;
@@ -38,7 +51,64 @@ import java.util.Optional;
  */
 public record StateDelta(List<PolityChange> polities, List<ClaimChange> claims, List<PlotChange> plots,
                          List<BalanceChange> balances, List<CurrencyTotals> currencies, List<CommodityStock> commodities,
-                         List<ShopChange> shops, List<DomainEvent> events, List<KnownPlayer> players, CalendarState calendar) {
+                         List<ShopChange> shops, List<DomainEvent> events, List<KnownPlayer> players, CalendarState calendar,
+                         Optional<List<Contract>> contracts, Optional<CommunitySnapshot> community,
+                         Optional<ExchangeSnapshot> exchange, Optional<List<Article>> press) {
+
+    /** Die ganze Börse. */
+    public record ExchangeSnapshot(List<Listing> listings, List<Holding> holdings, List<Order> orders,
+                                   List<Trade> trades, Map<PolityId, List<Quote>> quotes, List<Dividend> dividends) {
+
+        public ExchangeSnapshot {
+            listings = List.copyOf(listings);
+            holdings = List.copyOf(holdings);
+            orders = List.copyOf(orders);
+            trades = List.copyOf(trades);
+            quotes = Map.copyOf(quotes);
+            dividends = List.copyOf(dividends);
+        }
+
+        public static ExchangeSnapshot of(StockExchangeView exchange) {
+            return new ExchangeSnapshot(exchange.listings(), exchange.allHoldings(), exchange.orders(),
+                    exchange.trades(), exchange.allQuotes(), exchange.dividends());
+        }
+    }
+
+    /** Ohne Börse und Presse. */
+    public StateDelta(List<PolityChange> polities, List<ClaimChange> claims, List<PlotChange> plots,
+                      List<BalanceChange> balances, List<CurrencyTotals> currencies, List<CommodityStock> commodities,
+                      List<ShopChange> shops, List<DomainEvent> events, List<KnownPlayer> players,
+                      CalendarState calendar, Optional<List<Contract>> contracts,
+                      Optional<CommunitySnapshot> community) {
+        this(polities, claims, plots, balances, currencies, commodities, shops, events, players, calendar, contracts,
+                community, Optional.empty(), Optional.empty());
+    }
+
+    /** Alle Briefe, Freundschaften, Anfragen und Chatnachrichten. */
+    public record CommunitySnapshot(List<Letter> letters, List<List<PlayerRef>> friendships,
+                                    List<List<PlayerRef>> requests, List<ChatMessage> messages) {
+
+        public CommunitySnapshot {
+            letters = List.copyOf(letters);
+            friendships = List.copyOf(friendships);
+            requests = List.copyOf(requests);
+            messages = List.copyOf(messages);
+        }
+
+        public static CommunitySnapshot of(CommunityView community) {
+            return new CommunitySnapshot(community.letters(), community.friendships(), community.requests(),
+                    community.messages());
+        }
+    }
+
+    /** Ohne Verträge und Gemeinschaft. */
+    public StateDelta(List<PolityChange> polities, List<ClaimChange> claims, List<PlotChange> plots,
+                      List<BalanceChange> balances, List<CurrencyTotals> currencies, List<CommodityStock> commodities,
+                      List<ShopChange> shops, List<DomainEvent> events, List<KnownPlayer> players,
+                      CalendarState calendar) {
+        this(polities, claims, plots, balances, currencies, commodities, shops, events, players, calendar,
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+    }
 
     public StateDelta {
         polities = List.copyOf(Objects.requireNonNull(polities, "polities"));
@@ -51,6 +121,10 @@ public record StateDelta(List<PolityChange> polities, List<ClaimChange> claims, 
         events = List.copyOf(Objects.requireNonNull(events, "events"));
         players = List.copyOf(Objects.requireNonNull(players, "players"));
         Objects.requireNonNull(calendar, "calendar");
+        contracts = Objects.requireNonNull(contracts, "contracts").map(List::copyOf);
+        Objects.requireNonNull(community, "community");
+        Objects.requireNonNull(exchange, "exchange");
+        press = Objects.requireNonNull(press, "press").map(List::copyOf);
     }
 
     /** Aktueller Stand einer geänderten Polity; leer, wenn sie aufgelöst wurde. */
@@ -153,7 +227,15 @@ public record StateDelta(List<PolityChange> polities, List<ClaimChange> claims, 
             shops.add(new ShopChange(position, shopRegistry.shopAt(position)));
         }
 
+        Optional<List<Contract>> contracts = changes.contracts()
+                ? Optional.of(current.contracts().contracts()) : Optional.empty();
+        Optional<CommunitySnapshot> community = changes.community()
+                ? Optional.of(CommunitySnapshot.of(current.community())) : Optional.empty();
+        Optional<ExchangeSnapshot> exchange = changes.exchange()
+                ? Optional.of(ExchangeSnapshot.of(current.exchange())) : Optional.empty();
+        Optional<List<Article>> press = changes.press()
+                ? Optional.of(current.press().articles()) : Optional.empty();
         return new StateDelta(polities, claims, plots, balances, currencies, commodities, shops, changes.events(),
-                players, calendar);
+                players, calendar, contracts, community, exchange, press);
     }
 }

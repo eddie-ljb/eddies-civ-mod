@@ -7,14 +7,17 @@ import de.etiennebader.civ.application.office.AppointOfficer;
 import de.etiennebader.civ.application.office.CallElection;
 import de.etiennebader.civ.application.office.CastBallot;
 import de.etiennebader.civ.application.office.ElectionCount;
+import de.etiennebader.civ.application.office.ParliamentCount;
 import de.etiennebader.civ.application.office.RunElections;
 import de.etiennebader.civ.application.office.StandForElection;
 import de.etiennebader.civ.application.query.WorldQueries;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.actor.PlayerRef;
+import de.etiennebader.civ.domain.law.StandardParameters;
 import de.etiennebader.civ.domain.polity.Ballot;
 import de.etiennebader.civ.domain.polity.Election;
+import de.etiennebader.civ.domain.polity.ElectionResult;
 import de.etiennebader.civ.domain.polity.MembershipType;
 import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.OfficeTerm;
@@ -63,7 +66,8 @@ public final class OfficeService {
     private static final Map<String, Office> NAMES = Map.of(
             "buergermeister", Office.MAYOR, "bürgermeister", Office.MAYOR, "mayor", Office.MAYOR,
             "schatzmeister", Office.TREASURER, "treasurer", Office.TREASURER,
-            "bauamt", Office.PLANNER, "planner", Office.PLANNER);
+            "bauamt", Office.PLANNER, "planner", Office.PLANNER,
+            "parlament", Office.PARLIAMENT, "parliament", Office.PARLIAMENT);
 
     private final CivApplication app;
     private final WorldQueries queries;
@@ -84,7 +88,7 @@ public final class OfficeService {
 
     /** Ämternamen für die Vervollständigung im Chat. */
     public static List<String> officeNames() {
-        return List.of("buergermeister", "schatzmeister", "bauamt");
+        return List.of("buergermeister", "schatzmeister", "bauamt", "parlament");
     }
 
     /** Programmnamen für die Vervollständigung im Chat. */
@@ -108,7 +112,10 @@ public final class OfficeService {
             List<Message> lines = new ArrayList<>();
             lines.add(Message.of(MessageKey.OFFICES_HEADER, town.name().value()));
             for (OfficeView office : officesOf(town, caller.player())) {
-                if (office.holder().isEmpty()) {
+                if (office.office() == Office.PARLIAMENT) {
+                    lines.add(Message.of(MessageKey.OFFICE_PARLIAMENT, office.name(), town.parliament().size(),
+                            town.laws().valueOf(StandardParameters.PARLIAMENT_SEATS)));
+                } else if (office.holder().isEmpty()) {
                     lines.add(Message.of(MessageKey.OFFICE_VACANT, office.name()));
                 } else if (office.until().isPresent()) {
                     lines.add(Message.of(MessageKey.OFFICE_HELD_UNTIL, office.name(), office.holder().get(),
@@ -204,7 +211,18 @@ public final class OfficeService {
 
     /** Stimme in einer bestimmten Gemeinde oder einem Bund. */
     public Reply vote(Caller caller, PolityId polity, Office office, ActorRef candidate) {
-        return withPolity(polity, town -> vote(caller, town, office, candidate));
+        return vote(caller, polity, office, candidate, false);
+    }
+
+    /**
+     * Wie oben, auf Wunsch an einer Wahlurne.
+     *
+     * @param atBallotBox ob der Spieler an einer Wahlurne steht
+     */
+    public Reply vote(Caller caller, PolityId polity, Office office, ActorRef candidate, boolean atBallotBox) {
+        return withPolity(polity, town -> town.electionFor(office)
+                .map(election -> vote(caller, town, election, candidate, atBallotBox))
+                .orElseGet(() -> Reply.failure(Message.of(MessageKey.NO_ELECTION_FOR, officeName(town, office)))));
     }
 
     private Reply vote(Caller caller, PolityView town, Office office, ActorRef candidate) {
@@ -214,9 +232,13 @@ public final class OfficeService {
     }
 
     private Reply vote(Caller caller, PolityView town, Election election, ActorRef candidate) {
+        return vote(caller, town, election, candidate, false);
+    }
+
+    private Reply vote(Caller caller, PolityView town, Election election, ActorRef candidate, boolean atBallotBox) {
         return attempt(() -> {
             app.castBallot().execute(new CastBallot.Command(town.id(), election.id(), caller.player(), candidate,
-                    calendar.today()));
+                    calendar.today(), atBallotBox));
             return Reply.success(Message.of(MessageKey.BALLOT_CAST, officeName(town, election.office()),
                     texts.actor(candidate)));
         });
@@ -276,8 +298,18 @@ public final class OfficeService {
                         : Message.of(MessageKey.ELECTION_WON, town.get().name().value(), office,
                                 texts.actor(decided.winner()), result(decided.count()));
                 case RunElections.NoCandidates ignored -> Message.of(MessageKey.ELECTION_NO_CANDIDATES, office);
+                case RunElections.Seated seated -> Message.of(MessageKey.PARLIAMENT_ELECTED, town.get().name().value(),
+                        seated.count().seats().size(), parliamentResult(seated.count()),
+                        texts.actor(seated.count().seats().getFirst().member()));
+                case RunElections.Dissolved ignored ->
+                        Message.of(MessageKey.PARLIAMENT_DISSOLVED, town.get().name().value());
+                case RunElections.Nominated nominated -> Message.of(MessageKey.PARLIAMENT_NOMINATED,
+                        nominated.candidates().size(), town.get().name().value(),
+                        nominated.candidates().stream().map(texts::actor).collect(Collectors.joining(", ")));
             };
             announcements.add(Announcement.toTown(outcome.polity(), message));
+            districtsOf(town.get(), outcome).ifPresent(line -> announcements.add(Announcement.toTown(outcome.polity(),
+                    line)));
         }
     }
 
@@ -291,6 +323,11 @@ public final class OfficeService {
         for (Office office : officesIn(town)) {
             Optional<OfficeTerm> term = town.officeTerm(office);
             Optional<String> holder = term.map(OfficeTerm::holder).map(texts::actor);
+            Optional<Long> until = term.flatMap(OfficeTerm::until).map(Day::value);
+            if (office == Office.PARLIAMENT) {
+                holder = town.parliament().president().map(texts::actor);
+                until = town.parliament().until().map(Day::value);
+            }
             boolean implicit = false;
             if (holder.isEmpty() && office == Office.MAYOR) {
                 holder = town.mayor().map(texts::actor);
@@ -304,8 +341,7 @@ public final class OfficeService {
                     open.ballots().stream().filter(ballot -> ballot.voter().equals(viewer)).map(Ballot::candidate)
                             .findFirst(),
                     open.isCandidate(viewer), open.ballots().size(), electorate));
-            views.add(new OfficeView(office, officeName(town, office), holder,
-                    term.flatMap(OfficeTerm::until).map(Day::value), implicit, election));
+            views.add(new OfficeView(office, officeName(town, office), holder, until, implicit, election));
         }
         return views;
     }
@@ -326,10 +362,44 @@ public final class OfficeService {
         return officeName(office);
     }
 
-    /** Ämter, die es in dieser Polity gibt: Bünde haben kein Bauamt, weil sie kein eigenes Gebiet verwalten. */
+    /**
+     * Ämter, die es in dieser Polity gibt: Bünde haben kein Bauamt, weil sie kein eigenes Gebiet verwalten; das
+     * Parlament nur, wenn das Recht Sitze vorsieht, eines gewählt ist oder gerade gewählt wird.
+     */
     public static List<Office> officesIn(PolityView polity) {
-        return polity.kind() == PolityKind.FEDERATION ? List.of(Office.MAYOR, Office.TREASURER)
-                : List.of(Office.values());
+        List<Office> offices = new ArrayList<>(polity.kind() == PolityKind.FEDERATION
+                ? List.of(Office.MAYOR, Office.TREASURER) : List.of(Office.MAYOR, Office.TREASURER, Office.PLANNER));
+        if (polity.laws().valueOf(StandardParameters.PARLIAMENT_SEATS) > 0 || polity.parliament().seated()
+                || polity.electionFor(Office.PARLIAMENT).isPresent()) {
+            offices.add(Office.PARLIAMENT);
+        }
+        return List.copyOf(offices);
+    }
+
+    /** Bei Bünden: wer in welchem Wahlbezirk vorn lag. */
+    private Optional<Message> districtsOf(PolityView polity, RunElections.Outcome outcome) {
+        if (!(outcome instanceof RunElections.Decided) && !(outcome instanceof RunElections.Seated)) {
+            return Optional.empty();
+        }
+        Optional<ElectionResult> result = queries.polity(polity.id())
+                .flatMap(current -> current.results().isEmpty() ? Optional.empty()
+                        : Optional.of(current.results().getLast()));
+        if (result.isEmpty() || result.get().districts().size() < 2) {
+            return Optional.empty();
+        }
+        return Optional.of(Message.of(MessageKey.ELECTION_DISTRICTS, result.get().districts().stream()
+                .map(district -> district.district().map(texts::polityName).orElse("-") + ": "
+                        + district.leader().map(texts::actor).orElse("-"))
+                .collect(Collectors.joining(", "))));
+    }
+
+    /** Sitze je Liste, z. B. „Rot 2, Carla 1“. */
+    private String parliamentResult(ParliamentCount count) {
+        return count.lists().stream()
+                .filter(list -> list.seats() > 0)
+                .map(list -> list.party().flatMap(queries::polity).map(party -> party.name().value())
+                        .orElseGet(() -> texts.actor(list.candidates().getFirst())) + " " + list.seats())
+                .collect(Collectors.joining(", "));
     }
 
     private String result(ElectionCount count) {

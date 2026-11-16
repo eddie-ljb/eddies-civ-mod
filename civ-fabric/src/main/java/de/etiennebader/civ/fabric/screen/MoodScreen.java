@@ -28,7 +28,7 @@ import java.util.Optional;
  */
 final class MoodScreen extends MenuScreen {
 
-    private static final int[] FACTOR_SLOTS = {11, 12, 13, 14, 15};
+    private static final int[] FACTOR_SLOTS = {10, 11, 12, 13, 14, 15};
     private static final int[] TRAIT_SLOTS = {19, 20, 21, 23, 24, 25};
 
     private final PolityId town;
@@ -97,6 +97,7 @@ final class MoodScreen extends MenuScreen {
             case TAXES -> Items.GOLD_NUGGET;
             case VOICE -> Items.WRITABLE_BOOK;
             case PROSPERITY -> Items.EMERALD_BLOCK;
+            case MEDIA -> Items.PAPER;
         };
         return Icon.of(item)
                 .name(Message.of(TranslationKeys.moodFactor(factor)), Icon.TITLE)
