@@ -1,5 +1,6 @@
 package de.etiennebader.civ.fabric.screen;
 
+import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.territory.ClaimType;
 import de.etiennebader.civ.fabric.Components;
@@ -122,6 +123,7 @@ public final class TownHallScreen extends MenuScreen {
                     Feedback.click(click.player());
                     Screens.open(click.player(), new PressScreen(civ, player, Optional.of(this)));
                 });
+        renderLevels(canvas);
         canvas.set(2, Icon.of(Items.WRITABLE_BOOK).name(GuiKeys.MAIL_OPEN.text(), Icon.TITLE)
                 .hint(GuiKeys.MAIL_OPEN_HINT.text()).build(), click -> {
                     Feedback.click(click.player());
@@ -255,6 +257,21 @@ public final class TownHallScreen extends MenuScreen {
                     Feedback.click(click.player());
                     Components.send(click.player(), civ.commands().help());
                 });
+    }
+
+    /** Rechts oben: Menü des nächsthöheren Bundes (Land, Nation …), dort wechselt man weiter. */
+    private void renderLevels(Canvas canvas) {
+        Optional<PolityView> parent = civ.queries().parentOf(town);
+        Icon icon = Icon.of(parent.isPresent() ? Items.BEACON : Items.GLASS).name(GuiKeys.LEVELS_OPEN.text(), Icon.TITLE);
+        civ.queries().polity(town).ifPresent(polity -> {
+            for (PolityView ancestor : civ.queries().ancestorsOf(polity.id())) {
+                icon.line(GuiKeys.LEVEL_TAB.text(civ.levels().levelOf(ancestor).displayName(), ancestor.name().value()),
+                        Icon.INFO);
+            }
+        });
+        icon.hint(parent.isPresent() ? GuiKeys.LEVELS_OPEN_HINT.text() : GuiKeys.LEVELS_NONE_HINT.text());
+        canvas.set(8, icon.build(), click -> parent.flatMap(found -> civ.queries().polity(found.id()))
+                .ifPresent(found -> LevelScreen.open(civ, click.player(), found, Optional.of(this))));
     }
 
     private Message federationLine() {

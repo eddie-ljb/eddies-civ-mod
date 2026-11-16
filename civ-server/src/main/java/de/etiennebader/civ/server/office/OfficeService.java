@@ -108,32 +108,65 @@ public final class OfficeService {
 
     /** {@code /civ aemter} */
     public Reply list(Caller caller) {
-        return withTown(caller, town -> {
-            List<Message> lines = new ArrayList<>();
-            lines.add(Message.of(MessageKey.OFFICES_HEADER, town.name().value()));
-            for (OfficeView office : officesOf(town, caller.player())) {
-                if (office.office() == Office.PARLIAMENT) {
-                    lines.add(Message.of(MessageKey.OFFICE_PARLIAMENT, office.name(), town.parliament().size(),
-                            town.laws().valueOf(StandardParameters.PARLIAMENT_SEATS)));
-                } else if (office.holder().isEmpty()) {
-                    lines.add(Message.of(MessageKey.OFFICE_VACANT, office.name()));
-                } else if (office.until().isPresent()) {
-                    lines.add(Message.of(MessageKey.OFFICE_HELD_UNTIL, office.name(), office.holder().get(),
-                            office.until().get()));
-                } else {
-                    lines.add(Message.of(office.implicit() ? MessageKey.OFFICE_HELD_ACTING : MessageKey.OFFICE_HELD,
-                            office.name(), office.holder().get()));
-                }
-                office.election().ifPresent(election -> lines.add(Message.of(MessageKey.ELECTION_ENTRY, office.name(),
-                        election.closesOn(), candidateNames(election), election.ballots(), election.electorate())));
+        return withTown(caller, town -> list(caller, town));
+    }
+
+    /** Ämter einer bestimmten Gemeinde oder eines Bundes, z. B. {@code /civ nation aemter}. */
+    public Reply list(Caller caller, PolityView town) {
+        List<Message> lines = new ArrayList<>();
+        lines.add(Message.of(MessageKey.OFFICES_HEADER, town.name().value()));
+        for (OfficeView office : officesOf(town, caller.player())) {
+            if (office.office() == Office.PARLIAMENT) {
+                lines.add(Message.of(MessageKey.OFFICE_PARLIAMENT, office.name(), town.parliament().size(),
+                        town.laws().valueOf(StandardParameters.PARLIAMENT_SEATS)));
+            } else if (office.holder().isEmpty()) {
+                lines.add(Message.of(MessageKey.OFFICE_VACANT, office.name()));
+            } else if (office.until().isPresent()) {
+                lines.add(Message.of(MessageKey.OFFICE_HELD_UNTIL, office.name(), office.holder().get(),
+                        office.until().get()));
+            } else {
+                lines.add(Message.of(office.implicit() ? MessageKey.OFFICE_HELD_ACTING : MessageKey.OFFICE_HELD,
+                        office.name(), office.holder().get()));
             }
-            return Reply.success(lines);
-        });
+            office.election().ifPresent(election -> lines.add(Message.of(MessageKey.ELECTION_ENTRY, office.name(),
+                    election.closesOn(), candidateNames(election), election.ballots(), election.electorate())));
+        }
+        return Reply.success(lines);
     }
 
     /** {@code /civ wahl ausrufen <Amt>} */
     public Reply callElection(Caller caller, String officeInput) {
         return withOffice(caller, officeInput, (town, office) -> callElection(caller, town, office));
+    }
+
+    /** {@code /civ <Ebene> wahl ausrufen <Amt>} */
+    public Reply callElection(Caller caller, PolityView polity, String officeInput) {
+        return withOfficeIn(polity, officeInput, (town, office) -> callElection(caller, town, office));
+    }
+
+    /** {@code /civ <Ebene> wahl kandidieren <Amt> [Programm]} */
+    public Reply stand(Caller caller, PolityView polity, String officeInput, Optional<String> platformInput) {
+        Optional<Platform> platform = platformInput.map(OfficeService::parsePlatform).orElse(Optional.of(Platform.NONE));
+        if (platform.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.UNKNOWN_PLATFORM, platformInput.orElse("").strip()));
+        }
+        return withElectionIn(polity, officeInput, (town, election) -> stand(caller, town, election, platform.get()));
+    }
+
+    /** {@code /civ <Ebene> wahl stimmen <Amt> <Kandidat>} */
+    public Reply vote(Caller caller, PolityView polity, String officeInput, String candidateName) {
+        return withElectionIn(polity, officeInput, (town, election) -> voteByName(caller, town, election,
+                candidateName));
+    }
+
+    /** {@code /civ <Ebene> amt ernennen <Amt> <Spieler>} */
+    public Reply appoint(Caller caller, PolityView polity, String officeInput, String playerName) {
+        return withOfficeIn(polity, officeInput, (town, office) -> appoint(caller, town, office, playerName));
+    }
+
+    /** {@code /civ <Ebene> amt entlassen <Amt>} */
+    public Reply dismiss(Caller caller, PolityView polity, String officeInput) {
+        return withOfficeIn(polity, officeInput, (town, office) -> dismiss(caller, town, office));
     }
 
     /** Wahl in einer bestimmten Gemeinde oder einem Bund ausrufen, z. B. aus dem Verfassungsmenü. */
@@ -192,16 +225,19 @@ public final class OfficeService {
 
     /** {@code /civ wahl stimmen <Amt> <Spieler>} */
     public Reply vote(Caller caller, String officeInput, String candidateName) {
-        return withElection(caller, officeInput, (town, election) -> {
-            Optional<ActorRef> candidate = election.candidates().stream()
-                    .filter(actor -> texts.actor(actor).equalsIgnoreCase(candidateName.strip()))
-                    .findFirst();
-            if (candidate.isEmpty()) {
-                return Reply.failure(Message.of(MessageKey.UNKNOWN_CANDIDATE, candidateName.strip(),
-                        officeName(election.office())));
-            }
-            return vote(caller, town, election, candidate.get());
-        });
+        return withElection(caller, officeInput, (town, election) -> voteByName(caller, town, election,
+                candidateName));
+    }
+
+    private Reply voteByName(Caller caller, PolityView town, Election election, String candidateName) {
+        Optional<ActorRef> candidate = election.candidates().stream()
+                .filter(actor -> texts.actor(actor).equalsIgnoreCase(candidateName.strip()))
+                .findFirst();
+        if (candidate.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.UNKNOWN_CANDIDATE, candidateName.strip(),
+                    officeName(town, election.office())));
+        }
+        return vote(caller, town, election, candidate.get());
     }
 
     /** Stimme aus einem Menü oder von der Webseite. */
@@ -251,25 +287,31 @@ public final class OfficeService {
 
     /** {@code /civ amt ernennen <Amt> <Spieler>} */
     public Reply appoint(Caller caller, String officeInput, String playerName) {
-        return withOffice(caller, officeInput, (town, office) -> {
-            Optional<PlayerRef> appointee = players.findByName(playerName.strip());
-            if (appointee.isEmpty()) {
-                return Reply.failure(Message.of(MessageKey.UNKNOWN_RECIPIENT, playerName.strip()));
-            }
-            return attempt(() -> {
-                app.appointOfficer().execute(new AppointOfficer.Command(town.id(), caller.player(), office,
-                        Optional.of(appointee.get()), calendar.today()));
-                String name = texts.actor(appointee.get());
-                announcements.add(Announcement.toTown(town.id(),
-                        Message.of(MessageKey.OFFICER_APPOINTED, name, officeName(office))));
-                return Reply.success(Message.of(MessageKey.OFFICER_APPOINTED, name, officeName(office)));
-            });
+        return withOffice(caller, officeInput, (town, office) -> appoint(caller, town, office, playerName));
+    }
+
+    private Reply appoint(Caller caller, PolityView town, Office office, String playerName) {
+        Optional<PlayerRef> appointee = players.findByName(playerName.strip());
+        if (appointee.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.UNKNOWN_RECIPIENT, playerName.strip()));
+        }
+        return attempt(() -> {
+            app.appointOfficer().execute(new AppointOfficer.Command(town.id(), caller.player(), office,
+                    Optional.of(appointee.get()), calendar.today()));
+            String name = texts.actor(appointee.get());
+            announcements.add(Announcement.toTown(town.id(),
+                    Message.of(MessageKey.OFFICER_APPOINTED, name, officeName(office))));
+            return Reply.success(Message.of(MessageKey.OFFICER_APPOINTED, name, officeName(office)));
         });
     }
 
     /** {@code /civ amt entlassen <Amt>} */
     public Reply dismiss(Caller caller, String officeInput) {
-        return withOffice(caller, officeInput, (town, office) -> attempt(() -> {
+        return withOffice(caller, officeInput, (town, office) -> dismiss(caller, town, office));
+    }
+
+    private Reply dismiss(Caller caller, PolityView town, Office office) {
+        return attempt(() -> {
             boolean changed = app.appointOfficer().execute(new AppointOfficer.Command(town.id(), caller.player(),
                     office, Optional.empty(), calendar.today()));
             if (!changed) {
@@ -278,7 +320,7 @@ public final class OfficeService {
             announcements.add(Announcement.toTown(town.id(),
                     Message.of(MessageKey.OFFICER_DISMISSED, officeName(office))));
             return Reply.success(Message.of(MessageKey.OFFICER_DISMISSED, officeName(office)));
-        }));
+        });
     }
 
     /** Tagesende: fällige Wahlen auszählen und ausrufen, Ergebnisse melden. */
@@ -451,17 +493,25 @@ public final class OfficeService {
     }
 
     private Reply withOffice(Caller caller, String officeInput, OfficeAction action) {
+        return withTown(caller, town -> withOfficeIn(town, officeInput, action));
+    }
+
+    private Reply withOfficeIn(PolityView polity, String officeInput, OfficeAction action) {
         Optional<Office> office = parse(officeInput);
         if (office.isEmpty()) {
             return Reply.failure(Message.of(MessageKey.UNKNOWN_OFFICE, officeInput.strip()));
         }
-        return withTown(caller, town -> action.apply(town, office.get()));
+        return action.apply(polity, office.get());
     }
 
     private Reply withElection(Caller caller, String officeInput, ElectionAction action) {
-        return withOffice(caller, officeInput, (town, office) -> town.electionFor(office)
+        return withTown(caller, town -> withElectionIn(town, officeInput, action));
+    }
+
+    private Reply withElectionIn(PolityView polity, String officeInput, ElectionAction action) {
+        return withOfficeIn(polity, officeInput, (town, office) -> town.electionFor(office)
                 .map(election -> action.apply(town, election))
-                .orElseGet(() -> Reply.failure(Message.of(MessageKey.NO_ELECTION_FOR, officeName(office)))));
+                .orElseGet(() -> Reply.failure(Message.of(MessageKey.NO_ELECTION_FOR, officeName(town, office)))));
     }
 
     private Reply attempt(Supplier<Reply> action) {

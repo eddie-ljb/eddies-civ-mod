@@ -91,6 +91,10 @@ public final class CivServerFixture {
         return server.federations();
     }
 
+    public de.etiennebader.civ.server.level.LevelService levels() {
+        return server.levels();
+    }
+
     public de.etiennebader.civ.server.civil.CivilService civil() {
         return server.civil();
     }

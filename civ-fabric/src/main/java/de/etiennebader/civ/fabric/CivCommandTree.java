@@ -4,16 +4,19 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import com.mojang.brigadier.tree.LiteralCommandNode;
 import de.etiennebader.civ.EddiesCivMod;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.exchange.Side;
 import de.etiennebader.civ.domain.polity.Office;
+import de.etiennebader.civ.domain.polity.Polity;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.shared.PersonId;
 import de.etiennebader.civ.domain.territory.ClaimType;
@@ -24,11 +27,13 @@ import de.etiennebader.civ.fabric.screen.ContractsScreen;
 import de.etiennebader.civ.fabric.screen.ElectionsScreen;
 import de.etiennebader.civ.fabric.screen.ExchangeScreen;
 import de.etiennebader.civ.fabric.screen.FriendsScreen;
+import de.etiennebader.civ.fabric.screen.LevelScreen;
 import de.etiennebader.civ.fabric.screen.MailScreen;
 import de.etiennebader.civ.fabric.screen.ParliamentScreen;
 import de.etiennebader.civ.fabric.screen.PartiesScreen;
 import de.etiennebader.civ.fabric.screen.PressScreen;
 import de.etiennebader.civ.server.CivServer;
+import de.etiennebader.civ.server.ServerConfig;
 import de.etiennebader.civ.server.campaign.CampaignService;
 import de.etiennebader.civ.server.command.Caller;
 import de.etiennebader.civ.server.command.CivCommands;
@@ -36,6 +41,8 @@ import de.etiennebader.civ.server.command.Message;
 import de.etiennebader.civ.server.command.MessageKey;
 import de.etiennebader.civ.server.command.Reply;
 import de.etiennebader.civ.server.constitution.ConstitutionService;
+import de.etiennebader.civ.server.federation.Level;
+import de.etiennebader.civ.server.federation.Levels;
 import de.etiennebader.civ.server.office.OfficeService;
 import de.etiennebader.civ.server.office.OfficeView;
 import de.etiennebader.civ.server.party.PartyService;
@@ -54,6 +61,8 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.AABB;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -121,6 +130,10 @@ import java.util.function.Function;
  *
  * Nur Admins:
  * /civ gruenden &lt;Name&gt;              Gemeinde ohne Gemeindehaus-Block gründen, Sitz ist der eigene Standort
+ * /civ ebenen                      eigene Gemeinde, Land, Nation
+ * /civ gemeinde|land|nation &lt;Befehl&gt;  info, menue, aemter, wahl, amt, parlament, recht, abstimmungen, abstimmen,
+ *                                   verfassung, gesetze, umfrage, wahlergebnis für genau diese Ebene
+ * /civ ebene &lt;Ebene&gt; &lt;Befehl&gt;     dasselbe für jede Ebene, auch eigene aus der Konfiguration
  * /civ admin umgehen                Gebietsschutz für sich selbst aus- und wieder einschalten
  * /civ admin aufloesen &lt;Name&gt;      Gemeinde auflösen, Kasse an den Bürgermeister
  * /civ admin tag                   laufenden Tag sofort beenden (Steuern, Einnahmen, Abstimmungen)
@@ -161,7 +174,7 @@ public final class CivCommandTree {
     }
 
     public void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        dispatcher.register(Commands.literal("civ")
+        LiteralCommandNode<CommandSourceStack> root = dispatcher.register(Commands.literal("civ")
                 .executes(context -> asPlayer(context, CivCommands::info))
                 .then(Commands.literal("info")
                         .executes(context -> asPlayer(context, CivCommands::info)))
@@ -185,7 +198,7 @@ public final class CivCommandTree {
                                         (commands, caller) -> commands.claim(caller, ClaimType.OUTPOST)))))
                 .then(Commands.literal("freigeben")
                         .executes(context -> asPlayer(context, CivCommands::release)))
-                .then(Commands.literal("gemeinde")
+                .then(levelCommands(Commands.literal(Polity.MUNICIPAL_LEVEL), context -> Polity.MUNICIPAL_LEVEL)
                         .executes(context -> asPlayer(context,
                                 (commands, caller) -> commands.describe(caller, Optional.empty())))
                         .then(Commands.argument(NAME, StringArgumentType.greedyString())
@@ -397,6 +410,7 @@ public final class CivCommandTree {
                                             }
                                             return change.reply();
                                         }))))));
+        registerLevels(dispatcher, root);
     }
 
     /** Ein Befehl, der einen Spieler als Aufrufer braucht. */
@@ -639,6 +653,178 @@ public final class CivCommandTree {
                                         .executes(context -> withCiv(context, (civ, player) -> civ.constitutions().amend(
                                                 Players.caller(player), StringArgumentType.getString(context, ARTICLE),
                                                 StringArgumentType.getString(context, VALUE)))))));
+    }
+
+    /**
+     * Je Ebene ein eigener Befehl: {@code /civ land …}, {@code /civ nation …} und eigene Ebenen aus der
+     * Konfiguration, sofern ihr Name nicht schon belegt ist; jede Ebene außerdem über {@code /civ ebene <Ebene> …}.
+     */
+    private void registerLevels(CommandDispatcher<CommandSourceStack> dispatcher,
+                                LiteralCommandNode<CommandSourceStack> root) {
+        for (String id : levelIds()) {
+            if (root.getChild(id) == null) {
+                dispatcher.register(Commands.literal("civ").then(levelCommands(Commands.literal(id), context -> id)));
+            }
+        }
+        dispatcher.register(Commands.literal("civ")
+                .then(Commands.literal("ebenen")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().overview(
+                                Players.caller(player)))))
+                .then(Commands.literal("ebene")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().overview(
+                                Players.caller(player))))
+                        .then(levelCommands(Commands.argument(LEVEL, StringArgumentType.word())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(levelIds(), builder)),
+                                context -> StringArgumentType.getString(context, LEVEL)))));
+    }
+
+    /** Kennungen aller Ebenen: aus dem laufenden Server, sonst aus der Konfigurationsdatei. */
+    private List<String> levelIds() {
+        Levels levels = host.current().map(civ -> civ.federations().levels()).orElseGet(CivCommandTree::configuredLevels);
+        return levels.all().stream().map(Level::id).toList();
+    }
+
+    private static Levels configuredLevels() {
+        // Befehle werden vor dem Serverstart registriert; die Datei liegt wie in CivServerHost unter config/.
+        Path file = Path.of("config", EddiesCivMod.MOD_ID + ".properties");
+        if (!Files.exists(file)) {
+            return Levels.DEFAULT;
+        }
+        try {
+            return ServerConfig.load(file).levels();
+        } catch (RuntimeException e) {
+            return Levels.DEFAULT;
+        }
+    }
+
+    /** Die Befehle einer Ebene unter {@code node}; {@code level} liefert ihre Kennung. */
+    private <T extends ArgumentBuilder<CommandSourceStack, T>> T levelCommands(
+            T node, Function<CommandContext<CommandSourceStack>, String> level) {
+        return node
+                .executes(context -> withCiv(context, (civ, player) -> civ.levels().info(Players.caller(player),
+                        level.apply(context))))
+                .then(Commands.literal("info")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().info(Players.caller(player),
+                                level.apply(context)))))
+                .then(Commands.literal("menue")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(Players.caller(player),
+                                level.apply(context), polity -> {
+                                    LevelScreen.open(civ, player, polity, Optional.empty());
+                                    return null;
+                                }))))
+                .then(Commands.literal("aemter")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().offices(
+                                Players.caller(player), level.apply(context)))))
+                .then(Commands.literal("wahl")
+                        .then(Commands.literal("ausrufen")
+                                .then(Commands.argument(OFFICE, StringArgumentType.word())
+                                        .suggests(CivCommandTree::suggestOffices)
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().callElection(
+                                                Players.caller(player), level.apply(context),
+                                                StringArgumentType.getString(context, OFFICE))))))
+                        .then(Commands.literal("kandidieren")
+                                .then(Commands.argument(OFFICE, StringArgumentType.word())
+                                        .suggests(CivCommandTree::suggestOffices)
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().stand(
+                                                Players.caller(player), level.apply(context),
+                                                StringArgumentType.getString(context, OFFICE), Optional.empty())))
+                                        .then(Commands.argument(PLATFORM, StringArgumentType.word())
+                                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                        OfficeService.platformNames(), builder))
+                                                .executes(context -> withCiv(context, (civ, player) -> civ.levels().stand(
+                                                        Players.caller(player), level.apply(context),
+                                                        StringArgumentType.getString(context, OFFICE),
+                                                        Optional.of(StringArgumentType.getString(context, PLATFORM))))))))
+                        .then(Commands.literal("stimmen")
+                                .then(Commands.argument(OFFICE, StringArgumentType.word())
+                                        .suggests(CivCommandTree::suggestOffices)
+                                        .then(Commands.argument(CANDIDATE, StringArgumentType.string())
+                                                .suggests((context, builder) -> suggestLevelCandidates(context, builder,
+                                                        level.apply(context)))
+                                                .executes(context -> withCiv(context, (civ, player) -> civ.levels().vote(
+                                                        Players.caller(player), level.apply(context),
+                                                        StringArgumentType.getString(context, OFFICE),
+                                                        StringArgumentType.getString(context, CANDIDATE))))))))
+                .then(Commands.literal("amt")
+                        .then(Commands.literal("ernennen")
+                                .then(Commands.argument(OFFICE, StringArgumentType.word())
+                                        .suggests(CivCommandTree::suggestOffices)
+                                        .then(Commands.argument(RECIPIENT, StringArgumentType.string())
+                                                .suggests(this::suggestRecipients)
+                                                .executes(context -> withCiv(context, (civ, player) -> civ.levels().appoint(
+                                                        Players.caller(player), level.apply(context),
+                                                        StringArgumentType.getString(context, OFFICE),
+                                                        StringArgumentType.getString(context, RECIPIENT)))))))
+                        .then(Commands.literal("entlassen")
+                                .then(Commands.argument(OFFICE, StringArgumentType.word())
+                                        .suggests(CivCommandTree::suggestOffices)
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().dismiss(
+                                                Players.caller(player), level.apply(context),
+                                                StringArgumentType.getString(context, OFFICE)))))))
+                .then(Commands.literal("parlament")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().parliament(
+                                Players.caller(player), level.apply(context)))))
+                .then(Commands.literal("recht")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().laws(
+                                Players.caller(player), level.apply(context))))
+                        .then(Commands.literal("setzen")
+                                .then(Commands.argument(LAW, StringArgumentType.word())
+                                        .suggests(this::suggestLaws)
+                                        .then(Commands.argument(VALUE, StringArgumentType.word())
+                                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(YES_NO, builder))
+                                                .executes(context -> withCiv(context, (civ, player) -> civ.levels().amendLaw(
+                                                        Players.caller(player), level.apply(context),
+                                                        StringArgumentType.getString(context, LAW),
+                                                        StringArgumentType.getString(context, VALUE))))))))
+                .then(Commands.literal("abstimmungen")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().proposals(
+                                Players.caller(player), level.apply(context)))))
+                .then(Commands.literal("abstimmen")
+                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(1))
+                                .then(Commands.literal("ja")
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().voteOnProposal(
+                                                Players.caller(player), level.apply(context),
+                                                IntegerArgumentType.getInteger(context, COUNT), true))))
+                                .then(Commands.literal("nein")
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().voteOnProposal(
+                                                Players.caller(player), level.apply(context),
+                                                IntegerArgumentType.getInteger(context, COUNT), false))))))
+                .then(Commands.literal("verfassung")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().constitution(
+                                Players.caller(player), level.apply(context))))
+                        .then(Commands.literal("ausrufen")
+                                .executes(context -> withCiv(context, (civ, player) -> civ.levels().proclaim(
+                                        Players.caller(player), level.apply(context))))))
+                .then(Commands.literal("gesetze")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().lawBook(
+                                Players.caller(player), level.apply(context)))))
+                .then(Commands.literal("umfrage")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().poll(
+                                Players.caller(player), level.apply(context)))))
+                .then(Commands.literal("wahlergebnis")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().lastResult(
+                                Players.caller(player), level.apply(context)))));
+    }
+
+    /** Kandidaten der laufenden Wahl auf der angegebenen Ebene. */
+    private CompletableFuture<Suggestions> suggestLevelCandidates(CommandContext<CommandSourceStack> context,
+                                                                  SuggestionsBuilder builder, String levelId) {
+        List<String> names = new java.util.ArrayList<>();
+        ServerPlayer player = context.getSource().getPlayer();
+        Optional<Office> office = OfficeService.parse(StringArgumentType.getString(context, OFFICE));
+        host.current().ifPresent(civ -> {
+            if (player == null || office.isEmpty()) {
+                return;
+            }
+            civ.federations().levels().find(levelId)
+                    .flatMap(level -> civ.levels().polityOf(Players.ref(player), level))
+                    .flatMap(polity -> civ.offices().officesOf(polity, Players.ref(player)).stream()
+                            .filter(view -> view.office() == office.get()).findFirst())
+                    .flatMap(OfficeView::election)
+                    .ifPresent(election -> election.candidates().forEach(candidate ->
+                            names.add(StringArgumentType.escapeIfRequired(candidate.name()))));
+        });
+        return SharedSuggestionProvider.suggest(names, builder);
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> federationCommands() {

@@ -85,11 +85,16 @@ public final class VotingService {
         if (town.isEmpty()) {
             return Reply.failure(Message.of(MessageKey.NOT_IN_MUNICIPALITY));
         }
-        List<Proposal> open = List.copyOf(town.get().proposals());
+        return vote(caller, town.get(), number, inFavour);
+    }
+
+    /** {@code /civ <Ebene> abstimmen <Nr> ja|nein} */
+    public Reply vote(Caller caller, PolityView polity, int number, boolean inFavour) {
+        List<Proposal> open = List.copyOf(polity.proposals());
         if (number < 1 || number > open.size()) {
             return Reply.failure(Message.of(MessageKey.UNKNOWN_PROPOSAL_NUMBER, number));
         }
-        return vote(caller, town.get(), open.get(number - 1), inFavour);
+        return vote(caller, polity, open.get(number - 1), inFavour);
     }
 
     /** Stimme zu einem Antrag einer bestimmten Gemeinde oder eines Bundes, z. B. aus dem Verfassungsmenü. */
@@ -125,12 +130,17 @@ public final class VotingService {
         if (town.isEmpty()) {
             return Reply.failure(Message.of(MessageKey.NOT_IN_MUNICIPALITY));
         }
-        List<ProposalView> proposals = proposalsOf(town.get(), caller.player());
+        return list(caller, town.get());
+    }
+
+    /** {@code /civ <Ebene> abstimmungen}: offene Abstimmungen einer bestimmten Gemeinde oder eines Bundes. */
+    public Reply list(Caller caller, PolityView town) {
+        List<ProposalView> proposals = proposalsOf(town, caller.player());
         if (proposals.isEmpty()) {
-            return Reply.success(Message.of(MessageKey.PROPOSALS_NONE, town.get().name().value()));
+            return Reply.success(Message.of(MessageKey.PROPOSALS_NONE, town.name().value()));
         }
         List<Message> lines = new ArrayList<>();
-        lines.add(Message.of(MessageKey.PROPOSALS_HEADER, town.get().name().value()));
+        lines.add(Message.of(MessageKey.PROPOSALS_HEADER, town.name().value()));
         for (ProposalView proposal : proposals) {
             lines.add(Message.of(MessageKey.PROPOSAL_ENTRY, proposal.number(), proposal.law(), proposal.value(),
                     proposal.inFavour(), proposal.against(), proposal.electorate(), proposal.decidedOn()));

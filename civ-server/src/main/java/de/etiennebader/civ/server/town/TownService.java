@@ -10,6 +10,7 @@ import de.etiennebader.civ.domain.law.ParameterKey;
 import de.etiennebader.civ.domain.polity.Membership;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.shared.CurrencyId;
+import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.domain.territory.ChunkCoord;
 import de.etiennebader.civ.domain.territory.Claim;
@@ -92,6 +93,29 @@ public final class TownService {
                     polity.laws().valueOf(key)));
         }
         return settings;
+    }
+
+    /** Schaltet eine Ja/Nein-Regelung einer bestimmten Gemeinde oder eines Bundes um. */
+    public Reply toggleLaw(Caller caller, PolityId polity, LawSetting law) {
+        if (!law.isSwitch()) {
+            throw new IllegalArgumentException("Keine Ja/Nein-Regelung: " + law.id());
+        }
+        return amendIn(caller, polity, law, Boolean.TRUE.equals(law.own()) ? "nein" : "ja");
+    }
+
+    /** Ändert eine Zahlen-Regelung einer bestimmten Gemeinde oder eines Bundes um {@code delta}, nicht unter 0. */
+    public Reply adjustLaw(Caller caller, PolityId polity, LawSetting law, long delta) {
+        long value = Math.max(0, ((Number) law.own()).longValue() + delta);
+        return amendIn(caller, polity, law, Long.toString(value));
+    }
+
+    private Reply amendIn(Caller caller, PolityId polity, LawSetting law, String value) {
+        Optional<PolityView> target = queries.polity(polity);
+        Optional<ParameterKey<?>> key = laws.find(law.id());
+        if (target.isEmpty() || key.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.POLITY_GONE));
+        }
+        return commands.amendLaw(caller, target.get(), key.get(), value);
     }
 
     /** Schaltet eine Ja/Nein-Regelung der eigenen Gemeinde um. */

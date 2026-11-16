@@ -89,6 +89,8 @@ Gemeinden schließen sich zu **Bünden** zusammen: Länder, Nationen und eigene 
 - **Austreten und auflösen:** `/civ bund austreten` (die oberste Ebene, die du führst, verlässt ihren Bund; das letzte Glied kann nicht austreten), `/civ bund aufloesen` (Glieder werden frei, die Kasse geht an den Vorsitz). Löst sich das letzte Glied eines Bundes auf, verschwindet der Bund mit.
 - **Anzeige:** `/civ bund info [Name]`, im Gemeindehaus-Steckbrief „Gehört zu: …“ und auf der Webseite unter **Bünde**.
 - Wer mehrere Ebenen zugleich führt, handelt mit `/civ bund …` immer für die oberste.
+- **Befehle je Ebene:** `/civ gemeinde …`, `/civ land …`, `/civ nation …` (eigene Ebenen aus `federation_levels` unter ihrer Kennung, sonst `/civ ebene <Ebene> …`) wirken genau auf die Gemeinde, das Land oder die Nation, zu der die eigene Gemeinde gehört: `info`, `menue`, `aemter`, `wahl ausrufen|kandidieren|stimmen <Amt> …`, `amt ernennen|entlassen`, `parlament`, `recht [setzen <Regel> <Wert>]`, `abstimmungen`, `abstimmen <Nr> ja|nein`, `verfassung [ausrufen]`, `gesetze`, `umfrage`, `wahlergebnis`. Beispiel Nationalparlament: `/civ nation recht setzen parliament_seats 9`, dann `/civ nation wahl ausrufen parlament`. `/civ ebenen` zeigt die eigene Kette.
+- **Menü je Ebene:** `/civ land menue` bzw. `/civ nation menue` oder im Gemeindehaus oben rechts (Leuchtfeuer). Oben wechseln Reiter zwischen Gemeinde, Land und Nation; darunter Ämter, Parlament, Wahlen und Umfragen, Abstimmungen, Recht, Verfassung und Gesetzbuch genau dieser Ebene.
 - Bünde haben eigene Organe: **Vorsitz** (statt Bürgermeister) und **Schatzmeister**, gewählt von allen Bürgern der Glieder. Wahlen und Abstimmungen laufen über das Verfassungsmenü des Bundes, Gesetze über das Gesetzbuch des Bundes.
 
 ### Verfassung (Block)
@@ -291,6 +293,9 @@ Anmelden: Mit `/civ web` holst du dir im Spiel einen Code und gibst ihn auf der 
 | `/civ bund einladen <Name>` / `beitreten <Bund>` | Gemeinde einladen / Einladung annehmen |
 | `/civ bund austreten` / `aufloesen` | Bund verlassen / auflösen |
 | `/civ bund info [Name]` | Bünde über der eigenen Gemeinde oder ein bestimmter Bund |
+| `/civ ebenen` | Eigene Gemeinde, Land und Nation mit Spitze |
+| `/civ land\|nation <Befehl>` | `info`, `menue`, `aemter`, `wahl …`, `amt …`, `parlament`, `recht [setzen]`, `abstimmungen`, `abstimmen`, `verfassung`, `gesetze`, `umfrage`, `wahlergebnis` für diese Ebene |
+| `/civ ebene <Ebene> <Befehl>` | Dasselbe für jede Ebene, auch eigene |
 | `/civ verfassung` / `verfassung zeigen <Name>` | Verfassung der eigenen Gemeinde / einer Gemeinde oder eines Bundes |
 | `/civ verfassung menue` | Verfassungsmenü der eigenen Gemeinde |
 | `/civ verfassung praeambel <Text>` | Präambel des Entwurfs (Spitze, höchstens 600 Zeichen) |

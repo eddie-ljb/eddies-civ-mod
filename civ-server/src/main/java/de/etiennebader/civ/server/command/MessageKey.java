@@ -399,6 +399,13 @@ public enum MessageKey {
     DIRECT_SENT,
     WEB_CHAT,
     CHAT_SENT,
+    // Ebenen
+    LEVEL_NOT_JOINED,
+    LEVEL_CHAIN_HEADER,
+    LEVEL_CHAIN_ENTRY,
+    LEVEL_CHAIN_MISSING,
+    LEVEL_CHAIN_HINT,
+    HELP_LEVELS,
     // Firmen, Börse, Presse
     COMPANY_FOUNDED,
     COMPANIES_NONE,

@@ -80,10 +80,10 @@ final class LawsScreen extends MenuScreen {
                     return;
                 }
                 if (law.isSwitch()) {
-                    report(click, civ.towns().toggleLaw(caller(), law));
+                    report(click, civ.towns().toggleLaw(caller(), town, law));
                 } else {
                     long step = STEPS.getOrDefault(law.id(), 1L) * click.multiplier();
-                    report(click, civ.towns().adjustLaw(caller(), law, click.right() ? -step : step));
+                    report(click, civ.towns().adjustLaw(caller(), town, law, click.right() ? -step : step));
                 }
             });
         }

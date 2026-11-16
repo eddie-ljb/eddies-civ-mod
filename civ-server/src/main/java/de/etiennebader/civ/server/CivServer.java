@@ -32,6 +32,7 @@ import de.etiennebader.civ.server.company.CompanyService;
 import de.etiennebader.civ.server.constitution.ConstitutionService;
 import de.etiennebader.civ.server.federation.FederationService;
 import de.etiennebader.civ.server.law.LawBookService;
+import de.etiennebader.civ.server.level.LevelService;
 import de.etiennebader.civ.server.market.ItemTraits;
 import de.etiennebader.civ.server.market.MarketService;
 import de.etiennebader.civ.server.office.OfficeService;
@@ -97,6 +98,7 @@ public final class CivServer {
     private final VotingService voting;
     private final OfficeService offices;
     private final FederationService federations;
+    private final LevelService levels;
     private final ConstitutionService constitutions;
     private final LawBookService lawBooks;
     private final PartyService parties;
@@ -140,6 +142,8 @@ public final class CivServer {
         this.campaigns = new CampaignService(app, calendar, texts, offices);
         this.constitutions = new ConstitutionService(app, calendar, texts, announcements, commands, offices, voting,
                 federations);
+        this.levels = new LevelService(app.queries(), texts, federations, commands, offices, voting, parliaments,
+                constitutions, campaigns, lawBooks);
         this.bank = new BankService(app, calendar, settings.currency(), players, texts);
         this.market = new MarketService(app, calendar, settings, players, texts);
         this.territory = new TerritoryWatcher(app.queries(), texts);
@@ -385,6 +389,11 @@ public final class CivServer {
 
     public FederationService federations() {
         return federations;
+    }
+
+    /** Befehle je politischer Ebene. */
+    public LevelService levels() {
+        return levels;
     }
 
     public VotingService voting() {
