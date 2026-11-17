@@ -1,6 +1,7 @@
 package de.etiennebader.civ.application.query;
 
 import de.etiennebader.civ.domain.justice.JudiciaryView;
+import de.etiennebader.civ.domain.production.ProductionView;
 import de.etiennebader.civ.domain.civic.CivicView;
 import de.etiennebader.civ.application.Repositories;
 import de.etiennebader.civ.application.federation.Federations;
@@ -91,6 +92,10 @@ public final class WorldQueries {
     /** Alle Zeitungsartikel. */
     public CivicView civic() {
         return repositories.civic().load();
+    }
+
+    public ProductionView production() {
+        return repositories.production().load();
     }
 
     public JudiciaryView justice() {

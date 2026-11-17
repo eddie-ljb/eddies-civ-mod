@@ -165,10 +165,10 @@ Jede Gemeinde und jeder Bund hat ein Gericht; Richter ist, wen die Spitze ernenn
 - **Ablauf:** eingereicht → Beweisaufnahme → Plädoyers → Beratung → Urteil → nach zwei Tagen Berufungsfrist rechtskräftig und vollstreckt. Versäumt der Richter eine Frist, schaltet das Gericht am Tagesende selbst weiter und entscheidet nach Aktenlage.
 - **Beteiligte:** Strafprozesse bekommen eine Staatsanwaltschaft und Geschworene (`jury_size`, aus Spielern und Dorfbewohnern der Gemeinde; Dorfbewohner urteilen nach Beweislage und Persönlichkeit). Mit Jury entscheidet ihre Mehrheit über schuldig, der Richter nur über die Strafe. Der Angeklagte bestellt einen Verteidiger (`/civ gericht verteidiger <Nr> <Spieler|dorfbewohner>`), Parteien laden Zeugen (`zeuge <Nr> …`); Dorfbewohner sagen sofort aus.
 - **Beweise:** `/civ gericht beweis <Nr>` legt vor, was du in der Hand hast (Buch mit Feder, signiertes Buch, beliebiger Gegenstand), `beweis <Nr> vertrag <Vertragsnr>`, `beweis <Nr> artikel <Artikelnr>`, `beweis <Nr> text <Text>`. Verträge wiegen am schwersten.
-- **Aussagen und Plädoyers:** `/civ gericht aussage <Nr> <Text>`, `plaedoyer <Nr> <Text>`; der Ton (be- oder entlastend) wird erkannt.
+- **Aussagen und Plädoyers:** `/civ gericht aussage <Nr> <Text>`, `plaedoyer <Nr> <Text>`; der Ton (be- oder entlastend) wird erkannt. Aussagen und Beweise gehen vom Einreichen bis zum Ende der Plädoyers, auch von Zeugen; Plädoyers ab der Eröffnung.
 - **Richter:** `eroeffnen <Nr>`, `weiter <Nr>`, `einstellen <Nr> [Grund]`, `urteil <Nr> schuldig|freispruch [Smaragde] [verbannen] [absetzen] | Begründung`. Strafen: Geldstrafe bis `max_fine`, Schadensersatz bis zur Klagesumme, Verbannung für 30 Tage (`exile_allowed`; man fliegt aus der Gemeinde und darf nicht wieder beitreten), Amtsenthebung. Eine erfolgreiche Verfassungsklage hebt die Regel bzw. den Paragraphen auf.
-- **Geschworene:** `/civ gericht stimme <Nr> schuldig|unschuldig`.
-- **Berufung:** `/civ gericht berufung <Nr>` durch die unterlegene Seite, solange das Urteil nicht rechtskräftig ist; das Gericht der nächsthöheren Ebene verhandelt neu, die Beweise wandern mit.
+- **Geschworene:** `/civ gericht stimme <Nr> schuldig|unschuldig` während Plädoyers und Beratung. Spricht der Richter früh ein Urteil, stimmen die Dorfbewohner-Geschworenen vorher ab.
+- **Berufung:** `/civ gericht berufung <Nr>` durch die unterlegene Seite (auch Verteidigung bzw. Staatsanwaltschaft), solange das Urteil nicht rechtskräftig ist; das Gericht der nächsthöheren Ebene verhandelt neu, die Beweise wandern mit. Ohne höhere Ebene verhandelt dasselbe Gericht neu, aber nie mit dem Richter der Vorinstanz.
 - **Menüs:** `/civ gericht` (Gericht der eigenen Gemeinde), `/civ gericht fall <Nr>` (Akte mit allen Beteiligten, Beweisen, Protokoll und den Knöpfen, die dir offenstehen), `/civ gericht faelle`, `/civ gericht akte <Nr>` (in den Chat). Im Rathaus oben (Glocke) und im Ebenenmenü.
 - **Richterbank (Block):** Rezept Gold, Buch, Gold über drei Bretter über Brett-leer-Brett. Rechtsklick öffnet das Gericht der Gemeinde, in der sie steht.
 
@@ -237,6 +237,11 @@ Rezept: Eisen, Papier, Truhe (`III / IPI / ICI`).
 - Firmen verdienen über eigene Läden (`/civ laden eroeffnen <Preis> <Firma>`, Einnahmen in die Firmenkasse), Aufträge (freie Verträge mit der Firma) und angestellte Dorfbewohner (`/civ firma einstellen <Firma> dorfbewohner <Lohn>`: ihr Anteil am Gemeindeeinkommen geht an die Firma).
 - `dividende <Firma> <Betrag>` schüttet aus der Kasse an alle Aktionäre aus, je Aktie gleich viel. `ausgeben <Firma> <Anzahl> <Preis>` gibt neue Aktien aus und bietet sie an; der Erlös geht in die Kasse. `aufloesen <Firma>` verteilt die Kasse anteilig an die Aktionäre.
 - **Börse:** `/civ boerse` zeigt alle Kurse, `kaufen|verkaufen <Firma> <Anzahl> [Limit]` gibt eine Limit-Order auf (ohne Limit bis 10 % über bzw. unter dem letzten Kurs). Orders werden sofort gegen das Orderbuch ausgeführt, beste Preise zuerst, zum Preis der wartenden Order; der Rest wartet bis zu 7 Tage. `depot`, `buch <Firma>`, `streichen <Nr>`. Menü: Gemeindehaus → Börse oder Block **Börsenterminal** (Rezept `GRG / IEI / III`).
+- **Produktion:** Jede Firma wählt eine Branche: `/civ firma branche <Firma> forst|schaeferei|acker|bergwerk|fischerei|viehzucht|ziegelei|obstbau`. Jeden Abend erzeugt sie Waren (Holz, Wolle, Weizen, Bruchstein/Kohle/Eisenerz, Fisch, Rindfleisch/Leder/Eier, Ziegel/Glas, Äpfel/Honig).
+  - **Arbeitskräfte:** die Leitung und Mitglieder je ½, Angestellte mit Arbeitsvertrag (Spieler oder Dorfbewohner) je 1. Mehr Leute bringen mehr, mit abnehmendem Grenzertrag. Einstellen: `/civ firma einstellen <Firma> <Spieler|dorfbewohner> <Lohn je Tag>` (Dorfbewohner ab 0,25 Smaragden), kündigen: `/civ firma kuendigen <Firma> <Spieler|dorfbewohner>` (endet nach einem Tag).
+  - **Investieren:** `/civ firma investieren <Firma> <Betrag>` aus der Firmenkasse in die Ausstattung. Stufe 1 kostet 20 Smaragde, jede weitere doppelt so viel wie die vorige (20, 60, 140, 300 … insgesamt); jede Stufe bringt +25 % Ertrag, höchstens Stufe 8. Ein Branchenwechsel halbiert die Ausstattung.
+  - **Verkauf:** `/civ firma verkauf <Firma> automatisch` (Standard) verkauft die Tageserzeugung abends an den Servermarkt, der Erlös geht in die Firmenkasse; `hand` behält sie im Lager. `/civ firma lager <Firma>`, `/civ firma abholen <Firma> <Ware> [Anzahl]` (ins Inventar), `/civ firma verkauf <Firma> jetzt`.
+  - **Menü:** `/civ firma menue <Firma>` oder über die Börse: Branche wählen, investieren (Klick 10, Shift 100 Smaragde), Verkauf umschalten, Lager abholen, Belegschaft (Shift-Klick kündigt), einstellen. Die Leitung bekommt jeden Abend eine Meldung mit Stückzahl und Erlös; die Webseite zeigt den Betrieb unter Börse.
 - **Dorfbewohner investieren:** Sie sparen ein Zehntel ihres Anteils am Gemeindeeinkommen (bis 50 Smaragde). Sparsame kaufen Aktien mit gutem Verhältnis aus Buchwert, Dividende und Kurs; Ordnungsliebende meiden schwankende Kurse, Freiheitsliebende mögen steigende; Ausgabefreudige verkaufen nach und nach.
 
 ### Presse
@@ -281,7 +286,11 @@ Der Server stellt eine Webseite bereit, standardmäßig auf Port 8765, hell und 
 - **Freunde:** Anfragen senden, annehmen, ablehnen; wer online ist
 - **Mein Bereich:** Kontostand, Anschrift, Überweisen, Verträge unterschreiben, anbieten und kündigen, Ämter, Wahlen und Abstimmungen
 
-Anmelden: Mit `/civ web` holst du dir im Spiel einen Code und gibst ihn auf der Webseite ein.
+Anmelden: Mit `/civ web` holst du dir im Spiel einen Code und gibst ihn auf der Webseite ein. Sitzungen verfallen nach zwei Tagen ohne Nutzung oder nach sieben Tagen; `/civ web abmelden` meldet dich überall ab.
+
+### Englische Befehle und Handbuch
+- Jeder Befehl geht auch auf Englisch: `/civ court case 3`, `/civ company invest "Holz AG" 20`, `/civ election vote buergermeister Alex`, `/civ town court sue …`. Werte hinter den Befehlen (Ämter wie `buergermeister`, Branchen, `schuldig` usw.) bleiben deutsch.
+- Neue Spieler bekommen beim ersten Betreten das **Civ-Handbuch** (in ihrer Spielsprache). Nachschlag: `/civ handbuch`.
 
 ### Befehle
 | Befehl | Wirkung |
@@ -419,6 +428,7 @@ Der Bürgermeister (oder mit Abstimmungen die Bürger) stellt diese Regelungen i
 | `market_town_inhabitants`, `city_inhabitants`, `metropolis_inhabitants` | Einwohner für die Siedlungsstufen |
 | `web_enabled`, `web_bind`, `web_port` | Webseite ein/aus, Adresse und Port (Standard `true`, `0.0.0.0`, `8765`) |
 | `web_public_url` | Adresse, die `/civ web` den Spielern nennt, z. B. `https://civ.example.org` |
+| `web_trust_proxy` | nur hinter einem Reverse-Proxy `true`: dann zählen `X-Forwarded-For`/`-Proto` (Standard `false`) |
 | `live_count`, `live_count_seconds`, `live_count_projections` | Live-Auszählung nach Wahlschluss an/aus, Dauer in Sekunden, Hochrechnungen an/aus (Standard `true`, 60, `true`) |
 | `debate_minutes` | Länge einer Wahldebatte (Standard 5) |
 | `anthem_on_enter` | Hymne beim Betreten eines Gebiets (Standard `false`) |
@@ -427,6 +437,37 @@ Der Bürgermeister (oder mit Abstimmungen die Bürger) stellt diese Regelungen i
 Fehlen Einträge (nach einem Update), ergänzt der Mod sie beim Start mit Standardwerten.
 
 Der Zustand liegt je Welt in `<Welt>/data/eddies-civ-mod/civ.sqlite` und wird im Hintergrund zusammen mit der Welt gespeichert.
+
+### Installation
+Ein JAR für Server und Client: Der Mod bringt eigene Blöcke mit, deshalb brauchen ihn alle Spieler. Dazu Fabric Loader ab 0.19.5 und Fabric API ab 0.164.0, Java 25.
+
+### Rechte
+Über die Permission-API von Fabric, also auch mit LuckPerms. Ohne Rechte-Mod gilt die Operator-Stufe.
+
+| Knoten | Wofür | ohne Rechte-Mod |
+|---|---|---|
+| `eddies-civ-mod:use` | alle `/civ`-Befehle | alle Spieler |
+| `eddies-civ-mod:web` | `/civ web` | alle Spieler |
+| `eddies-civ-mod:found` | `/civ gruenden` ohne Gemeindehaus | Spielleiter (Stufe 2) |
+| `eddies-civ-mod:admin` | `/civ admin …` | Spielleiter (Stufe 2) |
+
+### Sicherungen
+- Beim Start prüft der Mod die Datenbank (`PRAGMA quick_check`). Ist sie beschädigt, startet der Server nicht und nennt den Ordner mit den Sicherungen.
+- Vor jeder Schemaänderung (nach einem Update) entsteht `backups/civ-v<alte Version>-….sqlite`, einmal je Spieltag `civ-daily-….sqlite`; von jeder Art bleiben die neuesten sieben. `/civ admin sicherung` schreibt sofort eine.
+- Wiederherstellen: Server stoppen, die gewünschte Sicherung aus `<Welt>/data/eddies-civ-mod/backups/` als `civ.sqlite` in den Ordner darüber kopieren, Server starten.
+
+### Webseite absichern
+- Die Seite setzt Sicherheits-Header (CSP, kein Einbetten in fremde Seiten), prüft bei Änderungen die Herkunft, begrenzt Anfragen je Adresse (600 lesend, 120 schreibend je Minute) und Fehlversuche bei der Anmeldung (10 je Adresse, 200 insgesamt je Minute).
+- Für HTTPS einen Reverse-Proxy davorsetzen und `web_bind=127.0.0.1`, `web_trust_proxy=true`, `web_public_url=https://…` eintragen. Beispiel für nginx:
+
+```
+location / {
+    proxy_pass http://127.0.0.1:8765;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
 
 ## Aufbau
 | Modul | Inhalt |

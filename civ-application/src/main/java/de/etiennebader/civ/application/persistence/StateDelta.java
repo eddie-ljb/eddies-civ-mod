@@ -2,6 +2,8 @@ package de.etiennebader.civ.application.persistence;
 
 import de.etiennebader.civ.domain.justice.JudiciaryView;
 import de.etiennebader.civ.domain.justice.Judiciary;
+import de.etiennebader.civ.domain.production.ProductionRegistry;
+import de.etiennebader.civ.domain.production.ProductionView;
 import de.etiennebader.civ.domain.civic.CivicView;
 import de.etiennebader.civ.domain.civic.CivicRegistry;
 import de.etiennebader.civ.application.day.CalendarState;
@@ -58,7 +60,19 @@ public record StateDelta(List<PolityChange> polities, List<ClaimChange> claims, 
                          List<ShopChange> shops, List<DomainEvent> events, List<KnownPlayer> players, CalendarState calendar,
                          Optional<List<Contract>> contracts, Optional<CommunitySnapshot> community,
                          Optional<ExchangeSnapshot> exchange, Optional<List<Article>> press,
-                         Optional<CivicRegistry> civic, Optional<Judiciary> justice) {
+                         Optional<CivicRegistry> civic, Optional<Judiciary> justice,
+                         Optional<ProductionRegistry> production) {
+
+    /** Ohne Firmenbetriebe. */
+    public StateDelta(List<PolityChange> polities, List<ClaimChange> claims, List<PlotChange> plots,
+                      List<BalanceChange> balances, List<CurrencyTotals> currencies, List<CommodityStock> commodities,
+                      List<ShopChange> shops, List<DomainEvent> events, List<KnownPlayer> players,
+                      CalendarState calendar, Optional<List<Contract>> contracts, Optional<CommunitySnapshot> community,
+                      Optional<ExchangeSnapshot> exchange, Optional<List<Article>> press, Optional<CivicRegistry> civic,
+                      Optional<Judiciary> justice) {
+        this(polities, claims, plots, balances, currencies, commodities, shops, events, players, calendar, contracts,
+                community, exchange, press, civic, justice, Optional.empty());
+    }
 
     /** Ohne Wahlkreise und Justiz. */
     public StateDelta(List<PolityChange> polities, List<ClaimChange> claims, List<PlotChange> plots,
@@ -144,6 +158,7 @@ public record StateDelta(List<PolityChange> polities, List<ClaimChange> claims, 
         press = Objects.requireNonNull(press, "press").map(List::copyOf);
         civic = Objects.requireNonNull(civic, "civic").map(StateDelta::copyOf);
         justice = Objects.requireNonNull(justice, "justice").map(StateDelta::copyOf);
+        production = Objects.requireNonNull(production, "production").map(StateDelta::copyOf);
     }
 
     /** Aktueller Stand einer geänderten Polity; leer, wenn sie aufgelöst wurde. */
@@ -256,13 +271,19 @@ public record StateDelta(List<PolityChange> polities, List<ClaimChange> claims, 
                 ? Optional.of(current.press().articles()) : Optional.empty();
         Optional<CivicRegistry> civic = changes.civic() ? Optional.of(copyOf(current.civic())) : Optional.empty();
         Optional<Judiciary> justice = changes.justice() ? Optional.of(copyOf(current.justice())) : Optional.empty();
+        Optional<ProductionRegistry> production = changes.production()
+                ? Optional.of(copyOf(current.production())) : Optional.empty();
         return new StateDelta(polities, claims, plots, balances, currencies, commodities, shops, changes.events(),
-                players, calendar, contracts, community, exchange, press, civic, justice);
+                players, calendar, contracts, community, exchange, press, civic, justice, production);
     }
 
     /** Eine unabhängige Kopie, damit der Speicher-Thread keinen Arbeitsstand sieht, der sich noch ändert. */
     private static CivicRegistry copyOf(CivicView civic) {
         return CivicRegistry.restore(civic.constituencies(), civic.flags(), civic.anthems());
+    }
+
+    private static ProductionRegistry copyOf(ProductionView production) {
+        return ProductionRegistry.restore(production.enterprises());
     }
 
     private static Judiciary copyOf(JudiciaryView justice) {

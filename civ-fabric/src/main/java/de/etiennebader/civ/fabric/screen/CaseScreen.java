@@ -156,22 +156,24 @@ public final class CaseScreen extends MenuScreen {
                             .line(Message.of(MessageKey.CASE_VERDICT_FORMAT), Icon.HINT).build(),
                     click -> prompt(click, GuiKeys.CASE_ACT_VERDICT.text(), base + "urteil " + number + " "));
         }
-        if (side && early) {
+        boolean witness = role.filter(Role.WITNESS::equals).isPresent();
+        boolean beforeDeliberation = early || stage == Stage.PLEADINGS;
+        if ((side || witness) && beforeDeliberation) {
             canvas.set(40, Icon.of(Items.WRITABLE_BOOK).name(GuiKeys.CASE_ACT_EVIDENCE.text(), Icon.TITLE)
                             .line(GuiKeys.CASE_ACT_EVIDENCE_LINE.text(), Icon.HINT).build(),
                     click -> act(click, () -> de.etiennebader.civ.fabric.CivCommandTree.handEvidence(civ, click.player(), number)));
-            canvas.set(41, Icon.of(Items.SPYGLASS).name(GuiKeys.CASE_ACT_SUMMON.text(), Icon.TITLE).build(),
-                    click -> prompt(click, GuiKeys.CASE_ACT_SUMMON.text(), base + "zeuge " + number + " "));
-        }
-        if ((side || role.filter(Role.WITNESS::equals).isPresent()) && early) {
             canvas.set(42, Icon.of(Items.FEATHER).name(GuiKeys.CASE_ACT_TESTIFY.text(), Icon.TITLE).build(),
                     click -> prompt(click, GuiKeys.CASE_ACT_TESTIFY.text(), base + "aussage " + number + " "));
         }
-        if (side && stage == Stage.PLEADINGS) {
-            canvas.set(42, Icon.of(Items.GOAT_HORN).name(GuiKeys.CASE_ACT_PLEAD.text(), Icon.TITLE).build(),
+        if (side && beforeDeliberation) {
+            canvas.set(41, Icon.of(Items.SPYGLASS).name(GuiKeys.CASE_ACT_SUMMON.text(), Icon.TITLE).build(),
+                    click -> prompt(click, GuiKeys.CASE_ACT_SUMMON.text(), base + "zeuge " + number + " "));
+        }
+        if (side && (stage == Stage.EVIDENCE || stage == Stage.PLEADINGS)) {
+            canvas.set(39, Icon.of(Items.GOAT_HORN).name(GuiKeys.CASE_ACT_PLEAD.text(), Icon.TITLE).build(),
                     click -> prompt(click, GuiKeys.CASE_ACT_PLEAD.text(), base + "plaedoyer " + number + " "));
         }
-        if (role.filter(Role.DEFENDANT::equals).isPresent() && early && view.defense().isEmpty()) {
+        if (role.filter(Role.DEFENDANT::equals).isPresent() && beforeDeliberation && view.defense().isEmpty()) {
             canvas.set(43, Icon.of(Items.SHIELD).name(GuiKeys.CASE_ACT_DEFENSE.text(), Icon.TITLE).build(),
                     click -> prompt(click, GuiKeys.CASE_ACT_DEFENSE.text(), base + "verteidiger " + number + " "));
         }

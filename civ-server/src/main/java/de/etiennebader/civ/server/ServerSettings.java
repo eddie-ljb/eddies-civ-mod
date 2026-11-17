@@ -115,9 +115,14 @@ public record ServerSettings(long ticksPerDay, int claimBase, int claimPerMember
      * @param bind      Adresse, an die der Server bindet, z. B. {@code 0.0.0.0}
      * @param publicUrl Adresse, die Spieler im Browser öffnen; leer heißt „Server-Adresse und Port“
      */
-    public record WebSettings(boolean enabled, String bind, int port, String publicUrl) {
+    public record WebSettings(boolean enabled, String bind, int port, String publicUrl, boolean trustProxy) {
 
-        public static final WebSettings DEFAULT = new WebSettings(true, "0.0.0.0", 8765, "");
+        public static final WebSettings DEFAULT = new WebSettings(true, "0.0.0.0", 8765, "", false);
+
+        /** Ohne Reverse-Proxy. */
+        public WebSettings(boolean enabled, String bind, int port, String publicUrl) {
+            this(enabled, bind, port, publicUrl, false);
+        }
 
         public WebSettings {
             Objects.requireNonNull(bind, "bind");
@@ -128,7 +133,7 @@ public record ServerSettings(long ticksPerDay, int claimBase, int claimPerMember
         }
 
         public WebSettings disabled() {
-            return new WebSettings(false, bind, port, publicUrl);
+            return new WebSettings(false, bind, port, publicUrl, trustProxy);
         }
     }
 

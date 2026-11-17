@@ -179,6 +179,7 @@ public final class CivServerHost {
         if (civ != null) {
             civ.playerJoined(Players.ref(player), Players.name(player));
             player.sendSystemMessage(Components.prefixed(Components.of(civ.commands().welcome(Players.caller(player))), true));
+            de.etiennebader.civ.fabric.content.Handbook.giveOnFirstJoin(player);
         }
     }
 

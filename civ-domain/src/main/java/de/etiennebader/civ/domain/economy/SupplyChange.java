@@ -14,6 +14,8 @@ public enum SupplyChange {
     MARKET_PURCHASE,
     /** Wirtschaftsleistung der Dorfbewohner einer Gemeinde, gutgeschrieben in der Gemeindekasse. */
     VILLAGER_ECONOMY,
+    /** Investition in die Ausstattung einer Firma; das Geld verlässt den Umlauf. */
+    INVESTMENT,
     /** Eingriff eines Administrators. */
     ADMIN
 }

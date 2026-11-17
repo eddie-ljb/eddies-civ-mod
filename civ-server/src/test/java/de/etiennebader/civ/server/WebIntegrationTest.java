@@ -223,6 +223,39 @@ class WebIntegrationTest {
                 new ServerSettings.WebSettings(true, "127.0.0.1", 0, ""));
     }
 
+    @Test
+    @DisplayName("Schutz: Sicherheits-Header, fremde Herkunft bei POST abgelehnt, gleiche Herkunft erlaubt")
+    void securityGuards() throws Exception {
+        SeededIdGenerator ids = new SeededIdGenerator(63);
+        CivServer civ = CivServer.start(new MemoryStateStore(), withWeb(ServerSettings.withDayLength(1_200)), ids,
+                SaveListener.NONE);
+        ExecutorService mainThread = Executors.newSingleThreadExecutor();
+        try {
+            int port = civ.startWeb(id -> Optional.empty(), mainThread).orElseThrow();
+            java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
+            java.net.http.HttpResponse<String> page = client.send(java.net.http.HttpRequest.newBuilder(
+                    URI.create("http://127.0.0.1:" + port + "/")).build(),
+                    java.net.http.HttpResponse.BodyHandlers.ofString());
+            assertEquals(Optional.of("nosniff"), page.headers().firstValue("X-Content-Type-Options"));
+            assertTrue(page.headers().firstValue("Content-Security-Policy").orElse("").contains("frame-ancestors"));
+            java.net.http.HttpResponse<String> foreign = client.send(java.net.http.HttpRequest.newBuilder(
+                    URI.create("http://127.0.0.1:" + port + "/api/login"))
+                    .header("Content-Type", "application/json").header("Origin", "https://evil.example")
+                    .POST(java.net.http.HttpRequest.BodyPublishers.ofString("{\"code\":\"AAAAAA\"}")).build(),
+                    java.net.http.HttpResponse.BodyHandlers.ofString());
+            assertEquals(403, foreign.statusCode());
+            java.net.http.HttpResponse<String> own = client.send(java.net.http.HttpRequest.newBuilder(
+                    URI.create("http://127.0.0.1:" + port + "/api/login"))
+                    .header("Content-Type", "application/json").header("Origin", "http://127.0.0.1:" + port)
+                    .POST(java.net.http.HttpRequest.BodyPublishers.ofString("{\"code\":\"AAAAAA\"}")).build(),
+                    java.net.http.HttpResponse.BodyHandlers.ofString());
+            assertEquals(401, own.statusCode());
+        } finally {
+            civ.stop();
+            mainThread.shutdownNow();
+        }
+    }
+
     private static Response request(String url, String json, String cookie) throws IOException {
         HttpURLConnection connection = (HttpURLConnection) URI.create(url).toURL().openConnection();
         connection.setConnectTimeout(5_000);

@@ -36,6 +36,7 @@ public final class ServerConfig {
     static final String WEB_BIND = "web_bind";
     static final String WEB_PORT = "web_port";
     static final String WEB_URL = "web_public_url";
+    static final String WEB_TRUST_PROXY = "web_trust_proxy";
     static final String LIVE_COUNT = "live_count";
     static final String LIVE_COUNT_SECONDS = "live_count_seconds";
     static final String PROJECTIONS = "live_count_projections";
@@ -44,7 +45,7 @@ public final class ServerConfig {
     static final String WORLD_MAP = "world_map";
     static final String MAP_RADIUS = "world_map_radius_chunks";
     private static final java.util.List<String> KEYS = java.util.List.of(LIVE_COUNT, LIVE_COUNT_SECONDS, PROJECTIONS,
-            DEBATE_MINUTES, ANTHEM_ON_ENTER, WORLD_MAP, MAP_RADIUS);
+            DEBATE_MINUTES, ANTHEM_ON_ENTER, WORLD_MAP, MAP_RADIUS, WEB_TRUST_PROXY);
 
     private static final String HEADER = """
             Eddies Civ Mod
@@ -59,6 +60,8 @@ public final class ServerConfig {
             villager_parties: ob Dorfbewohner Parteien beitreten und gruenden (true/false)
             villager_party_founders: wie viele parteilose Gleichgesinnte einer Gemeinde eine Partei gruenden (ab 2)
             web_enabled, web_bind, web_port: eingebettete Webseite; web_public_url: Adresse fuer Spieler (optional)
+            web_bind=127.0.0.1 macht die Webseite nur auf diesem Rechner erreichbar (fuer einen Reverse-Proxy mit HTTPS)
+            web_trust_proxy: true nur hinter einem Reverse-Proxy (nginx, Caddy): dann gelten X-Forwarded-For/-Proto
             live_count: Wahlergebnisse als Live-Auszaehlung mit Zwischenstaenden (true/false)
             live_count_seconds: Dauer der Live-Auszaehlung (5-600); live_count_projections: Hochrechnungen (true/false)
             debate_minutes: Laenge einer Wahldebatte in Minuten (0 = keine Debatten)
@@ -109,7 +112,9 @@ public final class ServerConfig {
                 Boolean.parseBoolean(properties.getProperty(WEB_ENABLED, Boolean.toString(defaults.web().enabled())).strip()),
                 properties.getProperty(WEB_BIND, defaults.web().bind()).strip(),
                 (int) Math.min(65_535, number(properties, WEB_PORT, defaults.web().port(), 0)),
-                properties.getProperty(WEB_URL, defaults.web().publicUrl()).strip());
+                properties.getProperty(WEB_URL, defaults.web().publicUrl()).strip(),
+                Boolean.parseBoolean(properties.getProperty(WEB_TRUST_PROXY,
+                        Boolean.toString(defaults.web().trustProxy())).strip()));
         return new ServerSettings(ticks, claimBase, claimPerMember, defaults.currency(),
                 Money.of(MoneyFormat.emeralds(reference), defaults.currency()), Money.of(income, defaults.currency()),
                 tiers, web, Boolean.parseBoolean(properties.getProperty(EMIGRATION,
@@ -160,6 +165,7 @@ public final class ServerConfig {
         properties.setProperty(WEB_BIND, settings.web().bind());
         properties.setProperty(WEB_PORT, Integer.toString(settings.web().port()));
         properties.setProperty(WEB_URL, settings.web().publicUrl());
+        properties.setProperty(WEB_TRUST_PROXY, Boolean.toString(settings.web().trustProxy()));
         properties.setProperty(LIVE_COUNT, Boolean.toString(settings.show().liveCount()));
         properties.setProperty(LIVE_COUNT_SECONDS, Integer.toString(settings.show().liveCountSeconds()));
         properties.setProperty(PROJECTIONS, Boolean.toString(settings.show().projections()));

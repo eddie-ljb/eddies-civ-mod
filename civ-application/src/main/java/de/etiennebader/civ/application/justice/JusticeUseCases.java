@@ -158,8 +158,11 @@ public final class JusticeUseCases {
 
     public CourtCase submit(ActorRef by, CaseId id, String kind, String title, String content, int weight, Day day) {
         CourtCase found = require(id);
-        Side side = found.sideOf(by).orElseThrow(() -> new IllegalArgumentException(
-                "Beweise reichen nur Kläger, Anklage, Angeklagter und Verteidigung ein"));
+        Side side = found.sideOf(by).or(() -> found.roleOf(by).filter(Role.WITNESS::equals)
+                        .map(witness -> CourtReasoning.tendency(title + " " + content, Role.WITNESS) >= 0
+                                ? Side.PROSECUTION : Side.DEFENSE))
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Beweise reichen nur Kläger, Anklage, Angeklagter, Verteidigung und Zeugen ein"));
         Judiciary judiciary = aggregates.justice();
         CourtCase updated = judiciary.submit(id, by, side, kind, title, content, weight, day);
         aggregates.commit(judiciary);
@@ -171,8 +174,8 @@ public final class JusticeUseCases {
         CourtCase found = require(id);
         Role role = found.roleOf(speaker).filter(candidate -> candidate != Role.JUROR && candidate != Role.JUDGE)
                 .orElseThrow(() -> new IllegalArgumentException("Nur Zeugen und Parteien sagen aus"));
-        if (found.stage() != Stage.EVIDENCE && found.stage() != Stage.FILED) {
-            throw new IllegalStateException("Aussagen nur während der Beweisaufnahme");
+        if (found.stage() != Stage.EVIDENCE && found.stage() != Stage.FILED && found.stage() != Stage.PLEADINGS) {
+            throw new IllegalStateException("Aussagen nur bis zu den Plädoyers");
         }
         return state(id, new Statement(speaker, role, text, CourtReasoning.tendency(text, role), day), day);
     }
@@ -180,8 +183,8 @@ public final class JusticeUseCases {
     /** Schlussvortrag einer Seite. */
     public CourtCase plead(ActorRef speaker, CaseId id, String text, Day day) {
         CourtCase found = require(id);
-        if (found.stage() != Stage.PLEADINGS) {
-            throw new IllegalStateException("Plädoyers erst nach der Beweisaufnahme");
+        if (found.stage() != Stage.PLEADINGS && found.stage() != Stage.EVIDENCE) {
+            throw new IllegalStateException("Plädoyers nur im eröffneten Verfahren vor der Beratung");
         }
         Role role = found.roleOf(speaker).filter(candidate -> found.sideOf(speaker).isPresent())
                 .orElseThrow(() -> new IllegalArgumentException("Plädieren dürfen nur die Parteien"));
@@ -219,6 +222,11 @@ public final class JusticeUseCases {
         if (found.stage() != Stage.DELIBERATION && found.stage() != Stage.PLEADINGS) {
             throw new IllegalStateException("Ein Urteil erst nach der Beweisaufnahme");
         }
+        if (found.hasJury()) {
+            Judiciary judiciary = aggregates.justice();
+            found = villagerVotes(judiciary, found, day);
+            aggregates.commit(judiciary);
+        }
         return decideNow(found, judge, upheld, fine, damages, exile, dismissal, reasoning, day);
     }
 
@@ -229,12 +237,14 @@ public final class JusticeUseCases {
             throw new IllegalStateException("Berufung nur gegen ein noch nicht rechtskräftiges Urteil");
         }
         boolean upheld = found.verdict().get().upheld();
-        ActorRef loser = upheld ? found.defendant() : found.plaintiff();
-        if (!loser.equals(by) && !(upheld && found.defense().filter(by::equals).isPresent())) {
-            throw new IllegalArgumentException("Berufung legt nur die unterlegene Partei ein");
+        boolean losingSide = upheld
+                ? found.defendant().equals(by) || found.defense().filter(by::equals).isPresent()
+                : found.plaintiff().equals(by) || found.prosecutor().filter(by::equals).isPresent();
+        if (!losingSide) {
+            throw new IllegalArgumentException("Berufung legt nur die unterlegene Seite ein");
         }
-        PolityId higher = queries().parentOf(found.court()).map(PolityView::id)
-                .orElseThrow(() -> new IllegalStateException("Es gibt kein höheres Gericht"));
+        // Ohne höhere Ebene verhandelt dasselbe Gericht neu, aber mit einem anderen Richter.
+        PolityId higher = queries().parentOf(found.court()).map(PolityView::id).orElse(found.court());
         Judiciary judiciary = aggregates.justice();
         judiciary.markAppealed(id, day);
         CourtCase appeal = judiciary.file(CaseId.generate(ids), higher, found.kind(), found.plaintiff(),
@@ -465,18 +475,27 @@ public final class JusticeUseCases {
     private ActorRef defaultJudge(CourtCase found) {
         Polity polity = aggregates.polity(found.court());
         CourtStaff staff = aggregates.justice().staffOf(found.court());
-        Optional<ActorRef> appointed = staff.judges().stream().filter(judge -> found.roleOf(judge).isEmpty()
+        Optional<ActorRef> previous = previousJudge(found);
+        java.util.function.Predicate<ActorRef> fresh = candidate -> previous.filter(candidate::equals).isEmpty();
+        Optional<ActorRef> appointed = staff.judges().stream().filter(fresh).filter(judge -> found.roleOf(judge).isEmpty()
                 || found.judge().filter(judge::equals).isPresent()).findFirst();
         if (appointed.isPresent()) {
             return appointed.get();
         }
-        Optional<ActorRef> head = polity.mayor().filter(mayor -> found.roleOf(mayor).isEmpty()
+        Optional<ActorRef> head = polity.mayor().filter(fresh).filter(mayor -> found.roleOf(mayor).isEmpty()
                 || found.judge().filter(mayor::equals).isPresent());
         if (head.isPresent()) {
             return head.get();
         }
         return polity.members().stream().map(Membership::member).filter(member -> member instanceof PersonRef)
-                .filter(member -> found.roleOf(member).isEmpty()).findFirst().orElse(polity.asActor());
+                .filter(fresh).filter(member -> found.roleOf(member).isEmpty()).findFirst().orElse(polity.asActor());
+    }
+
+    /** Der Richter der Vorinstanz, wenn sie am selben Gericht verhandelt wurde; er darf nicht erneut urteilen. */
+    private Optional<ActorRef> previousJudge(CourtCase found) {
+        return found.appealOf().flatMap(id -> aggregates.justice().courtCase(id))
+                .filter(original -> original.court().equals(found.court()))
+                .flatMap(CourtCase::judge);
     }
 
     private void requireJudge(ActorRef actor, CourtCase found) {
@@ -484,7 +503,8 @@ public final class JusticeUseCases {
         boolean appointed = staff.judges().contains(actor);
         boolean head = staff.judges().isEmpty() && isHead(actor, found);
         boolean assigned = found.judge().filter(actor::equals).isPresent();
-        if (!(appointed || head || assigned) || (found.sideOf(actor).isPresent())) {
+        boolean judgedBefore = found.judge().isEmpty() && previousJudge(found).filter(actor::equals).isPresent();
+        if (!(appointed || head || assigned) || found.sideOf(actor).isPresent() || judgedBefore) {
             throw new IllegalArgumentException("Nur der Richter dieses Gerichts");
         }
     }

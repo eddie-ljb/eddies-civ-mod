@@ -68,6 +68,16 @@ public final class ExchangeScreen extends MenuScreen {
         if (listings.isEmpty()) {
             canvas.set(22, Icon.of(Items.PAPER).name(Message.of(MessageKey.COMPANIES_NONE), Icon.INFO).build());
         }
+        List<de.etiennebader.civ.domain.polity.PolityView> led = civ.companies().led(Players.ref(player));
+        for (int index = 0; index < Math.min(3, led.size()); index++) {
+            String name = led.get(index).name().value();
+            canvas.set(36 + index, Icon.of(Items.CRAFTING_TABLE).name(Icon.literal(name, ChatFormatting.GOLD))
+                    .hint(GuiKeys.COMPANY_OPEN_HINT.text()).build(), click -> {
+                        de.etiennebader.civ.fabric.Feedback.click(click.player());
+                        de.etiennebader.civ.fabric.gui.Screens.open(click.player(),
+                                new CompanyScreen(civ, click.player(), name, Optional.of(this)));
+                    });
+        }
         canvas.fillRow(4, Icon.of(Items.STAINED_GLASS_PANE.gray()).hidden().build());
         long value = holdings.stream().mapToLong(HoldingView::valueUnits).sum();
         Icon depot = Icon.of(Items.CHEST).name(GuiKeys.EXCHANGE_DEPOT.text(), Icon.TITLE)

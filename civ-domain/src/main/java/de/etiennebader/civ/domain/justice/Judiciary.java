@@ -105,7 +105,10 @@ public final class Judiciary extends AggregateRoot<JusticeEvent> implements Judi
     }
 
     public CourtCase dismiss(CaseId id, ActorRef judge, String reason, Day day) {
-        CourtCase found = require(id, Stage.FILED);
+        CourtCase found = requireOpen(id);
+        if (found.stage() == Stage.DECIDED) {
+            throw new IllegalStateException("Ein Urteil wird nicht eingestellt, nur angefochten");
+        }
         CourtCase dismissed = found.staffed(Optional.of(judge), found.prosecutor(), found.defense(), found.jurors())
                 .withStatement(new Statement(judge, Role.JUDGE, reason, 0, day)).at(Stage.DISMISSED, day);
         return replace(dismissed, day);
@@ -134,8 +137,8 @@ public final class Judiciary extends AggregateRoot<JusticeEvent> implements Judi
     public CourtCase submit(CaseId id, ActorRef by, Side side, String kind, String title, String content, int weight,
                             Day day) {
         CourtCase found = requireOpen(id);
-        if (found.stage() != Stage.FILED && found.stage() != Stage.EVIDENCE) {
-            throw new IllegalStateException("Beweise nur bis zum Ende der Beweisaufnahme");
+        if (found.stage() != Stage.FILED && found.stage() != Stage.EVIDENCE && found.stage() != Stage.PLEADINGS) {
+            throw new IllegalStateException("Beweise nur bis zu den Plädoyers");
         }
         if (found.evidence().size() >= CourtCase.MAX_EVIDENCE) {
             throw new IllegalStateException("Höchstens " + CourtCase.MAX_EVIDENCE + " Beweise");
@@ -153,7 +156,10 @@ public final class Judiciary extends AggregateRoot<JusticeEvent> implements Judi
     }
 
     public CourtCase vote(CaseId id, ActorRef juror, boolean guilty, Day day) {
-        CourtCase found = require(id, Stage.DELIBERATION);
+        CourtCase found = requireOpen(id);
+        if (found.stage() != Stage.PLEADINGS && found.stage() != Stage.DELIBERATION) {
+            throw new IllegalStateException("Geschworene stimmen nach der Beweisaufnahme ab");
+        }
         if (!found.jurors().contains(juror)) {
             throw new IllegalArgumentException("Kein Geschworener");
         }

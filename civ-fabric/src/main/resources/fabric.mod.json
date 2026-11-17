@@ -3,25 +3,26 @@
 	"id": "eddies-civ-mod",
 	"version": "${version}",
 	"name": "Eddies Civ Mod",
-	"description": "Found towns around a town hall, claim land, pass laws by vote and grow your settlement with villagers as citizens. A server-side economy with banks, dynamic market prices, player shops and taxes, plus a web map, ties it all together.",
+	"description": "A civilization mod: found towns around a town hall, claim land, vote on laws and constitutions, elect mayors and parliaments with real voting systems, form parties, states and nations, run companies that produce goods and trade on a stock exchange, take each other to court, and let villagers live, work and vote as citizens. Includes a web map, newspapers, contracts, mail and an in-game handbook. Install on server and client.",
 	"authors": [
 		"_eddie_ljb"
 	],
 	"contact": {
-		"sources": "https://github.com/eddie-ljb/eddies-civ-mod"
+		"sources": "https://github.com/eddie-ljb/eddies-civ-mod",
+		"issues": "https://github.com/eddie-ljb/eddies-civ-mod/issues"
 	},
 	"license": "MPL-2.0",
 	"icon": "assets/eddies-civ-mod/icon.png",
 	"environment": "*",
 	"entrypoints": {
 		"main": [
-          "de.etiennebader.civ.EddiesCivMod"
+			"de.etiennebader.civ.EddiesCivMod"
 		],
 		"client": [
-          "de.etiennebader.civ.client.EddiesCivModClient"
+			"de.etiennebader.civ.client.EddiesCivModClient"
 		],
 		"fabric-datagen": [
-          "de.etiennebader.civ.client.EddiesCivModDataGenerator"
+			"de.etiennebader.civ.client.EddiesCivModDataGenerator"
 		]
 	},
 	"mixins": [
@@ -35,6 +36,10 @@
 		"fabricloader": ">=0.19.5",
 		"minecraft": "~26.3",
 		"java": ">=25",
-		"fabric-api": "*"
+		"fabric-api": ">=0.164.0",
+		"fabric-permission-api-v1": "*"
+	},
+	"suggests": {
+		"luckperms": "*"
 	}
 }

@@ -54,7 +54,7 @@ class JusticeServiceTest {
         assertTrue(verdict.success(), verdict.toString());
         assertEquals(MessageKey.CASE_VERDICT.key(), verdict.lines().getFirst().key());
         assertEquals(500L, justice.courtCase(number).orElseThrow().verdict().orElseThrow().fine());
-        assertFalse(justice.appeal(caller(carla), number).success(), "Gemeinde ohne höhere Ebene");
+        assertFalse(justice.appeal(caller(bob), number).success(), "nur die unterlegene Seite");
         for (int day = 0; day < 6 && justice.courtCase(number).orElseThrow().stage() != Stage.FINAL; day++) {
             server.endDayNow();
         }

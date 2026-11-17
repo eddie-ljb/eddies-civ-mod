@@ -19,7 +19,10 @@ import de.etiennebader.civ.domain.exchange.Quote;
 import de.etiennebader.civ.domain.exchange.Side;
 import de.etiennebader.civ.domain.exchange.StockExchange;
 import de.etiennebader.civ.domain.exchange.StockExchangeView;
+import de.etiennebader.civ.domain.market.Commodity;
 import de.etiennebader.civ.domain.polity.Office;
+import de.etiennebader.civ.domain.production.Branch;
+import de.etiennebader.civ.domain.production.Enterprise;
 import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.polity.PolityName;
 import de.etiennebader.civ.domain.polity.PolityView;
@@ -132,6 +135,7 @@ public final class CompanyService {
         for (ListingView.HolderLine holder : listing.holders()) {
             lines.add(Message.of(MessageKey.COMPANY_HOLDER, holder.name(), holder.shares(), percent(holder.percent())));
         }
+        productionLines(company.get(), lines);
         return Reply.success(lines);
     }
 
@@ -307,6 +311,237 @@ public final class CompanyService {
             }
         }
         return app.villagerInvestors().execute(day);
+    }
+
+
+    // ---- Produktion ----
+
+    private Supplier<de.etiennebader.civ.domain.market.PriceLevel> priceLevel =
+            () -> de.etiennebader.civ.domain.market.PriceLevel.NEUTRAL;
+
+    /** Woher das Preisniveau für Verkäufe aus dem Lager kommt (vom Markt). */
+    public void pricing(Supplier<de.etiennebader.civ.domain.market.PriceLevel> level) {
+        this.priceLevel = Objects.requireNonNull(level, "level");
+    }
+
+    /** Grundpreis einer Ware für den Servermarkt. */
+    public static java.util.OptionalLong basePrice(Commodity commodity) {
+        String path = commodity.id().substring(commodity.id().indexOf(':') + 1);
+        return de.etiennebader.civ.server.market.BasePrices.of(new de.etiennebader.civ.server.market.ItemTraits(
+                commodity.id(), itemKey(commodity), de.etiennebader.civ.server.market.ItemTraits.Rarity.COMMON, 64,
+                isBlock(path), false));
+    }
+
+    private static boolean isBlock(String path) {
+        return path.endsWith("_log") || path.endsWith("_wool") || path.endsWith("_sapling")
+                || java.util.Set.of("cobblestone", "bricks", "glass", "stone").contains(path);
+    }
+
+    /** Übersetzungsschlüssel einer Ware, z. B. {@code block.minecraft.oak_log}. */
+    public static String itemKey(Commodity commodity) {
+        int colon = commodity.id().indexOf(':');
+        String namespace = commodity.id().substring(0, colon);
+        String path = commodity.id().substring(colon + 1);
+        return (isBlock(path) ? "block." : "item.") + namespace + "." + path;
+    }
+
+    public static Message branchName(Branch branch) {
+        return Message.of("eddies-civ-mod.branch." + branch.name().toLowerCase(Locale.ROOT));
+    }
+
+    /** {@code /civ firma branche <Firma> <Branche>} */
+    public Reply chooseBranch(Caller caller, String companyName, String branchWord) {
+        Optional<Branch> branch = Branch.of(branchWord);
+        if (branch.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.PRODUCTION_BRANCH_UNKNOWN, branchWord.strip(),
+                    String.join(", ", Branch.ids())));
+        }
+        return withCompany(companyName, company -> attemptState(() -> {
+            app.production().chooseBranch(caller.player(), company.id(), branch.get(), calendar.today());
+            return Reply.success(Message.of(MessageKey.PRODUCTION_BRANCH_SET, company.name().value(),
+                    branchName(branch.get())));
+        }));
+    }
+
+    /** {@code /civ firma investieren <Firma> <Betrag>} */
+    public Reply invest(Caller caller, String companyName, String amountInput) {
+        return withCompany(companyName, company -> withAmount(amountInput, amount -> attemptState(() -> {
+            Enterprise enterprise = app.production().invest(caller.player(), company.id(), amount, calendar.today());
+            return Reply.success(Message.of(MessageKey.PRODUCTION_INVESTED, money(amount.amount()),
+                    company.name().value(), enterprise.level(), enterprise.level() * 25L,
+                    money(enterprise.toNextLevel())));
+        })));
+    }
+
+    /** {@code /civ firma verkauf <Firma> automatisch|hand|jetzt} */
+    public Reply sell(Caller caller, String companyName, String mode) {
+        return withCompany(companyName, company -> attemptState(() -> {
+            switch (mode.strip().toLowerCase(Locale.ROOT)) {
+                case "automatisch", "auto", "an", "on" -> {
+                    app.production().autoSell(caller.player(), company.id(), true, calendar.today());
+                    return Reply.success(Message.of(MessageKey.PRODUCTION_AUTOSELL_ON, company.name().value()));
+                }
+                case "hand", "manuell", "aus", "off", "manual" -> {
+                    app.production().autoSell(caller.player(), company.id(), false, calendar.today());
+                    return Reply.success(Message.of(MessageKey.PRODUCTION_AUTOSELL_OFF, company.name().value()));
+                }
+                default -> {
+                    var sale = app.production().sellStock(caller.player(), company.id(), CompanyService::basePrice,
+                            priceLevel.get(), calendar.today());
+                    if (sale.sold().isEmpty()) {
+                        return Reply.failure(Message.of(MessageKey.PRODUCTION_NOTHING_SOLD));
+                    }
+                    return Reply.success(Message.of(MessageKey.PRODUCTION_SOLD, company.name().value(),
+                            money(sale.revenue().amount())));
+                }
+            }
+        }));
+    }
+
+    /** {@code /civ firma lager <Firma>} */
+    public Reply stock(Caller caller, String companyName) {
+        return withCompany(companyName, company -> {
+            Optional<Enterprise> enterprise = queries.production().enterpriseOf(company.id());
+            if (enterprise.isEmpty()) {
+                return Reply.failure(Message.of(MessageKey.PRODUCTION_NONE, company.name().value(),
+                        String.join("|", Branch.ids())));
+            }
+            List<Message> lines = new ArrayList<>();
+            lines.add(Message.of(MessageKey.PRODUCTION_STOCK_HEADER, company.name().value()));
+            if (enterprise.get().stock().isEmpty()) {
+                lines.add(Message.of(MessageKey.PRODUCTION_STOCK_EMPTY));
+            }
+            enterprise.get().stock().forEach((commodity, quantity) -> lines.add(Message.of(
+                    MessageKey.PRODUCTION_STOCK_LINE, quantity, Message.of(itemKey(commodity)), commodity.id())));
+            return Reply.success(lines);
+        });
+    }
+
+    /** Ergebnis von {@code /civ firma abholen}: was dem Spieler ins Inventar gelegt werden soll. */
+    public record Pickup(Reply reply, String item, long quantity) {
+    }
+
+    /** {@code /civ firma abholen <Firma> <Ware> [Anzahl]}; legt nichts ins Inventar, das macht der Aufrufer. */
+    public Pickup take(Caller caller, String companyName, String item, long quantity) {
+        Optional<PolityView> company = company(companyName);
+        if (company.isEmpty()) {
+            return new Pickup(Reply.failure(Message.of(MessageKey.COMPANY_UNKNOWN, companyName.strip())), "", 0);
+        }
+        String id = item.contains(":") ? item.strip() : "minecraft:" + item.strip();
+        try {
+            Commodity commodity = Commodity.of(id);
+            long taken = app.production().take(caller.player(), company.get().id(), commodity, quantity,
+                    calendar.today());
+            return new Pickup(Reply.success(Message.of(MessageKey.PRODUCTION_TAKEN, taken,
+                    Message.of(itemKey(commodity)))), id, taken);
+        } catch (DomainException e) {
+            return new Pickup(Reply.failure(texts.error(e)), "", 0);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return new Pickup(Reply.failure(Message.of(MessageKey.CIVIC_REFUSED, e.getMessage())), "", 0);
+        }
+    }
+
+    /** Waren im Lager einer Firma, für Vorschläge. */
+    public List<String> stockItems(String companyName) {
+        return company(companyName).flatMap(company -> queries.production().enterpriseOf(company.id()))
+                .map(enterprise -> enterprise.stock().keySet().stream().map(Commodity::id)
+                        .map(id -> id.startsWith("minecraft:") ? id.substring(10) : id).toList())
+                .orElse(List.of());
+    }
+
+    /** {@code /civ firma kuendigen <Firma> <Spieler|dorfbewohner>}: kündigt den Arbeitsvertrag. */
+    public Reply fire(Caller caller, String companyName, ActorRef employee) {
+        return withCompany(companyName, company -> attemptState(() -> {
+            app.companies().requireHead(caller.player(), company.id(), PolityKind.COMPANY);
+            Optional<Contract> contract = queries.contracts().active().stream()
+                    .filter(found -> found.kind() == ContractKind.EMPLOYMENT
+                            && found.offeror().equals(company.asActor()) && found.counterparty().equals(employee))
+                    .findFirst();
+            if (contract.isEmpty()) {
+                return Reply.failure(Message.of(MessageKey.COMPANY_NOT_EMPLOYED, texts.actor(employee),
+                        company.name().value()));
+            }
+            Contract noticed = app.contracts().giveNotice(contract.get().id(), caller.player(), calendar.today());
+            if (employee instanceof PlayerRef player) {
+                announcements.add(Announcement.toPlayer(player, Message.of(MessageKey.COMPANY_FIRED_YOU,
+                        company.name().value(), noticed.number())));
+            }
+            return Reply.success(Message.of(MessageKey.COMPANY_FIRED, noticed.number(), texts.actor(employee),
+                    de.etiennebader.civ.application.civil.ContractUseCases.NOTICE_DAYS));
+        }));
+    }
+
+    public Reply fire(Caller caller, String companyName, String employeeName) {
+        return withPlayer(employeeName, employee -> fire(caller, companyName, employee));
+    }
+
+    /** Angestellte einer Firma mit geltendem Arbeitsvertrag. */
+    public List<ActorRef> employees(PolityView company) {
+        return app.production().employees(company.id());
+    }
+
+    /** Zeilen für {@code /civ firma info}. */
+    private void productionLines(PolityView company, List<Message> lines) {
+        Optional<Enterprise> enterprise = queries.production().enterpriseOf(company.id());
+        if (enterprise.isEmpty()) {
+            lines.add(Message.of(MessageKey.PRODUCTION_NONE, company.name().value(), String.join("|", Branch.ids())));
+            return;
+        }
+        Enterprise found = enterprise.get();
+        double workforce = app.production().workforce(company.id());
+        lines.add(Message.of(MessageKey.PRODUCTION_INFO, branchName(found.branch()), found.level(), found.level() * 25L,
+                String.format(Locale.ROOT, "%.1f", workforce),
+                Message.of(found.autoSell() ? MessageKey.PRODUCTION_SELL_AUTO : MessageKey.PRODUCTION_SELL_MANUAL)));
+        found.dailyOutput(workforce).forEach((commodity, quantity) -> lines.add(Message.of(
+                MessageKey.PRODUCTION_FORECAST_LINE, quantity, Message.of(itemKey(commodity)))));
+        if (found.lastDay().isPresent()) {
+            lines.add(Message.of(MessageKey.PRODUCTION_LAST, found.lastOutput(), money(found.lastRevenue())));
+        }
+    }
+
+    /** Ansicht des Betriebs für Menü und Webseite. */
+    public record EnterpriseView(String branch, int level, long toNextLevel, double workforce, boolean autoSell,
+                                 Map<String, Long> stock, Map<String, Long> forecast, long lastOutput,
+                                 long lastRevenue, List<String> employees) {
+    }
+
+    public Optional<EnterpriseView> enterprise(PolityView company) {
+        return queries.production().enterpriseOf(company.id()).map(found -> {
+            double workforce = app.production().workforce(company.id());
+            Map<String, Long> stock = new java.util.LinkedHashMap<>();
+            found.stock().forEach((commodity, quantity) -> stock.put(commodity.id(), quantity));
+            Map<String, Long> forecast = new java.util.LinkedHashMap<>();
+            found.dailyOutput(workforce).forEach((commodity, quantity) -> forecast.put(commodity.id(), quantity));
+            List<String> employees = app.production().employees(company.id()).stream().map(texts::actor).toList();
+            return new EnterpriseView(found.branch().name(), found.level(), found.toNextLevel(), workforce,
+                    found.autoSell(), stock, forecast, found.lastOutput(), found.lastRevenue(), employees);
+        });
+    }
+
+    /** Tagesende der Produktion: erzeugen, verkaufen, der Leitung melden. */
+    public void produce(Day day) {
+        for (var result : app.production().endOfDay(CompanyService::basePrice, priceLevel.get(), day)) {
+            long pieces = result.produced().values().stream().mapToLong(Long::longValue).sum();
+            if (pieces == 0) {
+                continue;
+            }
+            queries.polity(result.company()).ifPresent(company -> company.mayor()
+                    .filter(PlayerRef.class::isInstance).map(PlayerRef.class::cast)
+                    .ifPresent(head -> announcements.add(Announcement.toPlayer(head, result.revenue().amount() > 0
+                            ? Message.of(MessageKey.PRODUCTION_DAY_SOLD, company.name().value(), pieces,
+                            money(result.revenue().amount()))
+                            : Message.of(MessageKey.PRODUCTION_DAY, company.name().value(), pieces)))));
+        }
+    }
+
+    private Reply attemptState(Supplier<Reply> action) {
+        try {
+            return action.get();
+        } catch (DomainException e) {
+            return Reply.failure(texts.error(e));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return Reply.failure(Message.of(MessageKey.CIVIC_REFUSED, e.getMessage()));
+        }
     }
 
     // ---- Ansichten ----

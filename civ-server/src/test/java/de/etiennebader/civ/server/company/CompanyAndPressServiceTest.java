@@ -108,4 +108,39 @@ class CompanyAndPressServiceTest {
         assertTrue(server.press().dissolve(aliceAt, "Nordhainer Bote").success());
         assertTrue(server.press().latest(10).isEmpty());
     }
+
+    @Test
+    @DisplayName("Produktion: Branche, Investition, Lager, Verkauf, Abholen, Einstellen und Kündigen")
+    void production() {
+        setUp();
+        assertTrue(server.companies().found(aliceAt, "25", "Holz AG").success());
+        assertTrue(has(server.companies().info(aliceAt, Optional.of("Holz AG")), MessageKey.PRODUCTION_NONE));
+        assertTrue(has(server.companies().chooseBranch(aliceAt, "Holz AG", "zauberei"),
+                MessageKey.PRODUCTION_BRANCH_UNKNOWN));
+        assertFalse(server.companies().chooseBranch(bobAt, "Holz AG", "forst").success());
+        assertTrue(server.companies().chooseBranch(aliceAt, "Holz AG", "forst").success());
+        assertTrue(server.companies().sell(aliceAt, "Holz AG", "hand").success());
+        Reply invested = server.companies().invest(aliceAt, "Holz AG", "20");
+        assertTrue(has(invested, MessageKey.PRODUCTION_INVESTED), invested.toString());
+
+        Reply hired = server.companies().hire(aliceAt, "Holz AG", "Bob", "1");
+        assertTrue(hired.success(), hired.toString());
+        int contract = server.queries().contracts().contracts().getLast().number();
+        assertTrue(server.civil().sign(bobAt, contract).success());
+        assertEquals(1L, server.companies().employees(server.companies().company("Holz AG").orElseThrow()).size());
+
+        server.takeAnnouncements();
+        server.endDayNow();
+        assertTrue(server.takeAnnouncements().stream().anyMatch(a -> a.recipient().equals(Optional.of(alice))
+                && a.message().key().equals(MessageKey.PRODUCTION_DAY.key())));
+        assertTrue(has(server.companies().stock(aliceAt, "Holz AG"), MessageKey.PRODUCTION_STOCK_LINE));
+        CompanyService.Pickup pickup = server.companies().take(aliceAt, "Holz AG", "oak_log", 10);
+        assertEquals(10L, pickup.quantity());
+        assertEquals("minecraft:oak_log", pickup.item());
+        assertTrue(has(server.companies().sell(aliceAt, "Holz AG", "jetzt"), MessageKey.PRODUCTION_SOLD));
+        assertTrue(has(server.companies().info(aliceAt, Optional.of("Holz AG")), MessageKey.PRODUCTION_INFO));
+
+        assertTrue(has(server.companies().fire(aliceAt, "Holz AG", "Bob"), MessageKey.COMPANY_FIRED));
+        assertTrue(has(server.companies().fire(aliceAt, "Holz AG", "Alice"), MessageKey.COMPANY_NOT_EMPLOYED));
+    }
 }

@@ -464,6 +464,10 @@ class SqliteStateStoreTest {
             app.justice().open(dora, lawsuit.id(), DAY);
             app.justice().submit(alice, lawsuit.id(), "buch", "Foto", "Der Zaun ist kaputt.", 2, DAY);
             app.justice().testify(bertram, lawsuit.id(), "Das war ich nicht.", DAY);
+            app.production().chooseBranch(alice, company, de.etiennebader.civ.domain.production.Branch.FORESTRY, DAY);
+            app.production().autoSell(alice, company, false, DAY);
+            app.production().endOfDay(commodity -> java.util.OptionalLong.of(8),
+                    de.etiennebader.civ.domain.market.PriceLevel.NEUTRAL, DAY);
             app.endOfDay().execute(DAY);
             app.runElections().execute(DAY.plus(1));
         }

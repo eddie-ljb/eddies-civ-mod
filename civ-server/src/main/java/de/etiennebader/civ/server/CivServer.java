@@ -167,6 +167,7 @@ public final class CivServer {
                 player -> plots.selection(player).area());
         this.community = new CommunityService(app, calendar, players, texts, announcements, Clock.systemUTC());
         this.companies = new CompanyService(app, calendar, players, settings.currency(), texts, announcements);
+        this.companies.pricing(market::priceLevel);
         this.press = new PressService(app, calendar, players, settings.currency(), texts, announcements);
         this.civic = new CivicService(app, calendar, texts, announcements, plots);
         this.justice = new JusticeService(app, calendar, players, texts, announcements);
@@ -237,6 +238,7 @@ public final class CivServer {
         civil.endOfDay(day);
         justice.endOfDay(day);
         companies.endOfDay(day);
+        companies.produce(day);
         press.endOfDay(day.plus(1));
         community.endOfDay(day.plus(1));
         debates.newDay(day.plus(1), clock.millis());
@@ -333,6 +335,12 @@ public final class CivServer {
                 ? "http://<Server-Adresse>:" + web.port()
                 : settings.web().publicUrl();
         return Reply.success(Message.of(MessageKey.WEB_CODE, code, url));
+    }
+
+    /** {@code /civ web abmelden}: beendet alle Sitzungen des Spielers auf der Webseite. */
+    public Reply webLogout(Caller caller) {
+        requireRunning();
+        return Reply.success(Message.of(MessageKey.WEB_LOGGED_OUT, webSessions.logoutAll(caller.player())));
     }
 
     private void closeStorage() {
@@ -439,6 +447,19 @@ public final class CivServer {
     /** Setzt den Ordner der Kartenkacheln; die Fabric-Seite rendert hinein. */
     public void mapDirectory(java.nio.file.Path directory) {
         this.mapDirectory = directory;
+    }
+
+    /**
+     * Schreibt sofort eine Sicherung der Datenbank ({@code backups/civ-manual-…sqlite}).
+     *
+     * @return die Datei; leer, wenn ohne SQLite (Tests)
+     */
+    public Optional<Path> backupNow() {
+        save();
+        if (storage instanceof SqliteStateStore sqlite) {
+            return Optional.of(sqlite.backupNow());
+        }
+        return Optional.empty();
     }
 
     /** Gerichte und Verfahren. */

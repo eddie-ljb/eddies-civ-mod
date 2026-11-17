@@ -8,6 +8,7 @@ import de.etiennebader.civ.application.civil.ContractUseCases;
 import de.etiennebader.civ.application.civil.RunContracts;
 import de.etiennebader.civ.application.civil.StreetUseCases;
 import de.etiennebader.civ.application.company.CompanyUseCases;
+import de.etiennebader.civ.application.company.ProductionUseCases;
 import de.etiennebader.civ.application.company.Trading;
 import de.etiennebader.civ.application.company.VillagerInvestors;
 import de.etiennebader.civ.application.constitution.ChangePreamble;
@@ -122,6 +123,7 @@ public final class CivApplication {
     private final DissolvePolity dissolvePolity;
     private final Trading trading;
     private final CompanyUseCases companies;
+    private final ProductionUseCases production;
     private final PressUseCases press;
     private final CivicUseCases civic;
     private final JusticeUseCases justice;
@@ -222,6 +224,7 @@ public final class CivApplication {
         this.dissolvePolity = new DissolvePolity(aggregates);
         this.trading = new Trading(aggregates, ids);
         this.companies = new CompanyUseCases(aggregates, ids, trading, dissolvePolity);
+        this.production = new ProductionUseCases(aggregates, companies);
         this.press = new PressUseCases(aggregates, ids);
         this.civic = new CivicUseCases(aggregates, ids);
         this.justice = new JusticeUseCases(aggregates, ids);
@@ -434,6 +437,11 @@ public final class CivApplication {
     }
 
     /** Gerichte und Verfahren. */
+    /** Produktion der Firmen. */
+    public ProductionUseCases production() {
+        return production;
+    }
+
     public JusticeUseCases justice() {
         return justice;
     }

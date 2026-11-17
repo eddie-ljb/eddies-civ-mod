@@ -63,6 +63,7 @@ public final class WorldPersistence {
         repositories.press().save(world.press());
         repositories.civic().save(world.civic());
         repositories.justice().save(world.justice());
+        repositories.production().save(world.production());
         for (Polity polity : world.polities()) {
             if (repositories.land().findByPolity(polity.id()).isEmpty()) {
                 repositories.land().save(LandRegistry.open(polity.id()));

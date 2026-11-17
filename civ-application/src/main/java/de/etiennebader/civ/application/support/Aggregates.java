@@ -1,6 +1,7 @@
 package de.etiennebader.civ.application.support;
 
 import de.etiennebader.civ.domain.justice.Judiciary;
+import de.etiennebader.civ.domain.production.ProductionRegistry;
 import de.etiennebader.civ.domain.civic.CivicRegistry;
 import de.etiennebader.civ.application.Repositories;
 import de.etiennebader.civ.application.port.DomainEventPublisher;
@@ -107,6 +108,15 @@ public final class Aggregates {
     public void commit(CivicRegistry civic) {
         repositories.civic().save(civic);
         publisher.publish(civic.pullEvents());
+    }
+
+    public ProductionRegistry production() {
+        return repositories.production().load();
+    }
+
+    public void commit(ProductionRegistry production) {
+        repositories.production().save(production);
+        publisher.publish(production.pullEvents());
     }
 
     public Judiciary justice() {

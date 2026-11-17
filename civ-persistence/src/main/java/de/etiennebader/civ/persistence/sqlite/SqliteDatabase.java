@@ -89,6 +89,16 @@ public final class SqliteDatabase implements AutoCloseable {
         }
     }
 
+    /** Arbeit außerhalb einer Transaktion, z. B. eine Sicherung mit {@code VACUUM INTO}. */
+    public synchronized <T> T outsideTransaction(SqlWork<T> work) {
+        Objects.requireNonNull(work, "work");
+        try {
+            return work.execute(connection);
+        } catch (SQLException e) {
+            throw new PersistenceException("Datenbankzugriff fehlgeschlagen: " + file, e);
+        }
+    }
+
     @Override
     public synchronized void close() {
         try {

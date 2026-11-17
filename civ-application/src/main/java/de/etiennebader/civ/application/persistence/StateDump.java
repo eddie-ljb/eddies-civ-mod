@@ -229,6 +229,13 @@ public final class StateDump {
                 entry.getValue().prosecutors().stream().map(StateDump::actor).toList().toString())));
         world.justice().exiles().forEach(exile -> lines.add(String.join("|", "exile", exile.polity().value().toString(),
                 actor(exile.actor()), day(exile.until().value()))));
+        world.production().enterprises().stream()
+                .sorted(java.util.Comparator.comparing(enterprise -> enterprise.company().value().toString()))
+                .forEach(enterprise -> lines.add(String.join("|", "enterprise", enterprise.company().value().toString(),
+                        enterprise.branch().name(), Long.toString(enterprise.invested()),
+                        Boolean.toString(enterprise.autoSell()), enterprise.stock().toString(),
+                        enterprise.lastDay().map(found -> day(found.value())).orElse("-"),
+                        Long.toString(enterprise.lastOutput()), Long.toString(enterprise.lastRevenue()))));
         world.market().stocks().stream()
                 .map(stock -> "stock|" + stock.commodity().id() + "|" + stock.quantity() + "|" + day(stock.asOf().value()))
                 .sorted()

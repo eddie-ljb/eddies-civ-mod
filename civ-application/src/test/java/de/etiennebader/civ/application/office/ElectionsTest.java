@@ -216,6 +216,22 @@ class ElectionsTest {
         assertEquals(alice, polity().officeTerm(Office.MAYOR).orElseThrow().holder());
     }
 
+    @Test
+    @DisplayName("Amtszeit nachträglich eingeführt: unbefristete Ämter enden term_days nach Amtsantritt")
+    void termIntroducedLater() {
+        ElectionId election = call(alice, Office.MAYOR);
+        stand(alice, election);
+        fixture.app.runElections().execute(DAY.plus(3));
+        assertEquals(Optional.empty(), polity().officeTerm(Office.MAYOR).orElseThrow().until());
+
+        amend(StandardParameters.TERM_DAYS, 3L);
+        assertTrue(fixture.app.runElections().execute(DAY.plus(5)).stream()
+                .noneMatch(outcome -> outcome.office() == Office.MAYOR), "erst drei Tage nach Amtsantritt");
+        List<RunElections.Outcome> due = fixture.app.runElections().execute(DAY.plus(6));
+        assertTrue(due.stream().anyMatch(outcome -> outcome instanceof RunElections.Called
+                && outcome.office() == Office.MAYOR), due.toString());
+    }
+
     private PlayerRef carlaAsCitizen() {
         join(carla, MembershipType.CITIZEN);
         return carla;

@@ -1209,6 +1209,15 @@ async function renderStock(l) {
     chart(l.quotes),
     facts([["Börsenwert", l.marketCap], ["Kasse", l.treasury], ["Buchwert je Aktie", l.bookValue], ["Aktien", l.shares], ["Streubesitz", l.freeFloat],
       ["Dividendenrendite 30 Tage", l.dividendYield.toLocaleString("de-DE") + " %"], ["Angestellte", l.employees]]));
+  const itemName = id => id.replace(/^minecraft:/, "").replaceAll("_", " ");
+  if (l.production) {
+    const p = l.production;
+    panel.append(el("h3", { style: "margin:18px 0 8px", textContent: "Betrieb" }),
+      facts([["Branche", p.branch], ["Ausstattung", "Stufe " + p.level + " (+" + p.level * 25 + " %)"], ["Arbeitskräfte", p.workforce.toLocaleString("de-DE")],
+        ["Tagesproduktion", Object.entries(p.forecast).map(([k, v]) => v + " × " + itemName(k)).join(", ") || "–"],
+        ["Lager", Object.entries(p.stock).map(([k, v]) => v + " × " + itemName(k)).join(", ") || "leer"],
+        ["Verkauf", p.autoSell ? "automatisch an den Servermarkt" : "von Hand"], ["Gestern", p.lastOutput + " Stück, Erlös " + p.lastRevenue + " Smaragde"]]));
+  }
   if (l.holders.length) panel.append(el("h3", { style: "margin:18px 0 8px", textContent: "Aktionäre" }),
     el("div", { className: "chips" }, ...l.holders.map(h => el("span", { className: "chip", textContent: h.name + " " + h.percent + " %" }))));
   const book = el("div", { className: "book" }, el("div", {}, el("b", { textContent: "Kauf" })), el("div", {}, el("b", { textContent: "Verkauf" })));
@@ -1468,10 +1477,11 @@ function showCase(c) {
     if (role === "JUDGE" && (c.stage === "EVIDENCE" || c.stage === "PLEADINGS")) actions.append(el("div", { className: "row" }, el("button", { className: "btn small", textContent: "Nächster Abschnitt", onclick: () => act("advance") })));
     if (role === "JUDGE" && (c.stage === "PLEADINGS" || c.stage === "DELIBERATION")) actions.append(textAction("Urteil sprechen", "decide", "schuldig 5 | Begründung  oder  freispruch | Begründung"));
     if (role === "JUDGE" && early) actions.append(textAction("Einstellen", "dismiss", "Grund"));
-    if (side && early) { actions.append(textAction("Beweis vorlegen", "evidence", "Beweis als Text")); actions.append(textAction("Zeugen laden", "summon", "Spielername")); }
-    if ((side || role === "WITNESS") && early) actions.append(textAction("Aussagen", "testify", "Deine Aussage"));
-    if (side && c.stage === "PLEADINGS") actions.append(textAction("Plädieren", "plead", "Dein Schlussvortrag"));
-    if (role === "DEFENDANT" && early && !c.defense) actions.append(textAction("Verteidiger bestellen", "defense", "Spielername"));
+    const open = early || c.stage === "PLEADINGS";
+    if ((side || role === "WITNESS") && open) { actions.append(textAction("Beweis vorlegen", "evidence", "Beweis als Text")); actions.append(textAction("Aussagen", "testify", "Deine Aussage")); }
+    if (side && open) actions.append(textAction("Zeugen laden", "summon", "Spielername"));
+    if (side && (c.stage === "EVIDENCE" || c.stage === "PLEADINGS")) actions.append(textAction("Plädieren", "plead", "Dein Schlussvortrag"));
+    if (role === "DEFENDANT" && open && !c.defense) actions.append(textAction("Verteidiger bestellen", "defense", "Spielername"));
     if (role === "JUROR" && (c.stage === "PLEADINGS" || c.stage === "DELIBERATION")) actions.append(el("div", { className: "row" },
       el("button", { className: "btn small", textContent: "Schuldig", onclick: () => act("vote", { guilty: "true" }) }),
       el("button", { className: "btn small", textContent: "Unschuldig", onclick: () => act("vote", { guilty: "false" }) })));

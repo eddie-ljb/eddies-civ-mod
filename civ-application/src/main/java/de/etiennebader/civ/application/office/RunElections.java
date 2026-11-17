@@ -246,7 +246,8 @@ public final class RunElections {
     }
 
     private void callDue(Polity polity, Day day, Set<Office> justClosed, List<Outcome> outcomes) {
-        if (polity.laws().valueOf(StandardParameters.TERM_DAYS) <= 0) {
+        long termDays = polity.laws().valueOf(StandardParameters.TERM_DAYS);
+        if (termDays <= 0) {
             return;
         }
         for (Office office : Office.values()) {
@@ -254,7 +255,10 @@ public final class RunElections {
                 continue;
             }
             Optional<OfficeTerm> term = polity.officeTerm(office);
-            boolean due = term.map(current -> current.expiredOn(day)).orElse(office == Office.MAYOR);
+            // Amtszeiten von vor der Einführung einer Amtsdauer sind unbefristet: Sie enden term_days nach Beginn.
+            boolean due = term.map(current -> current.expiredOn(day)
+                            || current.until().isEmpty() && !day.isBefore(current.since().plus(termDays)))
+                    .orElse(office == Office.MAYOR);
             if (due) {
                 CallElection.call(polity, office, ids, day);
                 outcomes.add(new Called(polity.id(), office, polity.electionFor(office).orElseThrow().closesOn()));
@@ -316,7 +320,10 @@ public final class RunElections {
             return;
         }
         Parliament parliament = polity.parliament();
-        if (!parliament.seated() || parliament.expiredOn(day)) {
+        long termDays = polity.laws().valueOf(StandardParameters.TERM_DAYS);
+        boolean unlimitedButDue = termDays > 0 && parliament.until().isEmpty() && parliament.electedOn()
+                .filter(elected -> !day.isBefore(elected.plus(termDays))).isPresent();
+        if (!parliament.seated() || parliament.expiredOn(day) || unlimitedButDue) {
             CallElection.call(polity, Office.PARLIAMENT, ids, day);
             outcomes.add(new Called(polity.id(), Office.PARLIAMENT,
                     polity.electionFor(Office.PARLIAMENT).orElseThrow().closesOn()));

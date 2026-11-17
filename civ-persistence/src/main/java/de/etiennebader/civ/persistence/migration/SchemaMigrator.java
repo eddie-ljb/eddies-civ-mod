@@ -1,5 +1,7 @@
 package de.etiennebader.civ.persistence.migration;
 
+import de.etiennebader.civ.persistence.sqlite.Backups;
+
 import de.etiennebader.civ.persistence.sqlite.SqliteDatabase;
 
 import java.sql.Connection;
@@ -57,6 +59,10 @@ public final class SchemaMigrator {
         int current = database.inTransaction(SchemaMigrator::currentVersion);
         if (current > latestVersion()) {
             throw new UnsupportedSchemaVersionException(current, latestVersion());
+        }
+        if (current > 0 && current < latestVersion()) {
+            // Vor jeder Schemaänderung einer bestehenden Welt: Sicherung, damit ein Update rückgängig zu machen ist.
+            database.outsideTransaction(connection -> Backups.write(connection, database.file(), "v" + current));
         }
         for (Migration migration : migrations.subList(current, migrations.size())) {
             database.inTransaction(connection -> {

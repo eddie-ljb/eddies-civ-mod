@@ -11,8 +11,9 @@ import de.etiennebader.civ.domain.law.ParameterCatalog;
 import de.etiennebader.civ.domain.polity.Polity;
 import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.territory.TerritoryRegistry;
-import de.etiennebader.civ.persistence.PersistenceException;
 import de.etiennebader.civ.persistence.migration.SchemaMigrator;
+import de.etiennebader.civ.persistence.PersistenceException;
+import de.etiennebader.civ.persistence.sqlite.Backups;
 import de.etiennebader.civ.persistence.sqlite.SqliteDatabase;
 
 import java.nio.file.Path;
@@ -37,6 +38,7 @@ public final class SqliteStateStore implements StateStore, AutoCloseable {
     private static final CurrencyId MARKET_CURRENCY = CurrencyId.EMERALD;
 
     private final SqliteDatabase database;
+    private long lastBackupDay = -1;
     private final PolityTable polityTable;
     private final TerritoryTable territoryTable = new TerritoryTable();
     private final PlotTable plotTable = new PlotTable();
@@ -49,6 +51,7 @@ public final class SqliteStateStore implements StateStore, AutoCloseable {
     private final CivilTables civilTables = new CivilTables();
     private final MarketPressTables marketPressTables = new MarketPressTables();
     private final CivicJusticeTables civicJusticeTables = new CivicJusticeTables();
+    private final ProductionTables productionTables = new ProductionTables();
 
     public SqliteStateStore(SqliteDatabase database, ParameterCatalog catalog) {
         this.database = Objects.requireNonNull(database, "database");
@@ -63,6 +66,12 @@ public final class SqliteStateStore implements StateStore, AutoCloseable {
     public static SqliteStateStore open(Path file) {
         SqliteDatabase database = SqliteDatabase.open(file);
         try {
+            List<String> problems = database.outsideTransaction(Backups::problems);
+            if (!problems.isEmpty()) {
+                throw new PersistenceException("Die Datenbank " + database.file() + " ist beschädigt (" + problems.getFirst()
+                        + "). Stelle eine Sicherung aus " + Backups.folder(database.file())
+                        + " wieder her: Server stoppen, die Sicherung über civ.sqlite kopieren, neu starten.");
+            }
             SchemaMigrator.standard().migrate(database);
             return new SqliteStateStore(database, ParameterCatalog.standard());
         } catch (RuntimeException e) {
@@ -91,7 +100,7 @@ public final class SqliteStateStore implements StateStore, AutoCloseable {
                     calendarTable.load(connection), civilTables.loadContracts(connection),
                     civilTables.loadCommunity(connection), marketPressTables.loadExchange(connection),
                     marketPressTables.loadPress(connection), civicJusticeTables.loadCivic(connection),
-                    civicJusticeTables.loadJustice(connection));
+                    civicJusticeTables.loadJustice(connection), productionTables.load(connection));
         } catch (IllegalArgumentException e) {
             throw new PersistenceException("Gespeicherter Zustand ist ungültig: " + e.getMessage(), e);
         }
@@ -133,6 +142,9 @@ public final class SqliteStateStore implements StateStore, AutoCloseable {
             if (delta.civic().isPresent()) {
                 civicJusticeTables.writeCivic(connection, delta.civic().get());
             }
+            if (delta.production().isPresent()) {
+                productionTables.write(connection, delta.production().get());
+            }
             if (delta.justice().isPresent()) {
                 civicJusticeTables.writeJustice(connection, delta.justice().get());
             }
@@ -141,6 +153,29 @@ public final class SqliteStateStore implements StateStore, AutoCloseable {
             calendarTable.write(connection, delta.calendar());
             return null;
         });
+        dailyBackup(delta.calendar().today().value());
+    }
+
+    /** Einmal je Spieltag eine Sicherung; die letzten sieben bleiben. */
+    private void dailyBackup(long day) {
+        if (day == lastBackupDay) {
+            return;
+        }
+        if (lastBackupDay >= 0) {
+            try {
+                database.outsideTransaction(connection -> Backups.write(connection, database.file(), "daily"));
+            } catch (PersistenceException e) {
+                // Eine fehlgeschlagene Sicherung darf das Speichern nicht scheitern lassen.
+                System.getLogger(SqliteStateStore.class.getName()).log(System.Logger.Level.WARNING,
+                        "Tägliche Sicherung fehlgeschlagen", e);
+            }
+        }
+        lastBackupDay = day;
+    }
+
+    /** Schreibt sofort eine Sicherung, z. B. für {@code /civ admin sicherung}. */
+    public Path backupNow() {
+        return database.outsideTransaction(connection -> Backups.write(connection, database.file(), "manual"));
     }
 
     @Override

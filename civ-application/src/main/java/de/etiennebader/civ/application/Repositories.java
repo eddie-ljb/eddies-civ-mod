@@ -2,6 +2,7 @@ package de.etiennebader.civ.application;
 
 import de.etiennebader.civ.domain.justice.JusticeRepository;
 import de.etiennebader.civ.domain.civic.CivicRepository;
+import de.etiennebader.civ.domain.production.ProductionRepository;
 import de.etiennebader.civ.application.inmemory.InMemoryJusticeRepository;
 import de.etiennebader.civ.application.inmemory.InMemoryCivicRepository;
 import de.etiennebader.civ.application.inmemory.InMemoryCommunityRepository;
@@ -28,7 +29,17 @@ public record Repositories(PolityRepository polities, TerritoryRepository territ
                            LandRepository land, LedgerRepository ledger, MarketRepository market,
                            ShopRegistryRepository shops, ContractRegistryRepository contracts,
                            CommunityRepository community, StockExchangeRepository exchange, PressRepository press,
-                           CivicRepository civic, JusticeRepository justice) {
+                           CivicRepository civic, JusticeRepository justice, ProductionRepository production) {
+
+    /** Ohne Firmenbetriebe (im Speicher). */
+    public Repositories(PolityRepository polities, TerritoryRepository territory, LandRepository land,
+                        LedgerRepository ledger, MarketRepository market, ShopRegistryRepository shops,
+                        ContractRegistryRepository contracts, CommunityRepository community,
+                        StockExchangeRepository exchange, PressRepository press, CivicRepository civic,
+                        JusticeRepository justice) {
+        this(polities, territory, land, ledger, market, shops, contracts, community, exchange, press, civic, justice,
+                new de.etiennebader.civ.application.inmemory.InMemoryProductionRepository());
+    }
 
     /** Ohne Wahlkreise, Hoheitszeichen und Justiz (im Speicher). */
     public Repositories(PolityRepository polities, TerritoryRepository territory, LandRepository land,
@@ -61,6 +72,7 @@ public record Repositories(PolityRepository polities, TerritoryRepository territ
         Objects.requireNonNull(press, "press");
         Objects.requireNonNull(civic, "civic");
         Objects.requireNonNull(justice, "justice");
+        Objects.requireNonNull(production, "production");
         Objects.requireNonNull(polities, "polities");
         Objects.requireNonNull(territory, "territory");
         Objects.requireNonNull(land, "land");

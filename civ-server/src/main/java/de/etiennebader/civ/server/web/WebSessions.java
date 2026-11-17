@@ -7,6 +7,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -22,6 +23,11 @@ public final class WebSessions {
     static final Duration CODE_LIFETIME = Duration.ofMinutes(10);
     static final Duration SESSION_LIFETIME = Duration.ofDays(7);
     static final int MAX_FAILURES_PER_MINUTE = 10;
+    /** Fehlversuche aller Adressen zusammen je Minute, gegen verteiltes Raten. */
+    static final int MAX_GLOBAL_FAILURES_PER_MINUTE = 200;
+    /** Eine Sitzung, die so lange nicht benutzt wurde, verfällt. */
+    static final Duration IDLE_LIFETIME = Duration.ofDays(2);
+    static final int MAX_SESSIONS_PER_PLAYER = 8;
     private static final String CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static final int CODE_LENGTH = 6;
 
@@ -37,13 +43,17 @@ public final class WebSessions {
     private record Pending(Login login, Instant expires) {
     }
 
+    private record Session(Login login, Instant expires, Instant created, Instant lastUsed) {
+    }
+
     private record Failures(Instant windowStart, int count) {
     }
 
     private final Clock clock;
     private final SecureRandom random = new SecureRandom();
     private final Map<String, Pending> codes = new ConcurrentHashMap<>();
-    private final Map<String, Pending> sessions = new ConcurrentHashMap<>();
+    private final Map<String, Session> sessions = new ConcurrentHashMap<>();
+    private volatile Failures global = new Failures(Instant.EPOCH, 0);
     private final Map<String, Failures> failures = new ConcurrentHashMap<>();
 
     public WebSessions(Clock clock) {
@@ -52,6 +62,7 @@ public final class WebSessions {
 
     /** Ein neuer Anmeldecode für den Spieler; ältere Codes desselben Spielers verfallen. */
     public String issueCode(PlayerRef player, String name) {
+        purge();
         codes.values().removeIf(pending -> pending.login().player().equals(player));
         StringBuilder code = new StringBuilder();
         for (int i = 0; i < CODE_LENGTH; i++) {
@@ -73,29 +84,60 @@ public final class WebSessions {
                 && recent.count() >= MAX_FAILURES_PER_MINUTE) {
             return Optional.empty();
         }
+        if (global.windowStart().plusSeconds(60).isAfter(now) && global.count() >= MAX_GLOBAL_FAILURES_PER_MINUTE) {
+            return Optional.empty();
+        }
         Pending pending = codes.remove(code.strip().toUpperCase(java.util.Locale.ROOT));
         if (pending == null || pending.expires().isBefore(now)) {
             failures.merge(remoteAddress, new Failures(now, 1), (old, added) ->
                     old.windowStart().plusSeconds(60).isAfter(now) ? new Failures(old.windowStart(), old.count() + 1) : added);
+            Failures before = global;
+            global = before.windowStart().plusSeconds(60).isAfter(now)
+                    ? new Failures(before.windowStart(), before.count() + 1) : new Failures(now, 1);
             return Optional.empty();
         }
         byte[] token = new byte[32];
         random.nextBytes(token);
         String session = HexFormat.of().formatHex(token);
-        sessions.put(session, new Pending(pending.login(), now.plus(SESSION_LIFETIME)));
+        List<Map.Entry<String, Session>> own = sessions.entrySet().stream()
+                .filter(entry -> entry.getValue().login().player().equals(pending.login().player()))
+                .sorted(java.util.Comparator.comparing(entry -> entry.getValue().created()))
+                .toList();
+        for (int index = 0; index <= own.size() - MAX_SESSIONS_PER_PLAYER; index++) {
+            sessions.remove(own.get(index).getKey());
+        }
+        sessions.put(session, new Session(pending.login(), now.plus(SESSION_LIFETIME), now, now));
         return Optional.of(session);
     }
 
     public Optional<Login> session(String token) {
-        Pending pending = sessions.get(token);
-        if (pending == null) {
+        Session session = sessions.get(token);
+        if (session == null) {
             return Optional.empty();
         }
-        if (pending.expires().isBefore(clock.instant())) {
+        Instant now = clock.instant();
+        if (session.expires().isBefore(now) || session.lastUsed().plus(IDLE_LIFETIME).isBefore(now)) {
             sessions.remove(token);
             return Optional.empty();
         }
-        return Optional.of(pending.login());
+        sessions.put(token, new Session(session.login(), session.expires(), session.created(), now));
+        return Optional.of(session.login());
+    }
+
+    /** Meldet alle Sitzungen eines Spielers ab, z. B. mit {@code /civ web abmelden}. */
+    public int logoutAll(PlayerRef player) {
+        int before = sessions.size();
+        sessions.values().removeIf(session -> session.login().player().equals(player));
+        return before - sessions.size();
+    }
+
+    /** Räumt abgelaufene Codes, Sitzungen und alte Fehlversuche weg. */
+    private void purge() {
+        Instant now = clock.instant();
+        codes.values().removeIf(pending -> pending.expires().isBefore(now));
+        sessions.values().removeIf(session -> session.expires().isBefore(now)
+                || session.lastUsed().plus(IDLE_LIFETIME).isBefore(now));
+        failures.values().removeIf(failure -> failure.windowStart().plusSeconds(60).isBefore(now));
     }
 
     public void logout(String token) {

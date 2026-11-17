@@ -105,8 +105,103 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
         this.page = loadPage();
     }
 
+    /** Anfragen je Adresse und Minute, darüber antwortet die Seite mit 429. */
+    static final int MAX_REQUESTS_PER_MINUTE = 600;
+    static final int MAX_WRITES_PER_MINUTE = 120;
+
+    private record Window(long minute, int reads, int writes) {
+    }
+
+    private final java.util.concurrent.ConcurrentHashMap<String, Window> traffic =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static final Map<String, String> SECURITY_HEADERS = Map.of(
+            "X-Content-Type-Options", "nosniff",
+            "X-Frame-Options", "DENY",
+            "Referrer-Policy", "same-origin",
+            "Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+                    + "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; "
+                    + "img-src 'self' data: https://mc-heads.net; connect-src 'self'; frame-ancestors 'none'; "
+                    + "base-uri 'none'; form-action 'self'");
+
     @Override
-    public HttpResponse apply(HttpRequest request) {
+    public HttpResponse apply(HttpRequest raw) {
+        HttpRequest request = withClientAddress(raw);
+        HttpResponse response;
+        if (!withinLimits(request)) {
+            response = HttpResponse.error(429, "Zu viele Anfragen, bitte kurz warten.").withHeader("Retry-After", "60");
+        } else if (request.method().equals("POST") && !sameOrigin(request)) {
+            response = HttpResponse.error(403, "Fremde Herkunft");
+        } else {
+            response = handle(request);
+        }
+        for (Map.Entry<String, String> header : SECURITY_HEADERS.entrySet()) {
+            response = response.withHeader(header.getKey(), header.getValue());
+        }
+        if (secure(request) && response.headers().containsKey("Set-Cookie")) {
+            response = response.withHeader("Set-Cookie", response.headers().get("Set-Cookie") + "; Secure");
+        }
+        return response;
+    }
+
+    private boolean trustProxy() {
+        return civ.settings().web().trustProxy();
+    }
+
+    /** Hinter einem vertrauenswürdigen Reverse-Proxy zählt die Adresse aus {@code X-Forwarded-For}. */
+    private HttpRequest withClientAddress(HttpRequest request) {
+        if (!trustProxy()) {
+            return request;
+        }
+        return request.header("x-forwarded-for").map(forwarded -> forwarded.split(",")[0].strip())
+                .filter(address -> !address.isEmpty())
+                .map(address -> new HttpRequest(request.method(), request.path(), request.query(), request.headers(),
+                        request.body(), address))
+                .orElse(request);
+    }
+
+    private boolean secure(HttpRequest request) {
+        return trustProxy() && request.header("x-forwarded-proto").filter("https"::equalsIgnoreCase).isPresent();
+    }
+
+    private boolean withinLimits(HttpRequest request) {
+        long minute = System.currentTimeMillis() / 60_000;
+        boolean write = !request.method().equals("GET");
+        Window window = traffic.compute(request.remoteAddress(), (address, old) -> {
+            Window current = old == null || old.minute() != minute ? new Window(minute, 0, 0) : old;
+            return write ? new Window(minute, current.reads(), current.writes() + 1)
+                    : new Window(minute, current.reads() + 1, current.writes());
+        });
+        if (traffic.size() > 10_000) {
+            traffic.values().removeIf(old -> old.minute() != minute);
+        }
+        return window.reads() <= MAX_REQUESTS_PER_MINUTE && window.writes() <= MAX_WRITES_PER_MINUTE;
+    }
+
+    /**
+     * Schutz gegen Cross-Site-Requests: Ein Browser schickt bei POST die Herkunft mit. Sie muss zum angefragten Host
+     * oder zur eingestellten öffentlichen Adresse passen; ohne Herkunft (Werkzeuge, alte Browser) greifen Cookie
+     * ({@code SameSite=Strict}) und JSON-Pflicht.
+     */
+    private boolean sameOrigin(HttpRequest request) {
+        Optional<String> origin = request.header("origin").filter(value -> !value.equals("null"));
+        if (origin.isEmpty()) {
+            return true;
+        }
+        String originHost = hostOf(origin.get());
+        String host = (trustProxy() ? request.header("x-forwarded-host").or(() -> request.header("host"))
+                : request.header("host")).orElse("").strip().toLowerCase(Locale.ROOT);
+        String publicUrl = civ.settings().web().publicUrl();
+        return originHost.equals(host) || (!publicUrl.isBlank() && originHost.equals(hostOf(publicUrl)));
+    }
+
+    private static String hostOf(String url) {
+        String rest = url.strip().toLowerCase(Locale.ROOT).replaceFirst("^[a-z]+://", "");
+        int slash = rest.indexOf('/');
+        return slash < 0 ? rest : rest.substring(0, slash);
+    }
+
+    private HttpResponse handle(HttpRequest request) {
         Translator texts = request.header("accept-language").filter(lang -> lang.toLowerCase(Locale.ROOT).startsWith("en"))
                 .isPresent() ? english : german;
         try {
@@ -164,7 +259,7 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                         contracts(login, texts))));
                 case "POST /api/contracts" -> withLogin(request, login -> action(request, body -> game.call(() ->
                         contractAction(login, body)), texts));
-                case "GET /api/exchange" -> HttpResponse.json(200, game.call(this::exchange));
+                case "GET /api/exchange" -> HttpResponse.json(200, game.call(() -> exchange(texts)));
                 case "GET /api/exchange/book" -> HttpResponse.json(200, game.call(() ->
                         orderBook(request.query().getOrDefault("company", ""), request.cookie(SESSION_COOKIE)
                                 .flatMap(sessions::session))));
@@ -456,7 +551,7 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
     }
 
     /** Alle notierten Firmen mit Kursverlauf; ohne Anmeldung. */
-    private String exchange() {
+    private String exchange(Translator texts) {
         return Json.object()
                 .put("day", civ.calendar().today().value())
                 .raw("listings", Json.array(civ.companies().listings(), listing -> Json.object()
@@ -474,6 +569,26 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                         .put("volume", listing.volumeToday())
                         .put("employees", listing.employees())
                         .put("freeFloat", listing.freeFloat())
+                        .raw("production", civ.queries().polity(new de.etiennebader.civ.domain.shared.PolityId(
+                                        UUID.fromString(listing.id())))
+                                .flatMap(company -> civ.companies().enterprise(company))
+                                .map(view -> Json.object()
+                                        .put("branch", texts.translate(de.etiennebader.civ.server.company.CompanyService
+                                                .branchName(de.etiennebader.civ.domain.production.Branch.valueOf(
+                                                        view.branch()))))
+                                        .put("level", view.level())
+                                        .raw("workforce", String.format(Locale.ROOT, "%.1f", view.workforce()))
+                                        .put("autoSell", view.autoSell())
+                                        .raw("forecast", Json.object().rawAll(view.forecast().entrySet().stream()
+                                                .map(entry -> Map.entry(entry.getKey(), Long.toString(entry.getValue())))
+                                                .toList()).build())
+                                        .raw("stock", Json.object().rawAll(view.stock().entrySet().stream()
+                                                .map(entry -> Map.entry(entry.getKey(), Long.toString(entry.getValue())))
+                                                .toList()).build())
+                                        .put("lastOutput", view.lastOutput())
+                                        .put("lastRevenue", de.etiennebader.civ.server.company.CompanyService.money(view.lastRevenue()))
+                                        .build())
+                                .orElse("null"))
                         .raw("quotes", Json.array(listing.quotes(), quote -> Json.object()
                                 .put("day", quote.day()).put("open", quote.open()).put("high", quote.high())
                                 .put("low", quote.low()).put("close", quote.close()).put("volume", quote.volume())

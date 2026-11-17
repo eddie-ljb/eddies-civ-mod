@@ -250,7 +250,7 @@ public final class CivCommands {
     public Reply help() {
         return Reply.success(Message.of(MessageKey.HELP_HEADER), Message.of(MessageKey.HELP_TOWN),
                 Message.of(MessageKey.HELP_JOIN), Message.of(MessageKey.HELP_LAND), Message.of(MessageKey.HELP_LAWS),
-                Message.of(MessageKey.HELP_VOTES), Message.of(MessageKey.HELP_OFFICES), Message.of(MessageKey.HELP_FEDERATION), Message.of(MessageKey.HELP_LEVELS), Message.of(MessageKey.HELP_SHOW), Message.of(MessageKey.HELP_COURT), Message.of(MessageKey.HELP_CONSTITUTION), Message.of(MessageKey.HELP_LAW_BOOK), Message.of(MessageKey.HELP_PARTIES), Message.of(MessageKey.HELP_PARLIAMENT), Message.of(MessageKey.HELP_CAMPAIGN), Message.of(MessageKey.HELP_MOOD), Message.of(MessageKey.HELP_PLOTS),
+                Message.of(MessageKey.HELP_VOTES), Message.of(MessageKey.HELP_OFFICES), Message.of(MessageKey.HELP_FEDERATION), Message.of(MessageKey.HELP_LEVELS), Message.of(MessageKey.HELP_SHOW), Message.of(MessageKey.HELP_COURT), Message.of(MessageKey.HELP_HANDBOOK), Message.of(MessageKey.HELP_CONSTITUTION), Message.of(MessageKey.HELP_LAW_BOOK), Message.of(MessageKey.HELP_PARTIES), Message.of(MessageKey.HELP_PARLIAMENT), Message.of(MessageKey.HELP_CAMPAIGN), Message.of(MessageKey.HELP_MOOD), Message.of(MessageKey.HELP_PLOTS),
                 Message.of(MessageKey.HELP_SHOPS), Message.of(MessageKey.HELP_CIVIL), Message.of(MessageKey.HELP_CONTRACTS),
                 Message.of(MessageKey.HELP_MARKET_PRESS),
                 Message.of(MessageKey.HELP_BANK), Message.of(MessageKey.HELP_MARKET), Message.of(MessageKey.HELP_INFO));
