@@ -19,10 +19,27 @@ jobs:
         with:
           java-version: '25'
           distribution: 'microsoft'
+      - name: setup gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: wrapper
+          wrapper-directory: .
       - name: make gradle wrapper executable
         run: chmod +x ./gradlew
       - name: build
-        run: ./gradlew build
+        run: |
+          attempt=1
+          max_attempts=3
+          until ./gradlew build; do
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "::error::Build failed after $max_attempts attempts"
+              exit 1
+            fi
+            wait_seconds=$((attempt * 20))
+            echo "::warning::Build attempt $attempt failed (often a transient dependency-resolution hiccup against maven.fabricmc.net), retrying in ${wait_seconds}s"
+            sleep "$wait_seconds"
+            attempt=$((attempt + 1))
+          done
       - name: capture build artifacts
         uses: actions/upload-artifact@v7
         with:

@@ -58,6 +58,9 @@ public enum GuiKeys {
     MAP_HERE,
     MAP_CLAIM_HINT,
     MAP_OUTPOST_HINT,
+    MAP_LEVEL_HIGHEST,
+    MAP_LEVEL,
+    MAP_LEVEL_HINT,
     // Bank
     BANK_BALANCE,
     BANK_DEPOSIT,
