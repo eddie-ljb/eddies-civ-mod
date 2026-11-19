@@ -53,6 +53,21 @@ public record Constituency(ConstituencyId id, PolityId polity, String name, List
         return new Constituency(id, polity, name, areas, updated);
     }
 
+    /** Ob dieses Gebiet (exakt, gleiche Grenzen) Teil des Wahlkreises ist. */
+    boolean hasArea(Area area) {
+        return areas.contains(area);
+    }
+
+    Constituency withoutArea(Area area) {
+        List<Area> updated = areas.stream().filter(existing -> !existing.equals(area)).toList();
+        return new Constituency(id, polity, name, updated, towns);
+    }
+
+    Constituency withoutTown(PolityId town) {
+        List<PolityId> updated = towns.stream().filter(existing -> !existing.equals(town)).toList();
+        return new Constituency(id, polity, name, areas, updated);
+    }
+
     Constituency cleared() {
         return new Constituency(id, polity, name, List.of(), List.of());
     }
