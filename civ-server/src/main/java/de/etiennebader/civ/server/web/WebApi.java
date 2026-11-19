@@ -34,6 +34,7 @@ import de.etiennebader.civ.server.command.TranslationKeys;
 import de.etiennebader.civ.server.community.LetterView;
 import de.etiennebader.civ.server.company.HoldingView;
 import de.etiennebader.civ.server.company.OrderView;
+import de.etiennebader.civ.server.level.TerritoryColor;
 import de.etiennebader.civ.server.market.ItemTraits;
 import de.etiennebader.civ.server.market.MarketOffer;
 import de.etiennebader.civ.server.office.ElectionView;
@@ -46,6 +47,7 @@ import de.etiennebader.civ.server.vote.ProposalView;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -210,7 +212,8 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                         new HttpResponse(200, "text/html; charset=utf-8", page, Map.of("Cache-Control", "no-cache"));
                 case "GET /api/world" -> HttpResponse.json(200, game.call(() -> world(texts)));
                 case "GET /api/map" -> HttpResponse.json(200, game.call(() ->
-                        map(new DimensionId(request.query().getOrDefault("dim", DimensionId.OVERWORLD.value())))));
+                        map(new DimensionId(request.query().getOrDefault("dim", DimensionId.OVERWORLD.value())),
+                                Optional.ofNullable(request.query().get("level")).filter(v -> !v.isBlank()))));
                 case "GET /api/market" -> HttpResponse.json(200, game.call(this::market));
                 case "GET /api/elections" -> HttpResponse.json(200, game.call(() -> elections(texts)));
                 case "GET /api/shops" -> HttpResponse.json(200, game.call(this::shops));
@@ -383,6 +386,12 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                 .put("players", civ.players().all().size())
                 .raw("towns", "[" + String.join(",", towns) + "]")
                 .raw("federations", "[" + String.join(",", federations) + "]")
+                .raw("levels", Json.array(civ.federations().levels().all(), lvl -> Json.object()
+                        .put("id", lvl.id())
+                        .put("name", lvl.displayName() instanceof Message message ? texts.translate(message)
+                                : lvl.displayName().toString())
+                        .put("rank", lvl.rank())
+                        .build()))
                 .raw("parties", Json.array(civ.parties().parties(ANONYMOUS),
                         party -> Json.object()
                                 .put("id", party.id().value().toString())
@@ -480,10 +489,20 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                 .collect(Collectors.joining(" · "));
     }
 
-    private String map(DimensionId dimension) {
+    /**
+     * @param level Ebene, nach der Gebiete eingefärbt werden (z. B. {@code nation}); leer für die höchste Ebene des
+     *              Bundes, dem eine Gemeinde angehört. Siehe {@link de.etiennebader.civ.server.level.TerritoryColor}.
+     */
+    private String map(DimensionId dimension, Optional<String> level) {
         List<String> chunks = new ArrayList<>();
         for (PolityView polity : civ.queries().polities()) {
-            for (ChunkCoord chunk : civ.queries().territory().territoryOf(polity.id())) {
+            Collection<ChunkCoord> territory = civ.queries().territory().territoryOf(polity.id());
+            if (territory.isEmpty()) {
+                continue;
+            }
+            String group = TerritoryColor.groupOf(polity, civ.queries().ancestorsOf(polity.id()), level)
+                    .value().toString();
+            for (ChunkCoord chunk : territory) {
                 if (!chunk.dimension().equals(dimension) || chunks.size() >= MAX_MAP_CHUNKS) {
                     continue;
                 }
@@ -492,6 +511,7 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                         .put("x", chunk.x())
                         .put("z", chunk.z())
                         .put("town", polity.id().value().toString())
+                        .put("group", group)
                         .put("outpost", claim.map(c -> c.type().name().equals("OUTPOST")).orElse(false))
                         .build());
             }
