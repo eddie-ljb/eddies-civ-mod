@@ -10,15 +10,18 @@ import java.util.Optional;
 /**
  * Ein Feld der Gebietskarte.
  *
- * @param here ob der Spieler in diesem Chunk steht
+ * @param here  ob der Spieler in diesem Chunk steht
+ * @param group Kennung der Polity, deren Farbe dieses Feld zeigt (Bund der höchsten oder der gefilterten Ebene,
+ *              sonst die Gemeinde selbst), leer in der Wildnis; siehe {@link de.etiennebader.civ.server.level.TerritoryColor}
  */
 public record MapCell(ChunkCoord chunk, Relation relation, Optional<String> owner, Optional<ClaimType> type,
-                      boolean here) {
+                      boolean here, Optional<String> group) {
 
     public MapCell {
         Objects.requireNonNull(chunk, "chunk");
         Objects.requireNonNull(relation, "relation");
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(type, "type");
+        Objects.requireNonNull(group, "group");
     }
 }
