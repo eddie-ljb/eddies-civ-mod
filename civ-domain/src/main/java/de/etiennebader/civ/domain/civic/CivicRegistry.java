@@ -82,6 +82,29 @@ public final class CivicRegistry extends AggregateRoot<CivicEvent> implements Ci
         return replace(require(id).cleared(), day);
     }
 
+    /**
+     * Nimmt ein einzelnes Gebiet aus einem Wahlkreis heraus, ohne die übrigen Gebiete oder Gemeinden
+     * anzutasten (anders als {@link #clear}). So lassen sich Wahlkreise gezielt neu zuschneiden.
+     */
+    public Constituency removeArea(ConstituencyId id, Area area, Day day) {
+        Objects.requireNonNull(area, "area");
+        Constituency found = require(id);
+        if (!found.hasArea(area)) {
+            throw new IllegalArgumentException("Dieses Gebiet gehört nicht zum Wahlkreis: " + found.name());
+        }
+        return replace(found.withoutArea(area), day);
+    }
+
+    /** Nimmt eine einzelne Gemeinde aus einem Wahlkreis heraus, ohne die übrigen Gebiete/Gemeinden anzutasten. */
+    public Constituency removeTown(ConstituencyId id, PolityId town, Day day) {
+        Objects.requireNonNull(town, "town");
+        Constituency found = require(id);
+        if (!found.includes(town)) {
+            throw new IllegalArgumentException("Diese Gemeinde gehört nicht zum Wahlkreis: " + found.name());
+        }
+        return replace(found.withoutTown(town), day);
+    }
+
     /** Löst einen Wahlkreis auf. @return ob es ihn gab */
     public boolean remove(ConstituencyId id, Day day) {
         Optional<Constituency> found = constituency(id);
