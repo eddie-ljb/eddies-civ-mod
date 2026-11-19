@@ -63,6 +63,10 @@ final class Ballots {
 
     static VoteOutcome evaluate(Polity polity, Proposal proposal) {
         long electorate = electorate(polity);
+        if (polity.laws().valueOf(StandardParameters.FULL_TURNOUT_REQUIRED)
+                && proposal.inFavour() + proposal.against() < electorate) {
+            return VoteOutcome.OPEN;
+        }
         long percent = Majorities.requiredPercent(polity, proposal.motion());
         if (reaches(proposal.inFavour(), electorate, percent)) {
             return VoteOutcome.ACCEPTED;

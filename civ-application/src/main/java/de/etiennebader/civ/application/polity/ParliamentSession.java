@@ -20,17 +20,24 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Sitzung des Parlaments am Ende jedes Sitzungstags ({@link StandardParameters#SESSION_DAYS}): Dorfbewohner mit Sitz
- * stellen Anträge und stimmen ab; danach zählt {@link TallyProposals} fällige Anträge aus.
+ * Parlamentsbetrieb über mehrere Tage: Dorfbewohner mit Sitz können an jedem Tag einen Antrag stellen, nicht nur am
+ * Sitzungstag. Jeder Antrag muss mindestens {@link StandardParameters#PARLIAMENT_MOTION_MIN_OPEN_DAYS} offen sein,
+ * bevor am Sitzungstag ({@link StandardParameters#SESSION_DAYS}) darüber abgestimmt wird; die endgültige
+ * Tagesordnung wird dafür immer schon einen Tag vorher bekanntgegeben. Danach zählt {@link TallyProposals} am
+ * Fristende ({@link StandardParameters#VOTE_DAYS}) noch unentschiedene Anträge aus.
  *
  * <ul>
  *   <li>An jedem dritten Tag (fest je Parlament und Tag gewürfelt) stellt ein Dorfbewohner-Abgeordneter einen Antrag,
- *       wenn ihm etwas wichtig genug ist und kein anderer Antrag eines Dorfbewohners offen ist.</li>
- *   <li>Zu jedem offenen Antrag stimmt jeder Dorfbewohner-Abgeordnete ab, der noch nicht abgestimmt hat (oder enthält
- *       sich).</li>
- *   <li>Steht danach die Mehrheit fest, wird sofort entschieden.</li>
+ *       wenn ihm etwas wichtig genug ist und kein anderer Antrag eines Dorfbewohners offen ist. Das kann an jedem
+ *       Tag passieren, nicht nur an einem Sitzungstag.</li>
+ *   <li>Am Tag vor einer Sitzung wird die Tagesordnung bekanntgegeben: alle Anträge, die am Sitzungstag die
+ *       Mindestoffenzeit erreicht haben werden.</li>
+ *   <li>Am Sitzungstag stimmt zu jedem Antrag auf der Tagesordnung jeder Dorfbewohner-Abgeordnete ab, der noch nicht
+ *       abgestimmt hat (oder enthält sich).</li>
+ *   <li>Steht danach die Mehrheit fest, wird entschieden — außer das Gesetz
+ *       {@link StandardParameters#FULL_TURNOUT_REQUIRED} verlangt vorher die Stimme aller Abgeordneten.</li>
  * </ul>
- * Spieler mit Sitz stimmen selbst ab; was sie bis zur Frist nicht tun, zählt als Enthaltung.
+ * Spieler mit Sitz stimmen selbst ab, jederzeit; was sie bis zur Frist nicht tun, zählt als Enthaltung.
  */
 public final class ParliamentSession {
 
@@ -46,6 +53,10 @@ public final class ParliamentSession {
 
     /** Ein Dorfbewohner hat einen Antrag gestellt. */
     public record Tabled(PolityId polity, PersonRef member, Motion motion) implements Outcome {
+    }
+
+    /** Die Tagesordnung für die nächste Sitzung (morgen) steht fest. */
+    public record AgendaAnnounced(PolityId polity, int agenda) implements Outcome {
     }
 
     /** Dorfbewohner haben über einen Antrag abgestimmt. */
@@ -72,18 +83,28 @@ public final class ParliamentSession {
         Objects.requireNonNull(day, "day");
         List<Outcome> outcomes = new ArrayList<>();
         for (Polity polity : aggregates.repositories().polities().findAll()) {
-            if (!polity.parliament().seated() || !isSessionDay(polity, day)) {
+            if (!polity.parliament().seated()) {
                 continue;
             }
-            outcomes.add(new Session(polity.id(), polity.proposals().size()));
             List<PersonRef> villagers = villagerMembers(polity.parliament());
-            if (villagers.isEmpty()) {
-                continue;
-            }
             int before = outcomes.size();
-            table(polity, villagers, day, outcomes);
-            for (Proposal proposal : polity.proposals()) {
-                vote(polity, proposal, villagers, day, outcomes);
+            if (!villagers.isEmpty()) {
+                table(polity, villagers, day, outcomes);
+            }
+            if (isSessionDay(polity, day)) {
+                List<Proposal> agenda = onAgenda(polity, day);
+                outcomes.add(new Session(polity.id(), agenda.size()));
+                if (!villagers.isEmpty()) {
+                    for (Proposal proposal : agenda) {
+                        vote(polity, proposal, villagers, day, outcomes);
+                    }
+                }
+            }
+            if (isSessionDay(polity, day.next())) {
+                int tomorrow = onAgenda(polity, day.next()).size();
+                if (tomorrow > 0) {
+                    outcomes.add(new AgendaAnnounced(polity.id(), tomorrow));
+                }
             }
             if (outcomes.size() > before) {
                 aggregates.commit(polity);
@@ -147,6 +168,19 @@ public final class ParliamentSession {
     public static boolean isSessionDay(PolityView polity, Day day) {
         long every = polity.laws().valueOf(StandardParameters.SESSION_DAYS);
         return Math.floorMod(day.value(), every) == 0;
+    }
+
+    /**
+     * Anträge, die am gegebenen Tag auf der Tagesordnung stehen: offen seit mindestens
+     * {@link StandardParameters#PARLIAMENT_MOTION_MIN_OPEN_DAYS}. Da die Mindestoffenzeit feststeht, sobald ein
+     * Antrag gestellt ist, ist das Ergebnis für morgen schon heute bekannt — genau das macht die vorherige
+     * Bekanntgabe der Tagesordnung möglich.
+     */
+    private static List<Proposal> onAgenda(PolityView polity, Day day) {
+        long minOpenDays = polity.laws().valueOf(StandardParameters.PARLIAMENT_MOTION_MIN_OPEN_DAYS);
+        return polity.proposals().stream()
+                .filter(proposal -> !day.isBefore(proposal.openedOn().plus(minOpenDays)))
+                .toList();
     }
 
     private static List<PersonRef> villagerMembers(Parliament parliament) {
