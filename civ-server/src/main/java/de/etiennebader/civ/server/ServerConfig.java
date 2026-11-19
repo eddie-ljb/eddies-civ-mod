@@ -44,8 +44,12 @@ public final class ServerConfig {
     static final String ANTHEM_ON_ENTER = "anthem_on_enter";
     static final String WORLD_MAP = "world_map";
     static final String MAP_RADIUS = "world_map_radius_chunks";
+    static final String PRICE_LEVEL_MIN = "price_level_min";
+    static final String PRICE_LEVEL_MAX = "price_level_max";
+    static final String PRICE_LEVEL_DAMPING = "price_level_damping";
     private static final java.util.List<String> KEYS = java.util.List.of(LIVE_COUNT, LIVE_COUNT_SECONDS, PROJECTIONS,
-            DEBATE_MINUTES, ANTHEM_ON_ENTER, WORLD_MAP, MAP_RADIUS, WEB_TRUST_PROXY);
+            DEBATE_MINUTES, ANTHEM_ON_ENTER, WORLD_MAP, MAP_RADIUS, WEB_TRUST_PROXY, PRICE_LEVEL_MIN, PRICE_LEVEL_MAX,
+            PRICE_LEVEL_DAMPING);
 
     private static final String HEADER = """
             Eddies Civ Mod
@@ -66,7 +70,10 @@ public final class ServerConfig {
             live_count_seconds: Dauer der Live-Auszaehlung (5-600); live_count_projections: Hochrechnungen (true/false)
             debate_minutes: Laenge einer Wahldebatte in Minuten (0 = keine Debatten)
             anthem_on_enter: Hymne beim Betreten einer Gemeinde abspielen (true/false)
-            world_map: gerenderte Weltkarte auf der Webseite (true/false); world_map_radius_chunks: Umkreis um Spieler""";
+            world_map: gerenderte Weltkarte auf der Webseite (true/false); world_map_radius_chunks: Umkreis um Spieler
+            price_level_min, price_level_max: Grenzen des Marktpreisfaktors (Standard 0.5 .. 4.0)
+            price_level_damping: Daempfung der Preisreaktion auf die Geldmenge je Kopf (Standard 0.5 = Quadratwurzel;
+              1.0 liesse Preise proportional zur Geldmenge je Kopf schwanken, staerkere Inflation/Deflation)""";
 
     private ServerConfig() {
     }
@@ -124,7 +131,18 @@ public final class ServerConfig {
                         Boolean.parseBoolean(properties.getProperty(VILLAGER_PARTIES,
                                 Boolean.toString(defaults.parties().villagers())).strip()),
                         (int) number(properties, PARTY_FOUNDERS, defaults.parties().founders(), 2)),
-                show(properties, defaults.show()));
+                show(properties, defaults.show()), economy(properties, defaults.economy()));
+    }
+
+    private static ServerSettings.EconomySettings economy(Properties properties, ServerSettings.EconomySettings defaults) {
+        try {
+            return new ServerSettings.EconomySettings(
+                    decimal(properties, PRICE_LEVEL_MIN, defaults.priceLevelMin()),
+                    decimal(properties, PRICE_LEVEL_MAX, defaults.priceLevelMax()),
+                    decimal(properties, PRICE_LEVEL_DAMPING, defaults.priceLevelDamping()));
+        } catch (IllegalArgumentException e) {
+            return defaults;
+        }
     }
 
     private static ServerSettings.ShowSettings show(Properties properties, ServerSettings.ShowSettings defaults) {
@@ -173,6 +191,9 @@ public final class ServerConfig {
         properties.setProperty(ANTHEM_ON_ENTER, Boolean.toString(settings.show().anthemOnEnter()));
         properties.setProperty(WORLD_MAP, Boolean.toString(settings.show().worldMap()));
         properties.setProperty(MAP_RADIUS, Integer.toString(settings.show().mapRadius()));
+        properties.setProperty(PRICE_LEVEL_MIN, Double.toString(settings.economy().priceLevelMin()));
+        properties.setProperty(PRICE_LEVEL_MAX, Double.toString(settings.economy().priceLevelMax()));
+        properties.setProperty(PRICE_LEVEL_DAMPING, Double.toString(settings.economy().priceLevelDamping()));
         try {
             Files.createDirectories(file.toAbsolutePath().getParent());
             try (Writer writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
@@ -191,6 +212,18 @@ public final class ServerConfig {
         try {
             long parsed = Long.parseLong(value.strip());
             return parsed >= minimum ? parsed : fallback;
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
+    }
+
+    private static double decimal(Properties properties, String key, double fallback) {
+        String value = properties.getProperty(key);
+        if (value == null) {
+            return fallback;
+        }
+        try {
+            return Double.parseDouble(value.strip());
         } catch (NumberFormatException e) {
             return fallback;
         }
