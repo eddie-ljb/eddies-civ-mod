@@ -442,6 +442,7 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
           <option value="minecraft:the_end">Ende</option>
         </select>
         <select id="mapmode" aria-label="Ansicht"><option value="">Gebiete</option></select>
+        <select id="maplevel" aria-label="Ebene" title="Nach welcher Ebene Gebiete eingefärbt werden"><option value="">Höchste Ebene</option></select>
         <label class="btn small" style="background:var(--surface)"><input type="checkbox" id="showstreets" checked style="padding:0"> Straßen</label>
         <label class="btn small" style="background:var(--surface)" id="terrainbox" hidden><input type="checkbox" id="showterrain" checked style="padding:0"> Gelände</label>
         <button class="btn small" id="recenter">Zentrieren</button>
@@ -449,7 +450,7 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
       <div class="legend" id="legend"></div>
       <div class="tooltip" id="tooltip"></div>
     </div>
-    <p class="muted small" style="margin-top:10px">Außenposten sind schraffiert, ein Stern markiert das Gemeindehaus. In der Wahlkarte färbt sich jede Gemeinde nach dem Führenden ihres Wahlbezirks.</p>
+    <p class="muted small" style="margin-top:10px">Außenposten sind schraffiert, ein Stern markiert das Gemeindehaus. Gemeinden desselben Bundes teilen sich eine Farbe, standardmäßig nach dessen höchster Ebene (Nation &gt; Land &gt; Gemeinde); „Ebene" grenzt das auf eine bestimmte Stufe ein. In der Wahlkarte färbt sich jede Gemeinde nach dem Führenden ihres Wahlbezirks.</p>
   </section>
 
   <section data-page="wahlen">
@@ -673,7 +674,9 @@ const hash = s => { let h = 2166136261; for (const c of String(s)) h = Math.imul
 const palette = ["#127a55", "#2f6db5", "#b0542b", "#7a4bb0", "#a8771f", "#1f8c8c", "#b23a5a", "#5a7d1a", "#c2852c", "#3f5aa8"];
 let world = { towns: [], federations: [], parties: [] };
 const colorOf = id => {
-  const index = (world.towns || []).findIndex(t => t.id === id);
+  const towns = world.towns || [], feds = world.federations || [];
+  let index = towns.findIndex(t => t.id === id);
+  if (index < 0) { const fi = feds.findIndex(f => f.id === id); if (fi >= 0) index = towns.length + fi; }
   return palette[(index >= 0 ? index : hash(id)) % palette.length];
 };
 const tinctures = ["#f2ead3", "#d9b44a", "#e4e7e9", "#1d2a33"];
@@ -904,10 +907,18 @@ let view = { x: 0, z: 0, scale: 12 }, mapData = { chunks: [], seats: [] }, drag 
 let electionData = { results: [], polls: [] };
 async function openMap() {
   if (!world.towns.length) await fetchWorld();
+  fillLevels();
   if (!streetsData.towns.length) { const s = await api("/api/streets"); if (s.ok) streetsData = s.data; }
   resize();
   await loadMap();
   if (!centered) { centered = true; recenter(); }
+}
+function fillLevels() {
+  const sel = $("maplevel");
+  if (sel.dataset.filled) return;
+  sel.dataset.filled = "1";
+  [...(world.levels || [])].sort((a, b) => b.rank - a.rank)
+    .forEach(l => sel.append(el("option", { value: l.id, textContent: l.name })));
 }
 function resize() {
   const rect = canvas.getBoundingClientRect();
@@ -917,7 +928,9 @@ function resize() {
 window.addEventListener("resize", () => { if (page === "karte") resize(); });
 async function loadMap() {
   if (!electionData.results.length) { const r = await api("/api/elections"); if (r.ok) { electionData = r.data; fillModes(); } }
-  const [{ ok, data }, tiles] = await Promise.all([api("/api/map?dim=" + encodeURIComponent($("dim").value)),
+  const level = $("maplevel").value;
+  const [{ ok, data }, tiles] = await Promise.all([api("/api/map?dim=" + encodeURIComponent($("dim").value)
+      + (level ? "&level=" + encodeURIComponent(level) : "")),
     api("/api/map/tiles?dim=" + encodeURIComponent($("dim").value))]);
   if (!ok) return;
   mapData = data;
@@ -931,8 +944,8 @@ async function loadMap() {
       return el("div", {}, sw, (d.party || d.leader) + ": " + leaders.filter(x => x.key === d.key).map(x => x.name).join(", "));
     }) : [el("div", { textContent: "Keine Bezirke." })]));
   } else {
-    const names = Object.fromEntries(world.towns.map(t => [t.id, t.name]));
-    const present = [...new Set(data.chunks.map(c => c.town))];
+    const names = Object.fromEntries([...world.towns, ...(world.federations || [])].map(t => [t.id, t.name]));
+    const present = [...new Set(data.chunks.map(c => c.group || c.town))];
     $("legend").replaceChildren(...(present.length ? present.map(id => {
       const sw = el("span", { className: "swatch" }); sw.style.setProperty("--c", colorOf(id));
       return el("div", {}, sw, names[id] || "?");
@@ -962,7 +975,7 @@ function toScreen(cx, cz) {
 function electionResult() { const m = $("mapmode").value; return m === "" ? null : electionData.results[+m] || null; }
 function chunkColor(c) {
   const result = electionResult();
-  if (!result) return colorOf(c.town);
+  if (!result) return colorOf(c.group || c.town);
   const d = result.districts.find(x => x.town === c.town);
   const party = $("eparty").value;
   if (!d || (party && d.party !== party)) return css("--line");
@@ -1065,6 +1078,7 @@ canvas.addEventListener("pointerleave", () => $("tooltip").style.display = "none
 canvas.addEventListener("wheel", e => { e.preventDefault(); view.scale = Math.min(64, Math.max(1, view.scale * (e.deltaY < 0 ? 1.15 : 1 / 1.15))); draw(); }, { passive: false });
 $("dim").addEventListener("change", () => loadMap().then(recenter));
 $("mapmode").addEventListener("change", loadMap);
+$("maplevel").addEventListener("change", loadMap);
 $("showstreets").addEventListener("change", draw);
 $("showterrain").addEventListener("change", draw);
 $("recenter").addEventListener("click", recenter);
