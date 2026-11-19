@@ -30,6 +30,13 @@ public final class StandardParameters {
     public static final ParameterKey<Integer> MAX_OUTPOSTS =
             ParameterKey.constrained("max_outposts", Integer.class, 0, max -> max >= 0);
 
+    /**
+     * Kosten für einen Chunk-Claim in kleinster Währungseinheit (100 = ein Smaragd), fällig aus der Gemeindekasse.
+     * Reicht die Kasse nicht, wird der Claim abgelehnt.
+     */
+    public static final ParameterKey<Long> CLAIM_COST_PER_CHUNK =
+            ParameterKey.constrained("claim_cost_per_chunk", Long.class, 200L, cost -> cost >= 0);
+
     /** Ob Nicht-Mitglieder im Gebiet bauen und abbauen dürfen. */
     public static final ParameterKey<Boolean> OUTSIDERS_MAY_BUILD =
             ParameterKey.of("outsiders_may_build", Boolean.class, false);
@@ -184,7 +191,7 @@ public final class StandardParameters {
     /** Alle Standardparameter in fester Reihenfolge. */
     public static List<ParameterKey<?>> all() {
         return List.of(LAND_TAX_PER_BLOCK, LAND_TAX_FREE_BLOCKS, LAND_TAX_GRACE_DAYS, TAX_EMBASSIES, MAX_OUTPOSTS,
-                OUTSIDERS_MAY_BUILD, OUTSIDERS_MAY_INTERACT, OUTSIDERS_MAY_OPEN_CONTAINERS, EXPLOSIONS_ALLOWED,
+                CLAIM_COST_PER_CHUNK, OUTSIDERS_MAY_BUILD, OUTSIDERS_MAY_INTERACT, OUTSIDERS_MAY_OPEN_CONTAINERS, EXPLOSIONS_ALLOWED,
                 FIRE_SPREAD_ALLOWED, LAWS_BY_VOTE, VOTE_DAYS, SALES_TAX_PERCENT, TERM_DAYS, ELECTION_DAYS,
                 VILLAGER_VOTE_PERCENT, AMENDMENT_MAJORITY_PERCENT, FEDERAL_LAW_PREVAILS, PVP_ALLOWED, HOSTILE_MOBS_ALLOWED,
                 OUTSIDERS_MAY_HURT_ANIMALS, FEDERAL_LEVY_PERCENT, PARLIAMENT_SEATS, SESSION_DAYS, BALLOT_BOX_REQUIRED,
