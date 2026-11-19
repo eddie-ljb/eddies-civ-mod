@@ -42,6 +42,8 @@ Jede Ebene stellt im Recht ein, wie gewählt wird:
 ## Wahlkreise
 Unabhängig von Gemeinden kann jede Ebene eigene Wahlkreise schneiden: `/civ <Ebene> wahlkreis anlegen <Name>`, dann mit dem Grundstücksstab Gebiete markieren (`wahlkreis gebiet <Name>`) oder ganze Gemeinden zuordnen (`wahlkreis gemeinde <Name> <Gemeinde>`). `wahlkreis liste`, `leeren <Name>`, `aufloesen <Name>`. Spieler zählen im Wahlkreis ihres Wohngrundstücks, Dorfbewohner dort, wo sie zuletzt gesehen wurden. Bei `districts`/`mixed` gibt jeder Wahlkreis seinen Sieger.
 
+Gebiete und Gemeinden müssen dabei nicht zusammenhängen – ein Wahlkreis kann aus beliebig verstreuten Teilen bestehen. Einzelne Zuordnungen lassen sich auch nachträglich wieder herausnehmen, ohne den ganzen Wahlkreis zu leeren: `wahlkreis gebiet-entfernen <Name>` (mit dem Grundstücksstab markiertes Rechteck) bzw. `wahlkreis gemeinde-entfernen <Name> <Gemeinde>`. So lässt sich ein bestehender Wahlkreis jederzeit neu zuschneiden.
+
 ## Parteien
 Parteien sind Zusammenschlüsse von Personen (Spieler und Dorfbewohner) über alle Gemeinden hinweg; jede Person gehört höchstens einer Partei an.
 - **Richtung:** zwei Achsen -100..100 – Ordnung (− Freiheit, + Ordnung) und Wirtschaft (− niedrige Steuern, + Ausbau). Die stärkere Achse ergibt das Wahlprogramm.
