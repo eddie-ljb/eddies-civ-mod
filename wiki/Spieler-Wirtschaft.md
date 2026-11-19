@@ -10,7 +10,9 @@ Rezept: weiße und rote Wolle, Bretter, Smaragd, Truhe (`WRW / PEP / PCP`).
 - **Verkaufen:** Klick auf einen Stapel im Inventar verkauft den ganzen Stapel, Rechtsklick nur ein Stück.
 - **Kaufen:** oben liegt das Lager; Klick kauft 1, Shift-Klick 16.
 
-Preisbildung: Grundpreis je Item, je mehr Lagerbestand desto billiger, das Lager schrumpft täglich um 5 %, Ankauf/Verkauf liegen 10 % auseinander, das Preisniveau folgt der Geldmenge je Spieler (Inflation, 50–400 % begrenzt). Verzauberte, umbenannte oder beschädigte Items kauft der Markt nicht an.
+Preisbildung: Grundpreis je Item, je mehr Lagerbestand desto billiger, das Lager schrumpft täglich um 5 %, Ankauf/Verkauf liegen 10 % auseinander, das Preisniveau folgt der Geldmenge je Spieler (Inflation, standardmäßig 50–400 % begrenzt). Verzauberte, umbenannte oder beschädigte Items kauft der Markt nicht an.
+
+**Für Admins:** die drei Stellschrauben dieser Inflation/Deflation lassen sich seit Issue #5 in der Server-Konfiguration anpassen, siehe [Admin-Installation-und-Konfiguration](Admin-Installation-und-Konfiguration.md) – `price_level_min`/`price_level_max` (Standard 0,5/4,0) und `price_level_damping` (Standard 0,5 = Quadratwurzel-Formel; höhere Werte lassen die Preise stärker auf die Geldmenge je Kopf reagieren).
 
 ## Firmen und Börse
 - `/civ firma gruenden <Kapital> <Name>`: Kapital (mind. 10 Smaragde) geht vom Gründer in die Firmenkasse. 1.000 Aktien, anfangs alle beim Gründer; Ausgabepreis = Kapital / 1.000. Der Gründer leitet die Firma.
