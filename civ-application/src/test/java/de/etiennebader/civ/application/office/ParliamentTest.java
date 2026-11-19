@@ -106,7 +106,7 @@ class ParliamentTest {
     }
 
     @Test
-    @DisplayName("Dorfbewohner kandidieren für ihre Partei, ziehen ein und stimmen am Tagesende ab")
+    @DisplayName("Dorfbewohner kandidieren für ihre Partei, ziehen ein und stimmen ab, sobald die Mindestoffenzeit erreicht ist")
     void villagersInParliament() {
         List<PersonRef> villagers = new ArrayList<>();
         for (int i = 0; i < 4; i++) {
@@ -139,12 +139,78 @@ class ParliamentTest {
                 return Optional.empty();
             }
         };
-        List<ParliamentSession.Outcome> outcomes = new ParliamentSession(
-                new Aggregates(fixture.repositories, fixture.events), fixture.ids, yes).execute(DAY.plus(3));
+        ParliamentSession session = new ParliamentSession(
+                new Aggregates(fixture.repositories, fixture.events), fixture.ids, yes);
+        List<ParliamentSession.Outcome> sameDay = session.execute(DAY.plus(3));
+        assertTrue(sameDay.stream().noneMatch(ParliamentSession.Decided.class::isInstance),
+                "Antrag braucht erst parliament_motion_min_open_days, bevor im Parlament darüber abgestimmt wird");
+        ParliamentSession.AgendaAnnounced announced = sameDay.stream()
+                .filter(ParliamentSession.AgendaAnnounced.class::isInstance)
+                .map(ParliamentSession.AgendaAnnounced.class::cast)
+                .findFirst().orElseThrow(() -> new AssertionError("die Tagesordnung für morgen wird schon heute bekanntgegeben"));
+        assertEquals(1, announced.agenda());
+        List<ParliamentSession.Outcome> outcomes = session.execute(DAY.plus(4));
         ParliamentSession.Decided decided = assertInstanceOf(ParliamentSession.Decided.class, outcomes.getLast());
         assertEquals(proposal, decided.proposal().id());
         assertEquals(VoteOutcome.ACCEPTED, decided.outcome());
         assertEquals(5L, polity().laws().valueOf(StandardParameters.SALES_TAX_PERCENT));
+    }
+
+    @Test
+    @DisplayName("full_turnout_required: Ergebnis erst, wenn alle Abgeordneten abgestimmt haben, nicht schon bei rechnerisch sicherer Mehrheit")
+    void fullTurnoutRequired() {
+        for (PlayerRef citizen : List.of(bob, carla, dave)) {
+            join(citizen, MembershipType.CITIZEN);
+        }
+        amend(StandardParameters.PARLIAMENT_SEATS, 3L);
+        amend(StandardParameters.FULL_TURNOUT_REQUIRED, true);
+        fixture.app.runElections().execute(DAY);
+        ElectionId election = polity().electionFor(Office.PARLIAMENT).orElseThrow().id();
+        for (PlayerRef candidate : List.of(alice, bob, carla)) {
+            fixture.app.standForElection().execute(new StandForElection.Command(nordhain, election, candidate, DAY));
+        }
+        ballot(alice, election, alice);
+        ballot(bob, election, bob);
+        ballot(carla, election, carla);
+        fixture.app.runElections().execute(DAY.plus(2));
+        assertEquals(3, polity().parliament().seats().size(), "je 100 Stimmen auf 3 Sitze: ein Sitz je Kandidat");
+
+        ProposalId proposal = fixture.app.proposeMotion().execute(new ProposeMotion.Command(nordhain, alice,
+                change(StandardParameters.SALES_TAX_PERCENT, 7L), DAY.plus(2))).proposal();
+        assertEquals(VoteOutcome.OPEN, vote(bob, proposal, true),
+                "2 von 3 wären rechnerisch sicher, aber carla hat noch nicht abgestimmt");
+        assertEquals(VoteOutcome.ACCEPTED, vote(carla, proposal, false),
+                "jetzt haben alle drei abgestimmt: 2 dafür, 1 dagegen bleibt eine Mehrheit");
+        assertEquals(7L, polity().laws().valueOf(StandardParameters.SALES_TAX_PERCENT));
+    }
+
+    @Test
+    @DisplayName("full_turnout_required: ohne volle Beteiligung zählt trotzdem die Frist (vote_days) aus")
+    void fullTurnoutRequiredStillHitsDeadline() {
+        for (PlayerRef citizen : List.of(bob, carla)) {
+            join(citizen, MembershipType.CITIZEN);
+        }
+        amend(StandardParameters.PARLIAMENT_SEATS, 3L);
+        amend(StandardParameters.FULL_TURNOUT_REQUIRED, true);
+        amend(StandardParameters.VOTE_DAYS, 2L);
+        fixture.app.runElections().execute(DAY);
+        ElectionId election = polity().electionFor(Office.PARLIAMENT).orElseThrow().id();
+        for (PlayerRef candidate : List.of(alice, bob, carla)) {
+            fixture.app.standForElection().execute(new StandForElection.Command(nordhain, election, candidate, DAY));
+        }
+        ballot(alice, election, alice);
+        ballot(bob, election, bob);
+        ballot(carla, election, carla);
+        fixture.app.runElections().execute(DAY.plus(2));
+
+        ProposalId proposal = fixture.app.proposeMotion().execute(new ProposeMotion.Command(nordhain, alice,
+                change(StandardParameters.SALES_TAX_PERCENT, 9L), DAY.plus(2))).proposal();
+        assertEquals(VoteOutcome.OPEN, vote(bob, proposal, true), "carla stimmt nicht ab, aber die Mehrheit stünde fest");
+
+        List<de.etiennebader.civ.application.polity.TallyProposals.Tallied> tallied = fixture.app.tallyProposals()
+                .execute(DAY.plus(2).plus(2));
+        assertEquals(1, tallied.size(), "die Frist zählt trotz fehlender voller Beteiligung aus");
+        assertEquals(VoteOutcome.ACCEPTED, tallied.getFirst().outcome());
     }
 
     @Test
@@ -178,7 +244,11 @@ class ParliamentTest {
     }
 
     private VoteOutcome vote(ActorRef voter, ProposalId proposal) {
-        return fixture.app.castVote().execute(new CastVote.Command(nordhain, proposal, voter, true, DAY));
+        return vote(voter, proposal, true);
+    }
+
+    private VoteOutcome vote(ActorRef voter, ProposalId proposal, boolean inFavour) {
+        return fixture.app.castVote().execute(new CastVote.Command(nordhain, proposal, voter, inFavour, DAY));
     }
 
     private ElectionId call(ActorRef citizen) {

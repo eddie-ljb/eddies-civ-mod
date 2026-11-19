@@ -1,5 +1,10 @@
 # Eddies Civ Mod – Wiki
 
+> Diese Seiten liegen als Entwurf unter `wiki/` im Hauptrepo, weil das Build-Konto dieser Sitzung keinen Schreibzugriff
+> auf das separate `eddies-civ-mod.wiki.git`-Repository hat. Bitte Inhalte von hier in das echte GitHub-Wiki
+> übernehmen (Repo → Tab **Wiki** → Seite mit demselben Namen anlegen/bearbeiten).
+
+- [Parlament](Parlament.md) – Sitzungen, Anträge, Tagesordnung, Abstimmungsregeln
 Fabric-Mod für Minecraft 26.3: Gemeinden, Gebiete, Recht, Geld und ein Servermarkt mit dynamischen Preisen. Alle Menüs laufen auf dem Server als Truhenmenüs, deshalb können auch Spieler ohne den Mod auf einem Server mit dem Mod mitspielen (für Blöcke und eigene Items brauchen alle den Client-Teil des Mods).
 
 Dieses Wiki ist nach Zielgruppe sortiert: Spieler finden hier, wie man Gemeinden gründet, wählt und wirtschaftet; Admins, wie der Server eingerichtet, abgesichert und gepflegt wird; Entwickler, wie der Code aufgebaut ist.
