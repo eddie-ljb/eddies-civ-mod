@@ -65,4 +65,12 @@ ein guter Kandidat für eine eigene, kleinere Folge-Änderung, falls gewünscht.
   (`readsEconomyTuning`), ungültige Kombination (`min >= max`) fällt komplett auf den Standard-Record
   zurück (`invalidEconomyTuningFallsBackToDefaults`), und ein Schreib-/Lese-Durchlauf erhält die Werte
   (`economyTuningRoundTrips`).
-- `./gradlew :civ-domain:test :civ-application:test :civ-server:test` – **BUILD SUCCESSFUL**.
+- `./gradlew :civ-domain:test --tests "*PriceLevel*" --tests "*Market*" :civ-server:test --tests "*ServerConfig*"` –
+  **BUILD SUCCESSFUL**, alle neuen und bestehenden Tests zu Preisniveau und Server-Config grün.
+- `./gradlew :civ-server:test` (voller Modul-Testlauf): ein einzelner, inhaltlich nicht betroffener Test
+  (`CivServerTest.savesInBackgroundAndRestores`) schlug in dieser Session mit `ClassFormatError: Truncated
+  class file` beim Laden des SQLite-JDBC-Treibers fehl – reproduzierbar auch ohne Gradle-Daemon, aber die
+  Jar-Datei selbst ist laut `unzip -t` intakt. Das betrifft ausschließlich Datenbank-Persistenz, nicht den
+  Preisniveau-Code dieser Änderung, und trat vermutlich durch gleichzeitig laufende Sibling-Builds auf,
+  die denselben `~/.gradle`-Cache teilen. Sollte das auch in CI auftreten, ist es ein Umgebungs-/Cache-Problem,
+  kein Regressions-Fehler dieser PR.
