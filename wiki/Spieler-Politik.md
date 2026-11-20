@@ -80,7 +80,7 @@ Gemeinden und Bünde können ein Parlament haben; `parliament_seats` (0–99, Ve
 - **Wahlurne** (Block): Rechtsklick zeigt alle laufenden Wahlen am Ort; Klick wählt. Mit `ballot_box_required` zählen nur Stimmen an der Urne.
 - Die letzten 10 Ergebnisse jeder Gemeinde/jedes Bundes bleiben gespeichert: `/civ wahlergebnis [Name | menue]`.
 - `/civ umfrage [Name]` fragt Dorfbewohner, wen sie wählen würden; beim Parlament inklusive Sitzprognose.
-- Webseite: Reiter „Wahlen“ mit Umfragen und Ergebnissen, auf der Karte die Ansicht „Wahlkarte“ (siehe auch [Map Fix, Issue #8](Spieler-Webseite.md)).
+- Webseite: Reiter „Wahlen“ mit Umfragen, Ergebnissen (je Wahlbezirk aufklappbar zur vollen Kandidaten-Rangfolge, nicht nur zum Sieger) und einer Suche nach Gemeinde/Bund; auf der Karte die Ansicht „Wahlkarte“ mit eigenem Partei-Filter und sichtbaren Bezirksgrenzen (siehe [Karte](Karte.md)).
 
 ## Dorfbewohner-Politik (`villager_politics_enabled`, Standard an)
 Gemeinden, Bünde und Firmen brauchen keinen Spieler mehr, um am Spielgeschehen teilzunehmen:
