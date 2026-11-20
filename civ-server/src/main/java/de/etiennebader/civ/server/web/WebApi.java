@@ -9,6 +9,7 @@ import de.etiennebader.civ.domain.civic.CustomImage;
 import de.etiennebader.civ.domain.civic.ImageKind;
 import de.etiennebader.civ.domain.exchange.Side;
 import de.etiennebader.civ.domain.market.Quote;
+import de.etiennebader.civ.domain.polity.ElectionResult;
 import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.Platform;
 import de.etiennebader.civ.domain.polity.PolityKind;
@@ -36,6 +37,7 @@ import de.etiennebader.civ.server.command.TranslationKeys;
 import de.etiennebader.civ.server.community.LetterView;
 import de.etiennebader.civ.server.company.HoldingView;
 import de.etiennebader.civ.server.company.OrderView;
+import de.etiennebader.civ.server.election.ElectionMapColor;
 import de.etiennebader.civ.server.level.TerritoryColor;
 import de.etiennebader.civ.server.market.ItemTraits;
 import de.etiennebader.civ.server.market.MarketOffer;
@@ -220,9 +222,17 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                 case "GET /", "GET /index.html" ->
                         new HttpResponse(200, "text/html; charset=utf-8", page, Map.of("Cache-Control", "no-cache"));
                 case "GET /api/world" -> HttpResponse.json(200, game.call(() -> world(texts)));
-                case "GET /api/map" -> HttpResponse.json(200, game.call(() ->
-                        map(new DimensionId(request.query().getOrDefault("dim", DimensionId.OVERWORLD.value())),
-                                Optional.ofNullable(request.query().get("level")).filter(v -> !v.isBlank()))));
+                case "GET /api/map" -> HttpResponse.json(200, game.call(() -> {
+                    DimensionId dimension = new DimensionId(request.query().getOrDefault("dim", DimensionId.OVERWORLD.value()));
+                    String electionParam = request.query().get("election");
+                    if (electionParam != null && !electionParam.isBlank()) {
+                        PolityId electionPolity = new PolityId(UUID.fromString(electionParam));
+                        Optional<Office> office = Optional.ofNullable(request.query().get("office"))
+                                .filter(v -> !v.isBlank()).map(Office::valueOf);
+                        return mapElection(dimension, electionPolity, office);
+                    }
+                    return map(dimension, Optional.ofNullable(request.query().get("level")).filter(v -> !v.isBlank()));
+                }));
                 case "GET /api/market" -> HttpResponse.json(200, game.call(this::market));
                 case "GET /api/elections" -> HttpResponse.json(200, game.call(() -> elections(texts)));
                 case "GET /api/shops" -> HttpResponse.json(200, game.call(this::shops));
@@ -454,6 +464,12 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                                 .put("party", district.leaderParty().orElse(""))
                                 .put("key", district.leaderKey())
                                 .put("votes", CampaignService.votes(district.votes()))
+                                .raw("lines", Json.array(district.lines(), line -> Json.object()
+                                        .put("name", line.name())
+                                        .put("party", line.party().orElse(""))
+                                        .put("votes", CampaignService.votes(line.votes()))
+                                        .put("percent", line.percent())
+                                        .build()))
                                 .build()))
                         .build());
             }
@@ -527,6 +543,58 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                         .put("z", chunk.z())
                         .put("town", polity.id().value().toString())
                         .put("group", group)
+                        .put("outpost", claim.map(c -> c.type().name().equals("OUTPOST")).orElse(false))
+                        .build());
+            }
+        }
+        List<String> seats = new ArrayList<>();
+        for (PolityView polity : civ.queries().polities()) {
+            polity.seat().filter(seat -> seat.dimension().equals(dimension)).ifPresent(seat -> seats.add(Json.object()
+                    .put("town", polity.id().value().toString())
+                    .put("name", polity.name().value())
+                    .put("x", seat.x())
+                    .put("z", seat.z())
+                    .build()));
+        }
+        return Json.object()
+                .put("dimension", dimension.value())
+                .raw("chunks", "[" + String.join(",", chunks) + "]")
+                .raw("seats", "[" + String.join(",", seats) + "]")
+                .build();
+    }
+
+    /**
+     * Wie {@link #map(DimensionId, Optional)}, aber jedes Feld trägt zusätzlich seinen Wahlbezirk ({@code district})
+     * und seine Kartenfarbe richtet sich nach dem Wahlergebnis von {@code electionPolity} statt nach der
+     * Bundeshierarchie (#9). Nutzt dieselbe Bezirks- und Farbauflösung wie die Ingame-Karte, siehe
+     * {@link ElectionMapColor} und {@link de.etiennebader.civ.server.town.TownService#mapByElection}.
+     */
+    private String mapElection(DimensionId dimension, PolityId electionPolity, Optional<Office> office) {
+        Optional<PolityView> target = civ.queries().polity(electionPolity);
+        Optional<ElectionResult> result = target.flatMap(found -> office.isPresent()
+                ? ElectionMapColor.latestResult(found, office.get()) : ElectionMapColor.latestResult(found));
+        List<String> chunks = new ArrayList<>();
+        for (PolityView polity : civ.queries().polities()) {
+            Collection<ChunkCoord> territory = civ.queries().territory().territoryOf(polity.id());
+            if (territory.isEmpty()) {
+                continue;
+            }
+            for (ChunkCoord chunk : territory) {
+                if (!chunk.dimension().equals(dimension) || chunks.size() >= MAX_MAP_CHUNKS) {
+                    continue;
+                }
+                Optional<BlockPosition> representative = Optional.of(chunk.center(64));
+                Optional<Claim> claim = civ.queries().territory().claimAt(chunk);
+                PolityId district = ElectionMapColor.districtOf(civ.queries().civic(), electionPolity, representative,
+                        polity.id());
+                String group = ElectionMapColor.colorOf(civ.queries().civic(), electionPolity, representative,
+                        polity.id(), result, civ.queries()::partyOf).orElseThrow();
+                chunks.add(Json.object()
+                        .put("x", chunk.x())
+                        .put("z", chunk.z())
+                        .put("town", polity.id().value().toString())
+                        .put("group", group)
+                        .put("district", district.value().toString())
                         .put("outpost", claim.map(c -> c.type().name().equals("OUTPOST")).orElse(false))
                         .build());
             }
