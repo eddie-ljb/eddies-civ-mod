@@ -2,18 +2,26 @@ package de.etiennebader.civ.server.party;
 
 import de.etiennebader.civ.application.CivApplication;
 import de.etiennebader.civ.application.day.Calendar;
+import de.etiennebader.civ.application.directory.PlayerDirectory;
 import de.etiennebader.civ.application.party.ChangePartyProfile;
 import de.etiennebader.civ.application.party.FoundParty;
 import de.etiennebader.civ.application.party.JoinParty;
 import de.etiennebader.civ.application.party.LeaveParty;
+import de.etiennebader.civ.application.polity.AmendLaw;
 import de.etiennebader.civ.application.polity.DissolvePolity;
+import de.etiennebader.civ.application.polity.ProposeMotion;
+import de.etiennebader.civ.application.polity.VoteOutcome;
 import de.etiennebader.civ.application.population.PartyAffiliation;
 import de.etiennebader.civ.application.query.WorldQueries;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.actor.PlayerRef;
+import de.etiennebader.civ.domain.law.ParameterValue;
+import de.etiennebader.civ.domain.law.StandardParameters;
 import de.etiennebader.civ.domain.polity.Membership;
+import de.etiennebader.civ.domain.polity.Motion;
 import de.etiennebader.civ.domain.polity.Office;
+import de.etiennebader.civ.domain.polity.PartyList;
 import de.etiennebader.civ.domain.polity.PartyProfile;
 import de.etiennebader.civ.domain.polity.Platform;
 import de.etiennebader.civ.domain.polity.PolityName;
@@ -70,16 +78,19 @@ public final class PartyService {
     private final Calendar calendar;
     private final CurrencyId currency;
     private final ServerSettings.PartySettings settings;
+    private final PlayerDirectory players;
     private final Texts texts;
     private final Announcements announcements;
 
     public PartyService(CivApplication app, Calendar calendar, CurrencyId currency,
-                        ServerSettings.PartySettings settings, Texts texts, Announcements announcements) {
+                        ServerSettings.PartySettings settings, PlayerDirectory players, Texts texts,
+                        Announcements announcements) {
         this.app = Objects.requireNonNull(app, "app");
         this.queries = app.queries();
         this.calendar = Objects.requireNonNull(calendar, "calendar");
         this.currency = Objects.requireNonNull(currency, "currency");
         this.settings = Objects.requireNonNull(settings, "settings");
+        this.players = Objects.requireNonNull(players, "players");
         this.texts = Objects.requireNonNull(texts, "texts");
         this.announcements = Objects.requireNonNull(announcements, "announcements");
     }
@@ -239,6 +250,87 @@ public final class PartyService {
                     Message.of(TranslationKeys.platform(party.platform())), party.players(), party.villagers()));
         }
         return Reply.success(lines);
+    }
+
+    /** {@code /civ partei liste}: die Parteiliste der eigenen Partei für Listenwahlen, mit Modus. */
+    public Reply partyList(Caller caller) {
+        return withOwnParty(caller, party -> {
+            boolean byVote = party.laws().valueOf(StandardParameters.PARTY_LIST_BY_VOTE);
+            Message mode = Message.of(TranslationKeys.yesNo(byVote));
+            List<ActorRef> order = PartyList.decode(party.laws().valueOf(StandardParameters.PARTY_LIST));
+            if (order.isEmpty()) {
+                return Reply.success(Message.of(MessageKey.PARTY_CANDIDATES_EMPTY, party.name().value(), mode));
+            }
+            List<Message> lines = new ArrayList<>();
+            lines.add(Message.of(MessageKey.PARTY_CANDIDATES_HEADER, party.name().value(), mode));
+            for (int position = 0; position < order.size(); position++) {
+                lines.add(Message.of(MessageKey.PARTY_CANDIDATES_ENTRY, position + 1, texts.actor(order.get(position))));
+            }
+            return Reply.success(lines);
+        });
+    }
+
+    /** {@code /civ partei liste modus abstimmung|vorsitz}: nur der Vorsitz legt den Entscheidungsmodus fest. */
+    public Reply setPartyListMode(Caller caller, boolean byVote) {
+        return withOwnParty(caller, party -> {
+            if (!party.holds(caller.player(), Office.MAYOR)) {
+                return Reply.failure(Message.of(MessageKey.NOT_PARTY_HEAD));
+            }
+            return attempt(() -> {
+                app.amendLaw().execute(new AmendLaw.Command(party.id(), caller.player(),
+                        ParameterValue.of(StandardParameters.PARTY_LIST_BY_VOTE, byVote), calendar.today()));
+                return Reply.success(Message.of(MessageKey.PARTY_CANDIDATES_MODE_SET, party.name().value(),
+                        Message.of(TranslationKeys.yesNo(byVote))));
+            });
+        });
+    }
+
+    /**
+     * {@code /civ partei liste setzen <Spieler...>}: legt die Reihenfolge der Parteiliste fest. Gilt
+     * {@link StandardParameters#PARTY_LIST_BY_VOTE}, wird daraus ein Antrag, über den die Parteimitglieder abstimmen;
+     * sonst entscheidet allein der Vorsitz. Dorfbewohner-Mitglieder bleiben in Kandidatur-Reihenfolge am Ende, da sie
+     * sich nicht per Name angeben lassen.
+     */
+    public Reply setPartyList(Caller caller, List<String> playerNames) {
+        return withOwnParty(caller, party -> {
+            List<ActorRef> order;
+            try {
+                order = resolveMembers(party, playerNames);
+            } catch (IllegalArgumentException e) {
+                return Reply.failure(Message.of(MessageKey.UNKNOWN_PLAYER, e.getMessage()));
+            }
+            ParameterValue<String> change = ParameterValue.of(StandardParameters.PARTY_LIST, PartyList.encode(order));
+            if (party.laws().valueOf(StandardParameters.PARTY_LIST_BY_VOTE)) {
+                return attempt(() -> {
+                    ProposeMotion.Result result = app.proposeMotion().execute(new ProposeMotion.Command(party.id(),
+                            caller.player(), new Motion.Change(change), calendar.today()));
+                    if (result.outcome() == VoteOutcome.ACCEPTED) {
+                        return Reply.success(Message.of(MessageKey.PARTY_CANDIDATES_SET, party.name().value()));
+                    }
+                    return Reply.success(Message.of(MessageKey.PARTY_CANDIDATES_PROPOSED, party.name().value()));
+                });
+            }
+            if (!party.holds(caller.player(), Office.MAYOR)) {
+                return Reply.failure(Message.of(MessageKey.NOT_PARTY_HEAD));
+            }
+            return attempt(() -> {
+                app.amendLaw().execute(new AmendLaw.Command(party.id(), caller.player(), change, calendar.today()));
+                return Reply.success(Message.of(MessageKey.PARTY_CANDIDATES_SET, party.name().value()));
+            });
+        });
+    }
+
+    /** Löst Spielernamen auf Mitglieder der Partei auf; @throws IllegalArgumentException mit dem unbekannten Namen. */
+    private List<ActorRef> resolveMembers(PolityView party, List<String> playerNames) {
+        List<ActorRef> order = new ArrayList<>();
+        for (String name : playerNames) {
+            PlayerRef player = players.findByName(name.strip()).orElseThrow(() -> new IllegalArgumentException(name));
+            if (!party.isMember(player)) {
+                throw new IllegalArgumentException(name);
+            }
+            order.add(player);
+        }
+        return order;
     }
 
     /** Tagesende: Dorfbewohner treten Parteien bei, aus oder gründen eine. */

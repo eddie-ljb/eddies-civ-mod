@@ -14,6 +14,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 /**
@@ -70,9 +71,21 @@ public final class Emigration {
      */
     public static List<Departure> plan(List<? extends PolityView> towns, Day day,
                                        Function<PolityView, LawView> lawsOf) {
+        return plan(towns, day, lawsOf, (villager, town) -> 0);
+    }
+
+    /**
+     * Wie oben, aber die Bleibewahrscheinlichkeit wird zusätzlich durch die {@linkplain VillagerLoyalty Loyalität}
+     * zur Gemeinde gedämpft: loyale Dorfbewohner wandern seltener ab, unabhängig von der reinen Tageszufriedenheit.
+     *
+     * @param loyaltyOf liefert die Loyalität eines Dorfbewohners zu seiner (bisherigen) Gemeinde, -100 bis 100
+     */
+    public static List<Departure> plan(List<? extends PolityView> towns, Day day, Function<PolityView, LawView> lawsOf,
+                                       BiFunction<PersonRef, PolityView, Integer> loyaltyOf) {
         Objects.requireNonNull(towns, "towns");
         Objects.requireNonNull(lawsOf, "lawsOf");
         Objects.requireNonNull(day, "day");
+        Objects.requireNonNull(loyaltyOf, "loyaltyOf");
         List<PolityView> settlements = towns.stream()
                 .filter(town -> town.kind() == PolityKind.TERRITORIAL)
                 .map(PolityView.class::cast)
@@ -88,7 +101,8 @@ public final class Emigration {
             for (PersonRef villager : villagers) {
                 Personality personality = Personality.of(villager);
                 int score = Satisfaction.of(personality, town, lawsOf.apply(town)).score();
-                if (atRisk(score) && roll(villager, day) < chance(score, personality)) {
+                int loyalty = loyaltyOf.apply(villager, town);
+                if (atRisk(score) && roll(villager, day) < chance(score, personality, loyalty)) {
                     leaving.add(new Candidate(villager, personality, score));
                 }
             }
@@ -107,6 +121,16 @@ public final class Emigration {
         double misery = Math.min(1.0, (LEAVE_BELOW - satisfaction) / (double) FULL_MISERY);
         double restlessness = (150 - personality.belonging()) / 250.0;
         return Math.max(0, misery) * restlessness;
+    }
+
+    /**
+     * Wie oben, aber zusätzlich gedämpft durch die Loyalität zur (bisherigen) Gemeinde: bei voller Loyalität (100)
+     * höchstens noch die Hälfte der ungedämpften Wahrscheinlichkeit, bei 0 oder negativer Loyalität unverändert.
+     */
+    static double chance(int satisfaction, Personality personality, int loyaltyToHome) {
+        double base = chance(satisfaction, personality);
+        double dampening = 1.0 - Math.max(0, Math.min(100, loyaltyToHome)) / 200.0;
+        return base * dampening;
     }
 
     private static Optional<PolityId> destination(Personality personality, int score, PolityView home,

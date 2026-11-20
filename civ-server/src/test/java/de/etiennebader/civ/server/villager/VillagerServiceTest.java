@@ -181,6 +181,43 @@ class VillagerServiceTest {
         assertTrue(villagers.takeDeparture(departed).isEmpty());
     }
 
+    @Test
+    @DisplayName("villager_politics_enabled: ohne Spieler-Bürgermeister regiert der dienstälteste Dorfbewohner "
+            + "kommissarisch, beansprucht selbstständig Nachbar-Chunks bis zum Limit und nimmt Bund-Einladungen an")
+    void villagerPoliticsWhenMayorless() {
+        found(alice, "Nordhain", 0);
+        List<PersonRef> residents = new ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            PersonRef villager = new PersonRef(PersonId.generate(ids));
+            residents.add(villager);
+            villagers.seen(villager, pos(2, 2), DAY);
+        }
+        PolityView nordhain = town(residents.getFirst());
+        assertTrue(nordhain.mayor().map(alice::equals).orElse(false), "zunächst regiert noch Alice");
+
+        assertTrue(server.commands().leave(new Caller(alice, "Alice", pos(2, 2))).success());
+        PolityView afterLeave = server.queries().polity(nordhain.id()).orElseThrow();
+        assertTrue(afterLeave.mayor().isEmpty(), "ohne villagerPolitics kein Bürgermeister mehr");
+        assertEquals(residents.getFirst(), afterLeave.mayor(true).orElseThrow(),
+                "kommissarisch regiert der dienstälteste Dorfbewohner");
+
+        int limit = server.towns().overview(afterLeave, residents.getFirst()).claimLimit();
+        int before = server.queries().territory().territoryOf(afterLeave.id()).size();
+        for (long day = 2; day <= 2 + limit; day++) {
+            villagers.endOfDay(Day.of(day));
+        }
+        int after = server.queries().territory().territoryOf(afterLeave.id()).size();
+        assertEquals(limit, after, "beansprucht Tag für Tag Nachbar-Chunks bis zum Limit (" + before + " -> " + after + ")");
+
+        found(bob, "Westmark-Sitz", 20);
+        assertTrue(server.federations().found(new Caller(bob, "Bob", pos(323, 323)), "land", "Westmark").success());
+        assertTrue(server.federations().invite(new Caller(bob, "Bob", pos(323, 323)), "Nordhain").success());
+        server.federations().autoDecideInvitations(Day.of(100), true);
+        Optional<de.etiennebader.civ.server.command.Message> belongsTo = server.federations()
+                .belongsTo(server.queries().polity(nordhain.id()).orElseThrow());
+        assertTrue(belongsTo.isPresent(), "Nordhain hat die Einladung angenommen oder zumindest entschieden");
+    }
+
     private static BlockPosition pos(int x, int z) {
         return new BlockPosition(DimensionId.OVERWORLD, x, 64, z);
     }

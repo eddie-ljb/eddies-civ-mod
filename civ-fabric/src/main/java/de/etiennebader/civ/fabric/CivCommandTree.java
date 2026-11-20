@@ -460,7 +460,22 @@ public final class CivCommandTree {
                         Optional.empty())))
                 .then(Commands.literal("liste")
                         .executes(context -> withCiv(context, (civ, player) -> civ.parties().list(
-                                Players.caller(player)))))
+                                Players.caller(player))))
+                        .then(Commands.literal("zeigen")
+                                .executes(context -> withCiv(context, (civ, player) -> civ.parties().partyList(
+                                        Players.caller(player)))))
+                        .then(Commands.literal("setzen")
+                                .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.parties()
+                                                .setPartyList(Players.caller(player),
+                                                        List.of(name(context).split("\\s+")))))))
+                        .then(Commands.literal("modus")
+                                .then(Commands.literal("abstimmung")
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.parties()
+                                                .setPartyListMode(Players.caller(player), true))))
+                                .then(Commands.literal("vorsitz")
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.parties()
+                                                .setPartyListMode(Players.caller(player), false))))))
                 .then(Commands.literal("menue")
                         .executes(context -> withCiv(context, (civ, player) -> {
                             Feedback.click(player);
