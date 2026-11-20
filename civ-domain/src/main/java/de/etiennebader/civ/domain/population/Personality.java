@@ -47,6 +47,15 @@ public record Personality(int order, int thrift, int belonging) {
         return derived(5);
     }
 
+    /**
+     * Wie treu ein Dorfbewohner aktuellen Autoritäten (Gemeindeführung, Partei, …) folgt, von 0,3 bis 0,9.
+     * Vorläufiger Platzhalter aus {@link #belonging()}, solange es keinen eigenen, je Ziel gespeicherten
+     * Loyalitätswert gibt (siehe Issue #14 "loyality") — dann sollte dieser Wert dadurch ersetzt werden.
+     */
+    public double loyalty() {
+        return 0.6 + belonging / 333.0;
+    }
+
     /** Tradition (positiv) gegen Fortschritt (negativ). */
     public int tradition() {
         return derived(6);

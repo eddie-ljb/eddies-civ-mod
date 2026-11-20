@@ -5,6 +5,7 @@ import de.etiennebader.civ.domain.law.StandardParameters;
 import de.etiennebader.civ.domain.law.VotingMethod;
 import de.etiennebader.civ.domain.polity.Election;
 import de.etiennebader.civ.domain.polity.Parliament;
+import de.etiennebader.civ.domain.polity.PartyList;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.polity.SeatAllocation;
 import de.etiennebader.civ.domain.shared.PolityId;
@@ -112,9 +113,16 @@ public record ParliamentCount(ElectionCount count, List<ListResult> lists, List<
         Map<Object, Integer> capacity = new LinkedHashMap<>();
         members.forEach((key, candidates) -> {
             votes.put(key, candidates.stream().mapToLong(personal::apply).sum());
-            List<ActorRef> order = listBallot ? List.copyOf(candidates) : candidates.stream()
-                    .sorted(Comparator.comparingLong((ActorRef candidate) -> personal.apply(candidate)).reversed())
-                    .toList();
+            List<ActorRef> order;
+            if (listBallot) {
+                String partyList = partyOf.apply(candidates.getFirst())
+                        .map(party -> party.laws().valueOf(StandardParameters.PARTY_LIST)).orElse("");
+                order = PartyList.apply(partyList, candidates);
+            } else {
+                order = candidates.stream()
+                        .sorted(Comparator.comparingLong((ActorRef candidate) -> personal.apply(candidate)).reversed())
+                        .toList();
+            }
             ordered.put(key, order);
             capacity.put(key, listBallot ? (votes.get(key) > 0 ? candidates.size() : 0)
                     : (int) candidates.stream().filter(candidate -> personal.apply(candidate) > 0).count());

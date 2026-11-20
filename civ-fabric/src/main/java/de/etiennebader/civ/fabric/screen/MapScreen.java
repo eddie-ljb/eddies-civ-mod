@@ -46,8 +46,11 @@ public final class MapScreen extends MenuScreen {
             () -> Items.CONCRETE.brown(), () -> Items.CONCRETE.gray(), () -> Items.CONCRETE.black(),
             () -> Items.CONCRETE.white());
 
-    /** Leer = höchste Ebene; sonst die Ebene, auf die die Einfärbung eingegrenzt ist. */
+    /** Leer = höchste Ebene; sonst die Ebene, auf die die Einfärbung eingegrenzt ist. Ignoriert, wenn {@link #electionMode}. */
     private Optional<Level> levelFilter = Optional.empty();
+
+    /** Statt der Bundesfarbe die Wahlkarte der eigenen Gemeinde zeigen: Sieger je Wahlbezirk. */
+    private boolean electionMode = false;
 
     public MapScreen(CivServer civ, ServerPlayer player, Optional<Screen> parent) {
         super(civ, player, parent);
@@ -65,7 +68,11 @@ public final class MapScreen extends MenuScreen {
 
     @Override
     public void render(Canvas canvas) {
-        ChunkMap map = civ.towns().map(caller(), WIDTH, HEIGHT, levelFilter.map(Level::id));
+        Optional<de.etiennebader.civ.domain.shared.PolityId> ownTown = civ.queries().municipalityOf(caller().player())
+                .map(de.etiennebader.civ.domain.polity.PolityView::id);
+        ChunkMap map = electionMode && ownTown.isPresent()
+                ? civ.towns().mapByElection(caller(), WIDTH, HEIGHT, ownTown.get(), Optional.empty())
+                : civ.towns().map(caller(), WIDTH, HEIGHT, levelFilter.map(Level::id));
         for (int row = 0; row < HEIGHT; row++) {
             for (int column = 0; column < WIDTH; column++) {
                 MapCell cell = map.at(column, row);
@@ -92,6 +99,11 @@ public final class MapScreen extends MenuScreen {
             levelFilter = nextLevel();
             Screens.open(click.player(), this);
         });
+        canvas.set(HEIGHT * 9 + 6, electionIcon(), click -> {
+            Feedback.click(click.player());
+            electionMode = !electionMode;
+            Screens.open(click.player(), this);
+        });
     }
 
     /** Kreis durch die Ebenen, von der höchsten (Standard, {@code leer}) abwärts bis zur Gemeinde. */
@@ -115,6 +127,11 @@ public final class MapScreen extends MenuScreen {
         Message name = levelFilter.map(level -> GuiKeys.MAP_LEVEL.text(level.id()))
                 .orElseGet(GuiKeys.MAP_LEVEL_HIGHEST::text);
         return Icon.of(Items.FILLED_MAP).name(name, Icon.TITLE).hint(GuiKeys.MAP_LEVEL_HINT.text()).build();
+    }
+
+    private ItemStack electionIcon() {
+        Message name = electionMode ? GuiKeys.MAP_ELECTION_ON.text() : GuiKeys.MAP_ELECTION_OFF.text();
+        return Icon.of(Items.PAPER).name(name, Icon.TITLE).hint(GuiKeys.MAP_ELECTION_HINT.text()).build();
     }
 
     private static ItemStack icon(MapCell cell) {
