@@ -4,13 +4,14 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
- * Die politische Richtung und das Wappen einer Partei.
+ * Das Programm einer Partei: ihre politische Richtung, ihr Wappen und wie beides geändert wird.
  *
  * @param order   -100 (Freiheit) bis +100 (Ordnung)
  * @param economy -100 (niedrige Steuern) bis +100 (Ausbau und Investitionen)
  * @param emblem  Item-ID als Logo, z. B. {@code minecraft:red_banner}
+ * @param mode    ob der Vorsitz allein entscheidet oder die Partei darüber abstimmt
  */
-public record PartyProfile(int order, int economy, String emblem) {
+public record PartyProfile(int order, int economy, String emblem, ProgramMode mode) {
 
     public static final int MAX = 100;
     public static final String DEFAULT_EMBLEM = "minecraft:white_banner";
@@ -26,14 +27,25 @@ public record PartyProfile(int order, int economy, String emblem) {
         if (!ITEM_ID.matcher(emblem).matches()) {
             throw new IllegalArgumentException("Ungültiges Wappen: " + emblem);
         }
+        Objects.requireNonNull(mode, "mode");
+    }
+
+    /** Ohne Angabe entscheidet der Vorsitz allein über künftige Änderungen. */
+    public PartyProfile(int order, int economy, String emblem) {
+        this(order, economy, emblem, ProgramMode.CHAIR);
     }
 
     public PartyProfile withDirection(int newOrder, int newEconomy) {
-        return new PartyProfile(newOrder, newEconomy, emblem);
+        return new PartyProfile(newOrder, newEconomy, emblem, mode);
     }
 
     public PartyProfile withEmblem(String newEmblem) {
-        return new PartyProfile(order, economy, newEmblem);
+        return new PartyProfile(order, economy, newEmblem, mode);
+    }
+
+    /** Ändert nur, wie künftige Programmänderungen entschieden werden; Richtung und Wappen bleiben. */
+    public PartyProfile withMode(ProgramMode newMode) {
+        return new PartyProfile(order, economy, emblem, newMode);
     }
 
     /** Das Wahlprogramm, das der stärksten Richtung entspricht; in der Mitte {@link Platform#NONE}. */

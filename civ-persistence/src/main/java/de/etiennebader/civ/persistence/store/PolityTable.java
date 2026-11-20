@@ -519,6 +519,8 @@ final class PolityTable {
         }
     }
 
+    private static final String PARTY_PROGRAM_KIND = "PARTY_PROGRAM";
+
     private static void insertProposals(Connection connection, String polityId, List<Proposal> proposals)
             throws SQLException {
         try (PreparedStatement insertProposal = connection.prepareStatement("""

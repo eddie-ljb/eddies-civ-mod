@@ -120,6 +120,8 @@ public enum ErrorCode {
     ALREADY_IN_PARTY,
     NOT_IN_PARTY,
     NOT_A_PARTY,
+    /** Das Parteiprogramm wird nur durch Abstimmung geändert, nicht vom Vorsitz allein verordnet. */
+    PROGRAM_VOTE_REQUIRED,
     STATUTE_TEXT_TOO_LONG,
     /** Argumente: Gliedkörperschaft, Bund. */
     FEDERATION_CYCLE,
