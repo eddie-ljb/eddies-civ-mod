@@ -88,6 +88,17 @@ public record Satisfaction(Map<Factor, Integer> factors) {
         return new Satisfaction(copy);
     }
 
+    /**
+     * Mit dem Zuschlag aus politischer Beeinflussung und Dorfbewohner-Kontakten ({@link SocialEffects}), auf die
+     * Grundstimmung aufgeschlagen statt als eigener Faktor, damit bestehende Anzeigen mit festen Faktor-Slots
+     * (z. B. die Stimmungsübersicht) unverändert bleiben.
+     */
+    public Satisfaction withSocial(int points) {
+        Map<Factor, Integer> copy = new EnumMap<>(factors);
+        copy.merge(Factor.BASE, points, Integer::sum);
+        return new Satisfaction(copy);
+    }
+
     public int score() {
         int sum = factors.values().stream().mapToInt(Integer::intValue).sum();
         return Math.max(-100, Math.min(100, sum));
