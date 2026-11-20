@@ -1,8 +1,6 @@
 {
-  "parent": "minecraft:block/cube_bottom_top",
+  "parent": "eddies-civ-mod:block/label_house",
   "textures": {
-    "top": "eddies-civ-mod:block/house_number_top",
-    "side": "eddies-civ-mod:block/house_number_side",
-    "bottom": "eddies-civ-mod:block/house_number_bottom"
+    "front": "eddies-civ-mod:block/house_number_face"
   }
 }

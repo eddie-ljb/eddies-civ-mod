@@ -48,7 +48,7 @@ Grundstücke teilen das Gemeindeland auf. Nur ihre Inhaber dürfen dort bauen, u
 - `/civ adresse [Spieler]` zeigt die Anschrift, `/civ adressen` listet die Straßen der Gemeinde. Dorfbewohner nennen ihre Anschrift beim Anklicken.
 
 ### Schilder und Hausnummern zum Aufstellen
-Zusätzlich zur automatischen Adressvergabe oben gibt es eigene, von Hand beschriftbare Blöcke, die der Deko und Beschilderung dienen:
+Die fünf eigenen Blöcke zeigen ihren Text direkt vorne auf der Schildfläche. Straßenschilder und Gebietsschilder stehen auf einem Pfosten; Hausnummern sind flache Plaketten, die sich beim Platzieren an einer Wand ausrichten.
 
 | Block/Item | Zeilen | Zweck |
 |---|---|---|
@@ -58,9 +58,10 @@ Zusätzlich zur automatischen Adressvergabe oben gibt es eigene, von Hand beschr
 | Länderschild | mehrzeilig | Landes-Begrüßungsschild |
 | Nationenschild | mehrzeilig | Nations-Begrüßungsschild |
 
-- Hinstellen, dann im Amboss den gewünschten Text als Namen vergeben (bei den mehrzeiligen Schildern trennt ein `|` die Zeilen, bis zu vier Zeilen à 32 Zeichen) und erneut platzieren – der Amboss-Name wird beim Setzen übernommen.
-- Rechtsklick zeigt den aktuellen Text in der Actionbar.
-- Rechtsklick mit einem Farbstoff färbt das Schild ein.
+- Ohne Amboss-Namen übernimmt das Schild beim Platzieren die passenden Daten: Straßennamen auf Straßen oder adressierten Grundstücken, Hausnummern auf adressierten Grundstücken, auf Ortsschildern die Siedlungsstufe und vorhandene Angaben zu Land und Nation. Länder- und Nationenschilder zeigen die entsprechende Ebene. Ohne passende Daten bleibt das Schild leer.
+- Für eigenen Text das Item vor dem Platzieren im Amboss benennen (z. B. `12` oder `Stadt: Nordhain|Land: Ost|Nation: Reich`). `|` trennt bis zu drei Zeilen auf Gebietsschildern. Der Amboss-Name hat Vorrang.
+- Die Beschriftung ist eine Momentaufnahme beim Platzieren. Für geänderte Gebietsdaten ein unbenanntes Schild neu platzieren. Bereits gespeicherte Beschriftungen bleiben erhalten und werden mit der Standardausrichtung Süden gerendert.
+- Rechtsklick zeigt den Text zusätzlich in der Actionbar. Farbstoff färbt die Schrift.
 - Craftbar: Straßenschild aus Stöcken und Eichenbrettern; Hausnummer aus Eisennuggets; Ortsschild aus Eichenbrettern und einem Stock; Länder- und Nationenschild aus Dunkeleichenbrettern und einem Stock (Nationenschild zusätzlich mit einem Smaragd in der Mitte).
 
 ## Schutz
