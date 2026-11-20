@@ -16,6 +16,7 @@ import de.etiennebader.civ.EddiesCivMod;
 import de.etiennebader.civ.application.population.VillagerDialogue;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
+import de.etiennebader.civ.domain.population.VillagerIdentity;
 import de.etiennebader.civ.domain.exchange.Side;
 import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.Polity;
@@ -268,6 +269,13 @@ public final class CivCommandTree {
                 .then(Commands.literal("stimmung")
                         .executes(context -> withCiv(context, (civ, player) -> civ.villagers().mood(Players.caller(player)))))
                 .then(Commands.literal("dorfbewohner")
+                        .then(Commands.literal("register")
+                                .executes(context -> withCiv(context, (civ, player) -> civ.villagers()
+                                        .residentRegister(Players.caller(player), 1)))
+                                .then(Commands.argument(COUNT, IntegerArgumentType.integer(1))
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.villagers()
+                                                .residentRegister(Players.caller(player),
+                                                        IntegerArgumentType.getInteger(context, COUNT))))))
                         .then(Commands.literal("reden")
                                 .then(Commands.argument(TOPIC, StringArgumentType.word())
                                         .suggests((context, builder) -> SharedSuggestionProvider.suggest(
@@ -1220,8 +1228,12 @@ public final class CivCommandTree {
                     .flatMap(polity -> civ.offices().officesOf(polity, Players.ref(player)).stream()
                             .filter(view -> view.office() == office.get()).findFirst())
                     .flatMap(OfficeView::election)
-                    .ifPresent(election -> election.candidates().forEach(candidate ->
-                            names.add(StringArgumentType.escapeIfRequired(candidate.name()))));
+                    .ifPresent(election -> election.candidates().forEach(candidate -> {
+                        names.add(StringArgumentType.escapeIfRequired(candidate.name()));
+                        if (candidate.actor() instanceof PersonRef villager) {
+                            names.add(VillagerIdentity.of(villager).registerNumber());
+                        }
+                    }));
         });
         return SharedSuggestionProvider.suggest(names, builder);
     }

@@ -26,6 +26,7 @@ Wer eine Gemeinde betritt oder verlässt, sieht ihren Namen als Titel. Auf Grund
 **Gemeindehaus verlegen:** Der Bürgermeister setzt ein neues Gemeindehaus irgendwo im eigenen Gebiet. Das alte verschwindet und landet wieder im Inventar.
 
 ### Dorfbewohner
+- Dorfbewohner erhalten dauerhaft einen Vor- und Nachnamen. Schleichen + Rechtsklick mit leerer Hand zeigt auch die eindeutige Registernummer. `/civ dorfbewohner register [Seite]` listet Spieler und Dorfbewohner der eigenen Gemeinde.
 - Dorfbewohner, die das Gebiet einer Gemeinde betreten, werden dort Einwohner. In der Wildnis bleiben sie in ihrer bisherigen Gemeinde gemeldet. Stirbt ein Dorfbewohner, tritt er aus.
 - Jeder Dorfbewohner erwirtschaftet täglich Geld für die Gemeindekasse; Standard ist ¼ Smaragd. Zufriedene leisten bis zu 50 % mehr, Unzufriedene bis zu 50 % weniger.
 - **Persönlichkeit:** Jeder Dorfbewohner hat feste Ansichten auf drei Achsen: *Ordnung ↔ Freiheit*, *Sparsamkeit ↔ Großzügigkeit* und *Heimatverbundenheit*.
