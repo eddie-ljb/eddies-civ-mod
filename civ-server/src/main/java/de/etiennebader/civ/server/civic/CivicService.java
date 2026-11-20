@@ -92,6 +92,34 @@ public final class CivicService {
         });
     }
 
+    /** {@code wahlkreis gebiet-entfernen <Name>}: das mit dem Grundstücksstab markierte Rechteck herausnehmen. */
+    public Reply removeArea(Caller caller, PolityView polity, String name) {
+        PlotService.Selection selection = plots.selection(caller.player());
+        if (selection.first().isEmpty() || selection.second().isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.CONSTITUENCY_NEEDS_SELECTION));
+        }
+        return attempt(() -> {
+            Area area = Area.between(selection.first().get(), selection.second().get());
+            Constituency updated = app.civic().removeArea(caller.player(), polity.id(), name, area, calendar.today());
+            return Reply.success(Message.of(MessageKey.CONSTITUENCY_AREA_REMOVED, area.blocks(), updated.name(),
+                    updated.areas().size()));
+        });
+    }
+
+    /** {@code wahlkreis gemeinde-entfernen <Name> <Gemeinde>} */
+    public Reply removeTown(Caller caller, PolityView polity, String name, String townName) {
+        Optional<PolityView> town = queries.polityNamed(townName.strip());
+        if (town.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.UNKNOWN_POLITY_NAMED, townName.strip()));
+        }
+        return attempt(() -> {
+            Constituency updated = app.civic().removeTown(caller.player(), polity.id(), name, town.get().id(),
+                    calendar.today());
+            return Reply.success(Message.of(MessageKey.CONSTITUENCY_TOWN_REMOVED, town.get().name().value(),
+                    updated.name()));
+        });
+    }
+
     public Reply clear(Caller caller, PolityView polity, String name) {
         return attempt(() -> {
             Constituency updated = app.civic().clear(caller.player(), polity.id(), name, calendar.today());

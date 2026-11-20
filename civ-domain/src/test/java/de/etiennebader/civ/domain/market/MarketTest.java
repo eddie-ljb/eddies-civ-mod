@@ -103,6 +103,29 @@ class MarketTest {
     }
 
     @Test
+    @DisplayName("Einstellbare Preisfaktor-Grenzen und -Dämpfung wirken wie konfiguriert")
+    void priceLevelHonoursConfiguredBoundsAndDamping() {
+        Money reference = Money.of(5_000, EMERALD);
+        Money fourfoldSupply = Money.of(200_000, EMERALD); // 20_000/Kopf = 4x reference/Kopf (500)
+
+        // Standard-Dämpfung (0,5): vierfache Geldmenge je Kopf -> Faktor 2,0 (Quadratwurzel von 4).
+        assertEquals(2.0, PriceLevel.of(fourfoldSupply, 10, reference, PriceLevel.MIN, PriceLevel.MAX, 0.5).factor(),
+                1e-9);
+        // Doppelte Dämpfung (1,0): Faktor steigt proportional, also 4,0 statt 2,0 - aber von der engeren
+        // Obergrenze 3,0 gekappt.
+        assertEquals(3.0, PriceLevel.of(fourfoldSupply, 10, reference, PriceLevel.MIN, 3.0, 1.0).factor(), 1e-9);
+        // Engere Untergrenze greift bei wenig Geldmenge.
+        assertEquals(0.8, PriceLevel.of(Money.zero(EMERALD), 0, reference, 0.8, PriceLevel.MAX, 0.5).factor(), 1e-9);
+
+        var badBounds = assertThrows(IllegalArgumentException.class,
+                () -> PriceLevel.of(reference, 1, reference, 2.0, 1.0, 0.5));
+        assertTrue(badBounds.getMessage().contains("min"));
+        var badDamping = assertThrows(IllegalArgumentException.class,
+                () -> PriceLevel.of(reference, 1, reference, PriceLevel.MIN, PriceLevel.MAX, 0.0));
+        assertTrue(badDamping.getMessage().contains("Dämpfung"));
+    }
+
+    @Test
     @DisplayName("Gespeicherte Bestände werden ohne Events wiederhergestellt")
     void restoresStocks() {
         Market restored = Market.restore(EMERALD, List.of(new CommodityStock(LOG, 40, Day.of(3))));
