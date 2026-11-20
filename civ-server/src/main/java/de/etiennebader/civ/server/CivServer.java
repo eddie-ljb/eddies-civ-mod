@@ -160,7 +160,7 @@ public final class CivServer {
         this.territory = new TerritoryWatcher(app.queries(), texts);
         this.towns = new TownService(app.queries(), settings, texts, commands, territory);
         this.plots = new PlotService(app, calendar, players, texts);
-        this.villagers = new VillagerService(app, settings, texts, announcements);
+        this.villagers = new VillagerService(app, calendar, settings, texts, announcements);
         this.townHalls = new TownHallService(app, calendar, texts, announcements);
         this.shops = new ShopService(app, calendar, settings.currency(), texts);
         this.civil = new CivilService(app, calendar, players, settings.currency(), texts, announcements,

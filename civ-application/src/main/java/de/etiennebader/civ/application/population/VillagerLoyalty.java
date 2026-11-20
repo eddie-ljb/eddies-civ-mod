@@ -78,7 +78,8 @@ public final class VillagerLoyalty {
         Objects.requireNonNull(polity, "polity");
         Objects.requireNonNull(today, "today");
         return polity.officeTerm(Office.MAYOR)
-                .map(term -> derive(personality.belonging(), Math.max(0, today.value() - term.since().value()),
+                .map(term -> derive(personality.belonging(),
+                        (int) Math.max(0L, today.value() - term.since().value()),
                         partyMood(personality, polity)))
                 .orElse(0);
     }
@@ -101,7 +102,7 @@ public final class VillagerLoyalty {
 
     private static int tenureDays(PolityView polity, ActorRef member, Day today) {
         return polity.membershipOf(member)
-                .map(membership -> Math.max(0, today.value() - membership.since().value()))
+                .map(membership -> (int) Math.max(0L, today.value() - membership.since().value()))
                 .orElse(0);
     }
 
