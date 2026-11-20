@@ -63,12 +63,12 @@ final class PolityTable {
     private static final String UPSERT_POLITY = """
             INSERT INTO polity (id, seq, name, kind, tier, currency, founded_on, seat_dimension, seat_x, seat_y, seat_z,
                                 level, constitution_proclaimed_on, preamble, party_order, party_economy, party_emblem,
-                                parliament_elected_on, parliament_until)
-            VALUES (?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM polity), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                party_area, parliament_elected_on, parliament_until)
+            VALUES (?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM polity), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (id) DO UPDATE SET name = excluded.name, kind = excluded.kind, level = excluded.level,
                 constitution_proclaimed_on = excluded.constitution_proclaimed_on, preamble = excluded.preamble,
                 party_order = excluded.party_order, party_economy = excluded.party_economy,
-                party_emblem = excluded.party_emblem,
+                party_emblem = excluded.party_emblem, party_area = excluded.party_area,
                 parliament_elected_on = excluded.parliament_elected_on, parliament_until = excluded.parliament_until,
                 tier = excluded.tier,
                 currency = excluded.currency, founded_on = excluded.founded_on,
@@ -102,13 +102,19 @@ final class PolityTable {
                 upsert.setInt(14, polity.party().get().order());
                 upsert.setInt(15, polity.party().get().economy());
                 upsert.setString(16, polity.party().get().emblem());
+                if (polity.party().get().area().isPresent()) {
+                    upsert.setString(17, polity.party().get().area().get().value().toString());
+                } else {
+                    upsert.setNull(17, Types.VARCHAR);
+                }
             } else {
                 upsert.setNull(14, Types.INTEGER);
                 upsert.setNull(15, Types.INTEGER);
                 upsert.setNull(16, Types.VARCHAR);
+                upsert.setNull(17, Types.VARCHAR);
             }
-            bindDay(upsert, 17, polity.parliament().electedOn());
-            bindDay(upsert, 18, polity.parliament().until());
+            bindDay(upsert, 18, polity.parliament().electedOn());
+            bindDay(upsert, 19, polity.parliament().until());
             upsert.executeUpdate();
         }
         deleteChildren(connection, id);
@@ -438,7 +444,9 @@ final class PolityTable {
         if (emblem == null) {
             return Optional.empty();
         }
-        return Optional.of(new PartyProfile(row.getInt("party_order"), row.getInt("party_economy"), emblem));
+        String area = row.getString("party_area");
+        Optional<PolityId> areaId = area == null ? Optional.empty() : Optional.of(new PolityId(UUID.fromString(area)));
+        return Optional.of(new PartyProfile(row.getInt("party_order"), row.getInt("party_economy"), emblem, areaId));
     }
 
     private static Constitution constitutionOf(ResultSet row) throws SQLException {
