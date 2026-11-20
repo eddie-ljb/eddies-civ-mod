@@ -61,6 +61,9 @@ public enum GuiKeys {
     MAP_LEVEL_HIGHEST,
     MAP_LEVEL,
     MAP_LEVEL_HINT,
+    MAP_ELECTION_ON,
+    MAP_ELECTION_OFF,
+    MAP_ELECTION_HINT,
     // Bank
     BANK_BALANCE,
     BANK_DEPOSIT,
