@@ -525,6 +525,19 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
     <div class="liveband" id="debates"></div>
     <h3 style="margin:8px 0 12px">Hoheitszeichen und Wahlkreise</h3>
     <div class="register" id="symbols"></div>
+    <div id="imageUploadBox" hidden style="margin-top:16px">
+      <h3 style="margin-bottom:12px">Eigenes Wappen, Wahlplakat oder Leuchtreklame hochladen</h3>
+      <p class="muted small">Höchstens 128×128 Pixel PNG. Nur die Spitze (Bürgermeister/Vorsitz) der angegebenen Einheit darf hochladen; Unternehmen gehen über ihren Namen genauso.</p>
+      <input id="imgPolity" type="text" placeholder="Name der Gemeinde, des Bundes oder Unternehmens" style="margin-right:8px">
+      <select id="imgKind" style="margin-right:8px">
+        <option value="WAPPEN">Wappen</option>
+        <option value="WAHLPLAKAT">Wahlplakat</option>
+        <option value="LEUCHTREKLAME">Leuchtreklame</option>
+      </select>
+      <input id="imgFile" type="file" accept="image/png" style="margin-right:8px">
+      <button class="btn" onclick="uploadImage()">Hochladen</button>
+      <div class="msg" id="imgMsg"></div>
+    </div>
   </section>
 
   <section data-page="justiz">
