@@ -531,6 +531,19 @@ public final class CivCommandTree {
                 .then(Commands.literal("aufloesen")
                         .executes(context -> withCiv(context, (civ, player) -> civ.parties().dissolve(
                                 Players.caller(player)))))
+                .then(Commands.literal("gebiet")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.parties().area(
+                                Players.caller(player))))
+                        .then(Commands.literal("setzen")
+                                .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                host.current().map(civ -> civ.parties().areaNames())
+                                                        .orElse(List.of()), builder))
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.parties()
+                                                .setArea(Players.caller(player), Optional.of(name(context)))))))
+                        .then(Commands.literal("leeren")
+                                .executes(context -> withCiv(context, (civ, player) -> civ.parties()
+                                        .setArea(Players.caller(player), Optional.empty())))))
                 .then(Commands.literal("wappen")
                         .executes(context -> withCiv(context, (civ, player) -> player.getMainHandItem().isEmpty()
                                 ? Reply.failure(Message.of(MessageKey.INVALID_EMBLEM))

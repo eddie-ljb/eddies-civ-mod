@@ -232,12 +232,7 @@ public final class OfficeService {
     private Reply stand(Caller caller, PolityView town, Election election, Platform chosen) {
         Optional<PolityView> party = queries.partyOf(caller.player());
         Platform platform = chosen != Platform.NONE ? chosen : party
-                .flatMap(PolityView::partyProfile).map(profile -> profile.platform()).orElse(Platform.NONE);
-        Optional<PolityId> area = party.flatMap(PolityView::partyProfile).flatMap(PartyProfile::area);
-        if (area.isPresent() && !withinPartyArea(town.id(), area.get())) {
-            return Reply.failure(Message.of(MessageKey.CANDIDACY_OUTSIDE_PARTY_AREA, party.get().name().value(),
-                    texts.polityName(area.get())));
-        }
+                .flatMap(PolityView::partyProfile).map(PartyProfile::platform).orElse(Platform.NONE);
         return attempt(() -> {
             app.standForElection().execute(new StandForElection.Command(town.id(), election.id(), caller.player(),
                     platform, calendar.today()));
@@ -247,15 +242,6 @@ public final class OfficeService {
                     office, programme)));
             return Reply.success(Message.of(MessageKey.CANDIDACY_DECLARED, office, programme));
         });
-    }
-
-    /**
-     * Ob {@code electionPolity} innerhalb des Geltungsgebiets {@code partyArea} liegt (#7): die Polity der Wahl
-     * selbst, oder eine ihrer untergeordneten Glieder (z. B. Partei-Gebiet Land, Wahl in einer seiner Gemeinden).
-     */
-    private boolean withinPartyArea(PolityId electionPolity, PolityId partyArea) {
-        return electionPolity.equals(partyArea)
-                || queries.ancestorsOf(electionPolity).stream().anyMatch(ancestor -> ancestor.id().equals(partyArea));
     }
 
     /** {@code /civ wahl stimmen <Amt> <Spieler>} */
@@ -273,7 +259,7 @@ public final class OfficeService {
             candidate = queries.polityNamed(candidateName.strip())
                     .filter(party -> party.kind() == PolityKind.PARTY)
                     .flatMap(party -> election.candidates().stream()
-                            .filter(actor -> queries.partyOf(actor).map(PolityView::id).filter(party.id()::equals)
+                            .filter(actor -> queries.electoralPartyOf(actor, town.id()).map(PolityView::id).filter(party.id()::equals)
                                     .isPresent())
                             .findFirst());
         }
@@ -435,7 +421,8 @@ public final class OfficeService {
             Optional<ElectionView> election = town.electionFor(office).map(open -> new ElectionView(open.id(),
                     open.closesOn().value(),
                     open.candidates().stream().map(actor -> new ElectionView.Candidate(actor, texts.actor(actor),
-                                    open.platformOf(actor), queries.partyOf(actor).map(party -> party.name().value())))
+                                    open.platformOf(actor), queries.electoralPartyOf(actor, town.id())
+                                            .map(party -> party.name().value())))
                             .toList(),
                     open.ballots().stream().filter(ballot -> ballot.voter().equals(viewer)).map(Ballot::candidate)
                             .findFirst(),

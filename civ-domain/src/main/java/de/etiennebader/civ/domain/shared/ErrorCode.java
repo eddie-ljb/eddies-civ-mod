@@ -55,6 +55,7 @@ public enum ErrorCode {
     NOT_A_CANDIDATE,
     /** Amtszeitbegrenzung erreicht. */
     TERM_LIMIT_REACHED,
+    CANDIDACY_OUTSIDE_PARTY_AREA,
     /** Verbannt: Beitritt bis zum Ende der Verbannung verboten. */
     EXILED,
     /** Argumente: Akteur. */

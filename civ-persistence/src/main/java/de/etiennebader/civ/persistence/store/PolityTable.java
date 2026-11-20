@@ -813,7 +813,7 @@ final class PolityTable {
         try (PreparedStatement select = connection.prepareStatement(
                 """
                 SELECT id, name, kind, level, tier, currency, founded_on, seat_dimension, seat_x, seat_y, seat_z,
-                       constitution_proclaimed_on, preamble, party_order, party_economy, party_emblem, party_mode,
+                       constitution_proclaimed_on, preamble, party_order, party_economy, party_emblem, party_mode, party_area,
                        parliament_elected_on, parliament_until
                 FROM polity ORDER BY seq""");
              ResultSet rows = select.executeQuery()) {

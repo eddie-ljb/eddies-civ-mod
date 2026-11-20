@@ -414,8 +414,11 @@ class SqliteStateStoreTest {
                     "Feuer ist verboten. Wer stiehlt, wird verbannt.", DAY)).statute().orElseThrow();
             app.enactParagraph().execute(new EnactParagraph.Command(nordhain, alice, "Fristen",
                     "Abstimmungen dauern 4 Tage.", DAY));
-            app.foundParty().execute(new FoundParty.Command(PolityName.of("Ordnungspartei"), dora,
-                    new PartyProfile(60, -10, "minecraft:blue_banner"), EMERALD, List.of(bertram), DAY));
+            var areaProfile = new PartyProfile(60, -10, "minecraft:blue_banner").withArea(Optional.of(westmark));
+            var party = app.foundParty().execute(new FoundParty.Command(PolityName.of("Ordnungspartei"), dora,
+                    areaProfile, EMERALD, List.of(bertram), DAY));
+            app.proposeMotion().execute(new ProposeMotion.Command(party, dora,
+                    new Motion.PartyProgram(areaProfile.withArea(Optional.of(eichenfurt))), DAY));
             app.proposeMotion().execute(new ProposeMotion.Command(nordhain, dora,
                     new Motion.Repeal(house, "Hausordnung"), DAY));
             app.amendLaw().execute(new AmendLaw.Command(eichenfurt, carla,
