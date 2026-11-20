@@ -1,6 +1,7 @@
 package de.etiennebader.civ.server.villager;
 
 import de.etiennebader.civ.application.CivApplication;
+import de.etiennebader.civ.application.day.Calendar;
 import de.etiennebader.civ.application.economy.CreditTownIncome;
 import de.etiennebader.civ.application.party.LeaveParty;
 import de.etiennebader.civ.application.polity.ChangeTier;
@@ -9,6 +10,7 @@ import de.etiennebader.civ.application.polity.LeavePolity;
 import de.etiennebader.civ.application.population.Emigration;
 import de.etiennebader.civ.application.population.Satisfaction;
 import de.etiennebader.civ.application.population.TownMood;
+import de.etiennebader.civ.application.population.VillagerLoyalty;
 import de.etiennebader.civ.application.query.WorldQueries;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
@@ -60,6 +62,7 @@ public final class VillagerService {
 
     private final CivApplication app;
     private final WorldQueries queries;
+    private final Calendar calendar;
     private final ServerSettings settings;
     private final Texts texts;
     private final Announcements announcements;
@@ -86,9 +89,11 @@ public final class VillagerService {
         }
     }
 
-    public VillagerService(CivApplication app, ServerSettings settings, Texts texts, Announcements announcements) {
+    public VillagerService(CivApplication app, Calendar calendar, ServerSettings settings, Texts texts,
+                           Announcements announcements) {
         this.app = Objects.requireNonNull(app, "app");
         this.queries = app.queries();
+        this.calendar = Objects.requireNonNull(calendar, "calendar");
         this.settings = Objects.requireNonNull(settings, "settings");
         this.texts = Objects.requireNonNull(texts, "texts");
         this.announcements = Objects.requireNonNull(announcements, "announcements");
@@ -181,7 +186,12 @@ public final class VillagerService {
                         signed(satisfaction.points(Satisfaction.Factor.TAXES)),
                         signed(satisfaction.points(Satisfaction.Factor.VOICE)),
                         signed(satisfaction.points(Satisfaction.Factor.PROSPERITY)),
-                        satisfaction.productivityPercent())));
+                        satisfaction.productivityPercent()),
+                Message.of(MessageKey.VILLAGER_LOYALTY, signed(VillagerLoyalty.toPolity(personality, town.get(),
+                        villager, calendar.today(), queries.effectiveLaws(town.get()))))));
+        queries.partyOf(villager).ifPresent(party -> lines.add(Message.of(MessageKey.VILLAGER_PARTY_LOYALTY,
+                signed(VillagerLoyalty.toParty(personality, party, villager, calendar.today())),
+                signed(VillagerLoyalty.toChairperson(personality, party, calendar.today())))));
         lastSeen(villager).flatMap(position -> app.addresses().at(position))
                 .ifPresent(address -> lines.add(Message.of(MessageKey.VILLAGER_ADDRESS, address.line())));
         queries.contracts().active().stream()
@@ -321,7 +331,9 @@ public final class VillagerService {
     private void emigrate(Day day) {
         Map<PolityId, Integer> toWild = new HashMap<>();
         Map<PolityId, Map<PolityId, Integer>> moved = new HashMap<>();
-        for (Emigration.Departure departure : Emigration.plan(queries.polities(), day, queries::effectiveLaws)) {
+        for (Emigration.Departure departure : Emigration.plan(queries.polities(), day, queries::effectiveLaws,
+                (villager, town) -> VillagerLoyalty.toPolity(Personality.of(villager), town, villager, day,
+                        queries.effectiveLaws(town)))) {
             try {
                 app.leavePolity().execute(new LeavePolity.Command(departure.from(), departure.villager(), day));
                 Optional<BlockPosition> seat = Optional.empty();

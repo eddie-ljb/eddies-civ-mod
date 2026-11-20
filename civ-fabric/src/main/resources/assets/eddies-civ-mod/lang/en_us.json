@@ -849,6 +849,8 @@
   "eddies-civ-mod.gui.contract_notice_hint": "Sneak + click: give notice",
   "eddies-civ-mod.command.villager_address": "Lives at: %s",
   "eddies-civ-mod.command.villager_employed": "Employed by %1$s (contract #%2$s)",
+  "eddies-civ-mod.command.villager_loyalty": "Loyalty to the municipality: %s",
+  "eddies-civ-mod.command.villager_party_loyalty": "Loyalty to the party: %s · to its chair: %s",
   "eddies-civ-mod.command.help_civil": "Daily life: /civ strasse anlegen|aufheben|liste, /civ adresse [player], /civ vertrag …, /civ post, /civ brief <player> <subject> | <text>, /civ freund <player>|annehmen|ablehnen|vertrauen|misstrauen|entfernen <player>, /civ freunde, /civ nachricht <friend> <text>",
   "block.eddies-civ-mod.mailbox": "Mailbox",
   "eddies-civ-mod.command.chat_sent": "Sent.",
