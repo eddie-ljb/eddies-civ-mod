@@ -1,6 +1,7 @@
 package de.etiennebader.civ.server.command;
 
 import de.etiennebader.civ.application.population.Satisfaction;
+import de.etiennebader.civ.domain.conjuncture.BusinessPhase;
 import de.etiennebader.civ.domain.land.PlotType;
 import de.etiennebader.civ.domain.law.ParameterKey;
 import de.etiennebader.civ.domain.law.StandardParameters;
@@ -110,6 +111,11 @@ public final class TranslationKeys {
         return PREFIX + "plot_type." + type.name().toLowerCase(Locale.ROOT);
     }
 
+    /** Name einer Konjunkturphase, z. B. im {@code /civ konjunktur}-Befehl. */
+    public static String conjuncturePhase(BusinessPhase phase) {
+        return PREFIX + "conjuncture_phase." + phase.name().toLowerCase(Locale.ROOT);
+    }
+
     /** Alle Schlüssel, die jede Sprachdatei übersetzen muss. */
     public static List<String> all() {
         return Stream.of(
@@ -126,6 +132,7 @@ public final class TranslationKeys {
                         Arrays.stream(Platform.values()).map(TranslationKeys::platformDescription),
                         Arrays.stream(Satisfaction.Factor.values()).map(TranslationKeys::moodFactor),
                         Arrays.stream(Satisfaction.Factor.values()).map(TranslationKeys::moodFactorHint),
+                        Arrays.stream(BusinessPhase.values()).map(TranslationKeys::conjuncturePhase),
                         StandardParameters.all().stream().map(TranslationKeys::law),
                         Levels.DEFAULT.all().stream().map(level -> Level.translationKey(level.id())),
                         Stream.of(yesNo(true), yesNo(false)),

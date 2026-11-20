@@ -101,6 +101,7 @@ public final class CivServer {
     private final TownService towns;
     private final PlotService plots;
     private final VillagerService villagers;
+    private final de.etiennebader.civ.server.conjuncture.ConjunctureService conjuncture;
     private final Announcements announcements = new Announcements();
     private final VotingService voting;
     private final OfficeService offices;
@@ -160,13 +161,15 @@ public final class CivServer {
         this.territory = new TerritoryWatcher(app.queries(), texts);
         this.towns = new TownService(app.queries(), settings, texts, commands, territory);
         this.plots = new PlotService(app, calendar, players, texts);
-        this.villagers = new VillagerService(app, settings, texts, announcements);
+        this.conjuncture = new de.etiennebader.civ.server.conjuncture.ConjunctureService(app.queries());
+        this.villagers = new VillagerService(app, settings, texts, announcements, conjuncture);
         this.townHalls = new TownHallService(app, calendar, texts, announcements);
         this.shops = new ShopService(app, calendar, settings.currency(), texts);
         this.civil = new CivilService(app, calendar, players, settings.currency(), texts, announcements,
                 player -> plots.selection(player).area());
         this.community = new CommunityService(app, calendar, players, texts, announcements, Clock.systemUTC());
-        this.companies = new CompanyService(app, calendar, players, settings.currency(), texts, announcements);
+        this.companies = new CompanyService(app, calendar, players, settings.currency(), texts, announcements,
+                conjuncture);
         this.companies.pricing(market::priceLevel);
         this.press = new PressService(app, calendar, players, settings.currency(), texts, announcements);
         this.civic = new CivicService(app, calendar, texts, announcements, plots);
@@ -378,6 +381,10 @@ public final class CivServer {
 
     public VillagerService villagers() {
         return villagers;
+    }
+
+    public de.etiennebader.civ.server.conjuncture.ConjunctureService conjuncture() {
+        return conjuncture;
     }
 
     public OfficeService offices() {

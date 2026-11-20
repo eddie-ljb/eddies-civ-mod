@@ -1,6 +1,7 @@
 package de.etiennebader.civ.server.villager;
 
 import de.etiennebader.civ.application.CivApplication;
+import de.etiennebader.civ.application.day.Calendar;
 import de.etiennebader.civ.application.economy.CreditTownIncome;
 import de.etiennebader.civ.application.party.LeaveParty;
 import de.etiennebader.civ.application.polity.ChangeTier;
@@ -63,6 +64,8 @@ public final class VillagerService {
     private final ServerSettings settings;
     private final Texts texts;
     private final Announcements announcements;
+    private final de.etiennebader.civ.server.conjuncture.ConjunctureService conjuncture;
+    private final Calendar calendar;
     /** Wer abgewandert ist, aber im Spiel noch steht; das Spiel bringt ihn weg ({@link #takeDeparture}). */
     private final Map<PersonRef, PendingDeparture> departures = new HashMap<>();
     private final Map<PersonRef, BlockPosition> lastSeen = new HashMap<>();
@@ -86,12 +89,15 @@ public final class VillagerService {
         }
     }
 
-    public VillagerService(CivApplication app, ServerSettings settings, Texts texts, Announcements announcements) {
+    public VillagerService(CivApplication app, ServerSettings settings, Texts texts, Announcements announcements,
+                           de.etiennebader.civ.server.conjuncture.ConjunctureService conjuncture, Calendar calendar) {
         this.app = Objects.requireNonNull(app, "app");
         this.queries = app.queries();
         this.settings = Objects.requireNonNull(settings, "settings");
         this.texts = Objects.requireNonNull(texts, "texts");
         this.announcements = Objects.requireNonNull(announcements, "announcements");
+        this.conjuncture = Objects.requireNonNull(conjuncture, "conjuncture");
+        this.calendar = Objects.requireNonNull(calendar, "calendar");
     }
 
     /**
@@ -147,7 +153,19 @@ public final class VillagerService {
      */
     public Money dailyIncome(PolityView town) {
         long units = settings.villagerIncome().amount() * TownMood.of(town, queries.effectiveLaws(town), media(town)).productivity() / 100;
+        units = Math.round(units * conjuncture.multiplierOf(town, calendar.today()));
         return Money.of(units, town.currency());
+    }
+
+    /** {@code /civ konjunktur}: Konjunkturphase der Wirtschaftszone der eigenen Gemeinde. */
+    public Reply conjunctureReply(Caller caller) {
+        Optional<PolityView> town = queries.municipalityOf(caller.player());
+        if (town.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.NOT_IN_MUNICIPALITY));
+        }
+        var view = conjuncture.describe(town.get(), calendar.today());
+        return Reply.success(Message.of(MessageKey.CONJUNCTURE_INFO, view.zoneName(),
+                TranslationKeys.conjuncturePhase(view.phase()), Math.round(view.multiplier() * 100)));
     }
 
     /** Die Stimmung der Dorfbewohner einer Gemeinde. */

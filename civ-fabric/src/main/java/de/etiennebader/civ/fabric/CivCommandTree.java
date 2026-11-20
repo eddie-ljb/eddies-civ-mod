@@ -109,6 +109,7 @@ import java.util.function.Function;
  * /civ wahl ausrufen &lt;Amt&gt;         Wahl ausrufen (Bürgermeister; andere bei freiem Amt)
  * /civ wahl kandidieren &lt;Amt&gt; [Programm]  kandidieren (nur Bürger); ordnung|freiheit|steuern|ausbau|ohne
  * /civ stimmung                    Stimmung der Dorfbewohner der eigenen Gemeinde
+ * /civ konjunktur                   Konjunkturphase der Wirtschaftszone der eigenen Gemeinde
  * /civ wahl stimmen &lt;Amt&gt; &lt;Name&gt;  wählen (nur Bürger), bis zum Ende der Wahl änderbar
  * /civ amt ernennen &lt;Amt&gt; &lt;Name&gt;  Schatzmeister oder Bauamt ernennen (Bürgermeister)
  * /civ amt entlassen &lt;Amt&gt;         Amt frei machen (Bürgermeister)
@@ -262,6 +263,8 @@ public final class CivCommandTree {
                                                 Players.caller(player), IntegerArgumentType.getInteger(context, COUNT), false))))))
                 .then(Commands.literal("stimmung")
                         .executes(context -> withCiv(context, (civ, player) -> civ.villagers().mood(Players.caller(player)))))
+                .then(Commands.literal("konjunktur")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.villagers().conjunctureReply(Players.caller(player)))))
                 .then(Commands.literal("aemter")
                         .executes(context -> withCiv(context, (civ, player) -> civ.offices().list(Players.caller(player)))))
                 .then(Commands.literal("wahl")
