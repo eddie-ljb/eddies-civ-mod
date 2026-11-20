@@ -66,6 +66,19 @@ public record Personality(int order, int thrift, int belonging) {
         return derived(7);
     }
 
+    /**
+     * Gläubigkeit (positiv) gegen Atheismus (negativ), für Religion (Issue #13): wie sehr ein Dorfbewohner oder
+     * eine Person zur Gläubigkeit neigt, unabhängig davon, ob und welcher Religion er angehört.
+     */
+    public int religiosity() {
+        return derived(8);
+    }
+
+    /** Ob dieser Wert für {@link #religiosity()} einen Gläubigen statt einen Atheisten beschreibt. */
+    public static boolean believer(int religiosity) {
+        return religiosity > 0;
+    }
+
     private int derived(int salt) {
         long seed = (order + 101L) * 1_000_003L + (thrift + 101L) * 1_009L + (belonging + 101L);
         return axis(seed, salt);
