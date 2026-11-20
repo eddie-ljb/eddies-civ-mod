@@ -31,11 +31,12 @@ public final class StandardParameters {
             ParameterKey.constrained("max_outposts", Integer.class, 0, max -> max >= 0);
 
     /**
-     * Kosten für einen Chunk-Claim in kleinster Währungseinheit (100 = ein Smaragd), fällig aus der Gemeindekasse.
-     * Reicht die Kasse nicht, wird der Claim abgelehnt.
+     * Kosten für einen Chunk-Claim in kleinster Währungseinheit (100 = ein Smaragd), fällig aus der
+     * Gemeindekasse. Reicht die Kasse nicht, wird der Claim abgelehnt. 0 (Standard) = kostenlos, wie
+     * bisher; ein Beispielwert für eine spürbare Gebühr wäre 200 (2 Smaragde).
      */
     public static final ParameterKey<Long> CLAIM_COST_PER_CHUNK =
-            ParameterKey.constrained("claim_cost_per_chunk", Long.class, 200L, cost -> cost >= 0);
+            ParameterKey.constrained("claim_cost_per_chunk", Long.class, 0L, cost -> cost >= 0);
 
     /** Ob Nicht-Mitglieder im Gebiet bauen und abbauen dürfen. */
     public static final ParameterKey<Boolean> OUTSIDERS_MAY_BUILD =
