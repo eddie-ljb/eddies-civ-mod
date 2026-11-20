@@ -26,6 +26,8 @@ Ein JAR für Server **und** Client: Der Mod bringt eigene Blöcke mit, deshalb b
 | `debate_minutes` | Länge einer Wahldebatte (Standard 5) |
 | `anthem_on_enter` | Hymne beim Betreten eines Gebiets (Standard `false`) |
 | `world_map`, `world_map_radius_chunks` | gerenderte Weltkarte für die Webseite an/aus, Umkreis um Spieler (Standard `true`, 6); Kacheln unter `<Welt>/data/eddies-civ-mod/map/` |
+| `price_level_min`, `price_level_max` | Grenzen des Marktpreisfaktors (Standard `0.5`/`4.0`) |
+| `price_level_damping` | Dämpfung der Preisreaktion auf die Geldmenge je Kopf (Standard `0.5` = Quadratwurzel-Formel; `1.0` ließe Preise linear mit der Geldmenge schwanken, also stärkere Inflation/Deflation) |
 
 Fehlen Einträge (nach einem Update), ergänzt der Mod sie beim Start mit Standardwerten.
 
