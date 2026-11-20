@@ -226,18 +226,56 @@ public final class StandardParameters {
     public static final ParameterKey<Boolean> PARTY_LIST_BY_VOTE =
             ParameterKey.of("party_list_by_vote", Boolean.class, false);
 
-    /** Alle Standardparameter in fester Reihenfolge. */
+     /** Alle Standardparameter in fester Reihenfolge. */
     public static List<ParameterKey<?>> all() {
-        return List.of(LAND_TAX_PER_BLOCK, LAND_TAX_FREE_BLOCKS, LAND_TAX_GRACE_DAYS, TAX_EMBASSIES, MAX_OUTPOSTS,
-                CLAIM_COST_PER_CHUNK, OUTSIDERS_MAY_BUILD, OUTSIDERS_MAY_INTERACT, OUTSIDERS_MAY_OPEN_CONTAINERS, EXPLOSIONS_ALLOWED,
-                FIRE_SPREAD_ALLOWED, LAWS_BY_VOTE, VOTE_DAYS, SALES_TAX_PERCENT, TERM_DAYS, ELECTION_DAYS,
-                VILLAGER_VOTE_PERCENT, AMENDMENT_MAJORITY_PERCENT, FEDERAL_LAW_PREVAILS, PVP_ALLOWED, HOSTILE_MOBS_ALLOWED,
-                OUTSIDERS_MAY_HURT_ANIMALS, FEDERAL_LEVY_PERCENT, PARLIAMENT_SEATS, SESSION_DAYS, BALLOT_BOX_REQUIRED,
-                PARLIAMENT_MOTION_MIN_OPEN_DAYS, FULL_TURNOUT_REQUIRED,
-                POSTAL_VOTE_ALLOWED, OFFICE_SALARY, OFFICE_VOTING, PARLIAMENT_VOTING, BALLOT_TYPE, THRESHOLD_PERCENT,
-                TERM_LIMIT, COMPULSORY_VOTING, VOTING_FINE, ELECTION_DEBATES, PRESS_FREEDOM, JURY_SIZE, MAX_FINE,
-                EXILE_ALLOWED, COURT_FEE, CONJUNCTURE_STIMULUS_PERCENT);
-                EXILE_ALLOWED, COURT_FEE, PARTY_LIST, PARTY_LIST_BY_VOTE);
+        return List.of(
+                LAND_TAX_PER_BLOCK,
+                LAND_TAX_FREE_BLOCKS,
+                LAND_TAX_GRACE_DAYS,
+                TAX_EMBASSIES,
+                MAX_OUTPOSTS,
+                CLAIM_COST_PER_CHUNK,
+                OUTSIDERS_MAY_BUILD,
+                OUTSIDERS_MAY_INTERACT,
+                OUTSIDERS_MAY_OPEN_CONTAINERS,
+                EXPLOSIONS_ALLOWED,
+                FIRE_SPREAD_ALLOWED,
+                LAWS_BY_VOTE,
+                VOTE_DAYS,
+                SALES_TAX_PERCENT,
+                TERM_DAYS,
+                ELECTION_DAYS,
+                VILLAGER_VOTE_PERCENT,
+                AMENDMENT_MAJORITY_PERCENT,
+                FEDERAL_LAW_PREVAILS,
+                PVP_ALLOWED,
+                HOSTILE_MOBS_ALLOWED,
+                OUTSIDERS_MAY_HURT_ANIMALS,
+                FEDERAL_LEVY_PERCENT,
+                PARLIAMENT_SEATS,
+                SESSION_DAYS,
+                BALLOT_BOX_REQUIRED,
+                PARLIAMENT_MOTION_MIN_OPEN_DAYS,
+                FULL_TURNOUT_REQUIRED,
+                POSTAL_VOTE_ALLOWED,
+                OFFICE_SALARY,
+                OFFICE_VOTING,
+                PARLIAMENT_VOTING,
+                BALLOT_TYPE,
+                THRESHOLD_PERCENT,
+                TERM_LIMIT,
+                COMPULSORY_VOTING,
+                VOTING_FINE,
+                ELECTION_DEBATES,
+                PRESS_FREEDOM,
+                JURY_SIZE,
+                MAX_FINE,
+                EXILE_ALLOWED,
+                COURT_FEE,
+                CONJUNCTURE_STIMULUS_PERCENT,
+                PARTY_LIST,
+                PARTY_LIST_BY_VOTE
+        );
     }
 
     /**
