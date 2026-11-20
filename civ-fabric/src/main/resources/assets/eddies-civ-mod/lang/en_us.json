@@ -992,6 +992,7 @@
   "eddies-civ-mod.law.max_fine": "Maximum fine (100 = 1 emerald)",
   "eddies-civ-mod.law.exile_allowed": "Exile allowed as a penalty",
   "eddies-civ-mod.law.court_fee": "Court fee per lawsuit (100 = 1 emerald)",
+  "eddies-civ-mod.law.conjuncture_stimulus_percent": "Economic stimulus: dampens the business cycle phase in percent (0-100)",
   "eddies-civ-mod.law_option.plurality": "plurality (first past the post)",
   "eddies-civ-mod.law_option.runoff": "absolute majority with runoff",
   "eddies-civ-mod.law_option.sainte_lague": "proportional, Sainte-Laguë",

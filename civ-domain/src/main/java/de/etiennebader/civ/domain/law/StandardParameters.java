@@ -196,6 +196,15 @@ public final class StandardParameters {
     public static final ParameterKey<Long> COURT_FEE =
             ParameterKey.constrained("court_fee", Long.class, 100L, fee -> fee >= 0 && fee <= 100_000);
 
+    /**
+     * Regierungsmaßnahme gegen die Konjunktur: dämpft die Auswirkung der aktuellen Konjunkturphase auf
+     * Firmenproduktion, Dorfbewohner-Einkommen und Aktienkurse dieser Wirtschaftszone in Prozent; 100 dämpft am
+     * stärksten, neutralisiert die Phase aber nicht vollständig.
+     */
+    public static final ParameterKey<Long> CONJUNCTURE_STIMULUS_PERCENT =
+            ParameterKey.constrained("conjuncture_stimulus_percent", Long.class, 0L,
+                    percent -> percent >= 0 && percent <= 100);
+
     /** Alle Standardparameter in fester Reihenfolge. */
     public static List<ParameterKey<?>> all() {
         return List.of(LAND_TAX_PER_BLOCK, LAND_TAX_FREE_BLOCKS, LAND_TAX_GRACE_DAYS, TAX_EMBASSIES, MAX_OUTPOSTS,
@@ -206,7 +215,7 @@ public final class StandardParameters {
                 PARLIAMENT_MOTION_MIN_OPEN_DAYS, FULL_TURNOUT_REQUIRED,
                 POSTAL_VOTE_ALLOWED, OFFICE_SALARY, OFFICE_VOTING, PARLIAMENT_VOTING, BALLOT_TYPE, THRESHOLD_PERCENT,
                 TERM_LIMIT, COMPULSORY_VOTING, VOTING_FINE, ELECTION_DEBATES, PRESS_FREEDOM, JURY_SIZE, MAX_FINE,
-                EXILE_ALLOWED, COURT_FEE);
+                EXILE_ALLOWED, COURT_FEE, CONJUNCTURE_STIMULUS_PERCENT);
     }
 
     /**

@@ -992,6 +992,7 @@
   "eddies-civ-mod.law.max_fine": "Höchste Geldstrafe (100 = 1 Smaragd)",
   "eddies-civ-mod.law.exile_allowed": "Verbannung als Strafe erlaubt",
   "eddies-civ-mod.law.court_fee": "Gerichtsgebühr je Klage (100 = 1 Smaragd)",
+  "eddies-civ-mod.law.conjuncture_stimulus_percent": "Konjunkturstimulus: dämpft die Konjunkturphase in Prozent (0–100)",
   "eddies-civ-mod.law_option.plurality": "relative Mehrheit (First past the post)",
   "eddies-civ-mod.law_option.runoff": "absolute Mehrheit mit Stichwahl",
   "eddies-civ-mod.law_option.sainte_lague": "Verhältniswahl nach Sainte-Laguë",
