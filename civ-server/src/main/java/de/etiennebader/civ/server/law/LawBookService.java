@@ -7,10 +7,12 @@ import de.etiennebader.civ.application.law.RepealParagraph;
 import de.etiennebader.civ.application.polity.ProposeMotion;
 import de.etiennebader.civ.application.polity.VoteOutcome;
 import de.etiennebader.civ.application.query.WorldQueries;
+import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.law.EnactedStatute;
 import de.etiennebader.civ.domain.law.LawRecognizer;
 import de.etiennebader.civ.domain.law.ParameterValue;
 import de.etiennebader.civ.domain.law.StandardParameters;
+import de.etiennebader.civ.domain.law.Statute;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.shared.DomainException;
 import de.etiennebader.civ.domain.shared.PolityId;
@@ -26,9 +28,13 @@ import de.etiennebader.civ.server.federation.FederationService;
 import de.etiennebader.civ.server.town.LawSetting;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.Supplier;
 
 /**
@@ -51,6 +57,13 @@ public final class LawBookService {
     private final Texts texts;
     private final Announcements announcements;
     private final FederationService federations;
+
+    /**
+     * Gesetzesvorlagen für den Gesetzes-Editor im Web (#10): bewusst nur im Arbeitsspeicher, nicht Teil des
+     * persistierten Spielzustands – siehe {@code docs/issue-10-gesetzeseditor.md}. Ein Vorlagenentwurf bleibt also
+     * nur bis zum nächsten Serverneustart erhalten.
+     */
+    private final Map<String, LawDraft> drafts = new LinkedHashMap<>();
 
     public LawBookService(CivApplication app, Calendar calendar, Texts texts, Announcements announcements,
                           FederationService federations) {
@@ -209,6 +222,65 @@ public final class LawBookService {
             }
             return Reply.success(Message.of(MessageKey.PARAGRAPH_REPEAL_PROPOSED, name, paragraph.get().title()));
         });
+    }
+
+    // ---- Gesetzesvorlagen (#10) ----
+
+    /**
+     * Ein gespeicherter Entwurf für einen Paragraphen: sichtbar für die Autorin/den Autor und, sofern vorhanden,
+     * für die eigene Partei zum Zeitpunkt des Speicherns. Ob die Partei später wechselt, ändert die Sichtbarkeit
+     * eines schon gespeicherten Entwurfs nicht mehr.
+     */
+    public record LawDraft(String id, ActorRef author, String authorName, Optional<PolityId> party,
+                           Optional<PolityId> targetPolity, String title, String text, long savedOn) {
+    }
+
+    /**
+     * Speichert einen Entwurf neu oder, mit {@code id} eines eigenen vorhandenen Entwurfs, überschreibt ihn.
+     *
+     * @throws IllegalArgumentException bei leerem/zu langem Titel oder Text, oder wenn {@code id} den Entwurf
+     *                                  einer anderen Person meint
+     */
+    public LawDraft saveDraft(Caller caller, Optional<String> id, Optional<PolityId> targetPolity, String title,
+                              String text) {
+        String draftTitle = title.strip();
+        String draftText = text.strip();
+        if (draftTitle.isEmpty() || draftTitle.length() > Statute.MAX_TITLE_LENGTH) {
+            throw new IllegalArgumentException("Titel leer oder zu lang (höchstens %d Zeichen)"
+                    .formatted(Statute.MAX_TITLE_LENGTH));
+        }
+        if (draftText.length() > Statute.MAX_TEXT_LENGTH) {
+            throw new IllegalArgumentException("Text zu lang (höchstens %d Zeichen)".formatted(Statute.MAX_TEXT_LENGTH));
+        }
+        if (id.isPresent() && drafts.containsKey(id.get()) && !drafts.get(id.get()).author().equals(caller.player())) {
+            throw new IllegalArgumentException("Entwurf gehört einer anderen Person");
+        }
+        String draftId = id.filter(drafts::containsKey).orElseGet(() -> UUID.randomUUID().toString());
+        Optional<PolityId> party = queries.partyOf(caller.player()).map(PolityView::id);
+        LawDraft draft = new LawDraft(draftId, caller.player(), caller.name(), party, targetPolity, draftTitle,
+                draftText, calendar.today().value());
+        drafts.put(draftId, draft);
+        return draft;
+    }
+
+    /** Eigene Entwürfe und die der eigenen Partei, neueste zuerst. */
+    public List<LawDraft> draftsVisibleTo(Caller caller) {
+        Optional<PolityId> party = queries.partyOf(caller.player()).map(PolityView::id);
+        return drafts.values().stream()
+                .filter(draft -> draft.author().equals(caller.player())
+                        || (party.isPresent() && draft.party().equals(party)))
+                .sorted(Comparator.comparingLong(LawDraft::savedOn).reversed())
+                .toList();
+    }
+
+    /** @return ob gelöscht wurde; {@code false} ohne diesen Entwurf oder wenn er einer anderen Person gehört */
+    public boolean deleteDraft(Caller caller, String id) {
+        LawDraft draft = drafts.get(id);
+        if (draft == null || !draft.author().equals(caller.player())) {
+            return false;
+        }
+        drafts.remove(id);
+        return true;
     }
 
     private Optional<ParagraphView> paragraph(PolityView polity, int number) {
