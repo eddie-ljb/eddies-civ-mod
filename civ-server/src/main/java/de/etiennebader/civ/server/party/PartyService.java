@@ -4,7 +4,7 @@ import de.etiennebader.civ.application.CivApplication;
 import de.etiennebader.civ.application.day.Calendar;
 import de.etiennebader.civ.application.party.ChangePartyProgram;
 import de.etiennebader.civ.application.directory.PlayerDirectory;
-import de.etiennebader.civ.application.party.ChangePartyProfile;
+import de.etiennebader.civ.application.party.*;
 import de.etiennebader.civ.application.party.FoundParty;
 import de.etiennebader.civ.application.party.JoinParty;
 import de.etiennebader.civ.application.party.LeaveParty;

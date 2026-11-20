@@ -34,7 +34,7 @@ bestehende Flaggen-System:
   als lesende Default-Methoden, analog zu `flagOf(...)`.
 - **civ-application** (`CivicUseCases.uploadImage(...)`/`removeImage(...)`): prüft Berechtigung
   (Bürgermeister/Vorsitz der jeweiligen Einheit) und ruft die Domänenlogik auf.
-- **civ-persistence**: neue Migration `V020__polity_image.sql` (Tabelle `polity_image`), Laden/Speichern
+- **civ-persistence**: neue Migration `V021__polity_image.sql` (Tabelle `polity_image`), Laden/Speichern
   in `CivicJusticeTables.java`.
 - **civ-server**:
   - `CivicService.uploadImage(...)/removeImage(...)/imagesOf(...)/image(...)` als Fassade für die
