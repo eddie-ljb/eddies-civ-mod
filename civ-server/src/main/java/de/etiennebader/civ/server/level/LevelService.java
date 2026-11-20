@@ -226,11 +226,12 @@ public final class LevelService {
         return with(caller, level, polity -> civic.list(caller, polity));
     }
 
-    /** {@code /civ <Ebene> wahlkreis anlegen|gebiet|leeren|aufloesen <Name>} */
+    /** {@code /civ <Ebene> wahlkreis anlegen|gebiet|gebiet-entfernen|leeren|aufloesen <Name>} */
     public Reply constituency(Caller caller, String level, String action, String name) {
         return with(caller, level, polity -> switch (action) {
             case "anlegen" -> civic.define(caller, polity, name);
             case "gebiet" -> civic.addArea(caller, polity, name);
+            case "gebiet-entfernen" -> civic.removeArea(caller, polity, name);
             case "leeren" -> civic.clear(caller, polity, name);
             case "aufloesen" -> civic.remove(caller, polity, name);
             default -> throw new IllegalArgumentException("Unbekannte Aktion: " + action);
@@ -240,6 +241,11 @@ public final class LevelService {
     /** {@code /civ <Ebene> wahlkreis gemeinde <Name> <Gemeinde>} */
     public Reply constituencyTown(Caller caller, String level, String name, String town) {
         return with(caller, level, polity -> civic.addTown(caller, polity, name, town));
+    }
+
+    /** {@code /civ <Ebene> wahlkreis gemeinde-entfernen <Name> <Gemeinde>} */
+    public Reply constituencyTownRemove(Caller caller, String level, String name, String town) {
+        return with(caller, level, polity -> civic.removeTown(caller, polity, name, town));
     }
 
     /** {@code /civ <Ebene> hymne setzen <Titel> | [Instrument |] <Noten>} */
