@@ -112,6 +112,7 @@ public final class CivApplication {
     private final CastVote castVote;
     private final TallyProposals tallyProposals;
     private final ParliamentSession parliamentSession;
+    private final PersonalityLegislator villagerLegislator;
     private final Campaign campaign;
     private final ContractUseCases contracts;
     private final RunContracts runContracts;
@@ -214,8 +215,8 @@ public final class CivApplication {
         this.community = new CommunityUseCases(aggregates, ids);
         this.makePromise = new MakePromise(aggregates);
         this.putUpPoster = new PutUpPoster(aggregates);
-        this.parliamentSession = new ParliamentSession(aggregates, ids,
-                new PersonalityLegislator(effectiveLaws, partyOf));
+        this.villagerLegislator = new PersonalityLegislator(effectiveLaws, partyOf);
+        this.parliamentSession = new ParliamentSession(aggregates, ids, villagerLegislator);
         this.foundFederation = new FoundFederation(aggregates, ids);
         this.joinFederation = new JoinFederation(aggregates);
         this.proclaimConstitution = new ProclaimConstitution(aggregates);
@@ -366,6 +367,11 @@ public final class CivApplication {
 
     public ParliamentSession parliamentSession() {
         return parliamentSession;
+    }
+
+    /** Wie Dorfbewohner über Recht entscheiden; genutzt im Parlament und für kommissarisch regierende Dorfbewohner. */
+    public PersonalityLegislator villagerLegislator() {
+        return villagerLegislator;
     }
 
     public TallyProposals tallyProposals() {
