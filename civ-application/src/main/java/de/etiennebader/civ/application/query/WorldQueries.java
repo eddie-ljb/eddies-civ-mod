@@ -306,6 +306,15 @@ public final class WorldQueries {
     }
 
     /**
+     * Wie {@link #priceLevel(int, Money)}, aber mit einstellbaren Preisfaktor-Grenzen und -Dämpfung
+     * aus der Server-Konfiguration.
+     */
+    public PriceLevel priceLevel(int population, Money reference, double minFactor, double maxFactor, double damping) {
+        return PriceLevel.of(ledger().totalSupply(reference.currency()), population, reference, minFactor, maxFactor,
+                damping);
+    }
+
+    /**
      * @throws IllegalArgumentException wenn es für die Polity kein Grundbuch gibt
      */
     public LandView land(PolityId polity) {

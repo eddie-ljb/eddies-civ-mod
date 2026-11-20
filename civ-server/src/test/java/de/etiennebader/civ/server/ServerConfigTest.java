@@ -40,4 +40,48 @@ class ServerConfigTest {
         assertEquals(ServerSettings.defaults().claimPerMember(), settings.claimPerMember());
         assertEquals(8_000, settings.priceReference().amount());
     }
+
+    @Test
+    @DisplayName("Wirtschaftssimulation ist per Config fein einstellbar, Standardwerte bleiben sonst erhalten")
+    void readsEconomyTuning() {
+        Properties properties = new Properties();
+        properties.setProperty(ServerConfig.PRICE_LEVEL_MIN, "0.8");
+        properties.setProperty(ServerConfig.PRICE_LEVEL_MAX, "2.5");
+        properties.setProperty(ServerConfig.PRICE_LEVEL_DAMPING, "1.0");
+
+        ServerSettings settings = ServerConfig.of(properties);
+
+        assertEquals(0.8, settings.economy().priceLevelMin());
+        assertEquals(2.5, settings.economy().priceLevelMax());
+        assertEquals(1.0, settings.economy().priceLevelDamping());
+    }
+
+    @Test
+    @DisplayName("Ungueltige Wirtschafts-Werte (min >= max) fallen komplett auf den Standard zurueck")
+    void invalidEconomyTuningFallsBackToDefaults() {
+        Properties properties = new Properties();
+        properties.setProperty(ServerConfig.PRICE_LEVEL_MIN, "3.0");
+        properties.setProperty(ServerConfig.PRICE_LEVEL_MAX, "2.0");
+
+        ServerSettings settings = ServerConfig.of(properties);
+
+        assertEquals(ServerSettings.EconomySettings.DEFAULT, settings.economy());
+    }
+
+    @Test
+    @DisplayName("Wirtschafts-Werte ueberleben einen Schreib-/Lese-Durchlauf")
+    void economyTuningRoundTrips() throws IOException {
+        Path dir = Files.createTempDirectory("civ-config-economy");
+        Path file = dir.resolve("eddies-civ-mod.properties");
+        ServerSettings written = new ServerSettings(ServerSettings.defaults().ticksPerDay(),
+                ServerSettings.defaults().claimBase(), ServerSettings.defaults().claimPerMember(),
+                ServerSettings.defaults().currency(), ServerSettings.defaults().priceReference(),
+                ServerSettings.defaults().villagerIncome(), ServerSettings.defaults().tiers(),
+                ServerSettings.defaults().web(), ServerSettings.defaults().emigration(),
+                ServerSettings.defaults().levels(), ServerSettings.defaults().parties(),
+                ServerSettings.defaults().show(), new ServerSettings.EconomySettings(0.75, 3.5, 0.65));
+        ServerConfig.write(file, written);
+
+        assertEquals(written.economy(), ServerConfig.load(file).economy());
+    }
 }

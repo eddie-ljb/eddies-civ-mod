@@ -845,6 +845,7 @@ public final class CivCommandTree {
                                         Players.caller(player), level.apply(context)))))
                         .then(constituencyAction("anlegen", level))
                         .then(constituencyAction("gebiet", level))
+                        .then(constituencyAction("gebiet-entfernen", level))
                         .then(constituencyAction("leeren", level))
                         .then(constituencyAction("aufloesen", level))
                         .then(Commands.literal("gemeinde")
@@ -852,6 +853,14 @@ public final class CivCommandTree {
                                         .then(Commands.argument(TOWN, StringArgumentType.greedyString())
                                                 .executes(context -> withCiv(context, (civ, player) ->
                                                         civ.levels().constituencyTown(Players.caller(player),
+                                                                level.apply(context),
+                                                                StringArgumentType.getString(context, NAME),
+                                                                StringArgumentType.getString(context, TOWN)))))))
+                        .then(Commands.literal("gemeinde-entfernen")
+                                .then(Commands.argument(NAME, StringArgumentType.string())
+                                        .then(Commands.argument(TOWN, StringArgumentType.greedyString())
+                                                .executes(context -> withCiv(context, (civ, player) ->
+                                                        civ.levels().constituencyTownRemove(Players.caller(player),
                                                                 level.apply(context),
                                                                 StringArgumentType.getString(context, NAME),
                                                                 StringArgumentType.getString(context, TOWN))))))))
