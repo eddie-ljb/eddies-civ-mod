@@ -212,6 +212,7 @@ public final class StandardParameters {
     public static final ParameterKey<Long> CONJUNCTURE_STIMULUS_PERCENT =
             ParameterKey.constrained("conjuncture_stimulus_percent", Long.class, 0L,
                     percent -> percent >= 0 && percent <= 100);
+    /**
      * Die Parteiliste einer Partei für Listenwahlen: Mitglieder in Reihenfolge, kodiert wie
      * {@code PLAYER:<uuid>,PERSON:<uuid>,...}; leer, solange keine gesetzt wurde (dann gilt die
      * Reihenfolge der Kandidatur). Siehe {@code de.etiennebader.civ.domain.polity.PartyList}.
