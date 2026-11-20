@@ -1,6 +1,6 @@
 [Home](Home.md) › Alltag
 
-# Alltag: Verträge, Post, Freunde, Hoheitszeichen
+# Alltag: Verträge, Post, Freunde, Hoheitszeichen, Dorfbewohner
 
 ## Verträge
 `/civ vertrag` (oder Gemeindehaus → Verträge, oder die Webseite) verwaltet alle Verträge. Ein Angebot gilt, sobald die Gegenseite unterschreibt; für eine Gemeinde unterschreibt der Bürgermeister.
@@ -31,6 +31,15 @@ Rezept: Eisen, Papier, Truhe (`III / IPI / ICI`).
 ## Flaggen und Hymnen
 - **Flagge:** Banner am Webstuhl gestalten, in die Hand nehmen, `/civ <Ebene> flagge setzen`. `flagge holen` gibt ein Banner mit der Flagge, `flagge entfernen`.
 - **Hymne:** `/civ <Ebene> hymne setzen <Titel> | [Instrument |] <Noten>`. Noten F#3–F#5, `*2` verdoppelt, `/2` halbiert die Länge, `-` ist eine Pause. Instrumente: `harp`, `bell`, `flute`, `chime`, `guitar`, `xylophone` u. a. `hymne spielen`, `hymne entfernen`. Mit `anthem_on_enter` hört man sie beim Betreten des Gebiets.
+
+## Dorfbewohner: Interaktionsmenü
+Schleichen + Rechtsklick mit leerer Hand auf einen Dorfbewohner zeigt seine Auskunft (Name, Gemeinde, Persönlichkeit, Stimmung, Anschrift, Arbeitgeber, letzte Post). Darüber hinaus:
+- **Reden:** `/civ dorfbewohner reden <Thema>` (`greeting`, `weather`, `work`, `politics`) – die Antwort richtet sich nach seiner aktuellen Stimmung (zufrieden, gleichgültig, unzufrieden).
+- **Beeinflussen:** `/civ dorfbewohner beeinflussen` hebt die Stimmung des angesehenen bzw. nächsten Dorfbewohners ein wenig an – höchstens alle 3 Tage je Spieler-Dorfbewohner-Paar, sonst wirkt es nicht.
+- **Post:** `/civ dorfbewohner post <Thema>` schickt ihm einen vorformulierten Gruß; die letzte Post erscheint in seiner Auskunft. Das ist eine eigene, bewusst einfache Pinnwand nur für Dorfbewohner – für echte Briefe zwischen Spielern gilt weiterhin der Briefkasten oben.
+- **Verträge:** `/civ vertrag arbeit dorfbewohner <Lohn>` stellt ihn an (siehe oben); allgemeine freie Verträge mit Dorfbewohnern sind noch nicht möglich.
+- Dorfbewohner tauschen sich auch untereinander täglich aus und heben sich dabei gegenseitig etwas in der Stimmung.
+- Sehr unzufriedene, freiheitsliebende Dorfbewohner fallen gelegentlich mit dem Verdacht auf eine Straftat auf (Ankündigung an die Gemeinde); angeklagt wird er wie gewohnt über `/civ gericht …` mit ihm als Beschuldigtem.
 
 ## Englische Befehle und Handbuch
 Jeder Befehl gibt es auch auf Englisch, z. B. `/civ court case 3`, `/civ company invest …` (siehe [Befehlsübersicht](Befehlsuebersicht.md)). Neue Spieler bekommen beim ersten Betreten das **Civ-Handbuch** in ihrer Spielsprache; Nachschlag mit `/civ handbuch`.

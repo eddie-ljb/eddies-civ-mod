@@ -1,6 +1,7 @@
 package de.etiennebader.civ.server.villager;
 
 import de.etiennebader.civ.application.CivApplication;
+import de.etiennebader.civ.application.day.Calendar;
 import de.etiennebader.civ.application.economy.CreditTownIncome;
 import de.etiennebader.civ.application.party.LeaveParty;
 import de.etiennebader.civ.application.polity.ChangeTier;
@@ -65,12 +66,19 @@ public final class VillagerService {
 
     private final CivApplication app;
     private final WorldQueries queries;
+    private final Calendar calendar;
     private final ServerSettings settings;
     private final Texts texts;
     private final Announcements announcements;
     /** Wer abgewandert ist, aber im Spiel noch steht; das Spiel bringt ihn weg ({@link #takeDeparture}). */
     private final Map<PersonRef, PendingDeparture> departures = new HashMap<>();
     private final Map<PersonRef, BlockPosition> lastSeen = new HashMap<>();
+    /** Politische Beeinflussung und Dorfbewohner-Kontakte (Issue #18); wie {@link #departures} nur im Speicher. */
+    private final SocialEffects social = new SocialEffects();
+    /** Post zwischen Spielern und Dorfbewohnern bzw. unter Dorfbewohnern (Issue #18); wie {@link #social} nur im Speicher. */
+    private final VillagerMailbox mailbox = new VillagerMailbox();
+    /** Wie oft je 100 Chancen pro Tag ein sehr unzufriedener, freiheitsliebender Dorfbewohner auffällt. */
+    private static final int CRIME_MAX_CHANCE_PERCENT = 5;
     /**
      * Dorfbewohner sparen zusätzlich ein Zehntel ihres Anteils am Gemeindeeinkommen, bis 50 Smaragde; davon kaufen
      * sparsame Aktien.
@@ -91,9 +99,11 @@ public final class VillagerService {
         }
     }
 
-    public VillagerService(CivApplication app, ServerSettings settings, Texts texts, Announcements announcements) {
+    public VillagerService(CivApplication app, Calendar calendar, ServerSettings settings, Texts texts,
+            Announcements announcements) {
         this.app = Objects.requireNonNull(app, "app");
         this.queries = app.queries();
+        this.calendar = Objects.requireNonNull(calendar, "calendar");
         this.settings = Objects.requireNonNull(settings, "settings");
         this.texts = Objects.requireNonNull(texts, "texts");
         this.announcements = Objects.requireNonNull(announcements, "announcements");
@@ -164,7 +174,8 @@ public final class VillagerService {
     public Optional<Satisfaction> satisfactionOf(PersonRef villager) {
         return queries.municipalityOf(villager)
                 .map(town -> Satisfaction.of(Personality.of(villager), town, queries.effectiveLaws(town))
-                        .withMedia(app.pressInfluence().satisfactionPoints(villager, town)));
+                        .withMedia(app.pressInfluence().satisfactionPoints(villager, town))
+                        .withSocial(social.pointsOf(villager)));
     }
 
     /** Auskunft über einen Dorfbewohner, z. B. beim Anschauen mit Schleichen und Rechtsklick. */
@@ -177,7 +188,8 @@ public final class VillagerService {
                     personality.thrift(), personality.belonging()));
         }
         Satisfaction satisfaction = Satisfaction.of(personality, town.get(), queries.effectiveLaws(town.get()))
-                .withMedia(app.pressInfluence().satisfactionPoints(villager, town.get()));
+                .withMedia(app.pressInfluence().satisfactionPoints(villager, town.get()))
+                .withSocial(social.pointsOf(villager));
         List<Message> lines = new ArrayList<>(List.of(
                 Message.of(MessageKey.VILLAGER_INFO, town.get().name().value(), trait, personality.order(),
                         personality.thrift(), personality.belonging()),
@@ -194,7 +206,39 @@ public final class VillagerService {
                 .findFirst()
                 .ifPresent(contract -> lines.add(Message.of(MessageKey.VILLAGER_EMPLOYED,
                         texts.actor(contract.offeror()), contract.number())));
+        mailbox.latest(villager).ifPresent(mail -> lines.add(Message.of(MessageKey.VILLAGER_MAIL_LATEST,
+                texts.actor(mail.from()), mail.sent().value())));
         return Reply.success(lines);
+    }
+
+    /** Ein Spieler redet mit einem Dorfbewohner über ein Thema (Issue #18); die Antwort richtet sich nach seiner Stimmung. */
+    public Reply talk(PersonRef villager, VillagerDialogue.Topic topic) {
+        Satisfaction satisfaction = satisfactionOf(villager)
+                .orElseGet(() -> new Satisfaction(Map.of(Satisfaction.Factor.BASE, 0)));
+        Message topicWord = Message.of(TranslationKeys.dialogueTopic(topic));
+        MessageKey key = switch (VillagerDialogue.moodOf(satisfaction)) {
+            case CONTENT -> MessageKey.VILLAGER_TALK_CONTENT;
+            case NEUTRAL -> MessageKey.VILLAGER_TALK_NEUTRAL;
+            case DISCONTENT -> MessageKey.VILLAGER_TALK_DISCONTENT;
+        };
+        return Reply.success(Message.of(key, topicWord));
+    }
+
+    /**
+     * Ein Spieler versucht, politisch auf einen Dorfbewohner einzuwirken; hebt dessen Zufriedenheit ein wenig an,
+     * höchstens alle {@link SocialEffects#INFLUENCE_COOLDOWN_DAYS} Tage je Spieler-Dorfbewohner-Paar.
+     */
+    public Reply influence(Caller caller, PersonRef villager) {
+        if (social.influence(caller.player(), villager, calendar.today())) {
+            return Reply.success(Message.of(MessageKey.VILLAGER_INFLUENCE_OK));
+        }
+        return Reply.failure(Message.of(MessageKey.VILLAGER_INFLUENCE_COOLDOWN, SocialEffects.INFLUENCE_COOLDOWN_DAYS));
+    }
+
+    /** Ein Spieler schickt einem Dorfbewohner Post (vorformulierter Text, Issue #18). */
+    public Reply sendMail(ActorRef from, PersonRef villager, String templateKey) {
+        mailbox.send(from, villager, templateKey, calendar.today());
+        return Reply.success(Message.of(MessageKey.VILLAGER_MAIL_SENT, texts.actor(villager)));
     }
 
     /** {@code /civ stimmung}: Stimmung der Dorfbewohner der eigenen Gemeinde. */
@@ -265,7 +309,54 @@ public final class VillagerService {
         if (settings.emigration()) {
             emigrate(day);
         }
+        socialAndCrime(day);
         return changes;
+    }
+
+    /**
+     * Tagesabschluss für {@link #social} (abklingen, Dorfbewohner-Kontakte) und das Durchsickern der
+     * {@link #CRIME_MAX_CHANCE_PERCENT} genannten Verdachtsfälle (Issue #18): ein sehr unzufriedener,
+     * freiheitsliebender Dorfbewohner fällt gelegentlich mit einer Straftat auf. Das legt bewusst nur eine
+     * Ankündigung vor, kein fertiges Gerichtsverfahren - das Anklagen selbst bleibt beim bestehenden
+     * Spieler-ausgelösten Weg über {@code /civ gericht}, mit dem Dorfbewohner schon heute als Beschuldigte
+     * angegeben werden können.
+     */
+    private void socialAndCrime(Day day) {
+        List<List<PersonRef>> villagersByTown = new ArrayList<>();
+        for (PolityView town : queries.polities()) {
+            if (town.kind() != PolityKind.TERRITORIAL) {
+                continue;
+            }
+            List<PersonRef> villagers = town.members().stream()
+                    .map(Membership::member)
+                    .filter(PersonRef.class::isInstance)
+                    .map(PersonRef.class::cast)
+                    .toList();
+            villagersByTown.add(villagers);
+            for (PersonRef villager : villagers) {
+                rollCrime(town, villager, day);
+            }
+        }
+        social.endOfDay(villagersByTown, day);
+    }
+
+    private void rollCrime(PolityView town, PersonRef villager, Day day) {
+        Personality personality = Personality.of(villager);
+        int score = satisfactionOf(villager).map(Satisfaction::score).orElse(0);
+        if (personality.order() >= 0 || score >= 0) {
+            return;
+        }
+        int severity = Math.min(100, (-personality.order() - score) / 2);
+        int chancePercent = Math.min(CRIME_MAX_CHANCE_PERCENT, severity / 20);
+        if (chancePercent <= 0) {
+            return;
+        }
+        long mix = villager.uuid().getMostSignificantBits() ^ Long.rotateLeft(day.value() + 1, 13);
+        if (Math.floorMod(mix * 0x9E3779B97F4A7C15L, 100L) >= chancePercent) {
+            return;
+        }
+        announcements.add(Announcement.toTown(town.id(), Message.of(MessageKey.VILLAGER_CRIME_SUSPECTED,
+                texts.actor(villager), de.etiennebader.civ.server.justice.JusticeService.kindName(CaseKind.CRIMINAL))));
     }
 
     /**

@@ -1,6 +1,7 @@
 package de.etiennebader.civ.server.command;
 
 import de.etiennebader.civ.application.population.Satisfaction;
+import de.etiennebader.civ.application.population.VillagerDialogue;
 import de.etiennebader.civ.domain.land.PlotType;
 import de.etiennebader.civ.domain.law.ParameterKey;
 import de.etiennebader.civ.domain.law.StandardParameters;
@@ -110,6 +111,11 @@ public final class TranslationKeys {
         return PREFIX + "plot_type." + type.name().toLowerCase(Locale.ROOT);
     }
 
+    /** Worüber man mit einem Dorfbewohner redet (Issue #18). */
+    public static String dialogueTopic(VillagerDialogue.Topic topic) {
+        return PREFIX + "dialogue_topic." + topic.name().toLowerCase(Locale.ROOT);
+    }
+
     /** Alle Schlüssel, die jede Sprachdatei übersetzen muss. */
     public static List<String> all() {
         return Stream.of(
@@ -119,6 +125,7 @@ public final class TranslationKeys {
                         Arrays.stream(SettlementTier.values()).map(TranslationKeys::tier),
                         Arrays.stream(ClaimType.values()).map(TranslationKeys::claimType),
                         Arrays.stream(PlotType.values()).map(TranslationKeys::plotType),
+                        Arrays.stream(VillagerDialogue.Topic.values()).map(TranslationKeys::dialogueTopic),
                         Arrays.stream(Office.values()).map(TranslationKeys::office),
                         Arrays.stream(Platform.values()).map(TranslationKeys::platform),
                         Arrays.stream(Trait.values()).map(TranslationKeys::trait),

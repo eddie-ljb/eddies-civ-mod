@@ -13,6 +13,7 @@ import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import de.etiennebader.civ.EddiesCivMod;
+import de.etiennebader.civ.application.population.VillagerDialogue;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.exchange.Side;
@@ -164,6 +165,7 @@ public final class CivCommandTree {
     private static final String LEVEL = "ebene";
     private static final String ARTICLE = "artikel";
     private static final String TEXT = "text";
+    private static final String TOPIC = "thema";
     private static final String TOWN = "gemeinde";
     private static final String NUMBER = "nr";
     private static final String DEPOSIT = "kaution";
@@ -262,6 +264,25 @@ public final class CivCommandTree {
                                                 Players.caller(player), IntegerArgumentType.getInteger(context, COUNT), false))))))
                 .then(Commands.literal("stimmung")
                         .executes(context -> withCiv(context, (civ, player) -> civ.villagers().mood(Players.caller(player)))))
+                .then(Commands.literal("dorfbewohner")
+                        .then(Commands.literal("reden")
+                                .then(Commands.argument(TOPIC, StringArgumentType.word())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                VillagerDialogue.Topic.words(), builder))
+                                        .executes(context -> withCiv(context, (civ, player) -> talkToVillager(civ,
+                                                player, StringArgumentType.getString(context, TOPIC))))))
+                        .then(Commands.literal("beeinflussen")
+                                .executes(context -> withCiv(context, (civ, player) -> villagerRef(player)
+                                        .map(villager -> civ.villagers().influence(Players.caller(player), villager))
+                                        .orElseGet(() -> Reply.failure(Message.of(MessageKey.VILLAGER_NONE_NEAR))))))
+                        .then(Commands.literal("post")
+                                .then(Commands.argument(TOPIC, StringArgumentType.word())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                VillagerDialogue.Topic.words(), builder))
+                                        .executes(context -> withCiv(context, (civ, player) -> villagerRef(player)
+                                                .map(villager -> civ.villagers().sendMail(Players.ref(player), villager,
+                                                        StringArgumentType.getString(context, TOPIC)))
+                                                .orElseGet(() -> Reply.failure(Message.of(MessageKey.VILLAGER_NONE_NEAR))))))))
                 .then(Commands.literal("aemter")
                         .executes(context -> withCiv(context, (civ, player) -> civ.offices().list(Players.caller(player)))))
                 .then(Commands.literal("wahl")
@@ -1578,6 +1599,15 @@ public final class CivCommandTree {
                 .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
                         .executes(context -> withCiv(context, (civ, player) -> action.execute(civ, player,
                                 IntegerArgumentType.getInteger(context, NUMBER)))));
+    }
+
+    /** Redet mit dem angesehenen oder nächsten Dorfbewohner über ein Thema (Issue #18); unbekannte Themenwörter
+     * werden wie {@code greeting} behandelt. */
+    private static Reply talkToVillager(CivServer civ, ServerPlayer player, String topicWord) {
+        VillagerDialogue.Topic topic = VillagerDialogue.parseTopic(topicWord).orElse(VillagerDialogue.Topic.GREETING);
+        return villagerRef(player)
+                .map(villager -> civ.villagers().talk(villager, topic))
+                .orElseGet(() -> Reply.failure(Message.of(MessageKey.VILLAGER_NONE_NEAR)));
     }
 
     /** Stellt den nächsten Dorfbewohner in Reichweite ein. */

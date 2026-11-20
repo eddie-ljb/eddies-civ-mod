@@ -179,6 +179,77 @@ class VillagerServiceTest {
         assertTrue(villagers.takeDeparture(departed).isEmpty());
     }
 
+    @Test
+    @DisplayName("Reden: ein heimatloser Dorfbewohner antwortet neutral, je nach Thema")
+    void talkRespondsByMood() {
+        PersonRef villager = new PersonRef(PersonId.generate(ids));
+        Reply reply = villagers.talk(villager, de.etiennebader.civ.application.population.VillagerDialogue.Topic.WEATHER);
+        assertTrue(reply.success());
+        assertEquals(MessageKey.VILLAGER_TALK_NEUTRAL.key(), reply.lines().getFirst().key());
+    }
+
+    @Test
+    @DisplayName("Beeinflussen: wirkt einmal, dann greift die Abklingzeit; danach steigt die Zufriedenheit sichtbar")
+    void influenceLiftsSatisfactionWithCooldown() {
+        found(alice, "Nordhain", 0);
+        PersonRef villager = new PersonRef(PersonId.generate(ids));
+        villagers.seen(villager, pos(2, 2), DAY);
+        int before = villagers.satisfactionOf(villager).orElseThrow().score();
+
+        Reply first = villagers.influence(new Caller(alice, "Alice", pos(2, 2)), villager);
+        assertTrue(first.success());
+        assertEquals(MessageKey.VILLAGER_INFLUENCE_OK.key(), first.lines().getFirst().key());
+        assertTrue(villagers.satisfactionOf(villager).orElseThrow().score() > before);
+
+        Reply second = villagers.influence(new Caller(alice, "Alice", pos(2, 2)), villager);
+        assertFalse(second.success());
+        assertEquals(MessageKey.VILLAGER_INFLUENCE_COOLDOWN.key(), second.lines().getFirst().key());
+    }
+
+    @Test
+    @DisplayName("Post: eine gesendete Nachricht erscheint als letzte Post in der Dorfbewohner-Auskunft")
+    void mailShowsUpInDescribe() {
+        found(alice, "Nordhain", 0);
+        PersonRef villager = new PersonRef(PersonId.generate(ids));
+        villagers.seen(villager, pos(2, 2), DAY);
+
+        Reply sent = villagers.sendMail(alice, villager, "greeting");
+        assertTrue(sent.success());
+        Reply info = villagers.describe(villager);
+        assertTrue(info.lines().stream().anyMatch(line -> line.key().equals(MessageKey.VILLAGER_MAIL_LATEST.key())));
+    }
+
+    @Test
+    @DisplayName("Straftat-Verdacht: ein sehr unzufriedener, freiheitsliebender Dorfbewohner fällt irgendwann auf")
+    void crimeSuspicionEventuallyFires() {
+        ServerSettings base = CivServerFixture.SETTINGS;
+        CivServerFixture crimeServer = CivServerFixture.start(ids, new ServerSettings(base.ticksPerDay(),
+                base.claimBase(), base.claimPerMember(), base.currency(), base.priceReference(), base.villagerIncome(),
+                new ServerSettings.TierThresholds(500, 600, 700), base.web(), false));
+        VillagerService crimeVillagers = crimeServer.villagers();
+        crimeServer.commands().found(new Caller(alice, "Alice", pos(2, 2)), "Nordhain");
+        Caller mayor = new Caller(alice, "Alice", pos(2, 2));
+        crimeServer.commands().amendLaw(mayor, "sales_tax_percent", "90");
+        crimeServer.commands().amendLaw(mayor, "land_tax_per_block", "90");
+        crimeServer.commands().amendLaw(mayor, "explosions_allowed", "nein");
+        crimeServer.commands().amendLaw(mayor, "fire_spread_allowed", "nein");
+        List<PersonRef> candidates = new ArrayList<>();
+        for (int i = 0; i < 60; i++) {
+            PersonRef villager = new PersonRef(PersonId.generate(ids));
+            crimeVillagers.seen(villager, pos(2, 2), DAY);
+            candidates.add(villager);
+        }
+        crimeServer.takeAnnouncements();
+        boolean suspected = false;
+        for (long day = 1; day <= 120 && !suspected; day++) {
+            crimeVillagers.endOfDay(Day.of(day));
+            suspected = crimeServer.takeAnnouncements().stream()
+                    .anyMatch(a -> a.message().key().equals(MessageKey.VILLAGER_CRIME_SUSPECTED.key()));
+        }
+        assertTrue(suspected, "unter mindestens einem der sehr unzufriedenen, freiheitsliebenden Dorfbewohner "
+                + "sollte binnen 120 Tagen ein Verdacht aufkommen");
+    }
+
     private static BlockPosition pos(int x, int z) {
         return new BlockPosition(DimensionId.OVERWORLD, x, 64, z);
     }
