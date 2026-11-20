@@ -15,6 +15,7 @@ import de.etiennebader.civ.application.office.StandForElection;
 import de.etiennebader.civ.application.query.WorldQueries;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
+import de.etiennebader.civ.domain.population.VillagerIdentity;
 import de.etiennebader.civ.domain.actor.PlayerRef;
 import de.etiennebader.civ.domain.law.StandardParameters;
 import de.etiennebader.civ.domain.polity.Ballot;
@@ -251,9 +252,18 @@ public final class OfficeService {
     }
 
     private Reply voteByName(Caller caller, PolityView town, Election election, String candidateName) {
-        Optional<ActorRef> candidate = election.candidates().stream()
-                .filter(actor -> texts.actor(actor).equalsIgnoreCase(candidateName.strip()))
-                .findFirst();
+        String input = candidateName.strip();
+        List<ActorRef> matches = election.candidates().stream()
+                .filter(actor -> texts.actor(actor).equalsIgnoreCase(input)
+                        || actor instanceof PersonRef villager
+                        && VillagerIdentity.of(villager).registerNumber().equalsIgnoreCase(input))
+                .toList();
+        if (matches.size() > 1) {
+            String numbers = matches.stream().filter(PersonRef.class::isInstance).map(PersonRef.class::cast)
+                    .map(VillagerIdentity::of).map(VillagerIdentity::registerNumber).collect(Collectors.joining(", "));
+            return Reply.failure(Message.of(MessageKey.AMBIGUOUS_CANDIDATE, input, numbers));
+        }
+        Optional<ActorRef> candidate = matches.stream().findFirst();
         if (candidate.isEmpty()) {
             // Listenwahl: Die Stimme für eine Partei geht an ihren ersten Listenplatz und zählt für die ganze Liste.
             candidate = queries.polityNamed(candidateName.strip())
@@ -484,10 +494,8 @@ public final class OfficeService {
     private Optional<Map<String, Long>> tallyOf(RunElections.Outcome outcome) {
         Map<String, Long> totals = new LinkedHashMap<>();
         switch (outcome) {
-            case RunElections.Decided decided -> decided.count().totals()
-                    .forEach((candidate, votes) -> totals.merge(texts.actor(candidate), votes, Long::sum));
-            case RunElections.Runoff runoff -> runoff.count().totals()
-                    .forEach((candidate, votes) -> totals.merge(texts.actor(candidate), votes, Long::sum));
+            case RunElections.Decided decided -> addCandidateTallies(totals, decided.count().totals());
+            case RunElections.Runoff runoff -> addCandidateTallies(totals, runoff.count().totals());
             case RunElections.Seated seated -> seated.count().lists().forEach(list -> totals.merge(listName(list),
                     list.votes(), Long::sum));
             default -> {
@@ -495,6 +503,18 @@ public final class OfficeService {
             }
         }
         return Optional.of(totals);
+    }
+
+    private void addCandidateTallies(Map<String, Long> totals, Map<ActorRef, Long> candidates) {
+        Map<String, Long> frequency = candidates.keySet().stream()
+                .collect(Collectors.groupingBy(texts::actor, Collectors.counting()));
+        candidates.forEach((candidate, votes) -> {
+            String name = texts.actor(candidate);
+            if (frequency.get(name) > 1 && candidate instanceof PersonRef villager) {
+                name += " · " + VillagerIdentity.of(villager).registerNumber();
+            }
+            totals.put(name, votes);
+        });
     }
 
     private Map<String, Integer> seatsOf(RunElections.Outcome outcome) {

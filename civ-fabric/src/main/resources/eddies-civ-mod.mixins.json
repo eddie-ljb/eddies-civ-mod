@@ -6,7 +6,8 @@
 		"EndermanTakeBlockGoalMixin",
 		"FireBlockMixin",
 		"PistonStructureResolverMixin",
-		"ServerExplosionMixin"
+		"ServerExplosionMixin",
+		"VillagerNameMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

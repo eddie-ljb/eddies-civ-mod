@@ -34,6 +34,10 @@ Rezept: Eisen, Papier, Truhe (`III / IPI / ICI`).
 - **Eigenes Wappen, Wahlplakat oder Leuchtreklame hochladen:** Wer eine Gemeinde, ein Land, eine Nation oder einen Bund führt, kann zusätzlich zum Banner-Wappen ein selbst gemaltes Bild hochladen. Auf der Webseite in der Ansicht der jeweiligen Einheit: Reiter **Eigenes Bild** öffnen, Art wählen (Wappen, Wahlplakat oder Leuchtreklame), eine PNG-Datei (höchstens 128×128 Pixel) auswählen und hochladen. Ein neu hochgeladenes Wappen ersetzt das alte; von Wahlplakaten und Leuchtreklamen dürfen bis zu zehn gleichzeitig bestehen. Das Bild erscheint danach in der Webansicht der Einheit; eine Ingame-Darstellung auf einem eigenen Block ist als Folgeschritt vorgesehen (siehe `docs/issue-12-flaggen-banner.md`).
 
 ## Dorfbewohner: Interaktionsmenü
+Dorfbewohner haben einen stabilen Vor- und Nachnamen. Bei Namensgleichheit unterscheidet sie die eindeutige Registernummer `V-…`. Sie steht in der Auskunft und im Einwohnerregister (`/civ dorfbewohner register [Seite]`, englisch `/civ villager register [page]`). Das Register zeigt die Mitglieder der eigenen Gemeinde einschließlich ungeladener Dorfbewohner, aber keine Anschriften.
+
+Ein Minecraft-Namensschild überschreibt weiterhin den sichtbaren Minecraft-Namen, ändert aber weder die bürgerliche Identität noch die Registernummer. In Wahlbefehlen kann der vollständige Name in Anführungszeichen oder die Registernummer angegeben werden.
+
 Schleichen + Rechtsklick mit leerer Hand auf einen Dorfbewohner zeigt seine Auskunft (Name, Gemeinde, Persönlichkeit, Stimmung, Anschrift, Arbeitgeber, letzte Post). Darüber hinaus:
 - **Reden:** `/civ dorfbewohner reden <Thema>` (`greeting`, `weather`, `work`, `politics`) – die Antwort richtet sich nach seiner aktuellen Stimmung (zufrieden, gleichgültig, unzufrieden).
 - **Beeinflussen:** `/civ dorfbewohner beeinflussen` hebt die Stimmung des angesehenen bzw. nächsten Dorfbewohners ein wenig an – höchstens alle 3 Tage je Spieler-Dorfbewohner-Paar, sonst wirkt es nicht.

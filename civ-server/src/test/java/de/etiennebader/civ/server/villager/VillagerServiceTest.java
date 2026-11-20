@@ -4,6 +4,7 @@ import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.actor.PlayerRef;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.polity.SettlementTier;
+import de.etiennebader.civ.domain.population.VillagerIdentity;
 import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.PersonId;
 import de.etiennebader.civ.domain.shared.PlayerId;
@@ -15,6 +16,7 @@ import de.etiennebader.civ.server.Announcement;
 import de.etiennebader.civ.server.CivServerFixture;
 import de.etiennebader.civ.server.ServerSettings;
 import de.etiennebader.civ.server.command.Caller;
+import de.etiennebader.civ.server.command.Message;
 import de.etiennebader.civ.server.command.MessageKey;
 import de.etiennebader.civ.server.command.Reply;
 import org.junit.jupiter.api.DisplayName;
@@ -131,6 +133,31 @@ class VillagerServiceTest {
 
         PersonRef stranger = new PersonRef(PersonId.generate(ids));
         assertEquals(MessageKey.VILLAGER_HOMELESS.key(), villagers.describe(stranger).lines().getFirst().key());
+    }
+
+    @Test
+    @DisplayName("Gleiche Identität in Auskunft und Einwohnerregister; andere Gemeinden bleiben außen vor")
+    void residentRegisterUsesTheCivilIdentity() {
+        server.playerJoined(alice, "Alice");
+        found(alice, "Nordhain", 0);
+        found(bob, "Eichenfurt", 10);
+        Caller caller = new Caller(alice, "Alice", pos(2, 2));
+        PersonRef resident = new PersonRef(PersonId.generate(ids));
+        PersonRef visitor = new PersonRef(PersonId.generate(ids));
+        villagers.seen(resident, pos(2, 2), DAY);
+        villagers.seen(visitor, pos(163, 163), DAY);
+        VillagerIdentity identity = VillagerIdentity.of(resident);
+        Message row = Message.of(MessageKey.VILLAGER_IDENTITY, identity.fullName(), identity.registerNumber());
+
+        assertTrue(villagers.describe(resident).lines().contains(row));
+        Reply register = villagers.residentRegister(caller, 1);
+        assertTrue(register.success());
+        assertEquals(3, register.lines().size()); // Überschrift, Spieler und Dorfbewohner
+        assertTrue(register.lines().contains(row));
+        assertTrue(register.lines().contains(Message.of(MessageKey.VILLAGER_REGISTER_PLAYER, "Alice")));
+        assertFalse(villagers.residentRegister(caller, 2).success());
+        villagers.gone(resident, DAY);
+        assertFalse(villagers.residentRegister(caller, 1).lines().contains(row));
     }
 
     @Test
