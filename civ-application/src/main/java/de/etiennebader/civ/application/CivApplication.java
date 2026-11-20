@@ -43,7 +43,6 @@ import de.etiennebader.civ.application.office.PutUpPoster;
 import de.etiennebader.civ.application.office.RunElections;
 import de.etiennebader.civ.application.office.StandForElection;
 import de.etiennebader.civ.application.office.VillagerVoter;
-import de.etiennebader.civ.application.party.ChangePartyProfile;
 import de.etiennebader.civ.application.party.ChangePartyProgram;
 import de.etiennebader.civ.application.party.FoundParty;
 import de.etiennebader.civ.application.party.JoinParty;
@@ -133,7 +132,6 @@ public final class CivApplication {
     private final FoundParty foundParty;
     private final JoinParty joinParty;
     private final LeaveParty leaveParty;
-    private final ChangePartyProfile changePartyProfile;
     private final ChangePartyProgram changePartyProgram;
     private final MoveSeat moveSeat;
     private final OpenShop openShop;
@@ -234,7 +232,6 @@ public final class CivApplication {
         this.foundParty = new FoundParty(aggregates, ids);
         this.joinParty = new JoinParty(aggregates);
         this.leaveParty = new LeaveParty(aggregates, dissolvePolity);
-        this.changePartyProfile = new ChangePartyProfile(aggregates);
         this.changePartyProgram = new ChangePartyProgram(aggregates, ids, proposeMotion);
         this.moveSeat = new MoveSeat(aggregates);
         this.openShop = new OpenShop(aggregates);
@@ -425,10 +422,6 @@ public final class CivApplication {
 
     public LeaveParty leaveParty() {
         return leaveParty;
-    }
-
-    public ChangePartyProfile changePartyProfile() {
-        return changePartyProfile;
     }
 
     public ChangePartyProgram changePartyProgram() {

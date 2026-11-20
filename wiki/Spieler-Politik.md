@@ -50,6 +50,23 @@ Parteien sind Zusammenschlüsse von Personen (Spieler und Dorfbewohner) über al
 - **Befehle:** `/civ partei gruenden <ordnung|freiheit|steuern|ausbau|mitte> <Name>`, `beitreten <Name>`, `austreten`, `info [Name]`, `liste`, `menue`; nur der Vorsitz: `richtung <Ordnung> <Wirtschaft>`, `wappen`, `aufloesen`.
 - **Dorfbewohner:** treten täglich mit etwas Glück einer passenden Partei bei und verlassen sie, wenn sie sich zu weit entfernt. Finden sich genug Gleichgesinnte ohne passende Partei (`villager_party_founders`, Standard 5), gründen sie eine. Abschaltbar mit `villager_parties=false`.
 
+### Parteiprogramm: Abstimmung oder Vorsitz
+`/civ partei programmodus [abstimmung|vorsitz]` legt fest, wie künftige Änderungen an Richtung
+und Wappen entschieden werden (ohne Argument zeigt der Befehl nur den aktuellen Modus):
+- **Vorsitz** (Standard): wie bisher — der Vorsitz ändert `richtung`/`wappen` sofort, allein.
+- **Abstimmung**: jede Änderung wird zum Antrag, über den die Parteimitglieder mit Bürgerrecht
+  abstimmen (genau wie andere Rechtsänderungen). Reicht die eigene Stimme der/des
+  Antragstellenden schon für die Mehrheit, gilt sie sofort; sonst stimmen die übrigen Mitglieder
+  im Parteimenü oder mit `/civ abstimmen <Nr> ja|nein` noch mit ab.
+
+Das Parteiprogramm beeinflusst, wie Dorfbewohner als Abgeordnete im Parlament ihrer Gemeinde
+über Recht abstimmen: sie gewichten die Linie ihrer eigenen Partei mit in ihren Nutzen ein —
+aber nicht immer gleich stark. Wie treu ein Dorfbewohner der Parteilinie folgt, hängt von seiner
+*Heimatverbundenheit* ab (derselben Persönlichkeitsachse, die auch Zufriedenheit mit dem
+Amtsinhaber und Abwanderung beeinflusst): treue Dorfbewohner folgen dem Programm fast
+vollständig, weniger treue nur teilweise und richten sich stärker nach ihrer eigenen
+Persönlichkeit.
+
 ## Parlament
 Gemeinden und Bünde können ein Parlament haben; `parliament_seats` (0–99, Verfassungsartikel) legt die Sitzzahl fest, 0 = kein Parlament.
 - **Wahl:** automatisch am Tagesende, wenn Sitze vorgesehen sind und keins sitzt (oder die Wahlperiode um ist); per Hand `/civ wahl ausrufen parlament`.

@@ -98,8 +98,7 @@ public final class PersonalityVoter implements VillagerVoter {
             default -> PlatformAffinity.of(platform, personality);
         };
         double mood = satisfaction.score() / 100.0;
-        double loyalty = 0.6 + personality.belonging() / 333.0;
-        double incumbency = incumbent ? mood * loyalty : Math.max(0, -mood) * 0.4;
+        double incumbency = incumbent ? mood * personality.loyalty() : Math.max(0, -mood) * 0.4;
         return programme + incumbency + noise(villager, candidate);
     }
 
