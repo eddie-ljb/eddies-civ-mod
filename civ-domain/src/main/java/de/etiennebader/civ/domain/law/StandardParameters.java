@@ -119,6 +119,21 @@ public final class StandardParameters {
             ParameterKey.of("ballot_box_required", Boolean.class, false);
 
     /**
+     * Wie viele Tage ein Antrag mindestens offen sein muss, bevor im Parlament darüber abgestimmt wird; verhindert,
+     * dass ein Antrag noch am Tag seiner Stellung entschieden wird, bevor Spieler mitstimmen konnten.
+     */
+    public static final ParameterKey<Long> PARLIAMENT_MOTION_MIN_OPEN_DAYS =
+            ParameterKey.constrained("parliament_motion_min_open_days", Long.class, 1L, days -> days >= 0 && days <= 30);
+
+    /**
+     * Ob das Ergebnis einer Abstimmung erst verkündet wird, nachdem alle Stimmberechtigten (Abgeordnete bzw. Bürger)
+     * abgestimmt haben, statt schon bei rechnerisch sicherer Mehrheit. Die Frist ({@link #VOTE_DAYS}) zählt trotzdem
+     * aus, falls nicht alle abstimmen.
+     */
+    public static final ParameterKey<Boolean> FULL_TURNOUT_REQUIRED =
+            ParameterKey.of("full_turnout_required", Boolean.class, false);
+
+    /**
      * Alle wie viele Tage das Parlament tagt: Nur an Sitzungstagen stimmen Dorfbewohner-Abgeordnete ab, stellen Anträge
      * und werden fällige Anträge ausgezählt.
      */
@@ -196,6 +211,7 @@ public final class StandardParameters {
                 FIRE_SPREAD_ALLOWED, LAWS_BY_VOTE, VOTE_DAYS, SALES_TAX_PERCENT, TERM_DAYS, ELECTION_DAYS,
                 VILLAGER_VOTE_PERCENT, AMENDMENT_MAJORITY_PERCENT, FEDERAL_LAW_PREVAILS, PVP_ALLOWED, HOSTILE_MOBS_ALLOWED,
                 OUTSIDERS_MAY_HURT_ANIMALS, FEDERAL_LEVY_PERCENT, PARLIAMENT_SEATS, SESSION_DAYS, BALLOT_BOX_REQUIRED,
+                PARLIAMENT_MOTION_MIN_OPEN_DAYS, FULL_TURNOUT_REQUIRED,
                 POSTAL_VOTE_ALLOWED, OFFICE_SALARY, OFFICE_VOTING, PARLIAMENT_VOTING, BALLOT_TYPE, THRESHOLD_PERCENT,
                 TERM_LIMIT, COMPULSORY_VOTING, VOTING_FINE, ELECTION_DEBATES, PRESS_FREEDOM, JURY_SIZE, MAX_FINE,
                 EXILE_ALLOWED, COURT_FEE);

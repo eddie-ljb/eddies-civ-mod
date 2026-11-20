@@ -65,6 +65,22 @@ public final class CivicUseCases {
         return updated;
     }
 
+    public Constituency removeArea(ActorRef head, PolityId polity, String name, Area area, Day day) {
+        requireReshapable(head, polity);
+        CivicRegistry registry = aggregates.civic();
+        Constituency updated = registry.removeArea(require(registry, polity, name).id(), area, day);
+        aggregates.commit(registry);
+        return updated;
+    }
+
+    public Constituency removeTown(ActorRef head, PolityId polity, String name, PolityId town, Day day) {
+        requireReshapable(head, polity);
+        CivicRegistry registry = aggregates.civic();
+        Constituency updated = registry.removeTown(require(registry, polity, name).id(), town, day);
+        aggregates.commit(registry);
+        return updated;
+    }
+
     public void remove(ActorRef head, PolityId polity, String name, Day day) {
         requireReshapable(head, polity);
         CivicRegistry registry = aggregates.civic();

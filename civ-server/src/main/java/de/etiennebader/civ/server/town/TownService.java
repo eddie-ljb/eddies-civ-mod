@@ -24,6 +24,7 @@ import de.etiennebader.civ.server.command.MessageKey;
 import de.etiennebader.civ.server.command.Reply;
 import de.etiennebader.civ.server.command.Texts;
 import de.etiennebader.civ.server.command.TranslationKeys;
+import de.etiennebader.civ.server.level.TerritoryColor;
 import de.etiennebader.civ.server.territory.Relation;
 import de.etiennebader.civ.server.territory.TerritoryWatcher;
 
@@ -145,6 +146,15 @@ public final class TownService {
 
     /** Karte der Chunks um den Spieler; {@code width} und {@code height} sollten ungerade sein. */
     public ChunkMap map(Caller caller, int width, int height) {
+        return map(caller, width, height, Optional.empty());
+    }
+
+    /**
+     * Wie oben, aber die Farbgruppe jedes Feldes richtet sich nach {@code level} statt nach der höchsten Ebene; siehe
+     * {@link de.etiennebader.civ.server.level.TerritoryColor}.
+     */
+    public ChunkMap map(Caller caller, int width, int height, Optional<String> level) {
+        Objects.requireNonNull(level, "level");
         ChunkCoord center = caller.chunk();
         TerritoryView land = queries.territory();
         List<MapCell> cells = new ArrayList<>(width * height);
@@ -154,8 +164,11 @@ public final class TownService {
                         center.z() + row - height / 2);
                 Optional<Claim> claim = land.claimAt(chunk);
                 Relation relation = territory.relation(caller.player(), claim.map(Claim::polity));
+                Optional<String> group = claim.flatMap(found -> queries.polity(found.polity()))
+                        .map(owner -> TerritoryColor.groupOf(owner, queries.ancestorsOf(owner.id()), level)
+                                .value().toString());
                 cells.add(new MapCell(chunk, relation, claim.map(found -> texts.polityName(found.polity())),
-                        claim.map(Claim::type), chunk.equals(center)));
+                        claim.map(Claim::type), chunk.equals(center), group));
             }
         }
         return new ChunkMap(width, height, cells);
