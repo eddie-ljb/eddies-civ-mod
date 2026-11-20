@@ -166,6 +166,52 @@ public final class CivilService {
         return app.addresses().at(position).map(Address::line);
     }
 
+    public enum SignType { STREET, HOUSE, TOWN, COUNTRY, NATION }
+
+    /** Automatische Beschriftung am Aufstellort. Ein Spielertext hat beim Platzieren Vorrang. */
+    public List<String> signLines(SignType type, BlockPosition position) {
+        Optional<PolityView> owner = queries.territory().claimAt(position.chunk())
+                .flatMap(claim -> queries.polity(claim.polity()));
+        if (owner.isEmpty()) {
+            return List.of();
+        }
+        PolityView town = owner.orElseThrow();
+        if (type == SignType.HOUSE) {
+            return app.addresses().at(position).map(address -> List.of(Integer.toString(address.number())))
+                    .orElse(List.of());
+        }
+        if (type == SignType.STREET) {
+            Optional<String> onStreet = town.streets().stream()
+                    .filter(street -> street.area().contains(position.dimension(), position.x(), position.z()))
+                    .map(Street::name).findFirst();
+            return onStreet.or(() -> app.addresses().at(position).map(Address::street)).map(List::of)
+                    .orElse(List.of());
+        }
+        List<PolityView> ancestors = queries.ancestorsOf(town.id());
+        Optional<String> land = ancestors.stream().filter(polity -> polity.level().equals("land"))
+                .map(polity -> "Land: " + polity.name().value()).findFirst();
+        Optional<String> nation = ancestors.stream().filter(polity -> polity.level().equals("nation"))
+                .map(polity -> "Nation: " + polity.name().value()).findFirst();
+        List<String> lines = new ArrayList<>();
+        if (type == SignType.TOWN) {
+            String tier = switch (town.tier()) {
+                case MUNICIPALITY -> "Gemeinde";
+                case MARKET_TOWN -> "Marktgemeinde";
+                case CITY -> "Stadt";
+                case METROPOLIS -> "Metropole";
+            };
+            lines.add(tier + ": " + town.name().value());
+        }
+        if (type == SignType.COUNTRY && land.isEmpty()) {
+            return List.of();
+        }
+        if (type != SignType.NATION) {
+            land.ifPresent(lines::add);
+        }
+        nation.ifPresent(lines::add);
+        return List.copyOf(lines);
+    }
+
     // ---- Verträge ----
 
     /** Verträge eines Spielers und der Polities, die er führt, die neuesten zuerst. */

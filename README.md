@@ -206,6 +206,7 @@ Im Gemeindegebiet gilt Folgendes, solange das Recht nichts anderes erlaubt:
 - Bürgermeister oder Bauamt markieren eine Straße mit dem Grundstücksstab (zwei Ecken) und legen sie mit `/civ strasse anlegen <Name>` an; `aufheben <Name>` und `liste` gibt es auch.
 - Jede Gemeinde hat eine feste Postleitzahl. Grundstücke bis 12 Blöcke neben einer Straße bekommen Hausnummern: ungerade auf der einen, gerade auf der anderen Seite, aufsteigend entlang der Straße.
 - `/civ adresse [Spieler]` zeigt die Anschrift (Wohngrundstück, sonst gemietetes, sonst eigenes Grundstück); `/civ adressen` listet die Straßen der Gemeinde. Dorfbewohner nennen ihre Anschrift beim Anklicken.
+- Aufstellbare Schilder zeigen Straßenname, Hausnummer oder Gebietsdaten direkt auf dem Block. Ein Amboss-Name überschreibt die automatische Beschriftung; `|` trennt bis zu drei Zeilen auf Orts-, Länder- und Nationenschildern.
 
 ### Verträge
 `/civ vertrag` (oder Gemeindehaus → Verträge, oder die Webseite) verwaltet alle Verträge. Ein Angebot gilt, sobald die Gegenseite unterschreibt; für eine Gemeinde unterschreibt der Bürgermeister.

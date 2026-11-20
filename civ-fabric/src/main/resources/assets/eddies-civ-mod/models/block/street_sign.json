@@ -1,8 +1,6 @@
 {
-  "parent": "minecraft:block/cube_bottom_top",
+  "parent": "eddies-civ-mod:block/label_street",
   "textures": {
-    "top": "eddies-civ-mod:block/street_sign_top",
-    "side": "eddies-civ-mod:block/street_sign_side",
-    "bottom": "eddies-civ-mod:block/street_sign_bottom"
+    "front": "eddies-civ-mod:block/street_sign_face"
   }
 }

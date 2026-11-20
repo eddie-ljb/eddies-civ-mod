@@ -1,0 +1,15 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": { "particle": "#front", "edge": "minecraft:block/iron_block" },
+  "elements": [
+    {
+      "from": [3, 4, 0], "to": [13, 12, 2],
+      "faces": {
+        "north": { "texture": "#edge" },
+        "south": { "texture": "#front", "uv": [0, 0, 16, 16] },
+        "east": { "texture": "#edge" }, "west": { "texture": "#edge" },
+        "up": { "texture": "#edge" }, "down": { "texture": "#edge" }
+      }
+    }
+  ]
+}

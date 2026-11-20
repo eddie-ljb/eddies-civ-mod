@@ -3,6 +3,7 @@ package de.etiennebader.civ.fabric;
 import de.etiennebader.civ.domain.protection.Hazard;
 import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.server.CivServer;
+import de.etiennebader.civ.server.civil.CivilService.SignType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
@@ -84,6 +85,10 @@ public final class WorldHooks {
         }
         return current().map(civ -> civ.queries().territory().claimAt(Players.position(level, pos).chunk()).isPresent())
                 .orElse(false);
+    }
+
+    public static List<String> signLines(Level level, BlockPos pos, SignType type) {
+        return current().map(civ -> civ.civil().signLines(type, Players.position(level, pos))).orElse(List.of());
     }
 
     private static Optional<CivServer> current() {
