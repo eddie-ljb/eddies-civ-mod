@@ -118,15 +118,29 @@ public interface PolityView {
      * Dorfbewohner ist. So hat auch eine Gemeinde ohne Wahl immer einen Bürgermeister, anfangs den Gründer.
      */
     default Optional<ActorRef> mayor() {
+        return mayor(false);
+    }
+
+    /**
+     * Wie {@link #mayor()}, aber mit {@code villagerPolitics}: ist das Amt frei und auch kein Bürger, der kein
+     * Dorfbewohner ist, vorhanden, regiert kommissarisch der dienstälteste Dorfbewohner unter den Bürgern. So
+     * können Gemeinden ohne Spieler sich selbst regieren, wenn {@code villager_politics_enabled} gesetzt ist.
+     */
+    default Optional<ActorRef> mayor(boolean villagerPolitics) {
         Optional<ActorRef> elected = officeTerm(Office.MAYOR).map(OfficeTerm::holder);
         if (elected.isPresent()) {
             return elected;
         }
-        return members().stream()
+        List<ActorRef> citizens = members().stream()
                 .filter(membership -> membership.type() == MembershipType.CITIZEN)
                 .map(Membership::member)
-                .filter(member -> !(member instanceof PersonRef))
+                .toList();
+        Optional<ActorRef> nonVillager = citizens.stream().filter(member -> !(member instanceof PersonRef))
                 .findFirst();
+        if (nonVillager.isPresent() || !villagerPolitics) {
+            return nonVillager;
+        }
+        return citizens.stream().filter(PersonRef.class::isInstance).findFirst();
     }
 
     /** Ob der Akteur dieses Amt innehat; für {@link Office#MAYOR} gilt {@link #mayor()}. */

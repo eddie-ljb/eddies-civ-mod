@@ -25,20 +25,23 @@ import java.util.Objects;
  * @param tiers          ab wie vielen Einwohnern eine Gemeinde welche Stufe erreicht
  * @param web            die eingebettete Webseite
  * @param emigration     ob sehr unzufriedene Dorfbewohner ihre Gemeinde verlassen
+ * @param villagerPolitics ob Dorfbewohner ohne Spieler-Bürgermeister kommissarisch regieren, Bünde gründen/beitreten
+ *                         und Firmen gründen dürfen
  * @param levels         politische Ebenen, auf denen Bünde gegründet werden können
  * @param parties        ob und ab wie vielen Gleichgesinnten Dorfbewohner Parteien gründen
  * @param show           Inszenierung: Live-Auszählung, Debatten, Hymnen, Weltkarte
  */
 public record ServerSettings(long ticksPerDay, int claimBase, int claimPerMember, CurrencyId currency,
                              Money priceReference, Money villagerIncome, TierThresholds tiers, WebSettings web,
-                             boolean emigration, Levels levels, PartySettings parties, ShowSettings show) {
+                             boolean emigration, boolean villagerPolitics, Levels levels, PartySettings parties,
+                             ShowSettings show) {
 
     /** Mit Standard-Inszenierung. */
     public ServerSettings(long ticksPerDay, int claimBase, int claimPerMember, CurrencyId currency,
                           Money priceReference, Money villagerIncome, TierThresholds tiers, WebSettings web,
                           boolean emigration, Levels levels, PartySettings parties) {
         this(ticksPerDay, claimBase, claimPerMember, currency, priceReference, villagerIncome, tiers, web, emigration,
-                levels, parties, ShowSettings.DEFAULT);
+                true, levels, parties, ShowSettings.DEFAULT);
     }
 
     /**
@@ -75,7 +78,7 @@ public record ServerSettings(long ticksPerDay, int claimBase, int claimPerMember
                           Money priceReference, Money villagerIncome, TierThresholds tiers, WebSettings web,
                           boolean emigration, Levels levels) {
         this(ticksPerDay, claimBase, claimPerMember, currency, priceReference, villagerIncome, tiers, web, emigration,
-                levels, PartySettings.DEFAULT);
+                true, levels, PartySettings.DEFAULT, ShowSettings.DEFAULT);
     }
 
     /**
@@ -100,7 +103,7 @@ public record ServerSettings(long ticksPerDay, int claimBase, int claimPerMember
                           Money priceReference, Money villagerIncome, TierThresholds tiers, WebSettings web,
                           boolean emigration) {
         this(ticksPerDay, claimBase, claimPerMember, currency, priceReference, villagerIncome, tiers, web, emigration,
-                Levels.DEFAULT);
+                true, Levels.DEFAULT, PartySettings.DEFAULT, ShowSettings.DEFAULT);
     }
 
     /** Mit Abwanderung. */
@@ -187,7 +190,7 @@ public record ServerSettings(long ticksPerDay, int claimBase, int claimPerMember
         ServerSettings defaults = defaults();
         return new ServerSettings(ticksPerDay, defaults.claimBase(), defaults.claimPerMember(), defaults.currency(),
                 defaults.priceReference(), defaults.villagerIncome(), defaults.tiers(), defaults.web().disabled(),
-                defaults.emigration(), defaults.levels(), defaults.parties(),
+                defaults.emigration(), defaults.villagerPolitics(), defaults.levels(), defaults.parties(),
                 new ShowSettings(false, 60, true, 5, false, false, 6));
     }
 

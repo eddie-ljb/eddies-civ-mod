@@ -3,6 +3,7 @@ package de.etiennebader.civ.server.villager;
 import de.etiennebader.civ.application.CivApplication;
 import de.etiennebader.civ.application.economy.CreditTownIncome;
 import de.etiennebader.civ.application.party.LeaveParty;
+import de.etiennebader.civ.application.polity.AmendLaw;
 import de.etiennebader.civ.application.polity.ChangeTier;
 import de.etiennebader.civ.application.polity.JoinPolity;
 import de.etiennebader.civ.application.polity.LeavePolity;
@@ -16,6 +17,7 @@ import de.etiennebader.civ.domain.contract.Contract;
 import de.etiennebader.civ.domain.contract.ContractKind;
 import de.etiennebader.civ.domain.polity.Membership;
 import de.etiennebader.civ.domain.polity.MembershipType;
+import de.etiennebader.civ.domain.polity.Motion;
 import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.polity.SettlementTier;
@@ -260,7 +262,36 @@ public final class VillagerService {
         if (settings.emigration()) {
             emigrate(day);
         }
+        if (settings.villagerPolitics()) {
+            governAutonomously(day);
+        }
         return changes;
+    }
+
+    /**
+     * Gemeinden ohne Spieler-Bürgermeister regiert kommissarisch der dienstälteste Dorfbewohner-Bürger
+     * ({@link PolityView#mayor(boolean)}); er ändert das Recht, so wie es {@link CivApplication#villagerLegislator()}
+     * für ihn vorschlägt, genau wie ein Dorfbewohner-Abgeordneter im Parlament einen Antrag stellen würde. Nur eine
+     * Änderung je Gemeinde und Tag, damit das Recht nicht täglich hin- und herspringt.
+     */
+    private void governAutonomously(Day day) {
+        for (PolityView town : queries.polities()) {
+            if (town.kind() != PolityKind.TERRITORIAL) {
+                continue;
+            }
+            if (!(town.mayor(true).orElse(null) instanceof PersonRef villagerMayor)) {
+                continue;
+            }
+            app.villagerLegislator().propose(villagerMayor, town).ifPresent(motion -> {
+                if (motion instanceof Motion.Change change) {
+                    try {
+                        app.amendLaw().execute(new AmendLaw.Command(town.id(), villagerMayor, change.change(), day));
+                    } catch (DomainException e) {
+                        // Verfassungsartikel oder tagende Parlamente entscheiden anders; dann bleibt es beim Status quo.
+                    }
+                }
+            });
+        }
     }
 
     /**

@@ -234,6 +234,7 @@ public final class CivServer {
         offices.endOfDay(day);
         parties.endOfDay(day);
         villagers.endOfDay(day);
+        federations.autoDecideInvitations(day, settings.villagerPolitics());
         campaigns.endOfDay(day);
         civil.endOfDay(day);
         justice.endOfDay(day);
