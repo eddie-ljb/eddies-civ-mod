@@ -22,6 +22,7 @@ public final class CivicRegistry extends AggregateRoot<CivicEvent> implements Ci
     private final List<Constituency> constituencies = new ArrayList<>();
     private final Map<PolityId, Flag> flags = new LinkedHashMap<>();
     private final Map<PolityId, Anthem> anthems = new LinkedHashMap<>();
+    private final Map<String, CustomImage> images = new LinkedHashMap<>();
 
     private CivicRegistry() {
     }
@@ -32,10 +33,16 @@ public final class CivicRegistry extends AggregateRoot<CivicEvent> implements Ci
 
     public static CivicRegistry restore(Collection<Constituency> constituencies, Map<PolityId, Flag> flags,
                                         Map<PolityId, Anthem> anthems) {
+        return restore(constituencies, flags, anthems, Map.of());
+    }
+
+    public static CivicRegistry restore(Collection<Constituency> constituencies, Map<PolityId, Flag> flags,
+                                        Map<PolityId, Anthem> anthems, Map<String, CustomImage> images) {
         CivicRegistry registry = new CivicRegistry();
         registry.constituencies.addAll(constituencies);
         registry.flags.putAll(flags);
         registry.anthems.putAll(anthems);
+        registry.images.putAll(images);
         return registry;
     }
 
@@ -99,6 +106,9 @@ public final class CivicRegistry extends AggregateRoot<CivicEvent> implements Ci
         own.forEach(constituency -> remove(constituency.id(), day));
         boolean symbols = flags.remove(polity) != null;
         symbols |= anthems.remove(polity) != null;
+        List<String> ownImages = imagesOf(polity).stream().map(CustomImage::id).toList();
+        ownImages.forEach(images::remove);
+        symbols |= !ownImages.isEmpty();
         if (symbols) {
             raise(new CivicEvent.SymbolChanged(polity, "all", day));
         }
@@ -134,6 +144,43 @@ public final class CivicRegistry extends AggregateRoot<CivicEvent> implements Ci
         raise(new CivicEvent.SymbolChanged(polity, "anthem", day));
     }
 
+    /**
+     * Hinterlegt ein hochgeladenes Bild. Ein neues Wappen ersetzt ein etwaiges altes; von anderen Arten
+     * (Wahlplakat, Leuchtreklame) sind bis zu {@link CustomImage#MAX_PER_KIND} gleichzeitig erlaubt.
+     *
+     * @return die bei einem Wappen-Wechsel verdrängten Bilder, deren Dateien der Aufrufer aufräumen sollte
+     */
+    public List<CustomImage> addImage(String id, PolityId polity, ImageKind kind, String hash, int width, int height,
+                                      Day day) {
+        Objects.requireNonNull(day, "day");
+        List<CustomImage> displaced;
+        if (kind == ImageKind.WAPPEN) {
+            displaced = imagesOf(polity, kind);
+            displaced.forEach(image -> images.remove(image.id()));
+        } else {
+            List<CustomImage> existing = imagesOf(polity, kind);
+            if (existing.size() >= CustomImage.MAX_PER_KIND) {
+                throw new IllegalStateException(
+                        "Höchstens " + CustomImage.MAX_PER_KIND + " Bilder der Art " + kind + " je Polity");
+            }
+            displaced = List.of();
+        }
+        images.put(id, new CustomImage(id, polity, kind, hash, width, height, day));
+        raise(new CivicEvent.SymbolChanged(polity, "image:" + kind.name().toLowerCase(java.util.Locale.ROOT), day));
+        return displaced;
+    }
+
+    /** @return das entfernte Bild, falls es die angegebene Kennung gab */
+    public Optional<CustomImage> removeImage(String id, Day day) {
+        CustomImage removed = images.remove(id);
+        if (removed == null) {
+            return Optional.empty();
+        }
+        raise(new CivicEvent.SymbolChanged(removed.polity(),
+                "image:" + removed.kind().name().toLowerCase(java.util.Locale.ROOT), day));
+        return Optional.of(removed);
+    }
+
     @Override
     public List<Constituency> constituencies() {
         return List.copyOf(constituencies);
@@ -147,5 +194,10 @@ public final class CivicRegistry extends AggregateRoot<CivicEvent> implements Ci
     @Override
     public Map<PolityId, Anthem> anthems() {
         return Map.copyOf(anthems);
+    }
+
+    @Override
+    public Map<String, CustomImage> images() {
+        return Map.copyOf(images);
     }
 }
