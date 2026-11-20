@@ -39,6 +39,14 @@ public final class TranslationKeys {
     public static final String MOTION_ENACT = PREFIX + "motion.enact";
     /** Vorschlag „aufheben“. */
     public static final String MOTION_REPEAL = PREFIX + "motion.repeal";
+    /** Gegenstand eines Antrags auf Änderung des Parteiprogramms. */
+    public static final String MOTION_PARTY_PROGRAM = PREFIX + "motion.party_program";
+    /** Vorschlag „neues Programm“. */
+    public static final String MOTION_PARTY_PROGRAM_VALUE = PREFIX + "motion.party_program_value";
+    /** Programmänderungen laufen über Abstimmung. */
+    public static final String PROGRAM_MODE_VOTE = PREFIX + "program_mode.vote";
+    /** Programmänderungen entscheidet der Vorsitz allein. */
+    public static final String PROGRAM_MODE_CHAIR = PREFIX + "program_mode.chair";
 
     private TranslationKeys() {
     }
@@ -137,7 +145,8 @@ public final class TranslationKeys {
                         Levels.DEFAULT.all().stream().map(level -> Level.translationKey(level.id())),
                         Stream.of(yesNo(true), yesNo(false)),
                         Stream.of(currency(CurrencyId.EMERALD), MONEY, MONEY_AMOUNT, FEDERATION_HEAD, MOTION_PARAGRAPH,
-                                MOTION_ENACT, MOTION_REPEAL))
+                                MOTION_ENACT, MOTION_REPEAL, MOTION_PARTY_PROGRAM, MOTION_PARTY_PROGRAM_VALUE,
+                                PROGRAM_MODE_VOTE, PROGRAM_MODE_CHAIR))
                 .flatMap(keys -> keys)
                 .sorted()
                 .toList();

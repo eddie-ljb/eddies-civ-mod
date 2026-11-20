@@ -53,6 +53,7 @@ final class EnglishCommands {
             Map.entry("menue", "menu"), Map.entry("miete", "lease"), Map.entry("misstrauen", "distrust"),
             Map.entry("nachricht", "message"), Map.entry("nein", "no"), Map.entry("parlament", "parliament"),
             Map.entry("partei", "party"), Map.entry("plaedoyer", "plead"), Map.entry("post", "mail"),
+            Map.entry("programmodus", "programmode"),
             Map.entry("praeambel", "preamble"), Map.entry("preis", "price"), Map.entry("pruefen", "check"),
             Map.entry("recht", "rules"), Map.entry("redakteur", "editor"), Map.entry("rede", "speech"),
             Map.entry("richter", "judge"), Map.entry("richtung", "direction"), Map.entry("schliessen", "close"),
