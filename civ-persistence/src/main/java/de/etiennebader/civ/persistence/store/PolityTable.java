@@ -534,15 +534,18 @@ final class PolityTable {
 
     private static final String PARTY_PROGRAM_KIND = "PARTY_PROGRAM";
 
-    /** Kodiert ein Parteiprogramm für die Antrags-Textspalte: {@code order|economy|emblem|mode}. */
+    /** Kodiert ein Parteiprogramm für die Antrags-Textspalte: {@code order|economy|emblem|mode|area}. */
     private static String encodeProfile(PartyProfile profile) {
-        return profile.order() + "|" + profile.economy() + "|" + profile.emblem() + "|" + profile.mode().name();
+        return profile.order() + "|" + profile.economy() + "|" + profile.emblem() + "|" + profile.mode().name()
+                + "|" + profile.area().map(id -> id.value().toString()).orElse("");
     }
 
     private static PartyProfile decodeProfile(String encoded) {
-        String[] parts = encoded.split("\\|", 4);
+        String[] parts = encoded.split("\\|", 5);
+        Optional<PolityId> area = parts.length > 4 && !parts[4].isBlank()
+                ? Optional.of(new PolityId(UUID.fromString(parts[4]))) : Optional.empty();
         return new PartyProfile(Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), parts[2],
-                ProgramMode.valueOf(parts[3]));
+                ProgramMode.valueOf(parts[3]), area);
     }
 
     private static void insertProposals(Connection connection, String polityId, List<Proposal> proposals)

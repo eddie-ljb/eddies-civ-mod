@@ -33,7 +33,7 @@ class PartyProfileTest {
     @Test
     @DisplayName("with*-Methoden ändern nur das jeweilige Feld")
     void withMethodsChangeOnlyThatField() {
-        PartyProfile profile = new PartyProfile(50, -20, "minecraft:red_banner", ProgramMode.VOTE);
+        PartyProfile profile = new PartyProfile(50, -20, "minecraft:red_banner").withMode(ProgramMode.VOTE);
 
         PartyProfile redirected = profile.withDirection(-10, 10);
         assertEquals(-10, redirected.order());

@@ -23,6 +23,7 @@ import de.etiennebader.civ.domain.polity.ElectionResult;
 import de.etiennebader.civ.domain.polity.MembershipType;
 import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.OfficeTerm;
+import de.etiennebader.civ.domain.polity.PartyProfile;
 import de.etiennebader.civ.domain.polity.Platform;
 import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.polity.PolityView;
@@ -229,8 +230,14 @@ public final class OfficeService {
     }
 
     private Reply stand(Caller caller, PolityView town, Election election, Platform chosen) {
-        Platform platform = chosen != Platform.NONE ? chosen : queries.partyOf(caller.player())
+        Optional<PolityView> party = queries.partyOf(caller.player());
+        Platform platform = chosen != Platform.NONE ? chosen : party
                 .flatMap(PolityView::partyProfile).map(profile -> profile.platform()).orElse(Platform.NONE);
+        Optional<PolityId> area = party.flatMap(PolityView::partyProfile).flatMap(PartyProfile::area);
+        if (area.isPresent() && !withinPartyArea(town.id(), area.get())) {
+            return Reply.failure(Message.of(MessageKey.CANDIDACY_OUTSIDE_PARTY_AREA, party.get().name().value(),
+                    texts.polityName(area.get())));
+        }
         return attempt(() -> {
             app.standForElection().execute(new StandForElection.Command(town.id(), election.id(), caller.player(),
                     platform, calendar.today()));
@@ -240,6 +247,15 @@ public final class OfficeService {
                     office, programme)));
             return Reply.success(Message.of(MessageKey.CANDIDACY_DECLARED, office, programme));
         });
+    }
+
+    /**
+     * Ob {@code electionPolity} innerhalb des Geltungsgebiets {@code partyArea} liegt (#7): die Polity der Wahl
+     * selbst, oder eine ihrer untergeordneten Glieder (z. B. Partei-Gebiet Land, Wahl in einer seiner Gemeinden).
+     */
+    private boolean withinPartyArea(PolityId electionPolity, PolityId partyArea) {
+        return electionPolity.equals(partyArea)
+                || queries.ancestorsOf(electionPolity).stream().anyMatch(ancestor -> ancestor.id().equals(partyArea));
     }
 
     /** {@code /civ wahl stimmen <Amt> <Spieler>} */

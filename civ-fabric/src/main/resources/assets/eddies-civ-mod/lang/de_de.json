@@ -329,6 +329,7 @@
   "eddies-civ-mod.command.candidacy_announced": "%s kandidiert für das Amt %s (%s).",
   "eddies-civ-mod.command.ballot_cast": "Deine Stimme für %s: %s. Du kannst sie bis zum Ende der Wahl ändern.",
   "eddies-civ-mod.command.no_election_for": "Für das Amt %s läuft keine Wahl.",
+  "eddies-civ-mod.command.candidacy_outside_party_area": "Deine Partei %s ist nur in %s wählbar, nicht hier.",
   "eddies-civ-mod.command.unknown_candidate": "%s kandidiert nicht als %s.",
   "eddies-civ-mod.command.unknown_office": "Unbekanntes Amt „%s“. Ämter: buergermeister, schatzmeister, bauamt.",
   "eddies-civ-mod.command.election_won": "%s hat gewählt: %s übernimmt das Amt %s. Ergebnis: %s",
