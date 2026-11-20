@@ -2,8 +2,9 @@ package de.etiennebader.civ.server.party;
 
 import de.etiennebader.civ.application.CivApplication;
 import de.etiennebader.civ.application.day.Calendar;
+import de.etiennebader.civ.application.party.ChangePartyProgram;
 import de.etiennebader.civ.application.directory.PlayerDirectory;
-import de.etiennebader.civ.application.party.ChangePartyProfile;
+import de.etiennebader.civ.application.party.*;
 import de.etiennebader.civ.application.party.FoundParty;
 import de.etiennebader.civ.application.party.JoinParty;
 import de.etiennebader.civ.application.party.LeaveParty;
@@ -24,6 +25,7 @@ import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.PartyList;
 import de.etiennebader.civ.domain.polity.PartyProfile;
 import de.etiennebader.civ.domain.polity.Platform;
+import de.etiennebader.civ.domain.polity.ProgramMode;
 import de.etiennebader.civ.domain.polity.PolityName;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.shared.CurrencyId;
@@ -375,10 +377,39 @@ public final class PartyService {
         return name;
     }
 
+    /** {@code /civ partei programmodus [abstimmung|vorsitz]}: ohne Argument zeigt es den aktuellen Modus. */
+    public Reply programMode(Caller caller, Optional<ProgramMode> mode) {
+        return withOwnParty(caller, party -> {
+            ProgramMode current = party.partyProfile().orElseThrow().mode();
+            if (mode.isEmpty()) {
+                return Reply.success(Message.of(MessageKey.PARTY_PROGRAM_MODE_INFO, party.name().value(),
+                        Message.of(modeWord(current))));
+            }
+            PartyProfile profile = party.partyProfile().orElseThrow().withMode(mode.get());
+            return attempt(() -> {
+                if (!party.holds(caller.player(), Office.MAYOR)) {
+                    return Reply.failure(Message.of(MessageKey.NOT_PARTY_HEAD));
+                }
+                app.changePartyProgram().execute(new ChangePartyProgram.Command(
+                        party.id(), caller.player(), profile, calendar.today()));
+                return Reply.success(Message.of(MessageKey.PARTY_PROGRAM_MODE_SET, party.name().value(),
+                        Message.of(modeWord(mode.get()))));
+            });
+        });
+    }
+
+    private static String modeWord(ProgramMode mode) {
+        return mode == ProgramMode.VOTE ? TranslationKeys.PROGRAM_MODE_VOTE : TranslationKeys.PROGRAM_MODE_CHAIR;
+    }
+
     private Reply change(Caller caller, PolityView party, PartyProfile profile, Message success) {
         return attempt(() -> {
-            app.changePartyProfile().execute(new ChangePartyProfile.Command(party.id(), caller.player(), profile,
-                    calendar.today()));
+            ChangePartyProgram.Result result = app.changePartyProgram().execute(
+                    new ChangePartyProgram.Command(party.id(), caller.player(), profile, calendar.today()));
+            if (result.proposal().isPresent()) {
+                int number = queries.polity(party.id()).map(polity -> polity.proposals().size()).orElse(0);
+                return Reply.success(Message.of(MessageKey.PARTY_PROGRAM_PROPOSED, party.name().value(), number));
+            }
             return Reply.success(success);
         });
     }

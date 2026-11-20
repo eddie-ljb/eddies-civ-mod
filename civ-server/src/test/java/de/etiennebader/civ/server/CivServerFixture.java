@@ -59,6 +59,10 @@ public final class CivServerFixture {
         return server.villagers();
     }
 
+    public de.etiennebader.civ.server.conjuncture.ConjunctureService conjuncture() {
+        return server.conjuncture();
+    }
+
     public de.etiennebader.civ.server.vote.VotingService voting() {
         return server.voting();
     }

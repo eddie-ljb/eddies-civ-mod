@@ -171,6 +171,9 @@ public enum MessageKey {
     PARTY_DISSOLVED,
     PARTY_DIRECTION_SET,
     PARTY_EMBLEM_SET,
+    PARTY_PROGRAM_PROPOSED,
+    PARTY_PROGRAM_MODE_SET,
+    PARTY_PROGRAM_MODE_INFO,
     PARTY_INFO_HEADER,
     PARTY_INFO_DIRECTION,
     PARTY_INFO_CHAIR,
@@ -627,6 +630,7 @@ public enum MessageKey {
     DISSOLVED,
     SEAT_MOVED,
     TOWN_DEMOTED,
+    CONJUNCTURE_INFO,
     INTERNAL_ERROR;
 
     private static final String PREFIX = "eddies-civ-mod.command.";

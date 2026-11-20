@@ -76,7 +76,9 @@ class VillagerServiceTest {
         assertTrue(productivity >= 9 * 50 && productivity <= 9 * 150, "je Dorfbewohner 50 bis 150 %");
         var announcements = villagers.endOfDay(DAY);
 
-        assertEquals(25 * productivity / 100,
+        long baseIncome = 25 * productivity / 100;
+        double conjunctureMultiplier = server.conjuncture().multiplierOf(nordhain, DAY);
+        assertEquals(Math.round(baseIncome * conjunctureMultiplier),
                 server.queries().ledger().balanceOf(nordhain.asActor(), nordhain.currency()).amount());
         assertEquals(SettlementTier.MARKET_TOWN, server.queries().polity(nordhain.id()).orElseThrow().tier());
         assertEquals(1, announcements.size());

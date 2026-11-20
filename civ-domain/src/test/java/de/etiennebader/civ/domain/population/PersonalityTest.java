@@ -51,4 +51,13 @@ class PersonalityTest {
         assertEquals(Trait.FREE_SPIRITED, new Personality(-60, 50, -20).dominant());
         assertEquals(Trait.LOYAL, new Personality(10, 5, 70).dominant());
     }
+
+    @Test
+    @DisplayName("Loyalität steigt mit Heimatverbundenheit, bleibt zwischen 0,3 und 0,9")
+    void loyalty() {
+        assertEquals(0.3, new Personality(0, 0, -100).loyalty(), 0.001);
+        assertEquals(0.6, new Personality(0, 0, 0).loyalty(), 1e-9);
+        assertEquals(0.9, new Personality(0, 0, 100).loyalty(), 0.001);
+        assertTrue(new Personality(0, 0, 50).loyalty() > new Personality(0, 0, -50).loyalty());
+    }
 }

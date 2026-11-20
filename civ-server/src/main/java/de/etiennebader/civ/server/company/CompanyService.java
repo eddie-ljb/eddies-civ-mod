@@ -74,9 +74,11 @@ public final class CompanyService {
     private final CurrencyId currency;
     private final Texts texts;
     private final Announcements announcements;
+    private final de.etiennebader.civ.server.conjuncture.ConjunctureService conjuncture;
 
     public CompanyService(CivApplication app, Calendar calendar, PlayerDirectory players, CurrencyId currency,
-                          Texts texts, Announcements announcements) {
+                          Texts texts, Announcements announcements,
+                          de.etiennebader.civ.server.conjuncture.ConjunctureService conjuncture) {
         this.app = Objects.requireNonNull(app, "app");
         this.queries = app.queries();
         this.calendar = Objects.requireNonNull(calendar, "calendar");
@@ -84,6 +86,7 @@ public final class CompanyService {
         this.currency = Objects.requireNonNull(currency, "currency");
         this.texts = Objects.requireNonNull(texts, "texts");
         this.announcements = Objects.requireNonNull(announcements, "announcements");
+        this.conjuncture = Objects.requireNonNull(conjuncture, "conjuncture");
     }
 
     // ---- Firmen ----
@@ -520,7 +523,13 @@ public final class CompanyService {
 
     /** Tagesende der Produktion: erzeugen, verkaufen, der Leitung melden. */
     public void produce(Day day) {
-        for (var result : app.production().endOfDay(CompanyService::basePrice, priceLevel.get(), day)) {
+        // Firmen sind nicht geografisch verankert (keine Gemeinde, in der sie sitzen), deshalb wirkt die Konjunktur
+        // hier mit dem Durchschnitt aller Wirtschaftszonen statt einer einzelnen; siehe ConjunctureService.
+        double conjunctureFactor = conjuncture.globalAverageMultiplier(day);
+        de.etiennebader.civ.domain.market.PriceLevel adjusted = new de.etiennebader.civ.domain.market.PriceLevel(
+                Math.clamp(priceLevel.get().factor() * conjunctureFactor, de.etiennebader.civ.domain.market.PriceLevel.MIN,
+                        de.etiennebader.civ.domain.market.PriceLevel.MAX));
+        for (var result : app.production().endOfDay(CompanyService::basePrice, adjusted, day)) {
             long pieces = result.produced().values().stream().mapToLong(Long::longValue).sum();
             if (pieces == 0) {
                 continue;
