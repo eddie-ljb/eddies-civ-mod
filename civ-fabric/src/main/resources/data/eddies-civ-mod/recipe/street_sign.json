@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    " S ",
+    " S ",
+    " I "
+  ],
+  "key": {
+    "S": "minecraft:stick",
+    "I": "minecraft:oak_planks"
+  },
+  "result": {
+    "id": "eddies-civ-mod:street_sign",
+    "count": 2
+  }
+}

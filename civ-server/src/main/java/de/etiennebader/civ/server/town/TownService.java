@@ -7,7 +7,9 @@ import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.law.ParameterCatalog;
 import de.etiennebader.civ.domain.law.ParameterKey;
+import de.etiennebader.civ.domain.polity.ElectionResult;
 import de.etiennebader.civ.domain.polity.Membership;
+import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.PolityId;
@@ -24,6 +26,7 @@ import de.etiennebader.civ.server.command.MessageKey;
 import de.etiennebader.civ.server.command.Reply;
 import de.etiennebader.civ.server.command.Texts;
 import de.etiennebader.civ.server.command.TranslationKeys;
+import de.etiennebader.civ.server.election.ElectionMapColor;
 import de.etiennebader.civ.server.level.TerritoryColor;
 import de.etiennebader.civ.server.territory.Relation;
 import de.etiennebader.civ.server.territory.TerritoryWatcher;
@@ -167,6 +170,37 @@ public final class TownService {
                 Optional<String> group = claim.flatMap(found -> queries.polity(found.polity()))
                         .map(owner -> TerritoryColor.groupOf(owner, queries.ancestorsOf(owner.id()), level)
                                 .value().toString());
+                cells.add(new MapCell(chunk, relation, claim.map(found -> texts.polityName(found.polity())),
+                        claim.map(Claim::type), chunk.equals(center), group));
+            }
+        }
+        return new ChunkMap(width, height, cells);
+    }
+
+    /**
+     * Wie {@link #map(Caller, int, int)}, aber die Farbgruppe jedes Feldes zeigt das Wahlergebnis von
+     * {@code electionPolity}: die Partei bzw. der Kandidat, die im jeweiligen Wahlbezirk vorn liegen, sonst eine
+     * feste Kennung je Bezirk. Mit {@code office} leer das jeweils letzte Ergebnis zu irgendeinem Amt, sonst das
+     * letzte zu diesem Amt. Siehe {@link ElectionMapColor}.
+     */
+    public ChunkMap mapByElection(Caller caller, int width, int height, PolityId electionPolity, Optional<Office> office) {
+        Objects.requireNonNull(electionPolity, "electionPolity");
+        Objects.requireNonNull(office, "office");
+        Optional<PolityView> target = queries.polity(electionPolity);
+        Optional<ElectionResult> result = target.flatMap(found -> office.isPresent()
+                ? ElectionMapColor.latestResult(found, office.get()) : ElectionMapColor.latestResult(found));
+        ChunkCoord center = caller.chunk();
+        TerritoryView land = queries.territory();
+        List<MapCell> cells = new ArrayList<>(width * height);
+        for (int row = 0; row < height; row++) {
+            for (int column = 0; column < width; column++) {
+                ChunkCoord chunk = new ChunkCoord(center.dimension(), center.x() + column - width / 2,
+                        center.z() + row - height / 2);
+                Optional<Claim> claim = land.claimAt(chunk);
+                Relation relation = territory.relation(caller.player(), claim.map(Claim::polity));
+                Optional<String> group = claim.map(Claim::polity).flatMap(townId ->
+                        ElectionMapColor.colorOf(queries.civic(), electionPolity,
+                                Optional.of(chunk.center(caller.position().y())), townId, result, queries::partyOf));
                 cells.add(new MapCell(chunk, relation, claim.map(found -> texts.polityName(found.polity())),
                         claim.map(Claim::type), chunk.equals(center), group));
             }

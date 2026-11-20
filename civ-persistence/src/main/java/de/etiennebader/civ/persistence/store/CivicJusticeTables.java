@@ -7,7 +7,9 @@ import de.etiennebader.civ.domain.civic.CivicRegistry;
 import de.etiennebader.civ.domain.civic.CivicView;
 import de.etiennebader.civ.domain.civic.Constituency;
 import de.etiennebader.civ.domain.civic.ConstituencyId;
+import de.etiennebader.civ.domain.civic.CustomImage;
 import de.etiennebader.civ.domain.civic.Flag;
+import de.etiennebader.civ.domain.civic.ImageKind;
 import de.etiennebader.civ.domain.justice.CaseId;
 import de.etiennebader.civ.domain.justice.CaseKind;
 import de.etiennebader.civ.domain.justice.CourtCase;
@@ -44,7 +46,8 @@ import java.util.UUID;
 final class CivicJusticeTables {
 
     void writeCivic(Connection connection, CivicView civic) throws SQLException {
-        clear(connection, "constituency", "constituency_area", "constituency_town", "polity_flag", "polity_anthem");
+        clear(connection, "constituency", "constituency_area", "constituency_town", "polity_flag", "polity_anthem",
+                "polity_image");
         try (PreparedStatement insert = connection.prepareStatement(
                 "INSERT INTO constituency (id, position, polity_id, name) VALUES (?, ?, ?, ?)");
              PreparedStatement area = connection.prepareStatement("""
@@ -104,6 +107,20 @@ final class CivicJusticeTables {
             }
             insert.executeBatch();
         }
+        try (PreparedStatement insert = connection.prepareStatement(
+                "INSERT INTO polity_image (id, polity_id, kind, hash, width, height, uploaded) VALUES (?, ?, ?, ?, ?, ?, ?)")) {
+            for (CustomImage image : civic.images().values()) {
+                insert.setString(1, image.id());
+                insert.setString(2, image.polity().value().toString());
+                insert.setString(3, image.kind().name());
+                insert.setString(4, image.hash());
+                insert.setInt(5, image.width());
+                insert.setInt(6, image.height());
+                insert.setLong(7, image.uploadedAt().value());
+                insert.addBatch();
+            }
+            insert.executeBatch();
+        }
     }
 
     CivicRegistry loadCivic(Connection connection) throws SQLException {
@@ -158,7 +175,16 @@ final class CivicJusticeTables {
                         rows.getString("instrument"), rows.getString("notes")));
             }
         }
-        return CivicRegistry.restore(constituencies, flags, anthems);
+        Map<String, CustomImage> images = new LinkedHashMap<>();
+        try (PreparedStatement select = connection.prepareStatement("SELECT * FROM polity_image");
+             ResultSet rows = select.executeQuery()) {
+            while (rows.next()) {
+                images.put(rows.getString("id"), new CustomImage(rows.getString("id"), polity(rows.getString("polity_id")),
+                        ImageKind.valueOf(rows.getString("kind")), rows.getString("hash"), rows.getInt("width"),
+                        rows.getInt("height"), Day.of(rows.getLong("uploaded"))));
+            }
+        }
+        return CivicRegistry.restore(constituencies, flags, anthems, images);
     }
 
     void writeJustice(Connection connection, JudiciaryView justice) throws SQLException {

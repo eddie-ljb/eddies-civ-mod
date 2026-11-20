@@ -31,6 +31,7 @@ Rezept: Eisen, Papier, Truhe (`III / IPI / ICI`).
 ## Flaggen und Hymnen
 - **Flagge:** Banner am Webstuhl gestalten, in die Hand nehmen, `/civ <Ebene> flagge setzen`. `flagge holen` gibt ein Banner mit der Flagge, `flagge entfernen`.
 - **Hymne:** `/civ <Ebene> hymne setzen <Titel> | [Instrument |] <Noten>`. Noten F#3–F#5, `*2` verdoppelt, `/2` halbiert die Länge, `-` ist eine Pause. Instrumente: `harp`, `bell`, `flute`, `chime`, `guitar`, `xylophone` u. a. `hymne spielen`, `hymne entfernen`. Mit `anthem_on_enter` hört man sie beim Betreten des Gebiets.
+- **Eigenes Wappen, Wahlplakat oder Leuchtreklame hochladen:** Wer eine Gemeinde, ein Land, eine Nation oder einen Bund führt, kann zusätzlich zum Banner-Wappen ein selbst gemaltes Bild hochladen. Auf der Webseite in der Ansicht der jeweiligen Einheit: Reiter **Eigenes Bild** öffnen, Art wählen (Wappen, Wahlplakat oder Leuchtreklame), eine PNG-Datei (höchstens 128×128 Pixel) auswählen und hochladen. Ein neu hochgeladenes Wappen ersetzt das alte; von Wahlplakaten und Leuchtreklamen dürfen bis zu zehn gleichzeitig bestehen. Das Bild erscheint danach in der Webansicht der Einheit; eine Ingame-Darstellung auf einem eigenen Block ist als Folgeschritt vorgesehen (siehe `docs/issue-12-flaggen-banner.md`).
 
 ## Dorfbewohner: Interaktionsmenü
 Schleichen + Rechtsklick mit leerer Hand auf einen Dorfbewohner zeigt seine Auskunft (Name, Gemeinde, Persönlichkeit, Stimmung, Anschrift, Arbeitgeber, letzte Post). Darüber hinaus:

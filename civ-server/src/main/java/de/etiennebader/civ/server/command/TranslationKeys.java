@@ -2,6 +2,7 @@ package de.etiennebader.civ.server.command;
 
 import de.etiennebader.civ.application.population.Satisfaction;
 import de.etiennebader.civ.application.population.VillagerDialogue;
+import de.etiennebader.civ.domain.conjuncture.BusinessPhase;
 import de.etiennebader.civ.domain.land.PlotType;
 import de.etiennebader.civ.domain.law.ParameterKey;
 import de.etiennebader.civ.domain.law.StandardParameters;
@@ -39,6 +40,14 @@ public final class TranslationKeys {
     public static final String MOTION_ENACT = PREFIX + "motion.enact";
     /** Vorschlag „aufheben“. */
     public static final String MOTION_REPEAL = PREFIX + "motion.repeal";
+    /** Gegenstand eines Antrags auf Änderung des Parteiprogramms. */
+    public static final String MOTION_PARTY_PROGRAM = PREFIX + "motion.party_program";
+    /** Vorschlag „neues Programm“. */
+    public static final String MOTION_PARTY_PROGRAM_VALUE = PREFIX + "motion.party_program_value";
+    /** Programmänderungen laufen über Abstimmung. */
+    public static final String PROGRAM_MODE_VOTE = PREFIX + "program_mode.vote";
+    /** Programmänderungen entscheidet der Vorsitz allein. */
+    public static final String PROGRAM_MODE_CHAIR = PREFIX + "program_mode.chair";
 
     private TranslationKeys() {
     }
@@ -114,6 +123,9 @@ public final class TranslationKeys {
     /** Worüber man mit einem Dorfbewohner redet (Issue #18). */
     public static String dialogueTopic(VillagerDialogue.Topic topic) {
         return PREFIX + "dialogue_topic." + topic.name().toLowerCase(Locale.ROOT);
+    /** Name einer Konjunkturphase, z. B. im {@code /civ konjunktur}-Befehl. */
+    public static String conjuncturePhase(BusinessPhase phase) {
+        return PREFIX + "conjuncture_phase." + phase.name().toLowerCase(Locale.ROOT);
     }
 
     /** Alle Schlüssel, die jede Sprachdatei übersetzen muss. */
@@ -133,11 +145,13 @@ public final class TranslationKeys {
                         Arrays.stream(Platform.values()).map(TranslationKeys::platformDescription),
                         Arrays.stream(Satisfaction.Factor.values()).map(TranslationKeys::moodFactor),
                         Arrays.stream(Satisfaction.Factor.values()).map(TranslationKeys::moodFactorHint),
+                        Arrays.stream(BusinessPhase.values()).map(TranslationKeys::conjuncturePhase),
                         StandardParameters.all().stream().map(TranslationKeys::law),
                         Levels.DEFAULT.all().stream().map(level -> Level.translationKey(level.id())),
                         Stream.of(yesNo(true), yesNo(false)),
                         Stream.of(currency(CurrencyId.EMERALD), MONEY, MONEY_AMOUNT, FEDERATION_HEAD, MOTION_PARAGRAPH,
-                                MOTION_ENACT, MOTION_REPEAL))
+                                MOTION_ENACT, MOTION_REPEAL, MOTION_PARTY_PROGRAM, MOTION_PARTY_PROGRAM_VALUE,
+                                PROGRAM_MODE_VOTE, PROGRAM_MODE_CHAIR))
                 .flatMap(keys -> keys)
                 .sorted()
                 .toList();
