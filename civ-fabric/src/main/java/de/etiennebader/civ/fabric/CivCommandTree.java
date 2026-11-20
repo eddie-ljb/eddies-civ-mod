@@ -110,6 +110,7 @@ import java.util.function.Function;
  * /civ wahl ausrufen &lt;Amt&gt;         Wahl ausrufen (Bürgermeister; andere bei freiem Amt)
  * /civ wahl kandidieren &lt;Amt&gt; [Programm]  kandidieren (nur Bürger); ordnung|freiheit|steuern|ausbau|ohne
  * /civ stimmung                    Stimmung der Dorfbewohner der eigenen Gemeinde
+ * /civ konjunktur                   Konjunkturphase der Wirtschaftszone der eigenen Gemeinde
  * /civ wahl stimmen &lt;Amt&gt; &lt;Name&gt;  wählen (nur Bürger), bis zum Ende der Wahl änderbar
  * /civ amt ernennen &lt;Amt&gt; &lt;Name&gt;  Schatzmeister oder Bauamt ernennen (Bürgermeister)
  * /civ amt entlassen &lt;Amt&gt;         Amt frei machen (Bürgermeister)
@@ -264,6 +265,8 @@ public final class CivCommandTree {
                                                 Players.caller(player), IntegerArgumentType.getInteger(context, COUNT), false))))))
                 .then(Commands.literal("stimmung")
                         .executes(context -> withCiv(context, (civ, player) -> civ.villagers().mood(Players.caller(player)))))
+                .then(Commands.literal("konjunktur")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.villagers().conjunctureReply(Players.caller(player)))))
                 .then(Commands.literal("aemter")
                         .executes(context -> withCiv(context, (civ, player) -> civ.offices().list(Players.caller(player)))))
                 .then(Commands.literal("wahl")
@@ -459,7 +462,22 @@ public final class CivCommandTree {
                         Optional.empty())))
                 .then(Commands.literal("liste")
                         .executes(context -> withCiv(context, (civ, player) -> civ.parties().list(
-                                Players.caller(player)))))
+                                Players.caller(player))))
+                        .then(Commands.literal("zeigen")
+                                .executes(context -> withCiv(context, (civ, player) -> civ.parties().partyList(
+                                        Players.caller(player)))))
+                        .then(Commands.literal("setzen")
+                                .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.parties()
+                                                .setPartyList(Players.caller(player),
+                                                        List.of(name(context).split("\\s+")))))))
+                        .then(Commands.literal("modus")
+                                .then(Commands.literal("abstimmung")
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.parties()
+                                                .setPartyListMode(Players.caller(player), true))))
+                                .then(Commands.literal("vorsitz")
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.parties()
+                                                .setPartyListMode(Players.caller(player), false))))))
                 .then(Commands.literal("menue")
                         .executes(context -> withCiv(context, (civ, player) -> {
                             Feedback.click(player);

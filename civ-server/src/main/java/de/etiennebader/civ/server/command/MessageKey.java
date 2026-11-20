@@ -180,6 +180,13 @@ public enum MessageKey {
     PARTY_INFO_MEMBERS,
     PARTIES_NONE,
     PARTIES_HEADER,
+    UNKNOWN_PLAYER,
+    PARTY_CANDIDATES_EMPTY,
+    PARTY_CANDIDATES_HEADER,
+    PARTY_CANDIDATES_ENTRY,
+    PARTY_CANDIDATES_MODE_SET,
+    PARTY_CANDIDATES_SET,
+    PARTY_CANDIDATES_PROPOSED,
     // Parlament
     PARLIAMENT_NONE,
     PARLIAMENT_NOT_ELECTED,
@@ -525,6 +532,10 @@ public enum MessageKey {
     FLAG_NEEDS_BANNER,
     FLAG_NONE,
     FLAG_GIVEN,
+    IMAGE_SET,
+    IMAGE_REMOVED,
+    IMAGE_TOO_LARGE,
+    IMAGE_INVALID,
     ANTHEM_FORMAT,
     ANTHEM_INVALID,
     ANTHEM_SET,
@@ -607,6 +618,8 @@ public enum MessageKey {
     HELP_MARKET_PRESS,
     VILLAGER_ADDRESS,
     VILLAGER_EMPLOYED,
+    VILLAGER_LOYALTY,
+    VILLAGER_PARTY_LOYALTY,
     HELP_CIVIL,
     // Ankündigungen und Fehler ohne Domänenbezug
     NEW_DAY,
@@ -617,6 +630,7 @@ public enum MessageKey {
     DISSOLVED,
     SEAT_MOVED,
     TOWN_DEMOTED,
+    CONJUNCTURE_INFO,
     INTERNAL_ERROR;
 
     private static final String PREFIX = "eddies-civ-mod.command.";

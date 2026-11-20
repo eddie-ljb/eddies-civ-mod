@@ -26,6 +26,14 @@ Preisbildung: Grundpreis je Item, je mehr Lagerbestand desto billiger, das Lager
   - **Menü:** `/civ firma menue <Firma>` oder über die Börse.
 - **Dorfbewohner investieren:** sparen ein Zehntel ihres Anteils am Gemeindeeinkommen (bis 50 Smaragde) und kaufen/verkaufen Aktien nach ihrer Persönlichkeit (Sparsamkeit, Ordnungsliebe, Freiheitsliebe, Ausgabefreude).
 
+## Konjunktur
+Jede **Wirtschaftszone** (der höchste Bund, dem eine Gemeinde angehört – Nation > Land > Gemeinde; eine Gemeinde ohne Bund ist ihre eigene Zone) durchläuft eigenständig einen Konjunkturzyklus von 24–48 Tagen mit vier Phasen: **Aufschwung** (×1,10), **Hochkonjunktur** (×1,25), **Abschwung** (×0,90) und **Rezession** (×0,70). Zonen beeinflussen sich leicht gegenseitig über einen globalen Durchschnitt (15 % Gewicht).
+
+- `/civ konjunktur` zeigt Zone, aktuelle Phase und Effekt in Prozent der eigenen Gemeinde.
+- Die Phase wirkt auf das **Dorfbewohner-Einkommen** der Gemeinde (ihre eigene Zone) und auf die **Firmenproduktion** (globaler Durchschnitt, da Firmen keiner Gemeinde zugeordnet sind).
+- **Regierungsmaßnahme:** das Recht `conjuncture_stimulus_percent` (0–100, Standard 0) dämpft die Auswirkung der Konjunktur auf die eigene Zone, neutralisiert sie aber nie vollständig.
+- Die Phase einer Zone ist aus ihrer Kennung fest vorherbestimmt (kein Zufall bei jedem Neustart) – derselbe Tag ergibt immer dieselbe Phase.
+
 ## Presse
 - `/civ zeitung gruenden <Name>`; `redakteur <Zeitung> <Spieler|dorfbewohner>` nimmt in die Redaktion auf. Erscheint in den Gemeinden ihrer Redaktion.
 - Schreiben: `/civ zeitung schreiben <Zeitung> <Titel> | <Text>`, oder mit Buch und Feder `veroeffentlichen <Zeitung>`. Höchstens 5 Artikel je Zeitung und Tag.
