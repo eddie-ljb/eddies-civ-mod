@@ -16,10 +16,12 @@ import de.etiennebader.civ.domain.territory.DimensionId;
 import de.etiennebader.civ.server.CivServerFixture;
 import de.etiennebader.civ.server.command.Caller;
 import de.etiennebader.civ.server.command.MessageKey;
+import de.etiennebader.civ.server.command.Reply;
 import de.etiennebader.civ.server.office.ElectionView;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -86,6 +88,17 @@ class PartyServiceTest {
         assertTrue(party.officeTerm(Office.MAYOR).isPresent());
         assertTrue(server.takeAnnouncements().stream()
                 .anyMatch(a -> a.message().key().equals(MessageKey.VILLAGER_PARTY_FOUNDED.key())));
+    }
+
+    @Test
+    @DisplayName("Parteiliste: Vorsitz setzt die Reihenfolge per Spielername")
+    void partyListByName() {
+        town();
+        assertTrue(server.parties().found(caller(alice), "steuern", "Steuerzahlerbund").success());
+        assertTrue(server.parties().join(caller(bob), "steuerzahlerbund").success());
+        Reply reply = server.parties().setPartyList(caller(alice), List.of("Bob", "Alice"));
+        assertTrue(reply.success(), () -> "sollte beide bekannten, beigetretenen Spieler finden: "
+                + reply.lines().stream().map(line -> line.key().key()).toList());
     }
 
     @Test
