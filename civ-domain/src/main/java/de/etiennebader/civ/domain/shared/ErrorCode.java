@@ -163,7 +163,23 @@ public enum ErrorCode {
     INVALID_COMMODITY,
     INVALID_QUANTITY,
     OUT_OF_STOCK,
-    WORTHLESS_GOODS;
+    WORTHLESS_GOODS,
+
+    // Krieg
+    /** Argumente: Angreifer, Verteidiger. */
+    WAR_ALREADY_ONGOING,
+    /** Argumente: Krieg-ID. */
+    UNKNOWN_WAR,
+    /** Der Krieg ist bereits beendet. Argumente: Krieg-ID. */
+    WAR_ALREADY_ENDED,
+    /** Die Verteidigerin hat sich Neutralität erkauft. Argumente: Polity. */
+    DEFENDER_IS_NEUTRAL,
+    /** Argumente: Polity, Akteur. */
+    ALREADY_ENLISTED,
+    /** Argumente: Polity, Akteur. */
+    NOT_ENLISTED,
+    /** Neutralität lässt sich nicht während eines laufenden Kriegs erkaufen. Argumente: Polity. */
+    AT_WAR;
 
     private static final String TRANSLATION_PREFIX = "eddies-civ-mod.error.";
 
