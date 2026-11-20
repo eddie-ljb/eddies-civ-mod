@@ -1274,6 +1274,7 @@
   "eddies-civ-mod.branch.ranch": "Ranch",
   "eddies-civ-mod.branch.brickworks": "Brickworks",
   "eddies-civ-mod.branch.orchard": "Orchard and apiary",
+  "eddies-civ-mod.branch.construction": "Construction company",
   "eddies-civ-mod.gui.company_menu_title": "Company %s",
   "eddies-civ-mod.gui.company_treasury": "Treasury: %s emeralds",
   "eddies-civ-mod.gui.company_head": "Management: %s",

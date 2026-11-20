@@ -31,7 +31,12 @@ public enum Branch {
     /** Ziegelei: Ziegel und Glas. */
     BRICKWORKS("ziegelei", List.of(new Yield("minecraft:bricks", 12), new Yield("minecraft:glass", 16))),
     /** Imkerei und Obstbau: Äpfel, Honig. */
-    ORCHARD("obstbau", List.of(new Yield("minecraft:apple", 12), new Yield("minecraft:honey_bottle", 2)));
+    ORCHARD("obstbau", List.of(new Yield("minecraft:apple", 12), new Yield("minecraft:honey_bottle", 2))),
+    /**
+     * Baufirma (#19): erzeugt keine Ware am Tagesende, ihre Angestellten bauen stattdessen Bauaufträge nach
+     * Bauplänen ab, siehe {@code de.etiennebader.civ.domain.construction} und {@code ConstructionUseCases}.
+     */
+    CONSTRUCTION("bau", List.of());
 
     /** Menge einer Ware je Beschäftigtem und Tag. */
     public record Yield(String commodity, int perWorker) {
