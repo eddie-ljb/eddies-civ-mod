@@ -54,7 +54,8 @@ public final class StateDump {
                     day(polity.foundedOn().value()),
                     polity.seat().map(BlockPosition::toString).orElse("-")));
             polity.partyProfile().ifPresent(profile -> lines.add(String.join("|", "  party",
-                    Integer.toString(profile.order()), Integer.toString(profile.economy()), profile.emblem())));
+                    Integer.toString(profile.order()), Integer.toString(profile.economy()), profile.emblem())
+                    + profile.area().map(area -> "|area=" + area.value()).orElse("")));
             if (polity.constitution().proclaimed() || !polity.constitution().preamble().isEmpty()) {
                 lines.add(String.join("|", "  constitution",
                         polity.constitution().proclaimedOn().map(day -> day(day.value())).orElse("draft"),
@@ -264,7 +265,8 @@ public final class StateDump {
                     .collect(Collectors.joining(","));
             case Motion.Repeal repeal -> "repeal:" + repeal.statute().value() + ":" + repeal.title();
             case Motion.PartyProgram program -> "partyprogram:" + program.profile().order() + ":"
-                    + program.profile().economy() + ":" + program.profile().emblem() + ":" + program.profile().mode();
+                    + program.profile().economy() + ":" + program.profile().emblem() + ":" + program.profile().mode()
+                    + program.profile().area().map(area -> ":" + area.value()).orElse("");
         };
     }
 

@@ -114,6 +114,7 @@ Neben den Regelungen gibt es **Paragraphen**: Titel plus frei formulierter Text.
 ### Parteien
 Parteien sind Zusammenschlüsse von Personen (Spieler und Dorfbewohner) über alle Gemeinden hinweg. Jede Person gehört höchstens einer Partei an.
 
+- **Geltungsgebiet:** `/civ partei gebiet` zeigt es an, `gebiet setzen <Gemeinde oder Bund>` beschränkt Kandidaturen auf dieses Gebiet und seine Glieder, `gebiet leeren` hebt die Beschränkung auf. Ob der Vorsitz entscheidet oder die Mitglieder abstimmen, richtet sich nach dem Programmmodus.
 - **Richtung:** zwei Achsen von -100 bis 100: Ordnung (− Freiheit, + Ordnung) und Wirtschaft (− niedrige Steuern, + Ausbau). Die stärkere Achse ergibt das Wahlprogramm der Partei.
 - **Befehle:** `/civ partei gruenden <ordnung|freiheit|steuern|ausbau|mitte> <Name>`, `beitreten <Name>`, `austreten`, `info [Name]`, `liste`, `menue`; nur der Vorsitz: `richtung <Ordnung> <Wirtschaft>`, `wappen` (Item in der Hand wird Logo), `aufloesen`. Geht das letzte Mitglied, löst sich die Partei auf.
 - **Menü:** im Gemeindehaus unten rechts „Parteien“: Klick tritt bei, Umschalt-Klick auf die eigene tritt aus.

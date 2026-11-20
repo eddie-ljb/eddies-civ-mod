@@ -225,6 +225,18 @@ public final class WorldQueries {
                 .findFirst();
     }
 
+    /** Eine Partei darf im festgelegten Gebiet und allen ihm untergeordneten Gebietskörperschaften antreten. */
+    public boolean partyEligibleIn(PolityView party, PolityId electionPolity) {
+        return party.partyProfile().flatMap(profile -> profile.area())
+                .map(area -> area.equals(electionPolity)
+                        || ancestorsOf(electionPolity).stream().anyMatch(ancestor -> ancestor.id().equals(area)))
+                .orElse(true);
+    }
+
+    public Optional<PolityView> electoralPartyOf(ActorRef actor, PolityId electionPolity) {
+        return partyOf(actor).filter(party -> partyEligibleIn(party, electionPolity));
+    }
+
     /** Alle Parteien, in Reihenfolge ihrer Gründung. */
     public List<PolityView> parties() {
         return repositories.polities().findAll().stream()

@@ -46,6 +46,9 @@ Gebiete und Gemeinden müssen dabei nicht zusammenhängen – ein Wahlkreis kann
 
 ## Parteien
 Parteien sind Zusammenschlüsse von Personen (Spieler und Dorfbewohner) über alle Gemeinden hinweg; jede Person gehört höchstens einer Partei an.
+
+- **Geltungsgebiet:** `/civ partei gebiet` zeigt die aktuelle Einstellung, `gebiet setzen <Name>` wählt eine Gemeinde oder einen Bund, `gebiet leeren` erlaubt Kandidaturen wieder überall. Damit gilt die Partei bei Wahlen in genau diesem Gebiet und allen seinen Gliedern, nicht in einem übergeordneten Bund oder in Nachbargebieten. Der Programmmodus entscheidet, ob der Vorsitz die Änderung direkt vornimmt oder Parteimitglieder abstimmen.
+- **Laufende Wahlen:** Eine Gebietsänderung löscht keine bereits eingereichten Kandidaturen oder abgegebenen Stimmen. Bei der Parlamentsauszählung werden außerhalb des Gebiets keine Stimmen mehr dieser Parteiliste zugerechnet; bereits eingereichte Einzelkandidaturen bleiben bestehen. Die Parteimitgliedschaft selbst ist nicht ans Gebiet gebunden.
 - **Richtung:** zwei Achsen -100..100 – Ordnung (− Freiheit, + Ordnung) und Wirtschaft (− niedrige Steuern, + Ausbau). Die stärkere Achse ergibt das Wahlprogramm.
 - **Befehle:** `/civ partei gruenden <ordnung|freiheit|steuern|ausbau|mitte> <Name>`, `beitreten <Name>`, `austreten`, `info [Name]`, `liste`, `menue`; nur der Vorsitz: `richtung <Ordnung> <Wirtschaft>`, `wappen`, `aufloesen`.
 - **Dorfbewohner:** treten täglich mit etwas Glück einer passenden Partei bei und verlassen sie, wenn sie sich zu weit entfernt. Finden sich genug Gleichgesinnte ohne passende Partei (`villager_party_founders`, Standard 5), gründen sie eine. Abschaltbar mit `villager_parties=false`.

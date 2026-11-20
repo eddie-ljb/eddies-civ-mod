@@ -64,12 +64,12 @@ final class PolityTable {
     private static final String UPSERT_POLITY = """
             INSERT INTO polity (id, seq, name, kind, tier, currency, founded_on, seat_dimension, seat_x, seat_y, seat_z,
                                 level, constitution_proclaimed_on, preamble, party_order, party_economy, party_emblem,
-                                party_mode, parliament_elected_on, parliament_until)
-            VALUES (?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM polity), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                party_mode, party_area, parliament_elected_on, parliament_until)
+            VALUES (?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM polity), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (id) DO UPDATE SET name = excluded.name, kind = excluded.kind, level = excluded.level,
                 constitution_proclaimed_on = excluded.constitution_proclaimed_on, preamble = excluded.preamble,
                 party_order = excluded.party_order, party_economy = excluded.party_economy,
-                party_emblem = excluded.party_emblem, party_mode = excluded.party_mode,
+                party_emblem = excluded.party_emblem, party_mode = excluded.party_mode, party_area = excluded.party_area,
                 parliament_elected_on = excluded.parliament_elected_on, parliament_until = excluded.parliament_until,
                 tier = excluded.tier,
                 currency = excluded.currency, founded_on = excluded.founded_on,
@@ -104,14 +104,20 @@ final class PolityTable {
                 upsert.setInt(15, polity.party().get().economy());
                 upsert.setString(16, polity.party().get().emblem());
                 upsert.setString(17, polity.party().get().mode().name());
+                if (polity.party().get().area().isPresent()) {
+                    upsert.setString(18, polity.party().get().area().get().value().toString());
+                } else {
+                    upsert.setNull(18, Types.VARCHAR);
+                }
             } else {
                 upsert.setNull(14, Types.INTEGER);
                 upsert.setNull(15, Types.INTEGER);
                 upsert.setNull(16, Types.VARCHAR);
                 upsert.setNull(17, Types.VARCHAR);
+                upsert.setNull(18, Types.VARCHAR);
             }
-            bindDay(upsert, 18, polity.parliament().electedOn());
-            bindDay(upsert, 19, polity.parliament().until());
+            bindDay(upsert, 19, polity.parliament().electedOn());
+            bindDay(upsert, 20, polity.parliament().until());
             upsert.executeUpdate();
         }
         deleteChildren(connection, id);
@@ -443,7 +449,9 @@ final class PolityTable {
         }
         String modeName = row.getString("party_mode");
         ProgramMode mode = modeName == null ? ProgramMode.CHAIR : ProgramMode.valueOf(modeName);
-        return Optional.of(new PartyProfile(row.getInt("party_order"), row.getInt("party_economy"), emblem, mode));
+        String area = row.getString("party_area");
+        Optional<PolityId> areaId = area == null ? Optional.empty() : Optional.of(new PolityId(UUID.fromString(area)));
+        return Optional.of(new PartyProfile(row.getInt("party_order"), row.getInt("party_economy"), emblem, mode, areaId));
     }
 
     private static Constitution constitutionOf(ResultSet row) throws SQLException {
@@ -526,15 +534,18 @@ final class PolityTable {
 
     private static final String PARTY_PROGRAM_KIND = "PARTY_PROGRAM";
 
-    /** Kodiert ein Parteiprogramm für die Antrags-Textspalte: {@code order|economy|emblem|mode}. */
+    /** Kodiert ein Parteiprogramm für die Antrags-Textspalte: {@code order|economy|emblem|mode|area}. */
     private static String encodeProfile(PartyProfile profile) {
-        return profile.order() + "|" + profile.economy() + "|" + profile.emblem() + "|" + profile.mode().name();
+        return profile.order() + "|" + profile.economy() + "|" + profile.emblem() + "|" + profile.mode().name()
+                + "|" + profile.area().map(id -> id.value().toString()).orElse("");
     }
 
     private static PartyProfile decodeProfile(String encoded) {
-        String[] parts = encoded.split("\\|", 4);
+        String[] parts = encoded.split("\\|", 5);
+        Optional<PolityId> area = parts.length > 4 && !parts[4].isBlank()
+                ? Optional.of(new PolityId(UUID.fromString(parts[4]))) : Optional.empty();
         return new PartyProfile(Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), parts[2],
-                ProgramMode.valueOf(parts[3]));
+                ProgramMode.valueOf(parts[3]), area);
     }
 
     private static void insertProposals(Connection connection, String polityId, List<Proposal> proposals)
@@ -802,7 +813,7 @@ final class PolityTable {
         try (PreparedStatement select = connection.prepareStatement(
                 """
                 SELECT id, name, kind, level, tier, currency, founded_on, seat_dimension, seat_x, seat_y, seat_z,
-                       constitution_proclaimed_on, preamble, party_order, party_economy, party_emblem, party_mode,
+                       constitution_proclaimed_on, preamble, party_order, party_economy, party_emblem, party_mode, party_area,
                        parliament_elected_on, parliament_until
                 FROM polity ORDER BY seq""");
              ResultSet rows = select.executeQuery()) {

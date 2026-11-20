@@ -23,6 +23,7 @@ import de.etiennebader.civ.domain.polity.ElectionResult;
 import de.etiennebader.civ.domain.polity.MembershipType;
 import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.OfficeTerm;
+import de.etiennebader.civ.domain.polity.PartyProfile;
 import de.etiennebader.civ.domain.polity.Platform;
 import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.polity.PolityView;
@@ -229,8 +230,9 @@ public final class OfficeService {
     }
 
     private Reply stand(Caller caller, PolityView town, Election election, Platform chosen) {
-        Platform platform = chosen != Platform.NONE ? chosen : queries.partyOf(caller.player())
-                .flatMap(PolityView::partyProfile).map(profile -> profile.platform()).orElse(Platform.NONE);
+        Optional<PolityView> party = queries.partyOf(caller.player());
+        Platform platform = chosen != Platform.NONE ? chosen : party
+                .flatMap(PolityView::partyProfile).map(PartyProfile::platform).orElse(Platform.NONE);
         return attempt(() -> {
             app.standForElection().execute(new StandForElection.Command(town.id(), election.id(), caller.player(),
                     platform, calendar.today()));
@@ -257,7 +259,7 @@ public final class OfficeService {
             candidate = queries.polityNamed(candidateName.strip())
                     .filter(party -> party.kind() == PolityKind.PARTY)
                     .flatMap(party -> election.candidates().stream()
-                            .filter(actor -> queries.partyOf(actor).map(PolityView::id).filter(party.id()::equals)
+                            .filter(actor -> queries.electoralPartyOf(actor, town.id()).map(PolityView::id).filter(party.id()::equals)
                                     .isPresent())
                             .findFirst());
         }
@@ -419,7 +421,8 @@ public final class OfficeService {
             Optional<ElectionView> election = town.electionFor(office).map(open -> new ElectionView(open.id(),
                     open.closesOn().value(),
                     open.candidates().stream().map(actor -> new ElectionView.Candidate(actor, texts.actor(actor),
-                                    open.platformOf(actor), queries.partyOf(actor).map(party -> party.name().value())))
+                                    open.platformOf(actor), queries.electoralPartyOf(actor, town.id())
+                                            .map(party -> party.name().value())))
                             .toList(),
                     open.ballots().stream().filter(ballot -> ballot.voter().equals(viewer)).map(Ballot::candidate)
                             .findFirst(),
