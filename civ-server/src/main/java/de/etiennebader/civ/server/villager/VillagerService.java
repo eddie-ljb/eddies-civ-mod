@@ -152,8 +152,13 @@ public final class VillagerService {
      * bis 50 % mehr, unzufriedene bis 50 % weniger ({@link TownMood#productivity()}).
      */
     public Money dailyIncome(PolityView town) {
+        return dailyIncome(town, calendar.today());
+    }
+
+    /** Wie {@link #dailyIncome(PolityView)}, aber für einen bestimmten Tag statt {@code calendar.today()}. */
+    public Money dailyIncome(PolityView town, Day day) {
         long units = settings.villagerIncome().amount() * TownMood.of(town, queries.effectiveLaws(town), media(town)).productivity() / 100;
-        units = Math.round(units * conjuncture.multiplierOf(town, calendar.today()));
+        units = Math.round(units * conjuncture.multiplierOf(town, day));
         return Money.of(units, town.currency());
     }
 
@@ -262,7 +267,7 @@ public final class VillagerService {
             if (town.kind() != PolityKind.TERRITORIAL) {
                 continue;
             }
-            Money income = dailyIncome(town);
+            Money income = dailyIncome(town, day);
             if (income.isPositive() && income.currency().equals(settings.villagerIncome().currency())) {
                 creditIncome(town, income, day);
             }

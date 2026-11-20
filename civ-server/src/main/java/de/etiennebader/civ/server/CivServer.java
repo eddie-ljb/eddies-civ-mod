@@ -162,7 +162,7 @@ public final class CivServer {
         this.towns = new TownService(app.queries(), settings, texts, commands, territory);
         this.plots = new PlotService(app, calendar, players, texts);
         this.conjuncture = new de.etiennebader.civ.server.conjuncture.ConjunctureService(app.queries());
-        this.villagers = new VillagerService(app, settings, texts, announcements, conjuncture);
+        this.villagers = new VillagerService(app, settings, texts, announcements, conjuncture, calendar);
         this.townHalls = new TownHallService(app, calendar, texts, announcements);
         this.shops = new ShopService(app, calendar, settings.currency(), texts);
         this.civil = new CivilService(app, calendar, players, settings.currency(), texts, announcements,
