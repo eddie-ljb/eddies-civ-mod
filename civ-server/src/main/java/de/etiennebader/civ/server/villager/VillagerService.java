@@ -74,6 +74,8 @@ public final class VillagerService {
     private final ServerSettings settings;
     private final Texts texts;
     private final Announcements announcements;
+    private final de.etiennebader.civ.server.conjuncture.ConjunctureService conjuncture;
+
     /** Wer abgewandert ist, aber im Spiel noch steht; das Spiel bringt ihn weg ({@link #takeDeparture}). */
     private final Map<PersonRef, PendingDeparture> departures = new HashMap<>();
     private final Map<PersonRef, BlockPosition> lastSeen = new HashMap<>();
@@ -97,14 +99,15 @@ public final class VillagerService {
         }
     }
 
-    public VillagerService(CivApplication app, Calendar calendar, ServerSettings settings, Texts texts,
-                           Announcements announcements) {
+    public VillagerService(CivApplication app, ServerSettings settings, Texts texts, Announcements announcements,
+                           de.etiennebader.civ.server.conjuncture.ConjunctureService conjuncture, Calendar calendar) {
         this.app = Objects.requireNonNull(app, "app");
         this.queries = app.queries();
         this.calendar = Objects.requireNonNull(calendar, "calendar");
         this.settings = Objects.requireNonNull(settings, "settings");
         this.texts = Objects.requireNonNull(texts, "texts");
         this.announcements = Objects.requireNonNull(announcements, "announcements");
+        this.conjuncture = Objects.requireNonNull(conjuncture, "conjuncture");
     }
 
     /**
@@ -159,8 +162,25 @@ public final class VillagerService {
      * bis 50 % mehr, unzufriedene bis 50 % weniger ({@link TownMood#productivity()}).
      */
     public Money dailyIncome(PolityView town) {
+        return dailyIncome(town, calendar.today());
+    }
+
+    /** Wie {@link #dailyIncome(PolityView)}, aber für einen bestimmten Tag statt {@code calendar.today()}. */
+    public Money dailyIncome(PolityView town, Day day) {
         long units = settings.villagerIncome().amount() * TownMood.of(town, queries.effectiveLaws(town), media(town)).productivity() / 100;
+        units = Math.round(units * conjuncture.multiplierOf(town, day));
         return Money.of(units, town.currency());
+    }
+
+    /** {@code /civ konjunktur}: Konjunkturphase der Wirtschaftszone der eigenen Gemeinde. */
+    public Reply conjunctureReply(Caller caller) {
+        Optional<PolityView> town = queries.municipalityOf(caller.player());
+        if (town.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.NOT_IN_MUNICIPALITY));
+        }
+        var view = conjuncture.describe(town.get(), calendar.today());
+        return Reply.success(Message.of(MessageKey.CONJUNCTURE_INFO, view.zoneName(),
+                TranslationKeys.conjuncturePhase(view.phase()), Math.round(view.multiplier() * 100)));
     }
 
     /** Die Stimmung der Dorfbewohner einer Gemeinde. */
@@ -262,7 +282,7 @@ public final class VillagerService {
             if (town.kind() != PolityKind.TERRITORIAL) {
                 continue;
             }
-            Money income = dailyIncome(town);
+            Money income = dailyIncome(town, day);
             if (income.isPositive() && income.currency().equals(settings.villagerIncome().currency())) {
                 creditIncome(town, income, day);
             }

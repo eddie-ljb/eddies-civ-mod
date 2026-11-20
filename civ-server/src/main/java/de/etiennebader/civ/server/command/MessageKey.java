@@ -627,6 +627,7 @@ public enum MessageKey {
     DISSOLVED,
     SEAT_MOVED,
     TOWN_DEMOTED,
+    CONJUNCTURE_INFO,
     INTERNAL_ERROR;
 
     private static final String PREFIX = "eddies-civ-mod.command.";
