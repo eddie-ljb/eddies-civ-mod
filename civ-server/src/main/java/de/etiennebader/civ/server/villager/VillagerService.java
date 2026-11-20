@@ -75,7 +75,7 @@ public final class VillagerService {
     private final Texts texts;
     private final Announcements announcements;
     private final de.etiennebader.civ.server.conjuncture.ConjunctureService conjuncture;
-    private final Calendar calendar;
+
     /** Wer abgewandert ist, aber im Spiel noch steht; das Spiel bringt ihn weg ({@link #takeDeparture}). */
     private final Map<PersonRef, PendingDeparture> departures = new HashMap<>();
     private final Map<PersonRef, BlockPosition> lastSeen = new HashMap<>();
@@ -101,8 +101,6 @@ public final class VillagerService {
 
     public VillagerService(CivApplication app, ServerSettings settings, Texts texts, Announcements announcements,
                            de.etiennebader.civ.server.conjuncture.ConjunctureService conjuncture, Calendar calendar) {
-    public VillagerService(CivApplication app, Calendar calendar, ServerSettings settings, Texts texts,
-                           Announcements announcements) {
         this.app = Objects.requireNonNull(app, "app");
         this.queries = app.queries();
         this.calendar = Objects.requireNonNull(calendar, "calendar");
@@ -110,7 +108,6 @@ public final class VillagerService {
         this.texts = Objects.requireNonNull(texts, "texts");
         this.announcements = Objects.requireNonNull(announcements, "announcements");
         this.conjuncture = Objects.requireNonNull(conjuncture, "conjuncture");
-        this.calendar = Objects.requireNonNull(calendar, "calendar");
     }
 
     /**
