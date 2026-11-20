@@ -14,6 +14,8 @@ Wer eine Gemeinde betritt oder verlässt, sieht ihren Namen als Titel. Auf Grund
 
 Die Siedlungsstufe richtet sich nach allen Einwohnern: ab 10 Marktgemeinde, ab 30 Stadt, ab 80 Metropole. Jede Stufe erlaubt 8 Chunks mehr Gebiet (`claim_base` + `claim_per_member`, siehe [Konfiguration](Admin-Installation-und-Konfiguration.md)). Für die Gebietsgröße zählen Dorfbewohner nur zu einem Viertel, Land lässt sich also nicht allein durch Zucht vergrößern.
 
+**Claim-Kosten:** Jeder zusätzlich beanspruchte Chunk kostet die Gemeindekasse den per Recht `claim_cost_per_chunk` festgelegten Betrag (Standard: 0, also deaktiviert). Reicht die Kasse nicht, wird der Claim abgelehnt. Der Bürgermeister sieht den fehlenden Betrag in der Fehlermeldung.
+
 ## Dorfbewohner als Einwohner
 - Dorfbewohner, die das Gebiet einer Gemeinde betreten, werden dort Einwohner. In der Wildnis bleiben sie in ihrer bisherigen Gemeinde gemeldet. Stirbt ein Dorfbewohner, tritt er aus.
 - Jeder Dorfbewohner erwirtschaftet täglich Geld für die Gemeindekasse; Standard ist ¼ Smaragd. Zufriedene leisten bis zu 50 % mehr, Unzufriedene bis zu 50 % weniger.
