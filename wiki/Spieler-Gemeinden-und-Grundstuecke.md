@@ -47,6 +47,22 @@ Grundstücke teilen das Gemeindeland auf. Nur ihre Inhaber dürfen dort bauen, u
 - Jede Gemeinde hat eine feste Postleitzahl. Grundstücke bis 12 Blöcke neben einer Straße bekommen Hausnummern: ungerade auf der einen, gerade auf der anderen Seite, aufsteigend entlang der Straße.
 - `/civ adresse [Spieler]` zeigt die Anschrift, `/civ adressen` listet die Straßen der Gemeinde. Dorfbewohner nennen ihre Anschrift beim Anklicken.
 
+### Schilder und Hausnummern zum Aufstellen
+Zusätzlich zur automatischen Adressvergabe oben gibt es eigene, von Hand beschriftbare Blöcke, die der Deko und Beschilderung dienen:
+
+| Block/Item | Zeilen | Zweck |
+|---|---|---|
+| Straßenschild | 1 | z. B. „Hauptstraße“ |
+| Hausnummer | 1 | z. B. „12“ |
+| Ortsschild | mehrzeilig | Gemeinde-Begrüßungsschild |
+| Länderschild | mehrzeilig | Landes-Begrüßungsschild |
+| Nationenschild | mehrzeilig | Nations-Begrüßungsschild |
+
+- Hinstellen, dann im Amboss den gewünschten Text als Namen vergeben (bei den mehrzeiligen Schildern trennt ein `|` die Zeilen, bis zu vier Zeilen à 32 Zeichen) und erneut platzieren – der Amboss-Name wird beim Setzen übernommen.
+- Rechtsklick zeigt den aktuellen Text in der Actionbar.
+- Rechtsklick mit einem Farbstoff färbt das Schild ein.
+- Craftbar: Straßenschild aus Stöcken und Eichenbrettern; Hausnummer aus Eisennuggets; Ortsschild aus Eichenbrettern und einem Stock; Länder- und Nationenschild aus Dunkeleichenbrettern und einem Stock (Nationenschild zusätzlich mit einem Smaragd in der Mitte).
+
 ## Schutz
 Im Gemeindegebiet gilt, solange das Recht nichts anderes erlaubt:
 - Explosionen und Feuer zerstören keine Blöcke; Kolben bewegen/zerstören keine Blöcke über Gebietsgrenzen hinweg; Endermen nehmen keine Blöcke auf.
