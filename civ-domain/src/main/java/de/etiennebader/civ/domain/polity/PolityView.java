@@ -10,6 +10,7 @@ import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.territory.BlockPosition;
 
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -122,25 +123,28 @@ public interface PolityView {
     }
 
     /**
-     * Wie {@link #mayor()}, aber mit {@code villagerPolitics}: ist das Amt frei und auch kein Bürger, der kein
-     * Dorfbewohner ist, vorhanden, regiert kommissarisch der dienstälteste Dorfbewohner unter den Bürgern. So
-     * können Gemeinden ohne Spieler sich selbst regieren, wenn {@code villager_politics_enabled} gesetzt ist.
+     * Wie {@link #mayor()}, aber mit {@code villagerPolitics}: ist das Amt frei und gibt es auch keinen Bürger, der
+     * kein Dorfbewohner ist, regiert kommissarisch der dienstälteste Dorfbewohner unter allen Einwohnern (Bürger
+     * oder nicht, Dorfbewohner werden nie selbst Bürger). So können Gemeinden ohne Spieler sich selbst regieren,
+     * wenn {@code villager_politics_enabled} gesetzt ist.
      */
     default Optional<ActorRef> mayor(boolean villagerPolitics) {
         Optional<ActorRef> elected = officeTerm(Office.MAYOR).map(OfficeTerm::holder);
         if (elected.isPresent()) {
             return elected;
         }
-        List<ActorRef> citizens = members().stream()
+        Optional<ActorRef> nonVillagerCitizen = members().stream()
                 .filter(membership -> membership.type() == MembershipType.CITIZEN)
                 .map(Membership::member)
-                .toList();
-        Optional<ActorRef> nonVillager = citizens.stream().filter(member -> !(member instanceof PersonRef))
+                .filter(member -> !(member instanceof PersonRef))
                 .findFirst();
-        if (nonVillager.isPresent() || !villagerPolitics) {
-            return nonVillager;
+        if (nonVillagerCitizen.isPresent() || !villagerPolitics) {
+            return nonVillagerCitizen;
         }
-        return citizens.stream().filter(PersonRef.class::isInstance).findFirst();
+        return members().stream()
+                .filter(membership -> membership.member() instanceof PersonRef)
+                .min(Comparator.comparing(Membership::since))
+                .map(Membership::member);
     }
 
     /** Ob der Akteur dieses Amt innehat; für {@link Office#MAYOR} gilt {@link #mayor()}. */

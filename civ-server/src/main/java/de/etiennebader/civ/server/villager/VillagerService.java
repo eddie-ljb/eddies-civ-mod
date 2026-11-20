@@ -11,6 +11,8 @@ import de.etiennebader.civ.application.population.Emigration;
 import de.etiennebader.civ.application.population.Satisfaction;
 import de.etiennebader.civ.application.population.TownMood;
 import de.etiennebader.civ.application.query.WorldQueries;
+import de.etiennebader.civ.application.support.ClaimWeighting;
+import de.etiennebader.civ.application.territory.ClaimChunk;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.contract.Contract;
@@ -28,6 +30,9 @@ import de.etiennebader.civ.domain.shared.DomainException;
 import de.etiennebader.civ.domain.shared.Money;
 import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.territory.BlockPosition;
+import de.etiennebader.civ.domain.territory.ChunkCoord;
+import de.etiennebader.civ.domain.territory.ClaimType;
+import de.etiennebader.civ.domain.territory.TerritoryView;
 import de.etiennebader.civ.server.Announcement;
 import de.etiennebader.civ.server.Announcements;
 import de.etiennebader.civ.server.ServerSettings;
@@ -45,6 +50,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.ToIntFunction;
 
 /**
@@ -264,6 +270,7 @@ public final class VillagerService {
         }
         if (settings.villagerPolitics()) {
             governAutonomously(day);
+            autoClaimChunk(day);
         }
         return changes;
     }
@@ -291,6 +298,39 @@ public final class VillagerService {
                     }
                 }
             });
+        }
+    }
+
+    /**
+     * Gemeinden mit kommissarischem Dorfbewohner-Bürgermeister beanspruchen selbstständig je einen freien
+     * Nachbar-Chunk ihres Kerngebiets pro Tag, solange die Gemeinde ihr Claim-Limit noch nicht erreicht hat – so,
+     * wie es sonst der Bürgermeister oder das Bauamt manuell täte ({@code /civ grundstueck} bzw. die Weltkarte).
+     * Lehnt das Recht (z. B. künftige Claim-Kosten) den Claim ab, wird es am nächsten Tag erneut versucht.
+     */
+    private void autoClaimChunk(Day day) {
+        TerritoryView land = queries.territory();
+        for (PolityView town : queries.polities()) {
+            if (town.kind() != PolityKind.TERRITORIAL) {
+                continue;
+            }
+            if (!(town.mayor(true).orElse(null) instanceof PersonRef)) {
+                continue;
+            }
+            Set<ChunkCoord> owned = land.territoryOf(town.id());
+            if (owned.size() >= settings.claimLimit(ClaimWeighting.PERSONS_QUARTER.weightOf(town))) {
+                continue;
+            }
+            owned.stream()
+                    .flatMap(chunk -> chunk.neighbours().stream())
+                    .filter(candidate -> land.sovereignOf(candidate).isEmpty())
+                    .findFirst()
+                    .ifPresent(candidate -> {
+                        try {
+                            app.claimChunk().execute(new ClaimChunk.Command(town.id(), candidate, ClaimType.CORE, day));
+                        } catch (DomainException e) {
+                            // abgelehnt (z. B. künftige Claim-Kosten unbezahlbar); morgen erneut versuchen.
+                        }
+                    });
         }
     }
 

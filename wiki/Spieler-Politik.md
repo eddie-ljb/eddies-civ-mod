@@ -62,6 +62,14 @@ Gemeinden und Bünde können ein Parlament haben; `parliament_seats` (0–99, Ve
 - `/civ umfrage [Name]` fragt Dorfbewohner, wen sie wählen würden; beim Parlament inklusive Sitzprognose.
 - Webseite: Reiter „Wahlen“ mit Umfragen und Ergebnissen, auf der Karte die Ansicht „Wahlkarte“ (siehe auch [Map Fix, Issue #8](Spieler-Webseite.md)).
 
+## Dorfbewohner-Politik (`villager_politics_enabled`, Standard an)
+Gemeinden, Bünde und Firmen brauchen keinen Spieler mehr, um am Spielgeschehen teilzunehmen:
+- **Kommissarische Regierung:** Hat eine Gemeinde keinen Bürger, der kein Dorfbewohner ist, und ist auch kein Amt gewählt, regiert der dienstälteste Dorfbewohner kommissarisch. Er ändert täglich höchstens eine Rechtsregelung, so wie er auch als Dorfbewohner-Abgeordneter im Parlament stimmen würde (nach Ordnung/Freiheit, Partei usw.).
+- **Gebietswachstum:** Diese Gemeinden beanspruchen von selbst täglich einen freien Nachbar-Chunk ihres Kerngebiets, bis sie ihr Claim-Limit erreichen (`/civ grundstueck`-Chunkbefehle entsprechend).
+- **Bündnisse:** Eine Einladung in einen Bund entscheidet der kommissarische Dorfbewohner-Bürgermeister selbst anhand seiner Persönlichkeit (Ordnungsliebende und Heimatverbundene treten eher bei) – kein Spielerklick nötig.
+- Abschaltbar in der Server-Konfiguration mit `villager_politics_enabled=false`; dann bleiben solche Gemeinden ohne Bürgermeister stehen, wie zuvor.
+- **Bewusst (noch) nicht umgesetzt** (siehe `docs/issue-01-villager-politik.md`): Dorfbewohner gründen selbst brandneue Gemeinden oder Bünde, und Dorfbewohner gründen/leiten eigene Firmen oder sind an der Börse aktiv – beides erfordert größere, hier bewusst nicht mitgerissene Folgeänderungen.
+
 ## Wahlkampf
 - **Reden:** `/civ rede <Text>` – Dorfbewohner in Hörweite reagieren drei Tage lang auf das erkannte Thema. Eine wirksame Rede pro Tag.
 - **Wahlversprechen:** `/civ versprechen geben <Text>`; das Gesetzbuch erkennt Messbares. `/civ versprechen [liste [Name]]` zeigt die Bilanz (gehalten, gebrochen, teilweise, nicht messbar).
