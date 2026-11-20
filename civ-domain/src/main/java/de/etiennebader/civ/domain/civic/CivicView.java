@@ -52,11 +52,26 @@ public interface CivicView {
 
     Map<PolityId, Anthem> anthems();
 
+    /** Hochgeladene Bilder (Wappen, Wahlplakat, Leuchtreklame), nach Kennung. */
+    Map<String, CustomImage> images();
+
     default Optional<Flag> flagOf(PolityId polity) {
         return Optional.ofNullable(flags().get(polity));
     }
 
     default Optional<Anthem> anthemOf(PolityId polity) {
         return Optional.ofNullable(anthems().get(polity));
+    }
+
+    default Optional<CustomImage> image(String id) {
+        return Optional.ofNullable(images().get(id));
+    }
+
+    default List<CustomImage> imagesOf(PolityId polity) {
+        return images().values().stream().filter(image -> image.polity().equals(polity)).toList();
+    }
+
+    default List<CustomImage> imagesOf(PolityId polity, ImageKind kind) {
+        return imagesOf(polity).stream().filter(image -> image.kind() == kind).toList();
     }
 }

@@ -1,21 +1,27 @@
 package de.etiennebader.civ.server.villager;
 
 import de.etiennebader.civ.application.CivApplication;
+import de.etiennebader.civ.application.day.Calendar;
 import de.etiennebader.civ.application.economy.CreditTownIncome;
 import de.etiennebader.civ.application.party.LeaveParty;
+import de.etiennebader.civ.application.polity.AmendLaw;
 import de.etiennebader.civ.application.polity.ChangeTier;
 import de.etiennebader.civ.application.polity.JoinPolity;
 import de.etiennebader.civ.application.polity.LeavePolity;
 import de.etiennebader.civ.application.population.Emigration;
 import de.etiennebader.civ.application.population.Satisfaction;
 import de.etiennebader.civ.application.population.TownMood;
+import de.etiennebader.civ.application.population.VillagerLoyalty;
 import de.etiennebader.civ.application.query.WorldQueries;
+import de.etiennebader.civ.application.support.ClaimWeighting;
+import de.etiennebader.civ.application.territory.ClaimChunk;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.contract.Contract;
 import de.etiennebader.civ.domain.contract.ContractKind;
 import de.etiennebader.civ.domain.polity.Membership;
 import de.etiennebader.civ.domain.polity.MembershipType;
+import de.etiennebader.civ.domain.polity.Motion;
 import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.polity.SettlementTier;
@@ -26,6 +32,9 @@ import de.etiennebader.civ.domain.shared.DomainException;
 import de.etiennebader.civ.domain.shared.Money;
 import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.territory.BlockPosition;
+import de.etiennebader.civ.domain.territory.ChunkCoord;
+import de.etiennebader.civ.domain.territory.ClaimType;
+import de.etiennebader.civ.domain.territory.TerritoryView;
 import de.etiennebader.civ.server.Announcement;
 import de.etiennebader.civ.server.Announcements;
 import de.etiennebader.civ.server.ServerSettings;
@@ -43,6 +52,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.ToIntFunction;
 
 /**
@@ -60,6 +70,7 @@ public final class VillagerService {
 
     private final CivApplication app;
     private final WorldQueries queries;
+    private final Calendar calendar;
     private final ServerSettings settings;
     private final Texts texts;
     private final Announcements announcements;
@@ -86,9 +97,11 @@ public final class VillagerService {
         }
     }
 
-    public VillagerService(CivApplication app, ServerSettings settings, Texts texts, Announcements announcements) {
+    public VillagerService(CivApplication app, Calendar calendar, ServerSettings settings, Texts texts,
+                           Announcements announcements) {
         this.app = Objects.requireNonNull(app, "app");
         this.queries = app.queries();
+        this.calendar = Objects.requireNonNull(calendar, "calendar");
         this.settings = Objects.requireNonNull(settings, "settings");
         this.texts = Objects.requireNonNull(texts, "texts");
         this.announcements = Objects.requireNonNull(announcements, "announcements");
@@ -181,7 +194,12 @@ public final class VillagerService {
                         signed(satisfaction.points(Satisfaction.Factor.TAXES)),
                         signed(satisfaction.points(Satisfaction.Factor.VOICE)),
                         signed(satisfaction.points(Satisfaction.Factor.PROSPERITY)),
-                        satisfaction.productivityPercent())));
+                        satisfaction.productivityPercent()),
+                Message.of(MessageKey.VILLAGER_LOYALTY, signed(VillagerLoyalty.toPolity(personality, town.get(),
+                        villager, calendar.today(), queries.effectiveLaws(town.get()))))));
+        queries.partyOf(villager).ifPresent(party -> lines.add(Message.of(MessageKey.VILLAGER_PARTY_LOYALTY,
+                signed(VillagerLoyalty.toParty(personality, party, villager, calendar.today())),
+                signed(VillagerLoyalty.toChairperson(personality, party, calendar.today())))));
         lastSeen(villager).flatMap(position -> app.addresses().at(position))
                 .ifPresent(address -> lines.add(Message.of(MessageKey.VILLAGER_ADDRESS, address.line())));
         queries.contracts().active().stream()
@@ -260,7 +278,70 @@ public final class VillagerService {
         if (settings.emigration()) {
             emigrate(day);
         }
+        if (settings.villagerPolitics()) {
+            governAutonomously(day);
+            autoClaimChunk(day);
+        }
         return changes;
+    }
+
+    /**
+     * Gemeinden ohne Spieler-Bürgermeister regiert kommissarisch der dienstälteste Dorfbewohner-Bürger
+     * ({@link PolityView#mayor(boolean)}); er ändert das Recht, so wie es {@link CivApplication#villagerLegislator()}
+     * für ihn vorschlägt, genau wie ein Dorfbewohner-Abgeordneter im Parlament einen Antrag stellen würde. Nur eine
+     * Änderung je Gemeinde und Tag, damit das Recht nicht täglich hin- und herspringt.
+     */
+    private void governAutonomously(Day day) {
+        for (PolityView town : queries.polities()) {
+            if (town.kind() != PolityKind.TERRITORIAL) {
+                continue;
+            }
+            if (!(town.mayor(true).orElse(null) instanceof PersonRef villagerMayor)) {
+                continue;
+            }
+            app.villagerLegislator().propose(villagerMayor, town).ifPresent(motion -> {
+                if (motion instanceof Motion.Change change) {
+                    try {
+                        app.amendLaw().execute(new AmendLaw.Command(town.id(), villagerMayor, change.change(), day));
+                    } catch (DomainException e) {
+                        // Verfassungsartikel oder tagende Parlamente entscheiden anders; dann bleibt es beim Status quo.
+                    }
+                }
+            });
+        }
+    }
+
+    /**
+     * Gemeinden mit kommissarischem Dorfbewohner-Bürgermeister beanspruchen selbstständig je einen freien
+     * Nachbar-Chunk ihres Kerngebiets pro Tag, solange die Gemeinde ihr Claim-Limit noch nicht erreicht hat – so,
+     * wie es sonst der Bürgermeister oder das Bauamt manuell täte ({@code /civ grundstueck} bzw. die Weltkarte).
+     * Lehnt das Recht (z. B. künftige Claim-Kosten) den Claim ab, wird es am nächsten Tag erneut versucht.
+     */
+    private void autoClaimChunk(Day day) {
+        TerritoryView land = queries.territory();
+        for (PolityView town : queries.polities()) {
+            if (town.kind() != PolityKind.TERRITORIAL) {
+                continue;
+            }
+            if (!(town.mayor(true).orElse(null) instanceof PersonRef)) {
+                continue;
+            }
+            Set<ChunkCoord> owned = land.territoryOf(town.id());
+            if (owned.size() >= settings.claimLimit(ClaimWeighting.PERSONS_QUARTER.weightOf(town))) {
+                continue;
+            }
+            owned.stream()
+                    .flatMap(chunk -> chunk.neighbours().stream())
+                    .filter(candidate -> land.sovereignOf(candidate).isEmpty())
+                    .findFirst()
+                    .ifPresent(candidate -> {
+                        try {
+                            app.claimChunk().execute(new ClaimChunk.Command(town.id(), candidate, ClaimType.CORE, day));
+                        } catch (DomainException e) {
+                            // abgelehnt (z. B. künftige Claim-Kosten unbezahlbar); morgen erneut versuchen.
+                        }
+                    });
+        }
     }
 
     /**
@@ -321,7 +402,9 @@ public final class VillagerService {
     private void emigrate(Day day) {
         Map<PolityId, Integer> toWild = new HashMap<>();
         Map<PolityId, Map<PolityId, Integer>> moved = new HashMap<>();
-        for (Emigration.Departure departure : Emigration.plan(queries.polities(), day, queries::effectiveLaws)) {
+        for (Emigration.Departure departure : Emigration.plan(queries.polities(), day, queries::effectiveLaws,
+                (villager, town) -> VillagerLoyalty.toPolity(Personality.of(villager), town, villager, day,
+                        queries.effectiveLaws(town)))) {
             try {
                 app.leavePolity().execute(new LeavePolity.Command(departure.from(), departure.villager(), day));
                 Optional<BlockPosition> seat = Optional.empty();

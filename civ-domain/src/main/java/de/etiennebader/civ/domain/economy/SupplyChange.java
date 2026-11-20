@@ -16,6 +16,8 @@ public enum SupplyChange {
     VILLAGER_ECONOMY,
     /** Investition in die Ausstattung einer Firma; das Geld verlässt den Umlauf. */
     INVESTMENT,
+    /** Gebühr für das Beanspruchen eines Chunks; das Geld verlässt den Umlauf. */
+    TERRITORY_CLAIM,
     /** Eingriff eines Administrators. */
     ADMIN
 }

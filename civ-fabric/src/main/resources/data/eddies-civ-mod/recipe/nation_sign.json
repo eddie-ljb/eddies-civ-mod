@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "PPP",
+    "PGP",
+    " S "
+  ],
+  "key": {
+    "P": "minecraft:dark_oak_planks",
+    "G": "minecraft:emerald",
+    "S": "minecraft:stick"
+  },
+  "result": {
+    "id": "eddies-civ-mod:nation_sign",
+    "count": 1
+  }
+}
