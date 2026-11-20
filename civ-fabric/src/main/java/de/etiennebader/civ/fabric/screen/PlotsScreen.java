@@ -110,6 +110,7 @@ final class PlotsScreen extends MenuScreen {
             case AGRICULTURAL -> Items.WHEAT;
             case PUBLIC -> Items.BELL;
             case EMBASSY -> Items.BANNER.white();
+            case EDUCATION -> Items.BOOKSHELF;
         };
     }
 }

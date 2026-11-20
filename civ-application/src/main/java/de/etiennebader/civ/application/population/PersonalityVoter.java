@@ -37,9 +37,13 @@ public final class PersonalityVoter implements VillagerVoter {
     /** Bonus für Kandidaten der eigenen Partei. */
     static final double OWN_PARTY = 0.6;
 
+    /** Bildung/Intelligenz-Bonus (0-100, Issue #21) eines Dorfbewohners, der keine Wirkung hat (neutral). */
+    static final int NEUTRAL_EDUCATION = 50;
+
     private final Function<PolityView, LawView> lawsOf;
     private final Function<ActorRef, Optional<PolityView>> partyOf;
     private final CampaignInfluence campaign;
+    private final Function<PersonRef, Integer> educationOf;
 
     /** Ohne Bundesrecht und Parteien, z. B. für Tests. */
     public PersonalityVoter() {
@@ -57,9 +61,21 @@ public final class PersonalityVoter implements VillagerVoter {
      */
     public PersonalityVoter(Function<PolityView, LawView> lawsOf, Function<ActorRef, Optional<PolityView>> partyOf,
                             CampaignInfluence campaign) {
+        this(lawsOf, partyOf, campaign, villager -> NEUTRAL_EDUCATION);
+    }
+
+    /**
+     * @param lawsOf      das tatsächlich geltende Recht einer Polity
+     * @param partyOf     die Partei eines Akteurs
+     * @param educationOf Bildungs-/Intelligenz-Bonus (0-100, Issue #21) eines Dorfbewohners; je höher, desto stärker
+     *                    richtet er sich nach dem Programm der Kandidaten statt nach Amtsbonus und Bauchgefühl
+     */
+    public PersonalityVoter(Function<PolityView, LawView> lawsOf, Function<ActorRef, Optional<PolityView>> partyOf,
+                            CampaignInfluence campaign, Function<PersonRef, Integer> educationOf) {
         this.campaign = Objects.requireNonNull(campaign, "campaign");
         this.lawsOf = Objects.requireNonNull(lawsOf, "lawsOf");
         this.partyOf = Objects.requireNonNull(partyOf, "partyOf");
+        this.educationOf = Objects.requireNonNull(educationOf, "educationOf");
     }
 
     @Override
@@ -76,11 +92,12 @@ public final class PersonalityVoter implements VillagerVoter {
         boolean parliament = election.office() == Office.PARLIAMENT;
         ActorRef best = null;
         double bestUtility = Double.NEGATIVE_INFINITY;
+        int educationBonus = educationOf.apply(villager);
         for (ActorRef candidate : election.candidates()) {
             Optional<PolityView> party = partyOf.apply(candidate);
             double utility = utility(personality, satisfaction, election.platformOf(candidate),
                     parliament ? polity.parliament().holdsSeat(candidate) : incumbent.filter(candidate::equals).isPresent(),
-                    villager, candidate)
+                    villager, candidate, educationBonus)
                     + partyAffinity(personality, ownParty, party, ownPartyLoyalty)
                     + campaign.bonus(villager, candidate, election, polity);
             if (utility > bestUtility) {
