@@ -861,6 +861,8 @@
   "eddies-civ-mod.gui.contract_notice_hint": "Schleichen + Klick: kündigen",
   "eddies-civ-mod.command.villager_address": "Wohnt: %s",
   "eddies-civ-mod.command.villager_employed": "Angestellt bei %1$s (Vertrag #%2$s)",
+  "eddies-civ-mod.command.villager_loyalty": "Loyalität zur Gemeinde: %s",
+  "eddies-civ-mod.command.villager_party_loyalty": "Loyalität zur Partei: %s · zum Vorsitz: %s",
   "eddies-civ-mod.command.help_civil": "Alltag: /civ strasse anlegen|aufheben|liste, /civ adresse [Spieler], /civ vertrag …, /civ post, /civ brief <Spieler> <Betreff> | <Text>, /civ freund <Spieler>|annehmen|ablehnen|vertrauen|misstrauen|entfernen <Spieler>, /civ freunde, /civ nachricht <Freund> <Text>",
   "block.eddies-civ-mod.mailbox": "Briefkasten",
   "eddies-civ-mod.command.chat_sent": "Gesendet.",

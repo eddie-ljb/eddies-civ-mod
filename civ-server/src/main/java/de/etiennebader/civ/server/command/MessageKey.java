@@ -611,6 +611,8 @@ public enum MessageKey {
     HELP_MARKET_PRESS,
     VILLAGER_ADDRESS,
     VILLAGER_EMPLOYED,
+    VILLAGER_LOYALTY,
+    VILLAGER_PARTY_LOYALTY,
     HELP_CIVIL,
     // Ankündigungen und Fehler ohne Domänenbezug
     NEW_DAY,
