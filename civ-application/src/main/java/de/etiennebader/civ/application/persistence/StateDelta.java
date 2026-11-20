@@ -279,7 +279,7 @@ public record StateDelta(List<PolityChange> polities, List<ClaimChange> claims, 
 
     /** Eine unabhängige Kopie, damit der Speicher-Thread keinen Arbeitsstand sieht, der sich noch ändert. */
     private static CivicRegistry copyOf(CivicView civic) {
-        return CivicRegistry.restore(civic.constituencies(), civic.flags(), civic.anthems());
+        return CivicRegistry.restore(civic.constituencies(), civic.flags(), civic.anthems(), civic.images());
     }
 
     private static ProductionRegistry copyOf(ProductionView production) {

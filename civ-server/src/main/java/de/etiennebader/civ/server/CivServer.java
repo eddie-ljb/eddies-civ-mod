@@ -109,6 +109,7 @@ public final class CivServer {
     private final CivicService civic;
     private final JusticeService justice;
     private volatile java.nio.file.Path mapDirectory;
+    private final Optional<java.nio.file.Path> imagesDirectory;
     private final LiveCountService liveCount;
     private final DebateService debates;
     private final Clock clock = Clock.systemUTC();
@@ -131,11 +132,12 @@ public final class CivServer {
     private boolean running = true;
 
     private CivServer(StateStore store, AutoCloseable storage, ServerSettings settings, IdGenerator ids,
-                      SaveListener listener) {
+                      SaveListener listener, Optional<java.nio.file.Path> imagesDirectory) {
         Repositories repositories = InMemoryRepositories.create();
         ChangeTracker tracker = new ChangeTracker();
         this.storage = storage;
         this.settings = settings;
+        this.imagesDirectory = imagesDirectory;
         this.calendar = new Calendar(settings.ticksPerDay(), CalendarState.START);
         this.players = new PlayerDirectory();
         this.app = new CivApplication(repositories, ids, settings.claimPolicy(), tracker, ClaimWeighting.PERSONS_QUARTER);
@@ -190,8 +192,10 @@ public final class CivServer {
     public static CivServer open(Path databaseFile, ServerSettings settings, SaveListener listener) {
         Objects.requireNonNull(databaseFile, "databaseFile");
         SqliteStateStore store = SqliteStateStore.open(databaseFile);
+        Path parent = databaseFile.toAbsolutePath().getParent();
+        Optional<Path> images = Optional.ofNullable(parent).map(dir -> dir.resolve("images"));
         try {
-            return new CivServer(store, store, settings, new RandomIdGenerator(), listener);
+            return new CivServer(store, store, settings, new RandomIdGenerator(), listener, images);
         } catch (RuntimeException e) {
             store.close();
             throw e;
@@ -201,7 +205,7 @@ public final class CivServer {
     /** Für Tests: mit beliebigem Speicher und vorhersagbaren IDs. */
     static CivServer start(StateStore store, ServerSettings settings, IdGenerator ids, SaveListener listener) {
         return new CivServer(store, () -> {
-        }, settings, ids, listener);
+        }, settings, ids, listener, Optional.empty());
     }
 
     /**
@@ -449,6 +453,14 @@ public final class CivServer {
     /** Setzt den Ordner der Kartenkacheln; die Fabric-Seite rendert hinein. */
     public void mapDirectory(java.nio.file.Path directory) {
         this.mapDirectory = directory;
+    }
+
+    /**
+     * Ordner für selbst hochgeladene Bilder (Wappen, Wahlplakate, Leuchtreklamen), benannt nach ihrem Hash
+     * ({@code <hash>.png}); leer in Tests ohne echte Datenbankdatei.
+     */
+    public Optional<java.nio.file.Path> imagesDirectory() {
+        return imagesDirectory;
     }
 
     /**
