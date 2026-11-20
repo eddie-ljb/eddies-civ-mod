@@ -4,6 +4,7 @@ import de.etiennebader.civ.application.ApplicationFixture;
 import de.etiennebader.civ.application.economy.DepositEmeralds;
 import de.etiennebader.civ.application.federation.FoundFederation;
 import de.etiennebader.civ.application.polity.AmendLaw;
+import de.etiennebader.civ.application.polity.CastVote;
 import de.etiennebader.civ.application.polity.JoinPolity;
 import de.etiennebader.civ.application.population.PartyAffiliation;
 import de.etiennebader.civ.application.population.PersonalityVoter;
@@ -20,6 +21,7 @@ import de.etiennebader.civ.domain.polity.Platform;
 import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.polity.PolityName;
 import de.etiennebader.civ.domain.polity.PolityView;
+import de.etiennebader.civ.domain.polity.ProgramMode;
 import de.etiennebader.civ.domain.population.Personality;
 import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.Day;
@@ -71,9 +73,9 @@ class PartyTest {
         assertEquals(ErrorCode.NOT_A_MUNICIPALITY, code(() -> fixture.app.foundFederation()
                 .execute(new FoundFederation.Command(PolityName.of("Parteienbund"), "land", party, alice, DAY))));
 
-        assertEquals(ErrorCode.NOT_OFFICE_HOLDER, code(() -> fixture.app.changePartyProfile().execute(
-                new ChangePartyProfile.Command(party, bob, ORDER.withDirection(-50, 0), DAY))));
-        fixture.app.changePartyProfile().execute(new ChangePartyProfile.Command(party, alice,
+        assertEquals(ErrorCode.NOT_OFFICE_HOLDER, code(() -> fixture.app.changePartyProgram().execute(
+                new ChangePartyProgram.Command(party, bob, ORDER.withDirection(-50, 0), DAY))));
+        fixture.app.changePartyProgram().execute(new ChangePartyProgram.Command(party, alice,
                 ORDER.withDirection(-50, 10), DAY));
         assertEquals(Platform.FREEDOM, polity(party).partyProfile().orElseThrow().platform());
 
@@ -129,6 +131,28 @@ class PartyTest {
         assertTrue(same > other);
         assertTrue(PersonalityVoter.partyAffinity(personality, Optional.empty(), Optional.of(ownParty))
                 > PersonalityVoter.partyAffinity(personality, Optional.empty(), Optional.of(freedom)));
+    }
+
+    @Test
+    @DisplayName("Abstimmungsmodus: Programmänderung wird zum Antrag statt sofort zu gelten, Mehrheit setzt sie um")
+    void programModeVoteGoesThroughProposal() {
+        PolityId party = found("Ordnungspartei", alice);
+        fixture.app.joinParty().execute(new JoinParty.Command(party, bob, DAY));
+        fixture.app.changePartyProgram().execute(new ChangePartyProgram.Command(party, alice,
+                ORDER.withMode(ProgramMode.VOTE), DAY));
+        assertEquals(ProgramMode.VOTE, polity(party).partyProfile().orElseThrow().mode());
+
+        PartyProfile wanted = ORDER.withDirection(-50, 10).withMode(ProgramMode.VOTE);
+        ChangePartyProgram.Result result = fixture.app.changePartyProgram().execute(
+                new ChangePartyProgram.Command(party, alice, wanted, DAY));
+        assertTrue(result.proposal().isPresent(), "bei Abstimmungspflicht entsteht ein Antrag statt sofortiger Wirkung");
+        // Zwei Bürgerinnen/Bürger (alice, bob): alices eigene Ja-Stimme beim Antragstellen reicht allein noch
+        // nicht für die Mehrheit, der Antrag bleibt zunächst offen.
+        assertEquals(ORDER.order(), polity(party).partyProfile().orElseThrow().order(), "noch nicht entschieden");
+
+        fixture.app.castVote().execute(new CastVote.Command(party, result.proposal().get().proposal(), bob,
+                true, DAY));
+        assertEquals(-50, polity(party).partyProfile().orElseThrow().order(), "Mehrheit setzt das neue Programm um");
     }
 
     @Test

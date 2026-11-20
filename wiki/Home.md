@@ -1,26 +1,16 @@
 # Eddies Civ Mod – Wiki
 
-Dieses Verzeichnis enthält die Inhalte für das GitHub-Wiki des Mods (Issue #22). Da dieser Arbeitsbereich keinen
-Push-Zugriff auf das separate `*.wiki.git`-Repository von GitHub hat, liegen die Seiten hier versioniert im
-Hauptrepository unter `wiki/` und werden in Pull Requests mitgepflegt. Ein Repository-Owner kann sie bei Bedarf
-1:1 ins echte GitHub-Wiki kopieren (Wiki unter **Settings → Features → Wikis** aktivieren, dann je Datei eine
-Wiki-Seite mit demselben Namen anlegen).
-
-## Seiten
-
-- [Karte](Karte.md) – Web- und Ingame-Karte, Farben und Ebenen-Filter.
-> Diese Seiten liegen als Entwurf unter `wiki/` im Hauptrepo, weil das Build-Konto dieser Sitzung keinen Schreibzugriff
-> auf das separate `eddies-civ-mod.wiki.git`-Repository hat. Bitte Inhalte von hier in das echte GitHub-Wiki
-> übernehmen (Repo → Tab **Wiki** → Seite mit demselben Namen anlegen/bearbeiten).
-
-- [Parlament](Parlament.md) – Sitzungen, Anträge, Tagesordnung, Abstimmungsregeln
 Fabric-Mod für Minecraft 26.3: Gemeinden, Gebiete, Recht, Geld und ein Servermarkt mit dynamischen Preisen. Alle Menüs laufen auf dem Server als Truhenmenüs, deshalb können auch Spieler ohne den Mod auf einem Server mit dem Mod mitspielen (für Blöcke und eigene Items brauchen alle den Client-Teil des Mods).
 
 Dieses Wiki ist nach Zielgruppe sortiert: Spieler finden hier, wie man Gemeinden gründet, wählt und wirtschaftet; Admins, wie der Server eingerichtet, abgesichert und gepflegt wird; Entwickler, wie der Code aufgebaut ist.
 
+> Diese Seiten liegen als Markdown-Dateien hier im Hauptrepository unter `wiki/` und werden in Pull Requests mitgepflegt, weil dieser Arbeitsbereich keinen Push-Zugriff auf das separate `eddies-civ-mod.wiki.git`-Repository von GitHub hat (Hintergrund in `docs/issue-22-wiki.md`). Ein Repository-Owner kann sie bei Bedarf 1:1 ins echte GitHub-Wiki übernehmen (**Settings → Features → Wikis** aktivieren, dann je Datei eine Wiki-Seite mit demselben Namen anlegen).
+
 ## Für Spieler
 - [Gemeinden und Grundstücke](Spieler-Gemeinden-und-Grundstuecke.md) – Gemeinde gründen, Dorfbewohner, Läden, Grundstücke, Straßen und Adressen, Gebietsschutz
 - [Politik: Ämter, Wahlen und Parteien](Spieler-Politik.md) – Abstimmungen, Ämter und Wahlen, Wahlverfahren, Wahlkreise, Parlament, Parteien, Wahlkampf
+- [Parlament](Parlament.md) – Sitzungen, Anträge, Tagesordnung, Abstimmungsregeln
+- [Karte](Karte.md) – Web- und Ingame-Karte, Farben und Ebenen-Filter
 - [Recht, Verfassung und Bünde](Spieler-Recht-und-Verfassung.md) – Verfassung, Gesetzbuch, Gesetzes-Baukasten, Bünde und Ebenen
 - [Justiz](Spieler-Justiz.md) – Klagen, Gerichtsverfahren, Geschworene, Berufung
 - [Wirtschaft: Bank, Markt, Firmen und Börse](Spieler-Wirtschaft.md) – Bank, Servermarkt, Firmen, Aktien, Presse

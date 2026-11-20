@@ -263,6 +263,8 @@ public final class StateDump {
                     .map(value -> value.key().id() + "=" + ParameterCatalog.encode(value))
                     .collect(Collectors.joining(","));
             case Motion.Repeal repeal -> "repeal:" + repeal.statute().value() + ":" + repeal.title();
+            case Motion.PartyProgram program -> "partyprogram:" + program.profile().order() + ":"
+                    + program.profile().economy() + ":" + program.profile().emblem() + ":" + program.profile().mode();
         };
     }
 

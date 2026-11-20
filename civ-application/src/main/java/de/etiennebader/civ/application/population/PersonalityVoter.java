@@ -66,7 +66,10 @@ public final class PersonalityVoter implements VillagerVoter {
     public Optional<ActorRef> choose(PersonRef villager, Election election, PolityView polity) {
         Personality personality = Personality.of(villager);
         Satisfaction satisfaction = Satisfaction.of(personality, polity, lawsOf.apply(polity));
-        Optional<PolityId> ownParty = partyOf.apply(villager).map(PolityView::id);
+        Optional<PolityView> ownPartyView = partyOf.apply(villager);
+        Optional<PolityId> ownParty = ownPartyView.map(PolityView::id);
+        Optional<Integer> ownPartyLoyalty = ownPartyView
+                .map(party -> VillagerLoyalty.toParty(personality, party, villager, election.closesOn()));
         Optional<ActorRef> incumbent = election.office() == Office.MAYOR
                 ? polity.mayor()
                 : polity.officeTerm(election.office()).map(term -> term.holder());
@@ -78,7 +81,7 @@ public final class PersonalityVoter implements VillagerVoter {
             double utility = utility(personality, satisfaction, election.platformOf(candidate),
                     parliament ? polity.parliament().holdsSeat(candidate) : incumbent.filter(candidate::equals).isPresent(),
                     villager, candidate)
-                    + partyAffinity(personality, ownParty, party)
+                    + partyAffinity(personality, ownParty, party, ownPartyLoyalty)
                     + campaign.bonus(villager, candidate, election, polity);
             if (utility > bestUtility) {
                 bestUtility = utility;
@@ -98,8 +101,7 @@ public final class PersonalityVoter implements VillagerVoter {
             default -> PlatformAffinity.of(platform, personality);
         };
         double mood = satisfaction.score() / 100.0;
-        double loyalty = 0.6 + personality.belonging() / 333.0;
-        double incumbency = incumbent ? mood * loyalty : Math.max(0, -mood) * 0.4;
+        double incumbency = incumbent ? mood * personality.loyalty() : Math.max(0, -mood) * 0.4;
         return programme + incumbency + noise(villager, candidate);
     }
 
@@ -108,11 +110,22 @@ public final class PersonalityVoter implements VillagerVoter {
      * (bis ±0,3).
      */
     public static double partyAffinity(Personality personality, Optional<PolityId> ownParty, Optional<PolityView> party) {
+        return partyAffinity(personality, ownParty, party, Optional.empty());
+    }
+
+    /**
+     * Wie oben, aber der Bonus für die eigene Partei wird zusätzlich mit der {@linkplain VillagerLoyalty Loyalität}
+     * zu ihr gewichtet, falls bekannt: voll loyale Dorfbewohner folgen ihrer Partei vollständig, wenig loyale nur
+     * teilweise (Faktor 0,4 bis 1,0).
+     */
+    public static double partyAffinity(Personality personality, Optional<PolityId> ownParty, Optional<PolityView> party,
+                                       Optional<Integer> ownPartyLoyalty) {
         if (party.isEmpty()) {
             return 0;
         }
         if (ownParty.filter(party.get().id()::equals).isPresent()) {
-            return OWN_PARTY;
+            double loyaltyFactor = ownPartyLoyalty.map(loyalty -> 0.4 + (loyalty + 100) / 200.0 * 0.6).orElse(1.0);
+            return OWN_PARTY * loyaltyFactor;
         }
         return party.get().partyProfile()
                 .map(profile -> (0.5 - profile.distanceTo(personality.order(), -personality.thrift()) / 200.0) * 0.6)

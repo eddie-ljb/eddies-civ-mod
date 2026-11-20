@@ -1,14 +1,17 @@
 package de.etiennebader.civ.application.territory;
 
 import de.etiennebader.civ.application.ApplicationFixture;
+import de.etiennebader.civ.application.economy.DepositEmeralds;
 import de.etiennebader.civ.application.land.CreatePlot;
 import de.etiennebader.civ.application.polity.EnactStatute;
+import de.etiennebader.civ.domain.actor.PolityRef;
 import de.etiennebader.civ.domain.land.Area;
 import de.etiennebader.civ.domain.land.PlotType;
 import de.etiennebader.civ.domain.law.ParameterValue;
 import de.etiennebader.civ.domain.law.StandardParameters;
 import de.etiennebader.civ.domain.shared.DomainException;
 import de.etiennebader.civ.domain.shared.ErrorCode;
+import de.etiennebader.civ.domain.shared.Money;
 import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.territory.ClaimType;
 import de.etiennebader.civ.domain.territory.DimensionId;
@@ -21,6 +24,7 @@ import java.util.Optional;
 
 import static de.etiennebader.civ.application.ApplicationFixture.DAY;
 import static de.etiennebader.civ.application.ApplicationFixture.chunk;
+import static de.etiennebader.civ.application.ApplicationFixture.emeralds;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -56,6 +60,32 @@ class TerritoryUseCasesTest {
         claim(30, 30, ClaimType.OUTPOST);
 
         assertEquals(1, fixture.app.queries().territory().countOf(nordhain, ClaimType.OUTPOST));
+    }
+
+    @Test
+    @DisplayName("Claim-Kosten (Standard 0) werden aus der Gemeindekasse bezahlt")
+    void claimCostIsDeductedFromTreasury() {
+        fixture.app.enactStatute().execute(new EnactStatute.Command(nordhain, "Claim-Gebühr",
+                List.of(ParameterValue.of(StandardParameters.CLAIM_COST_PER_CHUNK, 200L)), DAY));
+        fixture.app.depositEmeralds().execute(new DepositEmeralds.Command(new PolityRef(nordhain), emeralds(500), DAY));
+
+        claim(1, 0, ClaimType.CORE);
+
+        assertEquals(emeralds(300), fixture.app.queries().ledger().balanceOf(new PolityRef(nordhain), ApplicationFixture.EMERALD));
+        assertEquals(Optional.of(nordhain), fixture.app.queries().territory().sovereignOf(chunk(1, 0)));
+    }
+
+    @Test
+    @DisplayName("Claim ohne ausreichende Gemeindekasse → CLAIM_INSUFFICIENT_FUNDS, Chunk bleibt frei")
+    void claimRejectedWhenTreasuryInsufficient() {
+        fixture.app.enactStatute().execute(new EnactStatute.Command(nordhain, "Claim-Gebühr",
+                List.of(ParameterValue.of(StandardParameters.CLAIM_COST_PER_CHUNK, 200L)), DAY));
+        fixture.app.depositEmeralds().execute(new DepositEmeralds.Command(new PolityRef(nordhain), emeralds(100), DAY));
+
+        assertError(ErrorCode.CLAIM_INSUFFICIENT_FUNDS, () -> claim(1, 0, ClaimType.CORE));
+
+        assertEquals(Optional.empty(), fixture.app.queries().territory().sovereignOf(chunk(1, 0)));
+        assertEquals(emeralds(100), fixture.app.queries().ledger().balanceOf(new PolityRef(nordhain), ApplicationFixture.EMERALD));
     }
 
     @Test

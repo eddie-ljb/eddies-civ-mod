@@ -99,6 +99,7 @@ final class Ballots {
                     polity.repeal(repeal.statute(), day);
                 }
             }
+            case Motion.PartyProgram program -> polity.changePartyProfile(program.profile(), day);
         }
     }
 

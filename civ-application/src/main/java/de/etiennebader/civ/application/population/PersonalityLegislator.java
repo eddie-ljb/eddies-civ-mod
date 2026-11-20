@@ -129,12 +129,16 @@ public final class PersonalityLegislator implements Legislator {
 
     /** Nutzen eines Rechtsstands für den Abgeordneten. */
     double utility(PersonRef member, PolityView polity, LawView laws) {
-        double utility = Satisfaction.of(Personality.of(member), polity, laws).score();
+        Personality self = Personality.of(member);
+        double utility = Satisfaction.of(self, polity, laws).score();
         Optional<PartyProfile> line = partyOf.apply(member).flatMap(PolityView::partyProfile);
         if (line.isPresent()) {
+            // Je loyaler (siehe Personality#loyalty, vorläufiger Platzhalter für Issue #14 "loyality"), desto
+            // stärker folgt der Abgeordnete dem Parteiprogramm statt allein seiner eigenen Persönlichkeit.
+            double loyalty = self.loyalty();
             Personality party = new Personality(line.get().order(), -line.get().economy(), 0);
-            utility += Satisfaction.of(party, polity, laws).score();
-            utility += Math.max(0, line.get().economy()) / 100.0 * REVENUE * Satisfaction.taxIndex(laws);
+            utility += Satisfaction.of(party, polity, laws).score() * loyalty;
+            utility += Math.max(0, line.get().economy()) / 100.0 * REVENUE * Satisfaction.taxIndex(laws) * loyalty;
         }
         return utility;
     }

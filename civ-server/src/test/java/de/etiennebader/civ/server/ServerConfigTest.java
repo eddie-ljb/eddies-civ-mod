@@ -78,8 +78,9 @@ class ServerConfigTest {
                 ServerSettings.defaults().currency(), ServerSettings.defaults().priceReference(),
                 ServerSettings.defaults().villagerIncome(), ServerSettings.defaults().tiers(),
                 ServerSettings.defaults().web(), ServerSettings.defaults().emigration(),
-                ServerSettings.defaults().levels(), ServerSettings.defaults().parties(),
-                ServerSettings.defaults().show(), new ServerSettings.EconomySettings(0.75, 3.5, 0.65));
+                ServerSettings.defaults().villagerPolitics(), ServerSettings.defaults().levels(),
+                ServerSettings.defaults().parties(), ServerSettings.defaults().show(),
+                new ServerSettings.EconomySettings(0.75, 3.5, 0.65));
         ServerConfig.write(file, written);
 
         assertEquals(written.economy(), ServerConfig.load(file).economy());

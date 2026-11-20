@@ -14,13 +14,16 @@ Wer eine Gemeinde betritt oder verlässt, sieht ihren Namen als Titel. Auf Grund
 
 Die Siedlungsstufe richtet sich nach allen Einwohnern: ab 10 Marktgemeinde, ab 30 Stadt, ab 80 Metropole. Jede Stufe erlaubt 8 Chunks mehr Gebiet (`claim_base` + `claim_per_member`, siehe [Konfiguration](Admin-Installation-und-Konfiguration.md)). Für die Gebietsgröße zählen Dorfbewohner nur zu einem Viertel, Land lässt sich also nicht allein durch Zucht vergrößern.
 
+**Claim-Kosten:** Jeder zusätzlich beanspruchte Chunk kostet die Gemeindekasse den per Recht `claim_cost_per_chunk` festgelegten Betrag (Standard: 0, also deaktiviert). Reicht die Kasse nicht, wird der Claim abgelehnt. Der Bürgermeister sieht den fehlenden Betrag in der Fehlermeldung.
+
 ## Dorfbewohner als Einwohner
 - Dorfbewohner, die das Gebiet einer Gemeinde betreten, werden dort Einwohner. In der Wildnis bleiben sie in ihrer bisherigen Gemeinde gemeldet. Stirbt ein Dorfbewohner, tritt er aus.
 - Jeder Dorfbewohner erwirtschaftet täglich Geld für die Gemeindekasse; Standard ist ¼ Smaragd. Zufriedene leisten bis zu 50 % mehr, Unzufriedene bis zu 50 % weniger.
 - **Persönlichkeit:** feste Ansichten auf drei Achsen – *Ordnung ↔ Freiheit*, *Sparsamkeit ↔ Großzügigkeit*, *Heimatverbundenheit*.
 - **Zufriedenheit** (-100 bis 100) setzt sich zusammen aus Grundstimmung, *Ordnung* (wie streng Explosionen, Feuer und Rechte von Fremden geregelt sind), *Steuern*, *Mitsprache* (gewählter Bürgermeister, Abstimmungen, Wahlrecht) und *Wohlstand* (Siedlungsstufe).
 - **Abwanderung:** Wer unter -30 Zufriedenheit fällt, denkt ans Wegziehen; je unzufriedener und rastloser, desto eher geht er am Tagesende. Gibt es eine Gemeinde, in der er deutlich zufriedener wäre, zieht er dorthin, sonst verschwindet er in die Wildnis. Höchstens ein Viertel der Dorfbewohner geht pro Tag. Abschaltbar mit `villager_emigration=false`.
-- Klick auf die Glocke im Gemeindehaus zeigt die Stimmung im Detail, `/civ stimmung` fasst sie im Chat zusammen. Schleichen + Rechtsklick mit leerer Hand auf einen Dorfbewohner zeigt seine Persönlichkeit und Zufriedenheit. Zufriedene lassen grüne Funken aufsteigen, Unzufriedene kleine Gewitterwolken.
+- Klick auf die Glocke im Gemeindehaus zeigt die Stimmung im Detail, `/civ stimmung` fasst sie im Chat zusammen. Schleichen + Rechtsklick mit leerer Hand auf einen Dorfbewohner zeigt seine Persönlichkeit, Zufriedenheit und Loyalität. Zufriedene lassen grüne Funken aufsteigen, Unzufriedene kleine Gewitterwolken.
+- **Loyalität** (-100 bis 100): anders als die tagesaktuelle Zufriedenheit sammelt sich Loyalität über die Zeit an – neue Einwohner haben nur ihre Heimatverbundenheit als Loyalität, mit wachsender Mitgliedsdauer (volles Gewicht nach 60 Tagen) schlägt die seitherige Zufriedenheit zunehmend durch. Dauerhaft zufriedene Dorfbewohner werden so loyaler, dauerhaft unzufriedene illoyaler. Loyalität gibt es auch zur eigenen Partei, zu deren Vorsitz (bzw. zum Bürgermeister/Vorsitz eines Bundes) und zum Arbeitgeber. Loyale Dorfbewohner folgen ihrer Partei beim Wählen stärker, illoyale schwächer; loyale wandern seltener ab (höchstens halb so wahrscheinlich wie unloyale, unabhängig von der reinen Tageszufriedenheit).
 
 ## Läden
 Spieler verkaufen eigene Waren an andere:
@@ -43,6 +46,22 @@ Grundstücke teilen das Gemeindeland auf. Nur ihre Inhaber dürfen dort bauen, u
 - Bürgermeister oder Bauamt markieren eine Straße mit dem Grundstücksstab und legen sie mit `/civ strasse anlegen <Name>` an; `aufheben <Name>` und `liste` gibt es auch.
 - Jede Gemeinde hat eine feste Postleitzahl. Grundstücke bis 12 Blöcke neben einer Straße bekommen Hausnummern: ungerade auf der einen, gerade auf der anderen Seite, aufsteigend entlang der Straße.
 - `/civ adresse [Spieler]` zeigt die Anschrift, `/civ adressen` listet die Straßen der Gemeinde. Dorfbewohner nennen ihre Anschrift beim Anklicken.
+
+### Schilder und Hausnummern zum Aufstellen
+Zusätzlich zur automatischen Adressvergabe oben gibt es eigene, von Hand beschriftbare Blöcke, die der Deko und Beschilderung dienen:
+
+| Block/Item | Zeilen | Zweck |
+|---|---|---|
+| Straßenschild | 1 | z. B. „Hauptstraße“ |
+| Hausnummer | 1 | z. B. „12“ |
+| Ortsschild | mehrzeilig | Gemeinde-Begrüßungsschild |
+| Länderschild | mehrzeilig | Landes-Begrüßungsschild |
+| Nationenschild | mehrzeilig | Nations-Begrüßungsschild |
+
+- Hinstellen, dann im Amboss den gewünschten Text als Namen vergeben (bei den mehrzeiligen Schildern trennt ein `|` die Zeilen, bis zu vier Zeilen à 32 Zeichen) und erneut platzieren – der Amboss-Name wird beim Setzen übernommen.
+- Rechtsklick zeigt den aktuellen Text in der Actionbar.
+- Rechtsklick mit einem Farbstoff färbt das Schild ein.
+- Craftbar: Straßenschild aus Stöcken und Eichenbrettern; Hausnummer aus Eisennuggets; Ortsschild aus Eichenbrettern und einem Stock; Länder- und Nationenschild aus Dunkeleichenbrettern und einem Stock (Nationenschild zusätzlich mit einem Smaragd in der Mitte).
 
 ## Schutz
 Im Gemeindegebiet gilt, solange das Recht nichts anderes erlaubt:
