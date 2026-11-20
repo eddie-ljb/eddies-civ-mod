@@ -1268,5 +1268,11 @@
   "eddies-civ-mod.handbook.page_11": "§lBörse§r\n\nFirmen sind an der Börse: /civ boerse, kaufen, verkaufen, depot. Gewinne schüttet die Leitung als Dividende aus. Zeitungen berichten und beeinflussen Wahlen.",
   "eddies-civ-mod.handbook.page_12": "§lGericht§r\n\nKlagen: /civ gericht klage straf|zivil|verfassung …\nAkte: /civ gericht fall <Nr>\nDort: Beweise aus der Hand, Aussagen, Zeugen, Plädoyers, Urteil und Berufung. Richterbank-Block öffnet das Gericht.",
   "eddies-civ-mod.handbook.page_13": "§lBünde und Symbole§r\n\nGemeinden schließen sich zu Ländern und Nationen zusammen: /civ bund. Jede Ebene hat eigene Befehle (/civ land …), Wahlkreise, Flagge (Banner) und Hymne.",
-  "eddies-civ-mod.handbook.page_14": "§lAlltag§r\n\nFreunde: /civ freund <Name>, Vertrauen gibt Baurecht. Post: Briefkasten-Block. Verträge: /civ vertrag. Auf der Webseite (/civ web) gibt es Karte, Wahlen, Börse, Presse, Justiz und Chat."
+  "eddies-civ-mod.handbook.page_14": "§lAlltag§r\n\nFreunde: /civ freund <Name>, Vertrauen gibt Baurecht. Post: Briefkasten-Block. Verträge: /civ vertrag. Auf der Webseite (/civ web) gibt es Karte, Wahlen, Börse, Presse, Justiz und Chat.",
+  "block.eddies-civ-mod.street_sign": "Straßenschild",
+  "block.eddies-civ-mod.house_number": "Hausnummer",
+  "block.eddies-civ-mod.town_sign": "Ortsschild",
+  "block.eddies-civ-mod.country_sign": "Länderschild",
+  "block.eddies-civ-mod.nation_sign": "Nationenschild",
+  "block.eddies-civ-mod.label.recolored": "Farbe geändert: %s"
 }

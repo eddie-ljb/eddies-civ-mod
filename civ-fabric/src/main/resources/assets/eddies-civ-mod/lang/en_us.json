@@ -1268,5 +1268,11 @@
   "eddies-civ-mod.handbook.page_11": "§lStock exchange§r\n\nCompanies are listed: /civ exchange, buy, sell, portfolio. Management pays profits as dividends. Newspapers report and sway elections.",
   "eddies-civ-mod.handbook.page_12": "§lCourt§r\n\nSue: /civ court sue straf|zivil|verfassung …\nFile: /civ court case <no>\nThere: evidence from your hand, testimony, witnesses, closing arguments, verdict and appeal. The judge's bench block opens the court.",
   "eddies-civ-mod.handbook.page_13": "§lFederations and symbols§r\n\nTowns join into states and nations: /civ federation. Each level has its own commands (/civ state …), districts, flag (banner) and anthem.",
-  "eddies-civ-mod.handbook.page_14": "§lDaily life§r\n\nFriends: /civ friend <name>, trust grants building rights. Mail: mailbox block. Contracts: /civ contract. The website (/civ web) has the map, elections, exchange, press, justice and chat."
+  "eddies-civ-mod.handbook.page_14": "§lDaily life§r\n\nFriends: /civ friend <name>, trust grants building rights. Mail: mailbox block. Contracts: /civ contract. The website (/civ web) has the map, elections, exchange, press, justice and chat.",
+  "block.eddies-civ-mod.street_sign": "Street Sign",
+  "block.eddies-civ-mod.house_number": "House Number",
+  "block.eddies-civ-mod.town_sign": "Town Sign",
+  "block.eddies-civ-mod.country_sign": "Country Sign",
+  "block.eddies-civ-mod.nation_sign": "Nation Sign",
+  "block.eddies-civ-mod.label.recolored": "Color changed: %s"
 }
