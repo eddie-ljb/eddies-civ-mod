@@ -24,6 +24,18 @@ zu zeigen:
 Außenposten bleiben schraffiert dargestellt, eigenes und fremdes Gebiet bleiben zusätzlich an Namen bzw.
 Textfarbe (grün/rot) erkennbar; nur die Flächenfarbe folgt dem Bund.
 
+## Wahlkarte
+
+Statt der Bundesfarbe lässt sich für die eigene Gemeinde die **Wahlkarte** einer vergangenen Wahl einblenden: Jeder
+Chunk zeigt die Farbe der Partei (bzw. des Kandidaten ohne Partei), die in seinem Wahlbezirk vorn liegt. Hat eine
+Gemeinde mehrere Wahlbezirke definiert, erscheinen diese dadurch getrennt auf der Karte, auch ohne Ergebnis schon
+anhand fester Bezirksfarben.
+
+- **Web-Karte:** Auswahlfeld „Ansicht" über der Karte; „Gebiete" zeigt die normale Bundeseinfärbung, jeder weitere
+  Eintrag eine vergangene Wahl. Ein zusätzlicher Partei-Filter grenzt auf eine Partei ein.
+- **Ingame-Karte:** Knopf „Wahlkarte: an/aus" neben dem Ebenen-Filter schaltet für die eigene Gemeinde auf die
+  Wahlkarte des jeweils letzten Ergebnisses um.
+
 ## Für Server-Betreiber
 
 Die Ebenen selbst (Kennung, Rang, Anzeigename) kommen aus `federation_levels`, siehe README. Eigene Ebenen

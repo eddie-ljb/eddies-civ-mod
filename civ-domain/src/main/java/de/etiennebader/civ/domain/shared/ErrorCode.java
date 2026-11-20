@@ -69,6 +69,8 @@ public enum ErrorCode {
     CLAIM_LIMIT_REACHED,
     /** Argumente: Chunk-X, Chunk-Z. */
     OUTPOST_LIMIT_REACHED,
+    /** Argumente: Chunk-X, Chunk-Z, fehlender Betrag. */
+    CLAIM_INSUFFICIENT_FUNDS,
     /** Argumente: Chunk-X, Chunk-Z. */
     NOT_SOVEREIGN,
 
