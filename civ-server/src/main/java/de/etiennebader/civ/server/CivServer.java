@@ -149,7 +149,8 @@ public final class CivServer {
         this.offices = new OfficeService(app, calendar, players, texts, announcements);
         this.federations = new FederationService(app, calendar, settings.levels(), texts, announcements);
         this.commands = new CivCommands(app, calendar, settings.currency(), texts, protection, voting);
-        this.parties = new PartyService(app, calendar, settings.currency(), settings.parties(), texts, announcements);
+        this.parties = new PartyService(app, calendar, settings.currency(), settings.parties(), players, texts,
+                announcements);
         this.lawBooks = new LawBookService(app, calendar, texts, announcements, federations);
         this.parliaments = new ParliamentService(app, texts, offices, voting);
         this.campaigns = new CampaignService(app, calendar, texts, offices);

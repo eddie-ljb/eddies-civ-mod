@@ -49,6 +49,7 @@ Parteien sind Zusammenschlüsse von Personen (Spieler und Dorfbewohner) über al
 - **Richtung:** zwei Achsen -100..100 – Ordnung (− Freiheit, + Ordnung) und Wirtschaft (− niedrige Steuern, + Ausbau). Die stärkere Achse ergibt das Wahlprogramm.
 - **Befehle:** `/civ partei gruenden <ordnung|freiheit|steuern|ausbau|mitte> <Name>`, `beitreten <Name>`, `austreten`, `info [Name]`, `liste`, `menue`; nur der Vorsitz: `richtung <Ordnung> <Wirtschaft>`, `wappen`, `aufloesen`.
 - **Dorfbewohner:** treten täglich mit etwas Glück einer passenden Partei bei und verlassen sie, wenn sie sich zu weit entfernt. Finden sich genug Gleichgesinnte ohne passende Partei (`villager_party_founders`, Standard 5), gründen sie eine. Abschaltbar mit `villager_parties=false`.
+- **Parteiliste (für Listenwahlen):** legt fest, in welcher Reihenfolge Sitze besetzt werden, die der Partei bei einer Listenwahl (`ballot_type=list`) zufallen. `/civ partei liste zeigen` zeigt die aktuelle Liste; `/civ partei liste setzen <Spieler...>` legt die Reihenfolge fest (Namen durch Leerzeichen getrennt); `/civ partei liste modus abstimmung|vorsitz` (nur Vorsitz) legt fest, ob Änderungen künftig eine Abstimmung aller Mitglieder brauchen oder der Vorsitz allein entscheidet. Kandidaten, die nicht auf der Liste stehen, rutschen in Kandidatur-Reihenfolge ans Ende; ohne gesetzte Liste gilt wie bisher die Kandidatur-Reihenfolge.
 
 ## Parlament
 Gemeinden und Bünde können ein Parlament haben; `parliament_seats` (0–99, Verfassungsartikel) legt die Sitzzahl fest, 0 = kein Parlament.
