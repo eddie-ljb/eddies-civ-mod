@@ -123,6 +123,8 @@ public final class TranslationKeys {
     /** Worüber man mit einem Dorfbewohner redet (Issue #18). */
     public static String dialogueTopic(VillagerDialogue.Topic topic) {
         return PREFIX + "dialogue_topic." + topic.name().toLowerCase(Locale.ROOT);
+    }
+
     /** Name einer Konjunkturphase, z. B. im {@code /civ konjunktur}-Befehl. */
     public static String conjuncturePhase(BusinessPhase phase) {
         return PREFIX + "conjuncture_phase." + phase.name().toLowerCase(Locale.ROOT);

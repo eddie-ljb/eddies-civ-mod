@@ -361,24 +361,29 @@ public final class VillagerService {
      */
     private void socialAndCrime(Day day) {
         List<List<PersonRef>> villagersByTown = new ArrayList<>();
+
         for (PolityView town : queries.polities()) {
             if (town.kind() != PolityKind.TERRITORIAL) {
                 continue;
             }
+
             List<PersonRef> villagers = town.members().stream()
                     .map(Membership::member)
                     .filter(PersonRef.class::isInstance)
                     .map(PersonRef.class::cast)
                     .toList();
+
             villagersByTown.add(villagers);
+
             for (PersonRef villager : villagers) {
                 rollCrime(town, villager, day);
             }
         }
+
         social.endOfDay(villagersByTown, day);
     }
-      
-      /**
+
+    /**
      * Gemeinden ohne Spieler-Bürgermeister regiert kommissarisch der dienstälteste Dorfbewohner-Bürger
      * ({@link PolityView#mayor(boolean)}); er ändert das Recht, so wie es {@link CivApplication#villagerLegislator()}
      * für ihn vorschlägt, genau wie ein Dorfbewohner-Abgeordneter im Parlament einen Antrag stellen würde. Nur eine
@@ -389,49 +394,56 @@ public final class VillagerService {
             if (town.kind() != PolityKind.TERRITORIAL) {
                 continue;
             }
-            List<PersonRef> villagers = town.members().stream()
-                    .map(Membership::member)
-                    .filter(PersonRef.class::isInstance)
-                    .map(PersonRef.class::cast)
-                    .toList();
-            villagersByTown.add(villagers);
-            for (PersonRef villager : villagers) {
-                rollCrime(town, villager, day);
+
+            if (!(town.mayor(true).orElse(null) instanceof PersonRef villagerMayor)) {
+                continue;
             }
+
+            app.villagerLegislator().propose(villagerMayor, town).ifPresent(motion -> {
+                if (motion instanceof Motion.Change change) {
+                    try {
+                        app.amendLaw().execute(
+                                new AmendLaw.Command(town.id(), villagerMayor, change.change(), day)
+                        );
+                    } catch (DomainException e) {
+                        // Verfassungsartikel oder tagende Parlamente entscheiden anders;
+                        // dann bleibt es beim Status quo.
+                    }
+                }
+            });
         }
-        social.endOfDay(villagersByTown, day);
     }
 
     private void rollCrime(PolityView town, PersonRef villager, Day day) {
         Personality personality = Personality.of(villager);
         int score = satisfactionOf(villager).map(Satisfaction::score).orElse(0);
+
         if (personality.order() >= 0 || score >= 0) {
             return;
         }
+
         int severity = Math.min(100, (-personality.order() - score) / 2);
         int chancePercent = Math.min(CRIME_MAX_CHANCE_PERCENT, severity / 20);
+
         if (chancePercent <= 0) {
             return;
         }
-        long mix = villager.uuid().getMostSignificantBits() ^ Long.rotateLeft(day.value() + 1, 13);
+
+        long mix = villager.uuid().getMostSignificantBits()
+                ^ Long.rotateLeft(day.value() + 1, 13);
+
         if (Math.floorMod(mix * 0x9E3779B97F4A7C15L, 100L) >= chancePercent) {
             return;
         }
-        announcements.add(Announcement.toTown(town.id(), Message.of(MessageKey.VILLAGER_CRIME_SUSPECTED,
-                texts.actor(villager), de.etiennebader.civ.server.justice.JusticeService.kindName(CaseKind.CRIMINAL))));
-            if (!(town.mayor(true).orElse(null) instanceof PersonRef villagerMayor)) {
-                continue;
-            }
-            app.villagerLegislator().propose(villagerMayor, town).ifPresent(motion -> {
-                if (motion instanceof Motion.Change change) {
-                    try {
-                        app.amendLaw().execute(new AmendLaw.Command(town.id(), villagerMayor, change.change(), day));
-                    } catch (DomainException e) {
-                        // Verfassungsartikel oder tagende Parlamente entscheiden anders; dann bleibt es beim Status quo.
-                    }
-                }
-            });
-        }
+
+        announcements.add(Announcement.toTown(
+                town.id(),
+                Message.of(
+                        MessageKey.VILLAGER_CRIME_SUSPECTED,
+                        texts.actor(villager),
+                        de.etiennebader.civ.server.justice.JusticeService.kindName(CaseKind.CRIMINAL)
+                )
+        ));
     }
 
     /**
