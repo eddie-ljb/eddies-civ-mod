@@ -1,15 +1,14 @@
 package de.etiennebader.civ.fabric.content;
 
+import com.mojang.serialization.Codec;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -37,7 +36,7 @@ public final class LabelBlockEntity extends BlockEntity {
     }
 
     public void setLines(List<String> newLines, int maxLines) {
-        List<String> trimmed = new ArrayList<>(newLines.size());
+        List<String> trimmed = new java.util.ArrayList<>(newLines.size());
         for (String line : newLines) {
             if (trimmed.size() >= maxLines) {
                 break;
@@ -59,38 +58,22 @@ public final class LabelBlockEntity extends BlockEntity {
     }
 
     @Override
-    protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
-        super.saveAdditional(tag, registries);
-        net.minecraft.nbt.ListTag list = new net.minecraft.nbt.ListTag();
+    protected void saveAdditional(ValueOutput output) {
+        super.saveAdditional(output);
+        ValueOutput.TypedOutputList<String> list = output.list(LINES_KEY, Codec.STRING);
         for (String line : lines) {
-            list.add(net.minecraft.nbt.StringTag.valueOf(line));
+            list.add(line);
         }
-        tag.put(LINES_KEY, list);
         if (color != null) {
-            tag.putString(COLOR_KEY, color.getSerializedName());
+            output.putString(COLOR_KEY, color.getSerializedName());
         }
     }
 
     @Override
-    protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
-        super.loadAdditional(tag, registries);
-        List<String> loaded = new ArrayList<>();
-        if (tag.get(LINES_KEY) instanceof net.minecraft.nbt.ListTag list) {
-            for (Tag element : list) {
-                if (element instanceof net.minecraft.nbt.StringTag stringTag) {
-                    loaded.add(stringTag.asString(""));
-                }
-            }
-        }
-        this.lines = List.copyOf(loaded);
-        this.color = tag.contains(COLOR_KEY) ? DyeColor.byName(tag.getString(COLOR_KEY, ""), null) : null;
-    }
-
-    @Override
-    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
-        CompoundTag tag = new CompoundTag();
-        saveAdditional(tag, registries);
-        return tag;
+    protected void loadAdditional(ValueInput input) {
+        super.loadAdditional(input);
+        this.lines = List.copyOf(input.listOrEmpty(LINES_KEY, Codec.STRING).stream().toList());
+        this.color = input.getString(COLOR_KEY).map(name -> DyeColor.byName(name, null)).orElse(null);
     }
 
     public String joinedLines() {

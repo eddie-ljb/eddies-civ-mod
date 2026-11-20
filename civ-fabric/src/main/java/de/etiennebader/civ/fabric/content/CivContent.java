@@ -166,8 +166,8 @@ public final class CivContent {
 
         ResourceKey<BlockEntityType<?>> entityTypeKey = ResourceKey.create(Registries.BLOCK_ENTITY_TYPE, LABEL_BLOCK_ENTITY_ID);
         labelTypeHolder[0] = Registry.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, entityTypeKey,
-                BlockEntityType.Builder.of((pos, state) -> new LabelBlockEntity(labelTypeHolder[0], pos, state),
-                        streetSign, houseNumber, townSign, countrySign, nationSign).build(null));
+                new BlockEntityType<>((pos, state) -> new LabelBlockEntity(labelTypeHolder[0], pos, state),
+                        java.util.Set.of(streetSign, houseNumber, townSign, countrySign, nationSign)));
 
         registerTab(townHallItem, bankItem, marketItem, constitutionItem, lawBook, plotWand, ballotBoxItem,
                 electionPosterItem, mailboxItem, newsstandItem, stockExchangeItem, courtBenchItem, streetSignItem,

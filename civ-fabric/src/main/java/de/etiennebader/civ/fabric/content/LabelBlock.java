@@ -8,9 +8,9 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.DyeColor;
-import net.minecraft.world.item.DyeItem;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.EntityBlock;
@@ -23,6 +23,7 @@ import net.minecraft.world.phys.BlockHitResult;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
 
@@ -37,6 +38,25 @@ import java.util.function.Supplier;
  * Rechtsklick den aktuellen Text in der Actionbar.
  */
 public final class LabelBlock extends Block implements EntityBlock {
+
+    /** 26.3 hat kein {@code DyeItem.getDyeColor()} mehr; Items.DYE ist eine ColorCollection ohne Rückweg. */
+    private static final Map<Item, DyeColor> DYE_COLORS = Map.ofEntries(
+            Map.entry(Items.DYE.white(), DyeColor.WHITE),
+            Map.entry(Items.DYE.orange(), DyeColor.ORANGE),
+            Map.entry(Items.DYE.magenta(), DyeColor.MAGENTA),
+            Map.entry(Items.DYE.lightBlue(), DyeColor.LIGHT_BLUE),
+            Map.entry(Items.DYE.yellow(), DyeColor.YELLOW),
+            Map.entry(Items.DYE.lime(), DyeColor.LIME),
+            Map.entry(Items.DYE.pink(), DyeColor.PINK),
+            Map.entry(Items.DYE.gray(), DyeColor.GRAY),
+            Map.entry(Items.DYE.lightGray(), DyeColor.LIGHT_GRAY),
+            Map.entry(Items.DYE.cyan(), DyeColor.CYAN),
+            Map.entry(Items.DYE.purple(), DyeColor.PURPLE),
+            Map.entry(Items.DYE.blue(), DyeColor.BLUE),
+            Map.entry(Items.DYE.brown(), DyeColor.BROWN),
+            Map.entry(Items.DYE.green(), DyeColor.GREEN),
+            Map.entry(Items.DYE.red(), DyeColor.RED),
+            Map.entry(Items.DYE.black(), DyeColor.BLACK));
 
     private final Supplier<BlockEntityType<LabelBlockEntity>> entityType;
     private final int maxLines;
@@ -72,13 +92,16 @@ public final class LabelBlock extends Block implements EntityBlock {
         if (level.isClientSide() || !(level.getBlockEntity(pos) instanceof LabelBlockEntity entity)) {
             return InteractionResult.SUCCESS;
         }
-        if (stack.getItem() instanceof DyeItem dyeItem) {
-            entity.setColor(dyeItem.getDyeColor());
+        DyeColor dyeColor = DYE_COLORS.get(stack.getItem());
+        if (dyeColor != null) {
+            entity.setColor(dyeColor);
             if (!player.getAbilities().instabuild) {
                 stack.shrink(1);
             }
-            player.displayClientMessage(Component.translatable("block." + de.etiennebader.civ.EddiesCivMod.MOD_ID
-                    + ".label.recolored", colorName(dyeItem.getDyeColor())), true);
+            if (player instanceof ServerPlayer serverPlayer) {
+                serverPlayer.sendSystemMessage(Component.translatable("block." + de.etiennebader.civ.EddiesCivMod.MOD_ID
+                        + ".label.recolored", colorName(dyeColor)), true);
+            }
             return InteractionResult.CONSUME;
         }
         showLabel(player, entity);
@@ -96,13 +119,13 @@ public final class LabelBlock extends Block implements EntityBlock {
     }
 
     private void showLabel(Player player, LabelBlockEntity entity) {
-        if (!(player instanceof ServerPlayer)) {
+        if (!(player instanceof ServerPlayer serverPlayer)) {
             return;
         }
         String text = entity.lines().isEmpty()
                 ? ""
                 : entity.joinedLines();
-        player.displayClientMessage(Component.literal(text), true);
+        serverPlayer.sendSystemMessage(Component.literal(text), true);
     }
 
     private static String colorName(DyeColor color) {
