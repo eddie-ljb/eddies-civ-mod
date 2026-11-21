@@ -38,6 +38,7 @@ import de.etiennebader.civ.server.community.CommunityService;
 import de.etiennebader.civ.server.company.CompanyService;
 import de.etiennebader.civ.server.constitution.ConstitutionService;
 import de.etiennebader.civ.server.federation.FederationService;
+import de.etiennebader.civ.server.federation.VillagerFederations;
 import de.etiennebader.civ.server.law.LawBookService;
 import de.etiennebader.civ.server.level.LevelService;
 import de.etiennebader.civ.server.market.ItemTraits;
@@ -101,6 +102,7 @@ public final class CivServer {
     private final TownService towns;
     private final PlotService plots;
     private final VillagerService villagers;
+    private final VillagerFederations villagerFederations;
     private final Announcements announcements = new Announcements();
     private final VotingService voting;
     private final OfficeService offices;
@@ -161,6 +163,7 @@ public final class CivServer {
         this.towns = new TownService(app.queries(), settings, texts, commands, territory);
         this.plots = new PlotService(app, calendar, players, texts);
         this.villagers = new VillagerService(app, settings, texts, announcements);
+        this.villagerFederations = new VillagerFederations(app, federations, announcements);
         this.townHalls = new TownHallService(app, calendar, texts, announcements);
         this.shops = new ShopService(app, calendar, settings.currency(), texts);
         this.civil = new CivilService(app, calendar, players, settings.currency(), texts, announcements,
@@ -234,6 +237,9 @@ public final class CivServer {
         offices.endOfDay(day);
         parties.endOfDay(day);
         villagers.endOfDay(day);
+        if (settings.ambitions()) {
+            villagerFederations.endOfDay(day);
+        }
         campaigns.endOfDay(day);
         civil.endOfDay(day);
         justice.endOfDay(day);
@@ -530,6 +536,10 @@ public final class CivServer {
     }
 
     /** Für Tests und spätere Etappen, die weitere Use Cases brauchen. */
+    public VillagerFederations villagerFederations() {
+        return villagerFederations;
+    }
+
     CivApplication app() {
         return app;
     }

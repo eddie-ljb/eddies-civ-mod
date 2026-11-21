@@ -28,10 +28,20 @@ import java.util.Objects;
  * @param levels         politische Ebenen, auf denen Bünde gegründet werden können
  * @param parties        ob und ab wie vielen Gleichgesinnten Dorfbewohner Parteien gründen
  * @param show           Inszenierung: Live-Auszählung, Debatten, Hymnen, Weltkarte
+ * @param ambitions      ob ehrgeizige Dorfbewohner Firmen, Parteien und Bünde gründen, kandidieren und Firmen übernehmen
  */
 public record ServerSettings(long ticksPerDay, int claimBase, int claimPerMember, CurrencyId currency,
                              Money priceReference, Money villagerIncome, TierThresholds tiers, WebSettings web,
-                             boolean emigration, Levels levels, PartySettings parties, ShowSettings show) {
+                             boolean emigration, Levels levels, PartySettings parties, ShowSettings show,
+                             boolean ambitions) {
+
+    /** Mit ehrgeizigen Dorfbewohnern. */
+    public ServerSettings(long ticksPerDay, int claimBase, int claimPerMember, CurrencyId currency,
+                          Money priceReference, Money villagerIncome, TierThresholds tiers, WebSettings web,
+                          boolean emigration, Levels levels, PartySettings parties, ShowSettings show) {
+        this(ticksPerDay, claimBase, claimPerMember, currency, priceReference, villagerIncome, tiers, web, emigration,
+                levels, parties, show, true);
+    }
 
     /** Mit Standard-Inszenierung. */
     public ServerSettings(long ticksPerDay, int claimBase, int claimPerMember, CurrencyId currency,
@@ -188,7 +198,7 @@ public record ServerSettings(long ticksPerDay, int claimBase, int claimPerMember
         return new ServerSettings(ticksPerDay, defaults.claimBase(), defaults.claimPerMember(), defaults.currency(),
                 defaults.priceReference(), defaults.villagerIncome(), defaults.tiers(), defaults.web().disabled(),
                 defaults.emigration(), defaults.levels(), defaults.parties(),
-                new ShowSettings(false, 60, true, 5, false, false, 6));
+                new ShowSettings(false, 60, true, 5, false, false, 6), defaults.ambitions());
     }
 
     /**

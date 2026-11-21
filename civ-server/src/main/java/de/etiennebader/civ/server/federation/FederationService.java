@@ -165,10 +165,28 @@ public final class FederationService {
             return Reply.failure(Message.of(MessageKey.FEDERATION_GUEST_TAKEN, guest.name().value(),
                     parent.get().name().value()));
         }
+        sendInvitation(host, guest);
+        return Reply.success(Message.of(MessageKey.FEDERATION_INVITED, guest.name().value(), host.name().value()));
+    }
+
+    /** Lädt eine Gemeinde oder einen Bund ein und benachrichtigt sie; die Prüfungen macht der Aufrufer. */
+    public void sendInvitation(PolityView host, PolityView guest) {
         invitations.computeIfAbsent(guest.id(), id -> new LinkedHashSet<>()).add(host.id());
         announcements.add(Announcement.toTown(guest.id(), Message.of(MessageKey.FEDERATION_INVITATION,
                 host.name().value(), guest.name().value())));
-        return Reply.success(Message.of(MessageKey.FEDERATION_INVITED, guest.name().value(), host.name().value()));
+    }
+
+    /** Die Bünde, die diese Gemeinde oder diesen Bund eingeladen haben. */
+    public Set<PolityId> invitationsFor(PolityId guest) {
+        return Set.copyOf(invitations.getOrDefault(guest, Set.of()));
+    }
+
+    /** Nimmt eine Einladung für die Gemeinde an, etwa durch einen Dorfbewohner als Bürgermeister. */
+    public void accept(PolityView host, PolityView guest) {
+        app.joinFederation().execute(new JoinFederation.Command(host.id(), guest.id(), calendar.today()));
+        invitations.remove(guest.id());
+        announcements.add(Announcement.toTown(host.id(), Message.of(MessageKey.FEDERATION_JOINED,
+                guest.name().value(), host.name().value())));
     }
 
     /** {@code /civ bund beitreten <Bund>}: nimmt eine Einladung an. */

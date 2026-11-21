@@ -29,6 +29,7 @@ public final class ServerConfig {
     static final String CITY_AT = "city_inhabitants";
     static final String METROPOLIS_AT = "metropolis_inhabitants";
     static final String EMIGRATION = "villager_emigration";
+    static final String AMBITIONS = "villager_ambitions";
     static final String LEVELS = "federation_levels";
     static final String VILLAGER_PARTIES = "villager_parties";
     static final String PARTY_FOUNDERS = "villager_party_founders";
@@ -55,6 +56,7 @@ public final class ServerConfig {
             villager_income_hundredths_per_day: Einnahmen der Gemeindekasse je Dorfbewohner und Tag (100 = 1 Smaragd)
             market_town_inhabitants, city_inhabitants, metropolis_inhabitants: Einwohner fuer die Siedlungsstufen
             villager_emigration: ob sehr unzufriedene Dorfbewohner ihre Gemeinde verlassen (true/false)
+            villager_ambitions: ob ehrgeizige Dorfbewohner Firmen, Parteien und Buende gruenden, kandidieren und Firmen uebernehmen (true/false)
             federation_levels: eigene Ebenen fuer Buende als id:Name:Rang, z. B. kreis:Kreis:10,bund:Bund:40
               (eingebaut: gemeinde 0, land 20, nation 30; ein Bund steht immer hoeher als seine Glieder)
             villager_parties: ob Dorfbewohner Parteien beitreten und gruenden (true/false)
@@ -124,7 +126,8 @@ public final class ServerConfig {
                         Boolean.parseBoolean(properties.getProperty(VILLAGER_PARTIES,
                                 Boolean.toString(defaults.parties().villagers())).strip()),
                         (int) number(properties, PARTY_FOUNDERS, defaults.parties().founders(), 2)),
-                show(properties, defaults.show()));
+                show(properties, defaults.show()),
+                Boolean.parseBoolean(properties.getProperty(AMBITIONS, Boolean.toString(defaults.ambitions())).strip()));
     }
 
     private static ServerSettings.ShowSettings show(Properties properties, ServerSettings.ShowSettings defaults) {
@@ -158,6 +161,7 @@ public final class ServerConfig {
         properties.setProperty(CITY_AT, Integer.toString(settings.tiers().city()));
         properties.setProperty(METROPOLIS_AT, Integer.toString(settings.tiers().metropolis()));
         properties.setProperty(EMIGRATION, Boolean.toString(settings.emigration()));
+        properties.setProperty(AMBITIONS, Boolean.toString(settings.ambitions()));
         properties.setProperty(LEVELS, settings.levels().spec());
         properties.setProperty(VILLAGER_PARTIES, Boolean.toString(settings.parties().villagers()));
         properties.setProperty(PARTY_FOUNDERS, Integer.toString(settings.parties().founders()));

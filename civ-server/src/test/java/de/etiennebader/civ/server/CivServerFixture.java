@@ -151,6 +151,14 @@ public final class CivServerFixture {
         return server.protection();
     }
 
+    public de.etiennebader.civ.application.CivApplication app() {
+        return server.app();
+    }
+
+    public de.etiennebader.civ.server.federation.VillagerFederations villagerFederations() {
+        return server.villagerFederations();
+    }
+
     public WorldQueries queries() {
         return server.queries();
     }

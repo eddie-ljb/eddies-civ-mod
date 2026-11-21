@@ -9,6 +9,9 @@ import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.actor.PlayerRef;
 import de.etiennebader.civ.domain.law.ParameterValue;
 import de.etiennebader.civ.domain.law.StandardParameters;
+import de.etiennebader.civ.domain.exchange.Side;
+import de.etiennebader.civ.domain.polity.PolityKind;
+import de.etiennebader.civ.domain.polity.PolityName;
 import de.etiennebader.civ.domain.polity.Election;
 import de.etiennebader.civ.domain.polity.MembershipType;
 import de.etiennebader.civ.domain.polity.Office;
@@ -135,6 +138,29 @@ class VillagerAmbitionsTest {
     void deterministic() {
         settle(10, 0, 8_000);
         VillagerAmbitions.Report first = fixture.app.villagerAmbitions().execute(DAY);
-        assertEquals(first, new VillagerAmbitions.Report(first.companies(), first.parties(), first.candidacies()));
+        assertEquals(first, new VillagerAmbitions.Report(first.companies(), first.parties(), first.candidacies(), first.takeovers()));
+    }
+
+    @Test
+    @DisplayName("Übernahme: Wer mehr als die Hälfte der Aktien hält, übernimmt die Firmenleitung; vorher nicht")
+    void takeOver() {
+        fixture.app.depositEmeralds().execute(new DepositEmeralds.Command(alice, emeralds(5_000), DAY));
+        PolityId firm = fixture.app.companies().foundCompany(alice, PolityName.of("Holz AG"), emeralds(2_000), DAY);
+        PersonRef raider = settle(1, 0, 0).getFirst();
+        fixture.app.companies().admit(alice, firm, PolityKind.COMPANY, raider, DAY);
+        assertFalse(fixture.app.takeOverCompany().execute(firm, raider, DAY), "noch keine Mehrheit");
+
+        fixture.app.trading().place(alice, firm, Side.SELL, 600, 1, DAY);
+        fixture.app.depositEmeralds().execute(new DepositEmeralds.Command(raider, emeralds(5_000), DAY));
+        fixture.app.trading().place(raider, firm, Side.BUY, 600, 5, DAY);
+        assertEquals(600L, fixture.app.queries().exchange().sharesOf(firm, raider));
+
+        VillagerAmbitions.Report report = fixture.app.villagerAmbitions().execute(DAY);
+        assertEquals(1, report.takeovers());
+        PolityView company = fixture.app.queries().polity(firm).orElseThrow();
+        assertTrue(company.holds(raider, Office.MAYOR));
+        assertFalse(company.holds(alice, Office.MAYOR));
+        assertTrue(company.isMember(alice));
+        assertFalse(fixture.app.takeOverCompany().execute(firm, raider, DAY), "schon Leiter");
     }
 }
