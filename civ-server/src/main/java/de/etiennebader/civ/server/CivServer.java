@@ -38,6 +38,7 @@ import de.etiennebader.civ.server.community.CommunityService;
 import de.etiennebader.civ.server.company.CompanyService;
 import de.etiennebader.civ.server.constitution.ConstitutionService;
 import de.etiennebader.civ.server.federation.FederationService;
+import de.etiennebader.civ.server.federation.VillagerFederations;
 import de.etiennebader.civ.server.law.LawBookService;
 import de.etiennebader.civ.server.level.LevelService;
 import de.etiennebader.civ.server.market.ItemTraits;
@@ -101,6 +102,7 @@ public final class CivServer {
     private final TownService towns;
     private final PlotService plots;
     private final VillagerService villagers;
+    private final VillagerFederations villagerFederations;
     private final de.etiennebader.civ.server.conjuncture.ConjunctureService conjuncture;
     private final Announcements announcements = new Announcements();
     private final VotingService voting;
@@ -164,6 +166,7 @@ public final class CivServer {
         this.territory = new TerritoryWatcher(app.queries(), texts);
         this.towns = new TownService(app.queries(), settings, texts, commands, territory);
         this.plots = new PlotService(app, calendar, players, texts);
+        this.villagerFederations = new VillagerFederations(app, federations, announcements);
         this.conjuncture = new de.etiennebader.civ.server.conjuncture.ConjunctureService(app.queries());
         this.villagers = new VillagerService(app, settings, texts, announcements, conjuncture, calendar);
         this.townHalls = new TownHallService(app, calendar, texts, announcements);
@@ -242,6 +245,9 @@ public final class CivServer {
         offices.endOfDay(day);
         parties.endOfDay(day);
         villagers.endOfDay(day);
+        if (settings.ambitions()) {
+            villagerFederations.endOfDay(day);
+        }
         federations.autoDecideInvitations(day, settings.villagerPolitics());
         campaigns.endOfDay(day);
         civil.endOfDay(day);
@@ -548,6 +554,10 @@ public final class CivServer {
 
     public PlayerDirectory players() {
         return players;
+    }
+
+    public VillagerFederations villagerFederations() {
+        return villagerFederations;
     }
 
     /** Für Tests und spätere Etappen, die weitere Use Cases brauchen. */

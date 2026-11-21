@@ -32,11 +32,22 @@ import java.util.Objects;
  * @param parties        ob und ab wie vielen Gleichgesinnten Dorfbewohner Parteien gründen
  * @param show           Inszenierung: Live-Auszählung, Debatten, Hymnen, Weltkarte
  * @param economy        Fein-tuning der Marktpreissimulation (Preisfaktor-Grenzen und -Dämpfung)
+ * @param ambitions      ob ehrgeizige Dorfbewohner Firmen, Parteien und Bünde gründen, kandidieren, Gebiet beanspruchen,
+ *                       Firmen übernehmen und führen
  */
 public record ServerSettings(long ticksPerDay, int claimBase, int claimPerMember, CurrencyId currency,
                              Money priceReference, Money villagerIncome, TierThresholds tiers, WebSettings web,
                              boolean emigration, boolean villagerPolitics, Levels levels, PartySettings parties,
-                             ShowSettings show, EconomySettings economy) {
+                             ShowSettings show, EconomySettings economy, boolean ambitions) {
+
+    /** Mit ehrgeizigen Dorfbewohnern. */
+    public ServerSettings(long ticksPerDay, int claimBase, int claimPerMember, CurrencyId currency,
+                          Money priceReference, Money villagerIncome, TierThresholds tiers, WebSettings web,
+                          boolean emigration, boolean villagerPolitics, Levels levels, PartySettings parties,
+                          ShowSettings show, EconomySettings economy) {
+        this(ticksPerDay, claimBase, claimPerMember, currency, priceReference, villagerIncome, tiers, web, emigration,
+                villagerPolitics, levels, parties, show, economy, true);
+    }
 
     /** Mit Standard-Wirtschaftssimulation. */
     public ServerSettings(long ticksPerDay, int claimBase, int claimPerMember, CurrencyId currency,

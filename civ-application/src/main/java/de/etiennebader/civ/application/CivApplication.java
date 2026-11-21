@@ -10,6 +10,8 @@ import de.etiennebader.civ.application.civil.StreetUseCases;
 import de.etiennebader.civ.application.company.CompanyUseCases;
 import de.etiennebader.civ.application.company.ProductionUseCases;
 import de.etiennebader.civ.application.company.Trading;
+import de.etiennebader.civ.application.company.TakeOverCompany;
+import de.etiennebader.civ.application.company.VillagerBusiness;
 import de.etiennebader.civ.application.company.VillagerInvestors;
 import de.etiennebader.civ.application.constitution.ChangePreamble;
 import de.etiennebader.civ.application.constitution.ProclaimConstitution;
@@ -61,6 +63,7 @@ import de.etiennebader.civ.application.polity.ProposeLawChange;
 import de.etiennebader.civ.application.polity.ProposeMotion;
 import de.etiennebader.civ.application.polity.RepealStatute;
 import de.etiennebader.civ.application.polity.TallyProposals;
+import de.etiennebader.civ.application.population.VillagerAmbitions;
 import de.etiennebader.civ.application.population.Campaign;
 import de.etiennebader.civ.application.population.PersonalityLegislator;
 import de.etiennebader.civ.application.population.PersonalityVoter;
@@ -130,6 +133,9 @@ public final class CivApplication {
     private final JusticeUseCases justice;
     private final PressInfluence pressInfluence;
     private final VillagerInvestors villagerInvestors;
+    private final VillagerAmbitions villagerAmbitions;
+    private final VillagerBusiness villagerBusiness;
+    private final TakeOverCompany takeOverCompany;
     private final FoundParty foundParty;
     private final JoinParty joinParty;
     private final LeaveParty leaveParty;
@@ -231,6 +237,11 @@ public final class CivApplication {
         this.justice = new JusticeUseCases(aggregates, ids);
         this.villagerInvestors = new VillagerInvestors(() -> new WorldQueries(repositories), trading);
         this.foundParty = new FoundParty(aggregates, ids);
+        this.takeOverCompany = new TakeOverCompany(aggregates);
+        this.villagerAmbitions = new VillagerAmbitions(() -> new WorldQueries(repositories), companies, foundParty,
+                standForElection, trading, takeOverCompany, claimChunk);
+        this.villagerBusiness = new VillagerBusiness(() -> new WorldQueries(repositories), companies, production,
+                contracts, buyPlot);
         this.joinParty = new JoinParty(aggregates);
         this.leaveParty = new LeaveParty(aggregates, dissolvePolity);
         this.changePartyProgram = new ChangePartyProgram(aggregates, ids, proposeMotion);
@@ -463,6 +474,18 @@ public final class CivApplication {
 
     public PressInfluence pressInfluence() {
         return pressInfluence;
+    }
+
+    public TakeOverCompany takeOverCompany() {
+        return takeOverCompany;
+    }
+
+    public VillagerBusiness villagerBusiness() {
+        return villagerBusiness;
+    }
+
+    public VillagerAmbitions villagerAmbitions() {
+        return villagerAmbitions;
     }
 
     public VillagerInvestors villagerInvestors() {
