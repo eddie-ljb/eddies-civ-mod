@@ -257,6 +257,26 @@ public final class StandardParameters {
     public static final ParameterKey<Long> NEUTRALITY_FEE_PER_DAY = ParameterKey.constrained(
             "neutrality_fee_per_day", Long.class, 100L, fee -> fee >= 0);
 
+    /** Ab diesem Kriegswillen (0-100) darf der Bürgermeister Krieg erklären; abhängig von Persönlichkeiten, Parteien, Ansprüchen. */
+    public static final ParameterKey<Long> WAR_WILL_THRESHOLD = ParameterKey.constrained(
+            "war_will_threshold", Long.class, 50L, value -> value >= 0 && value <= 100);
+
+    /** Grenz-Chunks, die der Sieger eines entschiedenen Kriegs fordert (0 = keine Gebietseroberung). */
+    public static final ParameterKey<Long> CONQUEST_CHUNKS_PER_WIN = ParameterKey.constrained(
+            "conquest_chunks_per_win", Long.class, 2L, value -> value >= 0 && value <= 16);
+
+    /** Kosten je Soldat für eine Stufe Ausbildung, aus der Gemeindekasse (kleinste Währungseinheit). */
+    public static final ParameterKey<Long> TRAINING_COST_PER_HEAD = ParameterKey.constrained(
+            "training_cost_per_head", Long.class, 20L, value -> value >= 0);
+
+    /** Kosten je Soldat für eine Stufe Ausrüstung, aus der Gemeindekasse. */
+    public static final ParameterKey<Long> EQUIPMENT_COST_PER_HEAD = ParameterKey.constrained(
+            "equipment_cost_per_head", Long.class, 50L, value -> value >= 0);
+
+    /** Kosten je Lazarettbett, aus der Gemeindekasse. */
+    public static final ParameterKey<Long> HOSPITAL_BED_COST = ParameterKey.constrained(
+            "hospital_bed_cost", Long.class, 200L, value -> value >= 0);
+
     /** Täglicher Sold je einfachem Soldaten in der Garnison, aus der Gemeindekasse. 0 (Standard) = unbezahlt. */
     public static final ParameterKey<Long> SOLDIER_WAGE = ParameterKey.constrained("soldier_wage", Long.class, 0L,
             wage -> wage >= 0);
@@ -321,7 +341,12 @@ public final class StandardParameters {
                 WAR_REPARATIONS_PER_STRENGTH_POINT,
                 SOLDIER_WAGE,
                 OFFICER_WAGE,
-                NEUTRALITY_FEE_PER_DAY
+                NEUTRALITY_FEE_PER_DAY,
+                WAR_WILL_THRESHOLD,
+                CONQUEST_CHUNKS_PER_WIN,
+                TRAINING_COST_PER_HEAD,
+                EQUIPMENT_COST_PER_HEAD,
+                HOSPITAL_BED_COST
         );
     }
 

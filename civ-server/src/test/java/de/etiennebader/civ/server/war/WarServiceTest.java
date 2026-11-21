@@ -44,6 +44,11 @@ class WarServiceTest {
         assertTrue(server.commands().found(b(), "Suedhain").success());
     }
 
+    private void war() {
+        assertTrue(server.war().claim(a(), "Suedhain").success());
+        assertTrue(server.war().declare(a(), "Suedhain").success());
+    }
+
     private PolityId id(String name) {
         return server.queries().polityNamed(name).orElseThrow().id();
     }
@@ -55,6 +60,9 @@ class WarServiceTest {
         assertFalse(server.war().declare(caller(carol, "Carol", 8), "Suedhain").success());
         assertFalse(server.war().declare(a(), "Nordhain").success());
         assertFalse(server.war().declare(a(), "Nirgendwo").success());
+        assertFalse(server.war().declare(a(), "Suedhain").success(), "ohne Anspruch fehlt der Kriegswille");
+        assertTrue(server.war().claim(a(), "Suedhain").success());
+        assertFalse(server.war().claim(a(), "Suedhain").success());
         assertTrue(server.war().declare(a(), "Suedhain").success());
         assertFalse(server.war().declare(b(), "Nordhain").success());
         assertEquals(1, server.war().registry().wars().size());
@@ -64,7 +72,7 @@ class WarServiceTest {
     @DisplayName("Die groessere Garnison gewinnt das Gefecht und der Krieg endet")
     void battleEndsWar() {
         found();
-        server.war().declare(a(), "Suedhain");
+        war();
         assertTrue(server.war().enlist(a(), MilitaryRank.OFFICER).success());
         assertFalse(server.war().enlist(a(), MilitaryRank.SOLDIER).success());
         assertTrue(server.war().enlist(b(), MilitaryRank.SOLDIER).success());
@@ -81,7 +89,7 @@ class WarServiceTest {
     @DisplayName("Gleichstand laesst den Krieg weiterlaufen, Frieden beendet ihn ohne Sieger")
     void drawThenPeace() {
         found();
-        server.war().declare(a(), "Suedhain");
+        war();
         assertTrue(server.war().battle(a(), 1).success());
         assertTrue(server.war().registry().wars().get(0).ongoing());
         assertTrue(server.war().peace(b(), 1).success());
@@ -99,7 +107,7 @@ class WarServiceTest {
         assertFalse(server.war().neutrality(b(), 5).success());
         assertTrue(server.levels().amendLaw(b(), "land", "neutrality_fee_per_day", "0").success());
         assertTrue(server.war().neutrality(b(), 5).success());
-        assertFalse(server.war().declare(a(), "Suedhain").success());
+        assertFalse(server.war().claim(a(), "Suedhain").success() && server.war().declare(a(), "Suedhain").success());
     }
 
     @Test
@@ -109,5 +117,39 @@ class WarServiceTest {
         assertFalse(server.war().discharge(a()).success());
         server.war().enlist(a(), MilitaryRank.SOLDIER);
         assertTrue(server.war().discharge(a()).success());
+    }
+
+    @Test
+    @DisplayName("Feldzuege laufen am Tagesende, verschieben die Front und entscheiden den Krieg")
+    void campaignsRunAtEndOfDay() {
+        found();
+        war();
+        for (int i = 0; i < 6; i++) {
+            server.war().registry().enlist(id("Nordhain"), new PlayerRef(PlayerId.generate(ids)), MilitaryRank.SOLDIER,
+                    de.etiennebader.civ.domain.shared.Day.ZERO);
+        }
+        assertTrue(server.war().enlist(b(), MilitaryRank.SOLDIER).success());
+        assertFalse(server.war().campaign(a(), 1, de.etiennebader.civ.domain.war.BattleKind.AMBUSH, 1).success());
+        assertTrue(server.war().campaign(a(), 1, de.etiennebader.civ.domain.war.BattleKind.ASSAULT, 0).success());
+        server.war().endOfDay(de.etiennebader.civ.domain.shared.Day.of(1000));
+        assertTrue(server.war().registry().frontOf(server.war().registry().wars().get(0).id()) > 0);
+        assertTrue(server.war().front(a(), 1).success());
+        assertFalse(server.war().campaign(caller(carol, "Carol", 8), 1,
+                de.etiennebader.civ.domain.war.BattleKind.ASSAULT, 1).success());
+    }
+
+    @Test
+    @DisplayName("Ausbildung ohne Geld scheitert; Lazarett und Buendnisse brauchen den Buergermeister")
+    void troopsAndDiplomacy() {
+        found();
+        assertFalse(server.war().train(caller(carol, "Carol", 8)).success());
+        server.war().enlist(a(), MilitaryRank.SOLDIER);
+        assertFalse(server.war().train(a()).success(), "leere Gemeindekasse");
+        assertFalse(server.war().hospital(a(), 3).success(), "leere Gemeindekasse");
+        assertTrue(server.war().propose(a(), "Suedhain").success());
+        assertTrue(server.war().propose(b(), "Nordhain").success());
+        assertTrue(server.war().registry().alliesOf(id("Nordhain")).contains(id("Suedhain")));
+        assertFalse(server.war().declare(a(), "Suedhain").success(), "Verbuendete greifen sich nicht an");
+        assertTrue(server.war().breakAlliance(a(), "Suedhain").success());
     }
 }

@@ -362,14 +362,21 @@ public final class WarRegistry extends AggregateRoot<WarEvent> implements WarVie
 
     /** Führt alle am {@code day} oder früher fälligen Feldzüge aus; die Garnison heilt zuvor. */
     public List<BattleReport> runDueCampaigns(Day day, long reparationsPerStrengthPoint, int conquestPerWin) {
+        return runDueCampaigns(day, war -> reparationsPerStrengthPoint, war -> conquestPerWin);
+    }
+
+    /** Wie {@link #runDueCampaigns(Day, long, int)}, mit Parametern je Krieg (nach den Gesetzen der Beteiligten). */
+    public List<BattleReport> runDueCampaigns(Day day, java.util.function.ToLongFunction<War> reparations,
+                                              java.util.function.ToIntFunction<War> conquest) {
         heal(day);
         List<BattleReport> reports = new ArrayList<>();
         for (Campaign campaign : List.copyOf(campaigns)) {
             if (campaign.on().isBefore(day) || campaign.on().equals(day)) {
                 campaigns.remove(campaign);
                 if (war(campaign.war()).filter(War::ongoing).isPresent()) {
+                    War war = war(campaign.war()).orElseThrow();
                     reports.add(fight(campaign.war(), campaign.initiator(), campaign.kind(),
-                            reparationsPerStrengthPoint, conquestPerWin, day));
+                            reparations.applyAsLong(war), conquest.applyAsInt(war), day));
                 }
             }
         }

@@ -1297,6 +1297,15 @@ public final class CivCommandTree {
     }
 
     /** {@code /civ krieg}: Krieg erklären, dienen, kämpfen, Frieden und Neutralität (Issue #27). */
+    private LiteralArgumentBuilder<CommandSourceStack> campaignKind(String word,
+            de.etiennebader.civ.domain.war.BattleKind kind) {
+        return Commands.literal(word)
+                .then(Commands.argument(COUNT, IntegerArgumentType.integer(0, 30))
+                        .executes(context -> withCiv(context, (civ, player) -> civ.war().campaign(
+                                Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER), kind,
+                                IntegerArgumentType.getInteger(context, COUNT)))));
+    }
+
     private LiteralArgumentBuilder<CommandSourceStack> warCommands() {
         return Commands.literal("krieg")
                 .then(Commands.literal("liste")
@@ -1311,9 +1320,52 @@ public final class CivCommandTree {
                                         Players.caller(player), de.etiennebader.civ.domain.war.MilitaryRank.SOLDIER))))
                         .then(Commands.literal("offizier")
                                 .executes(context -> withCiv(context, (civ, player) -> civ.war().enlist(
-                                        Players.caller(player), de.etiennebader.civ.domain.war.MilitaryRank.OFFICER)))))
+                                        Players.caller(player), de.etiennebader.civ.domain.war.MilitaryRank.OFFICER))))
+                        .then(Commands.literal("ausspaeher")
+                                .executes(context -> withCiv(context, (civ, player) -> civ.war().enlist(
+                                        Players.caller(player), de.etiennebader.civ.domain.war.MilitaryRank.SCOUT)))))
                 .then(Commands.literal("entlassen")
                         .executes(context -> withCiv(context, (civ, player) -> civ.war().discharge(Players.caller(player)))))
+                .then(Commands.literal("wille")
+                        .then(Commands.argument(COMPANY, StringArgumentType.string())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.war().willAgainst(
+                                        Players.caller(player), StringArgumentType.getString(context, COMPANY))))))
+                .then(Commands.literal("front")
+                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.war().front(
+                                        Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))))
+                .then(Commands.literal("feldzug")
+                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                                .then(campaignKind("angriff", de.etiennebader.civ.domain.war.BattleKind.ASSAULT))
+                                .then(campaignKind("hinterhalt", de.etiennebader.civ.domain.war.BattleKind.AMBUSH))
+                                .then(campaignKind("verteidigung", de.etiennebader.civ.domain.war.BattleKind.DEFENSIVE))))
+                .then(Commands.literal("ausbilden")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.war().train(Players.caller(player)))))
+                .then(Commands.literal("ausruesten")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.war().equip(Players.caller(player)))))
+                .then(Commands.literal("lazarett")
+                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(1, 1000))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.war().hospital(
+                                        Players.caller(player), IntegerArgumentType.getInteger(context, COUNT))))))
+                .then(Commands.literal("anspruch")
+                        .then(Commands.argument(COMPANY, StringArgumentType.string())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.war().claim(
+                                        Players.caller(player), StringArgumentType.getString(context, COMPANY))))))
+                .then(Commands.literal("buendnisse")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.war().allies(Players.caller(player)))))
+                .then(Commands.literal("buendnis")
+                        .then(Commands.literal("vorschlagen")
+                                .then(Commands.argument(COMPANY, StringArgumentType.string())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.war().propose(
+                                                Players.caller(player), StringArgumentType.getString(context, COMPANY))))))
+                        .then(Commands.literal("annehmen")
+                                .then(Commands.argument(COMPANY, StringArgumentType.string())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.war().accept(
+                                                Players.caller(player), StringArgumentType.getString(context, COMPANY))))))
+                        .then(Commands.literal("kuendigen")
+                                .then(Commands.argument(COMPANY, StringArgumentType.string())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.war().breakAlliance(
+                                                Players.caller(player), StringArgumentType.getString(context, COMPANY)))))))
                 .then(Commands.literal("gefecht")
                         .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.war().battle(
