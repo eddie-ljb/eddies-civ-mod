@@ -35,6 +35,19 @@ public final class BattleResolver {
     }
 
     /**
+     * Löst ein Gefecht aus fertig berechneten Kampfkräften (Hundertstel Soldaten) auf; der Verteidiger erhält den
+     * Heimvorteil. Ganzzahlig, damit ein exakter Gleichstand erkannt wird.
+     */
+    public static BattleOutcome resolvePower(long aggressorPower, long defenderPower) {
+        long aggressor = aggressorPower * 100;
+        long defender = defenderPower * DEFENDER_ADVANTAGE_PERCENT;
+        if (aggressor > defender) {
+            return BattleOutcome.AGGRESSOR_WINS;
+        }
+        return defender > aggressor ? BattleOutcome.DEFENDER_WINS : BattleOutcome.DRAW;
+    }
+
+    /**
      * Löst ein Gefecht zwischen Angreifer- und Verteidigergarnison auf.
      *
      * @param aggressorSoldiers Soldaten des Angreifers

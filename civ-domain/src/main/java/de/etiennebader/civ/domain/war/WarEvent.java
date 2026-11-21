@@ -33,4 +33,33 @@ public sealed interface WarEvent extends DomainEvent {
     /** Eine Polity hat sich für begrenzte Zeit Neutralität erkauft. */
     record NeutralityPurchased(PolityId polity, Day until, Day occurredOn) implements WarEvent {
     }
+
+    /** Ein Gefecht wurde ausgetragen und die Front verschob sich. */
+    record BattleFought(WarId war, int front, Day occurredOn) implements WarEvent {
+    }
+
+    /** Ein Mitglied wurde verwundet und fällt bis {@code until} aus. */
+    record Wounded(PolityId polity, ActorRef member, Day until, Day occurredOn) implements WarEvent {
+    }
+
+    /** Ein Feldzug wurde geplant. */
+    record CampaignPlanned(WarId war, PolityId initiator, BattleKind kind, Day on, Day occurredOn)
+            implements WarEvent {
+    }
+
+    /** Zwei Polities haben ein Bündnis geschlossen. */
+    record AllianceFormed(PolityId first, PolityId second, Day occurredOn) implements WarEvent {
+    }
+
+    /** Ein Bündnis wurde aufgekündigt. */
+    record AllianceBroken(PolityId first, PolityId second, Day occurredOn) implements WarEvent {
+    }
+
+    /** Eine Polity erhebt Anspruch auf eine andere. */
+    record ClaimLodged(PolityId claimant, PolityId target, Day occurredOn) implements WarEvent {
+    }
+
+    /** Eine Garnison wurde ausgebildet oder ausgerüstet. */
+    record TroopsImproved(PolityId polity, int training, int equipment, Day occurredOn) implements WarEvent {
+    }
 }

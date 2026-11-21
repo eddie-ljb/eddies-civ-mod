@@ -182,7 +182,17 @@ public enum ErrorCode {
     /** Argumente: Polity, Akteur. */
     NOT_ENLISTED,
     /** Neutralität lässt sich nicht während eines laufenden Kriegs erkaufen. Argumente: Polity. */
-    AT_WAR;
+    AT_WAR,
+    /** Der Feldzug ist nicht möglich (Zeitpunkt, Art oder Beteiligte). Argumente: keine. */
+    INVALID_CAMPAIGN,
+    /** Das Bündnis ist nicht möglich oder gibt es nicht. Argumente: keine. */
+    INVALID_ALLIANCE,
+    /** Verbündete können einander nicht den Krieg erklären. Argumente: Polity, Polity. */
+    ALLIED_POLITIES,
+    /** Der Anspruch ist nicht möglich. Argumente: keine. */
+    INVALID_CLAIM,
+    /** Die Truppe ist schon voll ausgebildet bzw. ausgerüstet. Argumente: keine. */
+    NOTHING_TO_IMPROVE;
 
     private static final String TRANSLATION_PREFIX = "eddies-civ-mod.error.";
 
