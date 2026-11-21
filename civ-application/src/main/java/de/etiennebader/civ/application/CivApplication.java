@@ -61,6 +61,7 @@ import de.etiennebader.civ.application.polity.ProposeLawChange;
 import de.etiennebader.civ.application.polity.ProposeMotion;
 import de.etiennebader.civ.application.polity.RepealStatute;
 import de.etiennebader.civ.application.polity.TallyProposals;
+import de.etiennebader.civ.application.population.VillagerAmbitions;
 import de.etiennebader.civ.application.population.Campaign;
 import de.etiennebader.civ.application.population.PersonalityLegislator;
 import de.etiennebader.civ.application.population.PersonalityVoter;
@@ -129,6 +130,7 @@ public final class CivApplication {
     private final JusticeUseCases justice;
     private final PressInfluence pressInfluence;
     private final VillagerInvestors villagerInvestors;
+    private final VillagerAmbitions villagerAmbitions;
     private final FoundParty foundParty;
     private final JoinParty joinParty;
     private final LeaveParty leaveParty;
@@ -230,6 +232,8 @@ public final class CivApplication {
         this.justice = new JusticeUseCases(aggregates, ids);
         this.villagerInvestors = new VillagerInvestors(() -> new WorldQueries(repositories), trading);
         this.foundParty = new FoundParty(aggregates, ids);
+        this.villagerAmbitions = new VillagerAmbitions(() -> new WorldQueries(repositories), companies, foundParty,
+                standForElection);
         this.joinParty = new JoinParty(aggregates);
         this.leaveParty = new LeaveParty(aggregates, dissolvePolity);
         this.changePartyProfile = new ChangePartyProfile(aggregates);
@@ -457,6 +461,10 @@ public final class CivApplication {
 
     public PressInfluence pressInfluence() {
         return pressInfluence;
+    }
+
+    public VillagerAmbitions villagerAmbitions() {
+        return villagerAmbitions;
     }
 
     public VillagerInvestors villagerInvestors() {

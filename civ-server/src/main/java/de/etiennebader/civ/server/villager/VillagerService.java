@@ -260,6 +260,7 @@ public final class VillagerService {
         if (settings.emigration()) {
             emigrate(day);
         }
+        app.villagerAmbitions().execute(day);
         return changes;
     }
 

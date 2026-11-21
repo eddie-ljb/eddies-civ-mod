@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.0 (in Arbeit)
+
+- **Ehrgeizige Dorfbewohner (#52):** Einzelne Dorfbewohner gründen Firmen und Parteien und kandidieren in Wahlen, auch in Spielergemeinden. Dorfbewohner dürfen kandidieren, wo sie wählen dürfen.
+
 ## 1.0.0
 
 Erste offizielle Version. Ein JAR für Server und Client (beide brauchen den Mod, weil er eigene Blöcke mitbringt).
