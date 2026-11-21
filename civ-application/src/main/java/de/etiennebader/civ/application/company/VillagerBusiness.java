@@ -36,7 +36,7 @@ import java.util.function.Supplier;
  *   <li><b>Entlassen:</b> Reicht die Kasse nicht mehr für wenige Tage Löhne, kündigt der Chef dem zuletzt Eingestellten.
  *       Sparsame handeln früher, Großzügige halten länger durch.</li>
  *   <li><b>Branche wählen:</b> Naturverbundene wählen Forst, Obst, Schafe oder Acker, Traditionelle Acker und
- *       Viehzucht, Fortschrittliche Bergwerk und Ziegelei.</li>
+ *       Viehzucht, Fortschrittliche Bergwerk, Ziegelei und Baufirma.</li>
  *   <li><b>Grundstück und Kernbelegschaft:</b> Die ersten {@value #BASE_STAFF} Stellen besetzt der Chef zuerst; die Firma kauft
  *       ein angebotenes Gewerbe-, Industrie- oder Landwirtschaftsgrundstück der Gemeinde, wenn sie noch keines hat.</li>
  *   <li><b>Dividende:</b> Alle sieben Tage, wenn die Kasse über der Rücklage liegt; Großzügige schütten mehr aus, Sparsame
@@ -177,7 +177,7 @@ public final class VillagerBusiness {
         } else if (personality.tradition() > 20) {
             pool = List.of(Branch.FARM, Branch.RANCH, Branch.FISHERY);
         } else if (personality.tradition() < -20) {
-            pool = List.of(Branch.MINE, Branch.BRICKWORKS);
+            pool = List.of(Branch.MINE, Branch.BRICKWORKS, Branch.CONSTRUCTION);
         } else {
             pool = List.of(Branch.values());
         }

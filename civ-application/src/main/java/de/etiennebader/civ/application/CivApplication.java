@@ -12,6 +12,7 @@ import de.etiennebader.civ.application.company.ProductionUseCases;
 import de.etiennebader.civ.application.company.Trading;
 import de.etiennebader.civ.application.company.TakeOverCompany;
 import de.etiennebader.civ.application.company.VillagerBusiness;
+import de.etiennebader.civ.application.land.VillagerLandlords;
 import de.etiennebader.civ.application.company.VillagerInvestors;
 import de.etiennebader.civ.application.constitution.ChangePreamble;
 import de.etiennebader.civ.application.constitution.ProclaimConstitution;
@@ -135,6 +136,7 @@ public final class CivApplication {
     private final VillagerInvestors villagerInvestors;
     private final VillagerAmbitions villagerAmbitions;
     private final VillagerBusiness villagerBusiness;
+    private final VillagerLandlords villagerLandlords;
     private final TakeOverCompany takeOverCompany;
     private final FoundParty foundParty;
     private final JoinParty joinParty;
@@ -242,6 +244,7 @@ public final class CivApplication {
                 standForElection, trading, takeOverCompany, claimChunk);
         this.villagerBusiness = new VillagerBusiness(() -> new WorldQueries(repositories), companies, production,
                 contracts, buyPlot);
+        this.villagerLandlords = new VillagerLandlords(() -> new WorldQueries(repositories), contracts, buyPlot);
         this.joinParty = new JoinParty(aggregates);
         this.leaveParty = new LeaveParty(aggregates, dissolvePolity);
         this.changePartyProgram = new ChangePartyProgram(aggregates, ids, proposeMotion);
@@ -482,6 +485,10 @@ public final class CivApplication {
 
     public VillagerBusiness villagerBusiness() {
         return villagerBusiness;
+    }
+
+    public VillagerLandlords villagerLandlords() {
+        return villagerLandlords;
     }
 
     public VillagerAmbitions villagerAmbitions() {

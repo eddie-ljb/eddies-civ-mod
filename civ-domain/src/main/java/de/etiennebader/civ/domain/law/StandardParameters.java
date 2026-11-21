@@ -70,6 +70,22 @@ public final class StandardParameters {
     public static final ParameterKey<Long> SALES_TAX_PERCENT =
             ParameterKey.constrained("sales_tax_percent", Long.class, 0L, percent -> percent >= 0 && percent <= 50);
 
+    /** Prozent der Mieteinnahmen und Löhne, die an die Gemeindekasse gehen (Einkommensteuer, Issue #19). */
+    public static final ParameterKey<Long> INCOME_TAX_PERCENT =
+            ParameterKey.constrained("income_tax_percent", Long.class, 0L, percent -> percent >= 0 && percent <= 50);
+
+    /** Ob Bauprojekte auf Grundstücken der Gemeinde vom Bauamt genehmigt werden müssen (Issue #19). */
+    public static final ParameterKey<Boolean> BUILD_PERMIT_REQUIRED =
+            ParameterKey.of("build_permit_required", Boolean.class, false);
+
+    /** Gebühr für eine Baugenehmigung in kleinster Währungseinheit, fällig vom Bauherrn an die Gemeindekasse. */
+    public static final ParameterKey<Long> BUILD_PERMIT_FEE =
+            ParameterKey.constrained("build_permit_fee", Long.class, 0L, fee -> fee >= 0);
+
+    /** Wie viele Mieter ein Grundstück höchstens hat; über 1 sind Mehrfamilienhäuser erlaubt (Issue #19). */
+    public static final ParameterKey<Integer> MAX_TENANTS_PER_PLOT =
+            ParameterKey.constrained("max_tenants_per_plot", Integer.class, 1, max -> max >= 1 && max <= 50);
+
     /** Amtszeit gewählter Ämter in Tagen; 0 heißt unbefristet, dann wird nur auf Antrag gewählt. */
     public static final ParameterKey<Long> TERM_DAYS =
             ParameterKey.constrained("term_days", Long.class, 0L, days -> days >= 0 && days <= 365);
@@ -243,6 +259,10 @@ public final class StandardParameters {
                 LAWS_BY_VOTE,
                 VOTE_DAYS,
                 SALES_TAX_PERCENT,
+                INCOME_TAX_PERCENT,
+                BUILD_PERMIT_REQUIRED,
+                BUILD_PERMIT_FEE,
+                MAX_TENANTS_PER_PLOT,
                 TERM_DAYS,
                 ELECTION_DAYS,
                 VILLAGER_VOTE_PERCENT,

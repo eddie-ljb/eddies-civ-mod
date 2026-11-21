@@ -40,6 +40,7 @@ public final class CivServerHost {
     private final TerritoryNotifier territoryNotifier = new TerritoryNotifier();
     private final BorderDisplay borders = new BorderDisplay();
     private final VillagerCensus villagers = new VillagerCensus(this);
+    private final ConstructionSites constructionSites = new ConstructionSites();
 
     public void register() {
         ServerLifecycleEvents.SERVER_STARTING.register(this::start);
@@ -112,6 +113,7 @@ public final class CivServerHost {
             territoryNotifier.tick(server, civ);
             villagers.tick(server, civ);
             borders.tick(server, civ);
+            constructionSites.tick(server, civ);
         } catch (RuntimeException e) {
             LOGGER.error("Fehler beim Tagesabschluss", e);
         }

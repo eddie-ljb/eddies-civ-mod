@@ -19,7 +19,7 @@ Preisbildung: Grundpreis je Item, je mehr Lagerbestand desto billiger, das Lager
 - Einnahmequellen: eigene Läden, Aufträge (freie Verträge), angestellte Dorfbewohner (`/civ firma einstellen <Firma> dorfbewohner <Lohn>`).
 - `dividende <Firma> <Betrag>` schüttet gleichmäßig an alle Aktionäre aus. `ausgeben <Firma> <Anzahl> <Preis>` gibt neue Aktien aus. `aufloesen <Firma>` verteilt die Kasse anteilig.
 - **Börse:** `/civ boerse` zeigt Kurse, `kaufen|verkaufen <Firma> <Anzahl> [Limit]` gibt eine Limit-Order auf (ohne Limit ±10 % vom letzten Kurs). Sofortige Ausführung gegen das Orderbuch, Rest wartet bis zu 7 Tage. `depot`, `buch <Firma>`, `streichen <Nr>`. Menü im Gemeindehaus oder am Block **Börsenterminal** (`GRG / IEI / III`).
-- **Produktion:** `/civ firma branche <Firma> forst|schaeferei|acker|bergwerk|fischerei|viehzucht|ziegelei|obstbau`. Jeden Abend erzeugt die Firma Waren.
+- **Produktion:** `/civ firma branche <Firma> forst|schaeferei|acker|bergwerk|fischerei|viehzucht|ziegelei|obstbau|bau`. Jeden Abend erzeugt die Firma Waren.
   - **Arbeitskräfte:** Leitung/Mitglieder je ½, Angestellte (Vertrag) je 1, mit abnehmendem Grenzertrag.
   - **Investieren:** `/civ firma investieren <Firma> <Betrag>` – Stufe 1 kostet 20 Smaragde, jede weitere doppelt so viel wie die vorige, +25 % Ertrag je Stufe, höchstens Stufe 8. Branchenwechsel halbiert die Ausstattung.
   - **Verkauf:** `automatisch` (Standard, abends an den Servermarkt) oder `hand` (Lager); `/civ firma lager`, `abholen`, `verkauf jetzt`.
