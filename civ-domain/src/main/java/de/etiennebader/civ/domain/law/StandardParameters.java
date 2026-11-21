@@ -242,6 +242,22 @@ public final class StandardParameters {
     public static final ParameterKey<Boolean> PARTY_LIST_BY_VOTE =
             ParameterKey.of("party_list_by_vote", Boolean.class, false);
 
+    /**
+     * Reparationen je Punkt Gefechtsstärke-Unterschied (siehe {@code de.etiennebader.civ.domain.war.BattleResolver}),
+     * in kleinster Währungseinheit, fällig von der Gemeindekasse der unterlegenen an die der siegreichen Polity
+     * nach einem entschiedenen Gefecht. 0 (Standard) = keine Reparationen.
+     */
+    public static final ParameterKey<Long> WAR_REPARATIONS_PER_STRENGTH_POINT =
+            ParameterKey.constrained("war_reparations_per_strength_point", Long.class, 0L, rate -> rate >= 0);
+
+    /** Täglicher Sold je einfachem Soldaten in der Garnison, aus der Gemeindekasse. 0 (Standard) = unbezahlt. */
+    public static final ParameterKey<Long> SOLDIER_WAGE = ParameterKey.constrained("soldier_wage", Long.class, 0L,
+            wage -> wage >= 0);
+
+    /** Täglicher Sold je Offizier in der Garnison, aus der Gemeindekasse. 0 (Standard) = unbezahlt. */
+    public static final ParameterKey<Long> OFFICER_WAGE = ParameterKey.constrained("officer_wage", Long.class, 0L,
+            wage -> wage >= 0);
+
      /** Alle Standardparameter in fester Reihenfolge. */
     public static List<ParameterKey<?>> all() {
         return List.of(
@@ -294,7 +310,10 @@ public final class StandardParameters {
                 COURT_FEE,
                 CONJUNCTURE_STIMULUS_PERCENT,
                 PARTY_LIST,
-                PARTY_LIST_BY_VOTE
+                PARTY_LIST_BY_VOTE,
+                WAR_REPARATIONS_PER_STRENGTH_POINT,
+                SOLDIER_WAGE,
+                OFFICER_WAGE
         );
     }
 

@@ -20,5 +20,6 @@ public enum TransferReason {
     SALARY,
     DIVIDEND,
     CAPITAL,
+    WAR_REPARATIONS,
     OTHER
 }
