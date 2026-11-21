@@ -139,6 +139,7 @@ public final class CivApplication {
     private final VillagerInvestors villagerInvestors;
     private final VillagerAmbitions villagerAmbitions;
     private final VillagerBusiness villagerBusiness;
+    private final de.etiennebader.civ.application.company.VillagerJobSearch villagerJobSearch;
     private final VillagerLandlords villagerLandlords;
     private final TakeOverCompany takeOverCompany;
     private final FoundParty foundParty;
@@ -249,6 +250,8 @@ public final class CivApplication {
                 standForElection, trading, takeOverCompany, claimChunk);
         this.villagerBusiness = new VillagerBusiness(() -> new WorldQueries(repositories), companies, production,
                 contracts, buyPlot);
+        this.villagerJobSearch = new de.etiennebader.civ.application.company.VillagerJobSearch(
+                () -> new WorldQueries(repositories), contracts);
         this.villagerLandlords = new VillagerLandlords(() -> new WorldQueries(repositories), contracts, buyPlot);
         this.joinParty = new JoinParty(aggregates);
         this.leaveParty = new LeaveParty(aggregates, dissolvePolity);
@@ -491,6 +494,10 @@ public final class CivApplication {
 
     public TakeOverCompany takeOverCompany() {
         return takeOverCompany;
+    }
+
+    public de.etiennebader.civ.application.company.VillagerJobSearch villagerJobSearch() {
+        return villagerJobSearch;
     }
 
     public VillagerBusiness villagerBusiness() {

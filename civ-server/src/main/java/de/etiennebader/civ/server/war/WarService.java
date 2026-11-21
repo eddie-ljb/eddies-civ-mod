@@ -11,7 +11,6 @@ import de.etiennebader.civ.domain.economy.SupplyChange;
 import de.etiennebader.civ.domain.economy.TransferReason;
 import de.etiennebader.civ.domain.law.StandardParameters;
 import de.etiennebader.civ.domain.polity.Membership;
-import de.etiennebader.civ.domain.polity.MembershipType;
 import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.polity.PolityView;
@@ -110,7 +109,7 @@ public final class WarService {
     public Will will(PolityView town, PolityView target, Day day) {
         List<Integer> peaces = new ArrayList<>();
         for (Membership membership : town.members()) {
-            if (membership.type() == MembershipType.CITIZEN && membership.member() instanceof PersonRef person) {
+            if (membership.member() instanceof PersonRef person) {
                 peaces.add(Personality.of(person).peace());
             }
         }
@@ -598,8 +597,7 @@ public final class WarService {
         }
         Map<ActorRef, MilitaryRank> garrison = registry.garrisonOf(townId);
         for (Membership membership : town.get().members()) {
-            if (membership.type() != MembershipType.CITIZEN || !(membership.member() instanceof PersonRef person)
-                    || garrison.containsKey(person)) {
+            if (!(membership.member() instanceof PersonRef person) || garrison.containsKey(person)) {
                 continue;
             }
             int peace = Personality.of(person).peace();

@@ -302,6 +302,7 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                         depot(login))));
                 case "POST /api/exchange" -> withLogin(request, login -> action(request, body -> game.call(() ->
                         exchangeAction(login, body)), texts));
+                case "GET /api/war" -> HttpResponse.json(200, game.call(this::war));
                 case "GET /api/press" -> HttpResponse.json(200, game.call(this::press));
                 case "POST /api/press" -> withLogin(request, login -> action(request, body -> game.call(() ->
                         civ.press().publish(login.player(), body.getOrDefault("paper", ""),
@@ -785,6 +786,48 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
     }
 
     /** Zeitungen und neueste Artikel; ohne Anmeldung. */
+    private String war() {
+        var registry = civ.war().registry();
+        var queries = civ.queries();
+        java.util.function.Function<de.etiennebader.civ.domain.shared.PolityId, String> name = id -> queries.polity(id)
+                .map(polity -> polity.name().toString()).orElse("?");
+        java.util.function.Function<de.etiennebader.civ.domain.shared.PolityId, Integer> wounded = id ->
+                registry.wounded().getOrDefault(id, java.util.Map.of()).size();
+        java.util.function.Function<de.etiennebader.civ.domain.shared.PolityId, Integer> troops = id ->
+                registry.services().getOrDefault(id, java.util.Map.of()).size();
+        java.util.List<String> pairs = new java.util.ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        registry.alliances().forEach((first, set) -> set.forEach(second -> {
+            String key = first.value().compareTo(second.value()) < 0 ? first.value() + "|" + second.value()
+                    : second.value() + "|" + first.value();
+            if (seen.add(key)) {
+                pairs.add(Json.object().put("first", name.apply(first)).put("second", name.apply(second)).build());
+            }
+        }));
+        return Json.object()
+                .raw("wars", Json.array(registry.wars(), war -> Json.object()
+                        .put("aggressor", name.apply(war.aggressor()))
+                        .put("defender", name.apply(war.defender()))
+                        .put("ongoing", war.ongoing())
+                        .put("declared", war.declaredOn().value())
+                        .put("ended", war.endedOn().map(day -> day.value()).orElse(0L))
+                        .put("front", registry.frontOf(war.id()))
+                        .put("aggressorTroops", troops.apply(war.aggressor()))
+                        .put("defenderTroops", troops.apply(war.defender()))
+                        .put("aggressorWounded", wounded.apply(war.aggressor()))
+                        .put("defenderWounded", wounded.apply(war.defender()))
+                        .put("winner", war.outcome().map(terms -> name.apply(terms.winner())).orElse(""))
+                        .put("reparations", war.outcome().map(terms -> terms.reparations()).orElse(0L))
+                        .raw("campaigns", Json.array(registry.campaigns().stream()
+                                .filter(campaign -> campaign.war().equals(war.id())).toList(), campaign -> Json.object()
+                                .put("kind", campaign.kind().name())
+                                .put("initiator", name.apply(campaign.initiator()))
+                                .put("on", campaign.on().value()).build()))
+                        .build()))
+                .raw("alliances", "[" + String.join(",", pairs) + "]")
+                .build();
+    }
+
     private String press() {
         return Json.object()
                 .raw("newspapers", Json.array(civ.press().newspapers(), paper -> Json.object()
