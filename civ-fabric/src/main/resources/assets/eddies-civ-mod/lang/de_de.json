@@ -1284,6 +1284,7 @@
   "eddies-civ-mod.branch.ranch": "Viehzucht",
   "eddies-civ-mod.branch.brickworks": "Ziegelei",
   "eddies-civ-mod.branch.orchard": "Obstbau und Imkerei",
+  "eddies-civ-mod.branch.construction": "Baufirma",
   "eddies-civ-mod.gui.company_menu_title": "Firma %s",
   "eddies-civ-mod.gui.company_treasury": "Firmenkasse: %s Smaragde",
   "eddies-civ-mod.gui.company_head": "Leitung: %s",

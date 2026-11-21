@@ -3,6 +3,7 @@
 ## 1.1.0 (in Arbeit)
 
 - **Ehrgeizige Dorfbewohner (#52):** Einzelne Dorfbewohner gründen Firmen, Parteien sowie Länder und Nationen, erweitern Bünde, kandidieren in Wahlen (auch in Spielergemeinden und Bünden) und übernehmen Firmen über die Aktienmehrheit; Villager-Bürgermeister beanspruchen selbstständig angrenzende Chunks; Villager-Firmenchefs wählen Branche, bauen aus, zahlen Dividenden, stellen ein und entlassen und kaufen Betriebsgrundstücke. Dorfbewohner dürfen kandidieren, wo sie wählen dürfen. Abschaltbar mit `villager_ambitions=false`.
+- **Baufirma und Vermieter (#19, erster Teil):** Neue Branche „Baufirma" (`/civ firma branche <Firma> bau`) liefert Baumaterial; Villager-Chefs mit fortschrittlicher Haltung wählen sie. Dorfbewohner kaufen angebotene Wohngrundstücke ihrer Gemeinde und vermieten sie an Mitbürger ohne Wohnung (Sparsame kaufen mehr Häuser und verlangen mehr Miete). Blaupausen, Bauamt-Genehmigung und Einkommensteuer auf Mieten folgen in weiteren Schritten.
 
 ## 1.0.0
 
