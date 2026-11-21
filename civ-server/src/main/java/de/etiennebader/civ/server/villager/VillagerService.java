@@ -262,6 +262,7 @@ public final class VillagerService {
         }
         if (settings.ambitions()) {
             app.villagerAmbitions().execute(day);
+            app.villagerBusiness().execute(day);
         }
         return changes;
     }
