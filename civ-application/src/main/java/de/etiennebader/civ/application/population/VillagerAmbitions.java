@@ -6,6 +6,7 @@ import de.etiennebader.civ.application.company.Trading;
 import de.etiennebader.civ.application.office.StandForElection;
 import de.etiennebader.civ.application.party.FoundParty;
 import de.etiennebader.civ.application.query.WorldQueries;
+import de.etiennebader.civ.application.territory.ClaimChunk;
 import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.exchange.Listing;
 import de.etiennebader.civ.domain.exchange.Side;
@@ -20,6 +21,9 @@ import de.etiennebader.civ.domain.polity.PolityName;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.population.Personality;
 import de.etiennebader.civ.domain.shared.Day;
+import de.etiennebader.civ.domain.territory.ChunkCoord;
+import de.etiennebader.civ.domain.territory.ClaimType;
+import de.etiennebader.civ.domain.territory.TerritoryView;
 import de.etiennebader.civ.domain.shared.DomainException;
 import de.etiennebader.civ.domain.shared.Money;
 import de.etiennebader.civ.domain.shared.PolityId;
@@ -47,6 +51,10 @@ import java.util.function.Supplier;
  *   <li><b>Kandidieren:</b> in jeder laufenden Wahl der eigenen Gemeinde und der Bünde darüber (Länder, Nationen),
  *       auch in von Spielern gegründeten. Das Programm passt zur Persönlichkeit; Aggressive (Friedfertigkeit unter 0)
  *       setzen ihre Agenda häufiger durch. So können sie Bürgermeister, Landeschef oder Staatsoberhaupt werden.</li>
+ *   <li><b>Gebiet beanspruchen:</b> Ein Dorfbewohner als Bürgermeister beansprucht einen angrenzenden freien Chunk als
+ *       Kerngebiet, höchstens {@value #MAX_CLAIMS} je Tag. Wie oft, hängt von Ehrgeiz, Aggressivität und der Richtung
+ *       seiner Partei ab (Ausbau treibt, niedrige Steuern bremsen); Aggressive suchen die Grenze zu Nachbarn, Friedfertige
+ *       meiden sie. Das Limit der Claim-Regeln gilt wie für Spieler.</li>
  *   <li><b>Firmen übernehmen:</b> Aggressive kaufen Aktien einer fremden Firma auf; wer mehr als die Hälfte hält,
  *       übernimmt die Leitung ({@link TakeOverCompany}).</li>
  * </ul>
@@ -59,6 +67,9 @@ public final class VillagerAmbitions {
     /** Ab diesem Ehrgeiz (0 bis 100) ist ein Dorfbewohner überhaupt aktiv. */
     public static final int AMBITIOUS_FROM = 85;
     public static final int MAX_ACTIONS = 3;
+    public static final int MAX_CLAIMS = 2;
+    /** Tageswahrscheinlichkeit, ein Chunk zu beanspruchen, bei vollem Ehrgeiz. */
+    static final double CLAIM_CHANCE = 0.15;
     /** Tageswahrscheinlichkeit einer Firma- oder Parteigründung bei vollem Ehrgeiz. */
     static final double FOUNDING_CHANCE = 0.05;
     /** Tageswahrscheinlichkeit einer Kandidatur bei vollem Ehrgeiz und ohne Aggressivität. */
@@ -67,7 +78,7 @@ public final class VillagerAmbitions {
     private static final int VILLAGERS_PER_PARTY = 15;
 
     /** Was an einem Tag geschah. */
-    public record Report(int companies, int parties, int candidacies, int takeovers) {
+    public record Report(int companies, int parties, int candidacies, int takeovers, int claims) {
     }
 
     private final Supplier<WorldQueries> queries;
@@ -76,15 +87,18 @@ public final class VillagerAmbitions {
     private final StandForElection standForElection;
     private final Trading trading;
     private final TakeOverCompany takeOver;
+    private final ClaimChunk claimChunk;
 
     public VillagerAmbitions(Supplier<WorldQueries> queries, CompanyUseCases companies, FoundParty foundParty,
-                             StandForElection standForElection, Trading trading, TakeOverCompany takeOver) {
+                             StandForElection standForElection, Trading trading, TakeOverCompany takeOver,
+                             ClaimChunk claimChunk) {
         this.queries = Objects.requireNonNull(queries, "queries");
         this.companies = Objects.requireNonNull(companies, "companies");
         this.foundParty = Objects.requireNonNull(foundParty, "foundParty");
         this.standForElection = Objects.requireNonNull(standForElection, "standForElection");
         this.trading = Objects.requireNonNull(trading, "trading");
         this.takeOver = Objects.requireNonNull(takeOver, "takeOver");
+        this.claimChunk = Objects.requireNonNull(claimChunk, "claimChunk");
     }
 
     /** Ehrgeiz von 0 bis 100, fest aus der Identität. */
@@ -174,7 +188,83 @@ public final class VillagerAmbitions {
                 actions++;
             }
         }
-        return new Report(newCompanies, newParties, candidacies, takeovers);
+        return new Report(newCompanies, newParties, candidacies, takeovers, expand(day));
+    }
+
+    /** Villager-Bürgermeister beanspruchen angrenzende Chunks; @return wie viele heute. */
+    private int expand(Day day) {
+        WorldQueries world = queries.get();
+        List<PolityView> towns = world.polities().stream()
+                .filter(polity -> polity.kind() == PolityKind.TERRITORIAL)
+                .filter(polity -> polity.mayor().filter(m -> m instanceof PersonRef p && isAmbitious(p)).isPresent())
+                .sorted(Comparator.comparing(polity -> polity.id().value()))
+                .toList();
+        int start = towns.isEmpty() ? 0 : (int) Math.floorMod(day.value(), (long) towns.size());
+        int claims = 0;
+        for (int index = 0; index < towns.size() && claims < MAX_CLAIMS; index++) {
+            PolityView town = towns.get((start + index) % towns.size());
+            PersonRef mayor = (PersonRef) town.mayor().orElseThrow();
+            WorldQueries now = queries.get();
+            if (roll(mayor, day, 0x70) < claimChance(mayor, now) && claim(town, mayor, now, day)) {
+                claims++;
+            }
+        }
+        return claims;
+    }
+
+    /** Tageswahrscheinlichkeit: Ehrgeiz, Aggressivität und Parteirichtung (Ausbau treibt, niedrige Steuern bremsen). */
+    static double claimChance(PersonRef mayor, WorldQueries world) {
+        Personality personality = Personality.of(mayor);
+        double chance = CLAIM_CHANCE * (drive(mayor) / 100.0) * (0.5 + aggression(personality));
+        Optional<PartyProfile> party = world.partyOf(mayor).flatMap(PolityView::partyProfile);
+        if (party.isPresent()) {
+            chance *= switch (party.get().platform()) {
+                case INVESTMENT -> 1.5;
+                case ORDER -> 1.2;
+                case LOW_TAXES -> 0.6;
+                default -> 1.0;
+            };
+        }
+        return Math.min(1.0, chance);
+    }
+
+    /**
+     * Wählt unter den angrenzenden freien Chunks einen: Aggressive bevorzugen solche an fremden Grenzen, Friedfertige
+     * solche abseits davon.
+     */
+    private boolean claim(PolityView town, PersonRef mayor, WorldQueries world, Day day) {
+        TerritoryView territory = world.territory();
+        double aggression = aggression(Personality.of(mayor));
+        ChunkCoord best = null;
+        double bestScore = Double.NEGATIVE_INFINITY;
+        List<ChunkCoord> own = territory.territoryOf(town.id()).stream()
+                .sorted(Comparator.comparing((ChunkCoord c) -> c.dimension().value()).thenComparingInt(ChunkCoord::x)
+                        .thenComparingInt(ChunkCoord::z)).toList();
+        for (ChunkCoord chunk : own) {
+            for (ChunkCoord candidate : chunk.neighbours()) {
+                if (territory.claimAt(candidate).isPresent()) {
+                    continue;
+                }
+                long foreign = candidate.neighbours().stream()
+                        .filter(n -> territory.claimAt(n).filter(c -> !c.polity().equals(town.id())).isPresent())
+                        .count();
+                double score = (2 * aggression - 1) * foreign
+                        + 0.1 * roll(mayor, day, 0x71 + candidate.x() * 31 + candidate.z());
+                if (score > bestScore) {
+                    bestScore = score;
+                    best = candidate;
+                }
+            }
+        }
+        if (best == null) {
+            return false;
+        }
+        try {
+            claimChunk.execute(new ClaimChunk.Command(town.id(), best, ClaimType.CORE, day));
+            return true;
+        } catch (DomainException ignored) {
+            return false; // z. B. Claim-Limit erreicht
+        }
     }
 
     private boolean candidate(PersonRef villager, Personality personality, double drive, WorldQueries world, Day day) {

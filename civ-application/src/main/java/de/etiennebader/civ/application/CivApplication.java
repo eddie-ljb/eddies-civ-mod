@@ -236,7 +236,7 @@ public final class CivApplication {
         this.foundParty = new FoundParty(aggregates, ids);
         this.takeOverCompany = new TakeOverCompany(aggregates);
         this.villagerAmbitions = new VillagerAmbitions(() -> new WorldQueries(repositories), companies, foundParty,
-                standForElection, trading, takeOverCompany);
+                standForElection, trading, takeOverCompany, claimChunk);
         this.joinParty = new JoinParty(aggregates);
         this.leaveParty = new LeaveParty(aggregates, dissolvePolity);
         this.changePartyProfile = new ChangePartyProfile(aggregates);

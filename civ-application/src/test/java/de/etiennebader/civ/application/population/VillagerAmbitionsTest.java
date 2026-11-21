@@ -138,7 +138,7 @@ class VillagerAmbitionsTest {
     void deterministic() {
         settle(10, 0, 8_000);
         VillagerAmbitions.Report first = fixture.app.villagerAmbitions().execute(DAY);
-        assertEquals(first, new VillagerAmbitions.Report(first.companies(), first.parties(), first.candidacies(), first.takeovers()));
+        assertEquals(first, new VillagerAmbitions.Report(first.companies(), first.parties(), first.candidacies(), first.takeovers(), first.claims()));
     }
 
     @Test
@@ -162,5 +162,32 @@ class VillagerAmbitionsTest {
         assertFalse(company.holds(alice, Office.MAYOR));
         assertTrue(company.isMember(alice));
         assertFalse(fixture.app.takeOverCompany().execute(firm, raider, DAY), "schon Leiter");
+    }
+
+    @Test
+    @DisplayName("Ein ehrgeiziger Villager-Bürgermeister beansprucht angrenzende Chunks, ein Spieler-Bürgermeister nicht")
+    void mayorClaims() {
+        int before = fixture.app.queries().territory().territoryOf(nordhain).size();
+        for (int day = 0; day < 150; day++) {
+            assertEquals(0, fixture.app.villagerAmbitions().execute(Day.of(DAY.value() + day)).claims());
+        }
+        assertEquals(before, fixture.app.queries().territory().territoryOf(nordhain).size());
+
+        PersonRef villager = settle(1, 0, 0).getFirst();
+        var election = fixture.app.callElection().execute(new CallElection.Command(nordhain, alice, Office.MAYOR, DAY));
+        amendVillagerVote(100L);
+        fixture.app.standForElection().execute(new de.etiennebader.civ.application.office.StandForElection.Command(
+                nordhain, election, villager, DAY));
+        fixture.app.castBallot().execute(new de.etiennebader.civ.application.office.CastBallot.Command(
+                nordhain, election, alice, villager, DAY));
+        fixture.app.runElections().execute(DAY.plus(5));
+        assertEquals(java.util.Optional.of(villager), fixture.app.queries().polity(nordhain).orElseThrow().mayor());
+
+        int claimed = 0;
+        for (int day = 0; day < 300; day++) {
+            claimed += fixture.app.villagerAmbitions().execute(Day.of(DAY.value() + 10 + day)).claims();
+        }
+        assertTrue(claimed >= 1, "claimed=" + claimed);
+        assertEquals(before + claimed, fixture.app.queries().territory().territoryOf(nordhain).size());
     }
 }

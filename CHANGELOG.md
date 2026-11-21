@@ -2,7 +2,7 @@
 
 ## 1.1.0 (in Arbeit)
 
-- **Ehrgeizige Dorfbewohner (#52):** Einzelne Dorfbewohner gründen Firmen, Parteien sowie Länder und Nationen, erweitern Bünde, kandidieren in Wahlen (auch in Spielergemeinden und Bünden) und übernehmen Firmen über die Aktienmehrheit. Dorfbewohner dürfen kandidieren, wo sie wählen dürfen. Abschaltbar mit `villager_ambitions=false`.
+- **Ehrgeizige Dorfbewohner (#52):** Einzelne Dorfbewohner gründen Firmen, Parteien sowie Länder und Nationen, erweitern Bünde, kandidieren in Wahlen (auch in Spielergemeinden und Bünden) und übernehmen Firmen über die Aktienmehrheit; Villager-Bürgermeister beanspruchen selbstständig angrenzende Chunks. Dorfbewohner dürfen kandidieren, wo sie wählen dürfen. Abschaltbar mit `villager_ambitions=false`.
 
 ## 1.0.0
 
