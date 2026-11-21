@@ -20,6 +20,7 @@ import de.etiennebader.civ.application.day.EndOfDay;
 import de.etiennebader.civ.application.economy.CreditTownIncome;
 import de.etiennebader.civ.application.economy.DepositCash;
 import de.etiennebader.civ.application.economy.DepositEmeralds;
+import de.etiennebader.civ.application.economy.SpendFunds;
 import de.etiennebader.civ.application.economy.TransferFunds;
 import de.etiennebader.civ.application.economy.WithdrawCash;
 import de.etiennebader.civ.application.economy.WithdrawEmeralds;
@@ -76,6 +77,7 @@ import de.etiennebader.civ.application.shop.OpenShop;
 import de.etiennebader.civ.application.support.Aggregates;
 import de.etiennebader.civ.application.support.ClaimWeighting;
 import de.etiennebader.civ.application.territory.ClaimChunk;
+import de.etiennebader.civ.application.territory.ConquerChunks;
 import de.etiennebader.civ.application.territory.ReleaseChunk;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.law.LawView;
@@ -103,6 +105,7 @@ public final class CivApplication {
     private final AmendLaw amendLaw;
     private final ClaimChunk claimChunk;
     private final ReleaseChunk releaseChunk;
+    private final ConquerChunks conquerChunks;
     private final CreatePlot createPlot;
     private final AssignPlot assignPlot;
     private final SellPlot sellPlot;
@@ -136,6 +139,7 @@ public final class CivApplication {
     private final VillagerInvestors villagerInvestors;
     private final VillagerAmbitions villagerAmbitions;
     private final VillagerBusiness villagerBusiness;
+    private final de.etiennebader.civ.application.company.VillagerJobSearch villagerJobSearch;
     private final VillagerLandlords villagerLandlords;
     private final TakeOverCompany takeOverCompany;
     private final FoundParty foundParty;
@@ -153,6 +157,7 @@ public final class CivApplication {
     private final WithdrawCash withdrawCash;
     private final DepositCash depositCash;
     private final TransferFunds transferFunds;
+    private final SpendFunds spendFunds;
     private final SellToMarket sellToMarket;
     private final BuyFromMarket buyFromMarket;
     private final EndOfDay endOfDay;
@@ -189,6 +194,7 @@ public final class CivApplication {
         this.amendLaw = new AmendLaw(aggregates, ids);
         this.claimChunk = new ClaimChunk(aggregates, claimPolicy, weighting);
         this.releaseChunk = new ReleaseChunk(aggregates);
+        this.conquerChunks = new ConquerChunks(aggregates);
         this.createPlot = new CreatePlot(aggregates, ids);
         this.assignPlot = new AssignPlot(aggregates);
         this.sellPlot = new SellPlot(aggregates);
@@ -244,6 +250,8 @@ public final class CivApplication {
                 standForElection, trading, takeOverCompany, claimChunk);
         this.villagerBusiness = new VillagerBusiness(() -> new WorldQueries(repositories), companies, production,
                 contracts, buyPlot);
+        this.villagerJobSearch = new de.etiennebader.civ.application.company.VillagerJobSearch(
+                () -> new WorldQueries(repositories), contracts);
         this.villagerLandlords = new VillagerLandlords(() -> new WorldQueries(repositories), contracts, buyPlot);
         this.joinParty = new JoinParty(aggregates);
         this.leaveParty = new LeaveParty(aggregates, dissolvePolity);
@@ -259,6 +267,7 @@ public final class CivApplication {
         this.withdrawCash = new WithdrawCash(aggregates);
         this.depositCash = new DepositCash(aggregates);
         this.transferFunds = new TransferFunds(aggregates);
+        this.spendFunds = new SpendFunds(aggregates);
         this.sellToMarket = new SellToMarket(aggregates);
         this.buyFromMarket = new BuyFromMarket(aggregates);
         this.endOfDay = new EndOfDay(aggregates);
@@ -291,6 +300,10 @@ public final class CivApplication {
 
     public ClaimChunk claimChunk() {
         return claimChunk;
+    }
+
+    public ConquerChunks conquerChunks() {
+        return conquerChunks;
     }
 
     public ReleaseChunk releaseChunk() {
@@ -483,6 +496,10 @@ public final class CivApplication {
         return takeOverCompany;
     }
 
+    public de.etiennebader.civ.application.company.VillagerJobSearch villagerJobSearch() {
+        return villagerJobSearch;
+    }
+
     public VillagerBusiness villagerBusiness() {
         return villagerBusiness;
     }
@@ -541,6 +558,10 @@ public final class CivApplication {
 
     public DepositCash depositCash() {
         return depositCash;
+    }
+
+    public SpendFunds spendFunds() {
+        return spendFunds;
     }
 
     public TransferFunds transferFunds() {

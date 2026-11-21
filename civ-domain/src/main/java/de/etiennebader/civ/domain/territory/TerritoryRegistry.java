@@ -82,6 +82,23 @@ public final class TerritoryRegistry extends AggregateRoot<TerritoryEvent> imple
         raise(new ChunkReleased(polity, chunk, day));
     }
 
+    /**
+     * Überträgt die Hoheit über einen Chunk im Krieg vom Verlierer an den Sieger. Prüft, dass der Chunk wirklich
+     * dem Verlierer gehört; sonst keine Regeln (die Eroberung ist keine gewöhnliche Beanspruchung).
+     *
+     * @throws NotSovereignException wenn {@code from} dort keine Hoheit hat
+     */
+    public void transfer(PolityId from, PolityId to, ChunkCoord chunk, Day day) {
+        Objects.requireNonNull(from, "from");
+        Objects.requireNonNull(to, "to");
+        Objects.requireNonNull(day, "day");
+        Claim current = claimAt(chunk).filter(claim -> claim.polity().equals(from))
+                .orElseThrow(() -> new NotSovereignException(chunk));
+        claims.put(chunk, new Claim(to, current.type() == ClaimType.CORE ? ClaimType.OUTPOST : current.type(), day));
+        raise(new ChunkReleased(from, chunk, day));
+        raise(new ChunkClaimed(to, chunk, claims.get(chunk).type(), day));
+    }
+
     @Override
     public Optional<Claim> claimAt(ChunkCoord chunk) {
         return Optional.ofNullable(claims.get(Objects.requireNonNull(chunk, "chunk")));

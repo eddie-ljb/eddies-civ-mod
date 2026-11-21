@@ -351,6 +351,7 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
       <a href="#boerse">Börse</a>
       <a href="#presse">Presse</a>
       <a href="#staat">Staat</a>
+      <a href="#krieg">Krieg</a>
       <a href="#justiz">Justiz</a>
       <a href="#post">Post<span class="badge" id="b-post"></span></a>
       <a href="#chat">Chat<span class="badge" id="b-chat"></span></a>
@@ -527,6 +528,13 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
     </div>
     <h3 style="margin:32px 0 12px">Zeitungen</h3>
     <div class="register" id="papers"></div>
+  </section>
+
+  <section data-page="krieg">
+    <div class="pagehead"><div><h2>Krieg</h2><p>Live-Frontverlauf aller Kriege: –100 heißt Sieg des Verteidigers, +100 Sieg des Angreifers. Die genaue Truppenstärke kennen nur Ausspäher, hier ist nur die grobe Größe sichtbar.</p></div></div>
+    <div class="register" id="wars"></div>
+    <h3 style="margin:32px 0 12px">Bündnisse</h3>
+    <div class="register" id="alliances"></div>
   </section>
 
   <section data-page="staat">
@@ -755,7 +763,7 @@ const head = name => el("img", { className: "avatar", alt: "", loading: "lazy", 
 const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
 /* Seiten */
-const pages = ["start", "welt", "karte", "wahlen", "markt", "boerse", "presse", "staat", "justiz", "post", "chat", "bauen", "freunde", "ich"];
+const pages = ["start", "welt", "karte", "wahlen", "markt", "boerse", "presse", "krieg", "staat", "justiz", "post", "chat", "bauen", "freunde", "ich"];
 let page = "start";
 function route() {
   const wanted = location.hash.slice(1).split("/")[0];
@@ -763,7 +771,7 @@ function route() {
   document.querySelectorAll("section[data-page]").forEach(s => s.classList.toggle("on", s.dataset.page === page));
   document.querySelectorAll(".nav a").forEach(a => { if (a.getAttribute("href") === "#" + page) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
   const loaders = { start: loadStart, welt: loadWorld, karte: openMap, wahlen: loadElections, markt: loadMarket,
-    boerse: loadExchange, presse: loadPress, staat: loadState, justiz: loadJustice, post: loadLetters,
+    boerse: loadExchange, presse: loadPress, krieg: loadWar, staat: loadState, justiz: loadJustice, post: loadLetters,
     chat: openChat, bauen: loadPlans, freunde: loadFriends, ich: loadMe };
   loaders[page]();
   if (page !== "chat") stopChat();
@@ -1360,6 +1368,25 @@ async function renderStock(l) {
 
 /* Presse */
 let openArticle = null, writing = false;
+async function loadWar() {
+  const r = await api("/api/war");
+  if (!r.ok) return;
+  $("wars").replaceChildren(...(r.data.wars.length ? r.data.wars.map(w => {
+    const bar = el("div", { style: "position:relative;height:14px;background:var(--line);border-radius:7px;overflow:hidden;margin:8px 0" });
+    const fill = el("div", { style: "position:absolute;top:0;bottom:0;background:" + (w.front >= 0 ? "var(--emerald)" : "var(--red)") +
+      ";left:" + (w.front >= 0 ? 50 : 50 + w.front / 2) + "%;width:" + Math.abs(w.front) / 2 + "%" });
+    bar.append(fill, el("div", { style: "position:absolute;left:50%;top:0;bottom:0;width:2px;background:var(--text)" }));
+    return el("div", { className: "card" },
+      el("h3", { textContent: w.aggressor + " gegen " + w.defender }),
+      el("p", { textContent: (w.ongoing ? "läuft seit Tag " : "beendet an Tag ") + (w.ongoing ? w.declared : w.ended) + " · Front " + w.front +
+        " · Truppen " + w.aggressorTroops + " : " + w.defenderTroops + " · Verwundete " + w.aggressorWounded + " : " + w.defenderWounded }),
+      bar,
+      w.winner ? el("p", { textContent: "Sieger: " + w.winner + (w.reparations ? " · Reparationen " + w.reparations : "") }) : el("span"),
+      ...w.campaigns.map(c => el("p", { textContent: "Geplant: " + c.kind + " von " + c.initiator + " am Tag " + c.on })));
+  }) : [el("div", { className: "empty", style: "border:none", textContent: "Es herrscht Frieden." })]));
+  $("alliances").replaceChildren(...(r.data.alliances.length ? r.data.alliances.map(a => el("div", { className: "card" }, el("p", { textContent: a.first + " ↔ " + a.second })))
+    : [el("div", { className: "empty", style: "border:none", textContent: "Keine Bündnisse." })]));
+}
 async function loadPress() {
   const [p, user] = await Promise.all([api("/api/press"), refreshMe()]);
   if (p.ok) pressData = p.data;

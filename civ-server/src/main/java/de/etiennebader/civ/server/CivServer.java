@@ -102,6 +102,7 @@ public final class CivServer {
     private final TownService towns;
     private final PlotService plots;
     private final de.etiennebader.civ.server.construction.ConstructionService construction;
+    private final de.etiennebader.civ.server.war.WarService war;
     private final VillagerService villagers;
     private final VillagerFederations villagerFederations;
     private final de.etiennebader.civ.server.conjuncture.ConjunctureService conjuncture;
@@ -171,6 +172,8 @@ public final class CivServer {
         this.construction = new de.etiennebader.civ.server.construction.ConstructionService(app, calendar, texts,
                 settings.ticksPerDay(), new de.etiennebader.civ.server.construction.BlueprintLibrary(
                 dataDirectory.map(dir -> dir.resolve("blueprints"))), dataDirectory.map(dir -> dir.resolve("construction.tsv")), announcements);
+        this.war = new de.etiennebader.civ.server.war.WarService(app, calendar, texts, announcements, ids,
+                settings, dataDirectory.map(dir -> dir.resolve("war.tsv")));
         this.villagerFederations = new VillagerFederations(app, federations, announcements);
         this.conjuncture = new de.etiennebader.civ.server.conjuncture.ConjunctureService(app.queries());
         this.villagers = new VillagerService(app, settings, texts, announcements, conjuncture, calendar);
@@ -257,6 +260,7 @@ public final class CivServer {
         }
         federations.autoDecideInvitations(day, settings.villagerPolitics());
         campaigns.endOfDay(day);
+        war.endOfDay(day);
         civil.endOfDay(day);
         justice.endOfDay(day);
         companies.endOfDay(day);
@@ -392,6 +396,10 @@ public final class CivServer {
 
     public TownService towns() {
         return towns;
+    }
+
+    public de.etiennebader.civ.server.war.WarService war() {
+        return war;
     }
 
     public de.etiennebader.civ.server.construction.ConstructionService construction() {
