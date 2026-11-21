@@ -106,12 +106,14 @@ class WarRegistryTest {
     void drawKeepsWarOngoing() {
         WarRegistry registry = WarRegistry.empty();
         War war = registry.declareWar(ids, nation, land, Day.ZERO);
-        // gleiche Garnisonen, aber der Verteidiger hat Heimvorteil -> Verteidiger gewinnt, nicht unentschieden;
-        // für ein echtes Unentschieden braucht der Angreifer etwas mehr Stärke als der Heimvorteil ausgleicht.
+        // Angreifer 1 Offizier + 8 Soldaten = 11, Verteidiger 10 Soldaten * 1,1 = 11 -> exakter Gleichstand
         registry.enlist(nation, person(), MilitaryRank.OFFICER, Day.ZERO);
-        registry.enlist(land, person(), MilitaryRank.SOLDIER, Day.ZERO);
-        registry.enlist(land, person(), MilitaryRank.SOLDIER, Day.ZERO);
-        registry.enlist(land, person(), MilitaryRank.SOLDIER, Day.ZERO);
+        for (int i = 0; i < 8; i++) {
+            registry.enlist(nation, person(), MilitaryRank.SOLDIER, Day.ZERO);
+        }
+        for (int i = 0; i < 10; i++) {
+            registry.enlist(land, person(), MilitaryRank.SOLDIER, Day.ZERO);
+        }
 
         BattleOutcome outcome = registry.resolveBattle(war.id(), 100, new Day(1));
 

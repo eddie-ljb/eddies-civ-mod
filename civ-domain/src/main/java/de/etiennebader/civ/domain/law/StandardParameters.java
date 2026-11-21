@@ -250,6 +250,13 @@ public final class StandardParameters {
     public static final ParameterKey<Long> WAR_REPARATIONS_PER_STRENGTH_POINT =
             ParameterKey.constrained("war_reparations_per_strength_point", Long.class, 0L, rate -> rate >= 0);
 
+    /**
+     * Gebühr je Tag erkaufter Neutralität (siehe {@code WarService}), aus der Gemeindekasse an den übergeordneten
+     * Bund. In kleinster Währungseinheit.
+     */
+    public static final ParameterKey<Long> NEUTRALITY_FEE_PER_DAY = ParameterKey.constrained(
+            "neutrality_fee_per_day", Long.class, 100L, fee -> fee >= 0);
+
     /** Täglicher Sold je einfachem Soldaten in der Garnison, aus der Gemeindekasse. 0 (Standard) = unbezahlt. */
     public static final ParameterKey<Long> SOLDIER_WAGE = ParameterKey.constrained("soldier_wage", Long.class, 0L,
             wage -> wage >= 0);
@@ -313,7 +320,8 @@ public final class StandardParameters {
                 PARTY_LIST_BY_VOTE,
                 WAR_REPARATIONS_PER_STRENGTH_POINT,
                 SOLDIER_WAGE,
-                OFFICER_WAGE
+                OFFICER_WAGE,
+                NEUTRALITY_FEE_PER_DAY
         );
     }
 

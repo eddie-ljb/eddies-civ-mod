@@ -234,6 +234,7 @@ public final class CivCommandTree {
                                                         StringArgumentType.getString(context, VALUE))))))))
                 .then(plotCommands())
                 .then(constructionCommands())
+                .then(warCommands())
                 .then(Commands.literal("laden")
                         .then(Commands.literal("eroeffnen")
                                 .then(Commands.argument(PRICE, StringArgumentType.word())
@@ -1293,6 +1294,38 @@ public final class CivCommandTree {
                                                                   SuggestionsBuilder builder) {
         return SharedSuggestionProvider.suggest(host.current().map(civ -> civ.federations().federationNames())
                 .orElse(List.of()), builder);
+    }
+
+    /** {@code /civ krieg}: Krieg erklären, dienen, kämpfen, Frieden und Neutralität (Issue #27). */
+    private LiteralArgumentBuilder<CommandSourceStack> warCommands() {
+        return Commands.literal("krieg")
+                .then(Commands.literal("liste")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.war().list())))
+                .then(Commands.literal("erklaeren")
+                        .then(Commands.argument(COMPANY, StringArgumentType.string())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.war().declare(
+                                        Players.caller(player), StringArgumentType.getString(context, COMPANY))))))
+                .then(Commands.literal("dienen")
+                        .then(Commands.literal("soldat")
+                                .executes(context -> withCiv(context, (civ, player) -> civ.war().enlist(
+                                        Players.caller(player), de.etiennebader.civ.domain.war.MilitaryRank.SOLDIER))))
+                        .then(Commands.literal("offizier")
+                                .executes(context -> withCiv(context, (civ, player) -> civ.war().enlist(
+                                        Players.caller(player), de.etiennebader.civ.domain.war.MilitaryRank.OFFICER)))))
+                .then(Commands.literal("entlassen")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.war().discharge(Players.caller(player)))))
+                .then(Commands.literal("gefecht")
+                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.war().battle(
+                                        Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))))
+                .then(Commands.literal("frieden")
+                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.war().peace(
+                                        Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))))
+                .then(Commands.literal("neutralitaet")
+                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(1, 365))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.war().neutrality(
+                                        Players.caller(player), IntegerArgumentType.getInteger(context, COUNT))))));
     }
 
     /** {@code /civ bau}: Baupläne ansehen, Bauaufträge vergeben, Bauamt entscheidet (Issue #19). */

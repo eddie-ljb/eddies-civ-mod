@@ -20,6 +20,9 @@ public final class BattleResolver {
     /** Multiplikator auf die Gefechtsstärke des Verteidigers. */
     public static final double DEFENDER_ADVANTAGE = 1.1;
 
+    /** Derselbe Heimvorteil in Prozent, für den exakten ganzzahligen Vergleich. */
+    static final long DEFENDER_ADVANTAGE_PERCENT = 110;
+
     private BattleResolver() {
     }
 
@@ -41,8 +44,13 @@ public final class BattleResolver {
      */
     public static BattleOutcome resolve(int aggressorSoldiers, int aggressorOfficers, int defenderSoldiers,
                                         int defenderOfficers) {
-        double aggressor = strength(aggressorSoldiers, aggressorOfficers);
-        double defender = strength(defenderSoldiers, defenderOfficers) * DEFENDER_ADVANTAGE;
+        // Ganzzahlig verglichen (Heimvorteil 11/10), damit ein exakter Gleichstand nicht an Gleitkommafehlern scheitert
+        long aggressor = (long) aggressorSoldiers + (long) aggressorOfficers * OFFICER_WEIGHT;
+        long defender = ((long) defenderSoldiers + (long) defenderOfficers * OFFICER_WEIGHT) * DEFENDER_ADVANTAGE_PERCENT;
+        aggressor *= 100;
+        if (aggressorSoldiers < 0 || aggressorOfficers < 0 || defenderSoldiers < 0 || defenderOfficers < 0) {
+            throw new IllegalArgumentException("Garnisonsgrößen dürfen nicht negativ sein");
+        }
         if (aggressor > defender) {
             return BattleOutcome.AGGRESSOR_WINS;
         }
