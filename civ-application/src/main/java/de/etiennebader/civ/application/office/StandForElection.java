@@ -55,7 +55,6 @@ public final class StandForElection {
         if (!villagerMayStand(polity, command.citizen())) {
             Citizens.require(polity, command.citizen());
         }
-        Citizens.require(polity, command.citizen());
         queries.partyOf(command.citizen())
                 .filter(party -> !queries.partyEligibleIn(party, polity.id()))
                 .ifPresent(party -> {

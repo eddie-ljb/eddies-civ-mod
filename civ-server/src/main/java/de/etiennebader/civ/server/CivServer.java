@@ -166,7 +166,6 @@ public final class CivServer {
         this.territory = new TerritoryWatcher(app.queries(), texts);
         this.towns = new TownService(app.queries(), settings, texts, commands, territory);
         this.plots = new PlotService(app, calendar, players, texts);
-        this.villagers = new VillagerService(app, settings, texts, announcements);
         this.villagerFederations = new VillagerFederations(app, federations, announcements);
         this.conjuncture = new de.etiennebader.civ.server.conjuncture.ConjunctureService(app.queries());
         this.villagers = new VillagerService(app, settings, texts, announcements, conjuncture, calendar);
@@ -557,11 +556,11 @@ public final class CivServer {
         return players;
     }
 
-    /** Für Tests und spätere Etappen, die weitere Use Cases brauchen. */
     public VillagerFederations villagerFederations() {
         return villagerFederations;
     }
 
+    /** Für Tests und spätere Etappen, die weitere Use Cases brauchen. */
     CivApplication app() {
         return app;
     }

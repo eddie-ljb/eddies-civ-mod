@@ -378,13 +378,14 @@ public final class VillagerService {
         if (settings.emigration()) {
             emigrate(day);
         }
-        if (settings.ambitions()) {
-            app.villagerAmbitions().execute(day);
-            app.villagerBusiness().execute(day);
         socialAndCrime(day);
         if (settings.villagerPolitics()) {
             governAutonomously(day);
             autoClaimChunk(day);
+        }
+        if (settings.ambitions()) {
+            app.villagerAmbitions().execute(day);
+            app.villagerBusiness().execute(day);
         }
         return changes;
     }
