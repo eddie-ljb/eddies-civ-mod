@@ -152,6 +152,8 @@ code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-si
 .legend { position: absolute; bottom: 12px; left: 12px; background: color-mix(in srgb, var(--surface) 92%, transparent); border: 1px solid var(--line);
   border-radius: var(--r-m); padding: 8px 12px; font-size: .85rem; max-height: 40%; max-width: calc(100% - 24px); overflow: auto; }
 .legend div { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
+.legend details { margin: 0 0 6px 20px; }
+.legend details summary { cursor: pointer; color: var(--emerald); font-size: .8rem; }
 .swatch { width: 12px; height: 12px; border-radius: 3px; background: var(--c); flex: none; }
 .tooltip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-s);
   padding: 6px 10px; font-size: .85rem; display: none; white-space: nowrap; box-shadow: 0 4px 14px rgba(0,0,0,.15); }
@@ -160,6 +162,12 @@ code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-si
 .polls { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 36px; }
 .poll { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-l); padding: 18px; border-left: 4px solid var(--c); }
 .poll .sub { color: var(--muted); font-size: .88rem; margin: 2px 0 12px; }
+.districts { margin-top: 10px; }
+.districts > summary { cursor: pointer; color: var(--emerald); font-size: .88rem; font-weight: 600; }
+.districts .line { margin: 8px 0 0; }
+.districts details { margin: 0 0 8px 16px; }
+.districts details summary { cursor: pointer; color: var(--muted); font-size: .82rem; }
+.districts details .line { font-size: .85rem; margin: 4px 0 0; }
 .bar { height: 8px; background: var(--sunk); border-radius: 4px; overflow: hidden; margin: 3px 0 10px; }
 .bar > span { display: block; height: 100%; background: var(--c); border-radius: 4px; }
 .line { display: flex; justify-content: space-between; gap: 10px; font-size: .93rem; }
@@ -442,6 +450,9 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
           <option value="minecraft:the_end">Ende</option>
         </select>
         <select id="mapmode" aria-label="Ansicht"><option value="">Gebiete</option></select>
+        <select id="maplevel" aria-label="Ebene" title="Nach welcher Ebene Gebiete eingefärbt werden"><option value="">Höchste Ebene</option></select>
+        <select id="mapparty" aria-label="Partei" title="Wahlkarte auf eine Partei eingrenzen" hidden><option value="">Alle Parteien</option></select>
+        <label class="btn small" style="background:var(--surface)" id="borderbox" hidden><input type="checkbox" id="showborders" checked style="padding:0"> Bezirksgrenzen</label>
         <label class="btn small" style="background:var(--surface)"><input type="checkbox" id="showstreets" checked style="padding:0"> Straßen</label>
         <label class="btn small" style="background:var(--surface)" id="terrainbox" hidden><input type="checkbox" id="showterrain" checked style="padding:0"> Gelände</label>
         <button class="btn small" id="recenter">Zentrieren</button>
@@ -449,7 +460,7 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
       <div class="legend" id="legend"></div>
       <div class="tooltip" id="tooltip"></div>
     </div>
-    <p class="muted small" style="margin-top:10px">Außenposten sind schraffiert, ein Stern markiert das Gemeindehaus. In der Wahlkarte färbt sich jede Gemeinde nach dem Führenden ihres Wahlbezirks.</p>
+    <p class="muted small" style="margin-top:10px">Außenposten sind schraffiert, ein Stern markiert das Gemeindehaus. Gemeinden desselben Bundes teilen sich eine Farbe, standardmäßig nach dessen höchster Ebene (Nation &gt; Land &gt; Gemeinde); „Ebene" grenzt das auf eine bestimmte Stufe ein. In der Wahlkarte („Ansicht") färbt sich jeder Chunk nach dem Führenden seines eigenen Wahlbezirks, auch wenn eine Gemeinde in mehrere Bezirke geteilt ist; „Bezirksgrenzen" zeichnet die Grenze zwischen Bezirken nach, „Partei" grenzt die Farbe auf eine Partei ein.</p>
   </section>
 
   <section data-page="wahlen">
@@ -458,6 +469,7 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
       <div class="toolbar" style="margin:0">
         <select id="elevel" aria-label="Ebene"><option value="">Alle Ebenen</option></select>
         <select id="eparty" aria-label="Partei"><option value="">Alle Parteien</option></select>
+        <input id="esearch" type="search" placeholder="Gemeinde/Bund suchen" aria-label="Gemeinde/Bund suchen">
       </div>
     </div>
     <h3 id="pollhead" style="margin-bottom:12px">Laufende Wahlen</h3>
@@ -524,6 +536,19 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
     <div class="liveband" id="debates"></div>
     <h3 style="margin:8px 0 12px">Hoheitszeichen und Wahlkreise</h3>
     <div class="register" id="symbols"></div>
+    <div id="imageUploadBox" hidden style="margin-top:16px">
+      <h3 style="margin-bottom:12px">Eigenes Wappen, Wahlplakat oder Leuchtreklame hochladen</h3>
+      <p class="muted small">Höchstens 128×128 Pixel PNG. Nur die Spitze (Bürgermeister/Vorsitz) der angegebenen Einheit darf hochladen; Unternehmen gehen über ihren Namen genauso.</p>
+      <input id="imgPolity" type="text" placeholder="Name der Gemeinde, des Bundes oder Unternehmens" style="margin-right:8px">
+      <select id="imgKind" style="margin-right:8px">
+        <option value="WAPPEN">Wappen</option>
+        <option value="WAHLPLAKAT">Wahlplakat</option>
+        <option value="LEUCHTREKLAME">Leuchtreklame</option>
+      </select>
+      <input id="imgFile" type="file" accept="image/png" style="margin-right:8px">
+      <button class="btn" onclick="uploadImage()">Hochladen</button>
+      <div class="msg" id="imgMsg"></div>
+    </div>
   </section>
 
   <section data-page="justiz">
@@ -673,7 +698,9 @@ const hash = s => { let h = 2166136261; for (const c of String(s)) h = Math.imul
 const palette = ["#127a55", "#2f6db5", "#b0542b", "#7a4bb0", "#a8771f", "#1f8c8c", "#b23a5a", "#5a7d1a", "#c2852c", "#3f5aa8"];
 let world = { towns: [], federations: [], parties: [] };
 const colorOf = id => {
-  const index = (world.towns || []).findIndex(t => t.id === id);
+  const towns = world.towns || [], feds = world.federations || [];
+  let index = towns.findIndex(t => t.id === id);
+  if (index < 0) { const fi = feds.findIndex(f => f.id === id); if (fi >= 0) index = towns.length + fi; }
   return palette[(index >= 0 ? index : hash(id)) % palette.length];
 };
 const tinctures = ["#f2ead3", "#d9b44a", "#e4e7e9", "#1d2a33"];
@@ -904,10 +931,18 @@ let view = { x: 0, z: 0, scale: 12 }, mapData = { chunks: [], seats: [] }, drag 
 let electionData = { results: [], polls: [] };
 async function openMap() {
   if (!world.towns.length) await fetchWorld();
+  fillLevels();
   if (!streetsData.towns.length) { const s = await api("/api/streets"); if (s.ok) streetsData = s.data; }
   resize();
   await loadMap();
   if (!centered) { centered = true; recenter(); }
+}
+function fillLevels() {
+  const sel = $("maplevel");
+  if (sel.dataset.filled) return;
+  sel.dataset.filled = "1";
+  [...(world.levels || [])].sort((a, b) => b.rank - a.rank)
+    .forEach(l => sel.append(el("option", { value: l.id, textContent: l.name })));
 }
 function resize() {
   const rect = canvas.getBoundingClientRect();
@@ -917,22 +952,28 @@ function resize() {
 window.addEventListener("resize", () => { if (page === "karte") resize(); });
 async function loadMap() {
   if (!electionData.results.length) { const r = await api("/api/elections"); if (r.ok) { electionData = r.data; fillModes(); } }
-  const [{ ok, data }, tiles] = await Promise.all([api("/api/map?dim=" + encodeURIComponent($("dim").value)),
+  const result = electionResult();
+  fillMapParty();
+  const level = $("maplevel").value;
+  $("maplevel").hidden = !!result; $("mapparty").hidden = !result; $("borderbox").hidden = !result;
+  const query = "dim=" + encodeURIComponent($("dim").value) + (result
+    ? "&election=" + encodeURIComponent(result.polity) + "&office=" + encodeURIComponent(result.office)
+    : (level ? "&level=" + encodeURIComponent(level) : ""));
+  const [{ ok, data }, tiles] = await Promise.all([api("/api/map?" + query),
     api("/api/map/tiles?dim=" + encodeURIComponent($("dim").value))]);
   if (!ok) return;
   mapData = data;
   terrain = tiles.ok ? tiles.data : { enabled: false, tiles: [] };
   $("terrainbox").hidden = !terrain.enabled;
-  const result = electionResult();
   if (result) {
-    const leaders = result.districts.filter(d => d.town);
-    $("legend").replaceChildren(...(leaders.length ? [...new Map(leaders.map(d => [d.key, d])).values()].map(d => {
+    const districts = result.districts.filter(d => d.town);
+    $("legend").replaceChildren(...(districts.length ? districts.map(d => {
       const sw = el("span", { className: "swatch" }); sw.style.setProperty("--c", colorOf(d.key));
-      return el("div", {}, sw, (d.party || d.leader) + ": " + leaders.filter(x => x.key === d.key).map(x => x.name).join(", "));
+      return el("div", {}, sw, districtRanking(d));
     }) : [el("div", { textContent: "Keine Bezirke." })]));
   } else {
-    const names = Object.fromEntries(world.towns.map(t => [t.id, t.name]));
-    const present = [...new Set(data.chunks.map(c => c.town))];
+    const names = Object.fromEntries([...world.towns, ...(world.federations || [])].map(t => [t.id, t.name]));
+    const present = [...new Set(data.chunks.map(c => c.group || c.town))];
     $("legend").replaceChildren(...(present.length ? present.map(id => {
       const sw = el("span", { className: "swatch" }); sw.style.setProperty("--c", colorOf(id));
       return el("div", {}, sw, names[id] || "?");
@@ -945,6 +986,27 @@ function fillModes() {
   mode.replaceChildren(el("option", { value: "", textContent: "Gebiete" }),
     ...electionData.results.map((r, i) => el("option", { value: String(i), textContent: "Wahlkarte: " + r.polityName + ", " + r.officeName + " (Tag " + r.day + ")" })));
   mode.value = current && electionData.results[+current] ? current : "";
+  fillMapParty();
+}
+function fillMapParty() {
+  const result = electionResult(), select = $("mapparty"), current = select.value;
+  const parties = result ? [...new Set(result.districts.flatMap(d => d.lines.map(l => l.party)).filter(Boolean))].sort() : [];
+  select.replaceChildren(el("option", { value: "", textContent: "Alle Parteien" }),
+    ...parties.map(p => el("option", { value: p, textContent: p })));
+  select.value = parties.includes(current) ? current : "";
+}
+/** Eine Bezirkszeile mit Führendem, aufklappbar zur vollen Kandidaten-Rangfolge (nicht nur der/die Erste). */
+function districtRanking(d) {
+  const row = el("div", {}, el("span", { textContent: d.name + ": " + d.leader + (d.party ? " (" + d.party + ")" : "") }));
+  if (d.lines && d.lines.length > 1) {
+    const details = el("details", {});
+    details.append(el("summary", { textContent: "Rangfolge (" + d.lines.length + ")" }),
+      ...d.lines.map((l, i) => el("div", { className: "line" },
+        el("span", { textContent: (i + 1) + ". " + l.name + (l.party ? " (" + l.party + ")" : "") }),
+        el("span", { textContent: l.percent + " %" }))));
+    row.append(details);
+  }
+  return row;
 }
 function recenter() {
   const rect = canvas.getBoundingClientRect();
@@ -961,12 +1023,13 @@ function toScreen(cx, cz) {
 }
 function electionResult() { const m = $("mapmode").value; return m === "" ? null : electionData.results[+m] || null; }
 function chunkColor(c) {
-  const result = electionResult();
-  if (!result) return colorOf(c.town);
-  const d = result.districts.find(x => x.town === c.town);
-  const party = $("eparty").value;
-  if (!d || (party && d.party !== party)) return css("--line");
-  return colorOf(d.key);
+  if (!electionResult()) return colorOf(c.group || c.town);
+  const party = $("mapparty").value;
+  if (party) {
+    const d = electionResult().districts.find(x => x.town === c.district);
+    if (!d || d.party !== party) return css("--line");
+  }
+  return colorOf(c.group);
 }
 let terrain = { enabled: false, tiles: [], chunks: 32 };
 const tileImages = new Map();
@@ -1009,6 +1072,20 @@ function draw() {
     if (c.outpost && s > 8) { ctx.globalAlpha = .9; ctx.strokeStyle = chunkColor(c); ctx.beginPath(); ctx.moveTo(px, pz + s); ctx.lineTo(px + s, pz); ctx.stroke(); }
   }
   ctx.globalAlpha = 1;
+  if (electionResult() && $("showborders").checked) {
+    const byPos = new Map(mapData.chunks.map(c => [c.x + "," + c.z, c]));
+    ctx.strokeStyle = css("--ink"); ctx.lineWidth = Math.max(1.5, s * .08); ctx.beginPath();
+    for (const c of mapData.chunks) {
+      if (!c.district) continue;
+      const [px, pz] = toScreen(c.x, c.z);
+      for (const [dx, dz, x1, y1, x2, y2] of [[1, 0, px + s, pz, px + s, pz + s], [-1, 0, px, pz, px, pz + s],
+          [0, 1, px, pz + s, px + s, pz + s], [0, -1, px, pz, px + s, pz]]) {
+        const neighbor = byPos.get((c.x + dx) + "," + (c.z + dz));
+        if (!neighbor || neighbor.district !== c.district) { ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); }
+      }
+    }
+    ctx.stroke();
+  }
   if ($("showstreets").checked && $("dim").value === "minecraft:overworld" && view.scale >= 8) {
     ctx.font = "600 " + (11 * devicePixelRatio) + "px " + css("--font"); ctx.textAlign = "center";
     for (const t of streetsData.towns) for (const st of t.streets) {
@@ -1053,7 +1130,7 @@ canvas.addEventListener("pointermove", e => {
   let text = hit ? (world.towns.find(t => t.id === hit.town) || {}).name || "?" : "Wildnis";
   if (hit && hit.outpost) text += " (Außenposten)";
   const result = electionResult();
-  if (hit && result) { const d = result.districts.find(x => x.town === hit.town); if (d) text += ", vorn: " + d.leader + (d.party ? " (" + d.party + ")" : ""); }
+  if (hit && result) { const d = result.districts.find(x => x.town === hit.district); if (d) text += ", " + d.name + ", vorn: " + d.leader + (d.party ? " (" + d.party + ")" : ""); }
   const street = streetsData.towns.flatMap(t => t.streets).find(st => bx * 16 >= st.minX && bx * 16 <= st.maxX + 1 && bz * 16 >= st.minZ && bz * 16 <= st.maxZ + 1);
   if (street) text += ", " + street.name;
   const tip = $("tooltip");
@@ -1065,6 +1142,9 @@ canvas.addEventListener("pointerleave", () => $("tooltip").style.display = "none
 canvas.addEventListener("wheel", e => { e.preventDefault(); view.scale = Math.min(64, Math.max(1, view.scale * (e.deltaY < 0 ? 1.15 : 1 / 1.15))); draw(); }, { passive: false });
 $("dim").addEventListener("change", () => loadMap().then(recenter));
 $("mapmode").addEventListener("change", loadMap);
+$("maplevel").addEventListener("change", loadMap);
+$("mapparty").addEventListener("change", draw);
+$("showborders").addEventListener("change", draw);
 $("showstreets").addEventListener("change", draw);
 $("showterrain").addEventListener("change", draw);
 $("recenter").addEventListener("click", recenter);
@@ -1087,8 +1167,9 @@ async function loadElections() {
   renderElections();
 }
 function renderElections() {
-  const level = $("elevel").value, party = $("eparty").value;
-  const polls = electionData.polls.filter(p => (!level || p.level === level) && (!party || p.entries.some(e => e.party === party)));
+  const level = $("elevel").value, party = $("eparty").value, search = $("esearch").value.trim().toLowerCase();
+  const matches = name => !search || name.toLowerCase().includes(search);
+  const polls = electionData.polls.filter(p => (!level || p.level === level) && (!party || p.entries.some(e => e.party === party)) && matches(p.polityName));
   $("polls").replaceChildren(...(polls.length ? polls.map(p => {
     const card = el("div", { className: "poll" }); card.style.setProperty("--c", colorOf(p.polity));
     card.append(el("h3", { textContent: p.polityName + ": " + p.officeName }),
@@ -1102,7 +1183,7 @@ function renderElections() {
     if (p.lists.length) card.append(el("div", { className: "muted small", textContent: "Sitzprognose: " + p.lists.map(l => l.name + " " + l.seats).join(", ") }));
     return card;
   }) : [el("div", { className: "empty", textContent: "Gerade läuft keine Wahl. Ausrufen kann sie der Bürgermeister im Rathaus." })]));
-  const results = electionData.results.filter(r => (!level || r.level === level) && (!party || r.totals.some(t => t.party === party)));
+  const results = electionData.results.filter(r => (!level || r.level === level) && (!party || r.totals.some(t => t.party === party)) && matches(r.polityName));
   $("results").replaceChildren(...(results.length ? [...results].reverse().map(r => {
     const card = el("div", { className: "poll" }); card.style.setProperty("--c", colorOf(r.polity));
     card.append(el("h3", { textContent: r.polityName + ": " + r.officeName }), el("div", { className: "sub", textContent: r.level + ", ausgezählt an Tag " + r.day }));
@@ -1112,12 +1193,17 @@ function renderElections() {
       card.append(el("div", { className: "line" }, el("span", { textContent: t.name + (t.party ? " (" + t.party + ")" : "") + (r.winners.includes(t.name) ? " ✓" : "") }),
         el("span", { textContent: t.votes + " Stimmen, " + t.percent + " %" })), bar);
     }
-    if (r.districts.length > 1) card.append(el("div", { className: "muted small", textContent: "Bezirke: " + r.districts.map(d => d.name + " " + d.leader).join(", ") }));
+    if (r.districts.length > 1) {
+      const box = el("details", { className: "districts" });
+      box.append(el("summary", { textContent: r.districts.length + " Wahlbezirke" }), ...r.districts.map(districtRanking));
+      card.append(box);
+    }
     return card;
   }) : [el("div", { className: "empty", textContent: "Noch keine Wahl ausgezählt." })]));
 }
 $("elevel").addEventListener("change", renderElections);
 $("eparty").addEventListener("change", () => { renderElections(); draw(); });
+$("esearch").addEventListener("input", renderElections);
 
 /* Markt */
 let offers = [], shopList = [], sortKey = "name", sortDir = 1;

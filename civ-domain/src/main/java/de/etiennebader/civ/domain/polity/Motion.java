@@ -13,7 +13,7 @@ import java.util.UUID;
  * Worüber eine Abstimmung entscheidet: eine einzelne Regelung, einen neuen Paragraphen oder die Aufhebung eines
  * Paragraphen.
  */
-public sealed interface Motion permits Motion.Change, Motion.Enact, Motion.Repeal {
+public sealed interface Motion permits Motion.Change, Motion.Enact, Motion.Repeal, Motion.PartyProgram {
 
     /** Die Regelungen, die eine Annahme setzt; bei einer Aufhebung leer. */
     List<ParameterValue<?>> values();
@@ -73,6 +73,27 @@ public sealed interface Motion permits Motion.Change, Motion.Enact, Motion.Repea
         @Override
         public String subject() {
             return "repeal:" + statute.value();
+        }
+    }
+
+    /**
+     * Eine Partei ändert ihr Programm (Richtung, Wappen oder wie künftig entschieden wird) per Abstimmung,
+     * statt dass der Vorsitz es allein verordnet. Höchstens ein solcher Antrag ist je Partei gleichzeitig offen.
+     */
+    record PartyProgram(PartyProfile profile) implements Motion {
+
+        public PartyProgram {
+            Objects.requireNonNull(profile, "profile");
+        }
+
+        @Override
+        public List<ParameterValue<?>> values() {
+            return List.of();
+        }
+
+        @Override
+        public String subject() {
+            return "partyprogram";
         }
     }
 }

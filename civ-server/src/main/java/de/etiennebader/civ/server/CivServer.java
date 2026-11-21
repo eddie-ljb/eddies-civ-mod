@@ -103,6 +103,7 @@ public final class CivServer {
     private final PlotService plots;
     private final VillagerService villagers;
     private final VillagerFederations villagerFederations;
+    private final de.etiennebader.civ.server.conjuncture.ConjunctureService conjuncture;
     private final Announcements announcements = new Announcements();
     private final VotingService voting;
     private final OfficeService offices;
@@ -111,6 +112,7 @@ public final class CivServer {
     private final CivicService civic;
     private final JusticeService justice;
     private volatile java.nio.file.Path mapDirectory;
+    private final Optional<java.nio.file.Path> imagesDirectory;
     private final LiveCountService liveCount;
     private final DebateService debates;
     private final Clock clock = Clock.systemUTC();
@@ -133,11 +135,12 @@ public final class CivServer {
     private boolean running = true;
 
     private CivServer(StateStore store, AutoCloseable storage, ServerSettings settings, IdGenerator ids,
-                      SaveListener listener) {
+                      SaveListener listener, Optional<java.nio.file.Path> imagesDirectory) {
         Repositories repositories = InMemoryRepositories.create();
         ChangeTracker tracker = new ChangeTracker();
         this.storage = storage;
         this.settings = settings;
+        this.imagesDirectory = imagesDirectory;
         this.calendar = new Calendar(settings.ticksPerDay(), CalendarState.START);
         this.players = new PlayerDirectory();
         this.app = new CivApplication(repositories, ids, settings.claimPolicy(), tracker, ClaimWeighting.PERSONS_QUARTER);
@@ -151,7 +154,8 @@ public final class CivServer {
         this.offices = new OfficeService(app, calendar, players, texts, announcements);
         this.federations = new FederationService(app, calendar, settings.levels(), texts, announcements);
         this.commands = new CivCommands(app, calendar, settings.currency(), texts, protection, voting);
-        this.parties = new PartyService(app, calendar, settings.currency(), settings.parties(), texts, announcements);
+        this.parties = new PartyService(app, calendar, settings.currency(), settings.parties(), players, texts,
+                announcements);
         this.lawBooks = new LawBookService(app, calendar, texts, announcements, federations);
         this.parliaments = new ParliamentService(app, texts, offices, voting);
         this.campaigns = new CampaignService(app, calendar, texts, offices);
@@ -164,12 +168,15 @@ public final class CivServer {
         this.plots = new PlotService(app, calendar, players, texts);
         this.villagers = new VillagerService(app, settings, texts, announcements);
         this.villagerFederations = new VillagerFederations(app, federations, announcements);
+        this.conjuncture = new de.etiennebader.civ.server.conjuncture.ConjunctureService(app.queries());
+        this.villagers = new VillagerService(app, settings, texts, announcements, conjuncture, calendar);
         this.townHalls = new TownHallService(app, calendar, texts, announcements);
         this.shops = new ShopService(app, calendar, settings.currency(), texts);
         this.civil = new CivilService(app, calendar, players, settings.currency(), texts, announcements,
                 player -> plots.selection(player).area());
         this.community = new CommunityService(app, calendar, players, texts, announcements, Clock.systemUTC());
-        this.companies = new CompanyService(app, calendar, players, settings.currency(), texts, announcements);
+        this.companies = new CompanyService(app, calendar, players, settings.currency(), texts, announcements,
+                conjuncture);
         this.companies.pricing(market::priceLevel);
         this.press = new PressService(app, calendar, players, settings.currency(), texts, announcements);
         this.civic = new CivicService(app, calendar, texts, announcements, plots);
@@ -192,8 +199,10 @@ public final class CivServer {
     public static CivServer open(Path databaseFile, ServerSettings settings, SaveListener listener) {
         Objects.requireNonNull(databaseFile, "databaseFile");
         SqliteStateStore store = SqliteStateStore.open(databaseFile);
+        Path parent = databaseFile.toAbsolutePath().getParent();
+        Optional<Path> images = Optional.ofNullable(parent).map(dir -> dir.resolve("images"));
         try {
-            return new CivServer(store, store, settings, new RandomIdGenerator(), listener);
+            return new CivServer(store, store, settings, new RandomIdGenerator(), listener, images);
         } catch (RuntimeException e) {
             store.close();
             throw e;
@@ -203,7 +212,7 @@ public final class CivServer {
     /** Für Tests: mit beliebigem Speicher und vorhersagbaren IDs. */
     static CivServer start(StateStore store, ServerSettings settings, IdGenerator ids, SaveListener listener) {
         return new CivServer(store, () -> {
-        }, settings, ids, listener);
+        }, settings, ids, listener, Optional.empty());
     }
 
     /**
@@ -240,6 +249,7 @@ public final class CivServer {
         if (settings.ambitions()) {
             villagerFederations.endOfDay(day);
         }
+        federations.autoDecideInvitations(day, settings.villagerPolitics());
         campaigns.endOfDay(day);
         civil.endOfDay(day);
         justice.endOfDay(day);
@@ -386,6 +396,10 @@ public final class CivServer {
         return villagers;
     }
 
+    public de.etiennebader.civ.server.conjuncture.ConjunctureService conjuncture() {
+        return conjuncture;
+    }
+
     public OfficeService offices() {
         return offices;
     }
@@ -453,6 +467,14 @@ public final class CivServer {
     /** Setzt den Ordner der Kartenkacheln; die Fabric-Seite rendert hinein. */
     public void mapDirectory(java.nio.file.Path directory) {
         this.mapDirectory = directory;
+    }
+
+    /**
+     * Ordner für selbst hochgeladene Bilder (Wappen, Wahlplakate, Leuchtreklamen), benannt nach ihrem Hash
+     * ({@code <hash>.png}); leer in Tests ohne echte Datenbankdatei.
+     */
+    public Optional<java.nio.file.Path> imagesDirectory() {
+        return imagesDirectory;
     }
 
     /**

@@ -45,7 +45,7 @@ import de.etiennebader.civ.application.office.PutUpPoster;
 import de.etiennebader.civ.application.office.RunElections;
 import de.etiennebader.civ.application.office.StandForElection;
 import de.etiennebader.civ.application.office.VillagerVoter;
-import de.etiennebader.civ.application.party.ChangePartyProfile;
+import de.etiennebader.civ.application.party.ChangePartyProgram;
 import de.etiennebader.civ.application.party.FoundParty;
 import de.etiennebader.civ.application.party.JoinParty;
 import de.etiennebader.civ.application.party.LeaveParty;
@@ -115,6 +115,7 @@ public final class CivApplication {
     private final CastVote castVote;
     private final TallyProposals tallyProposals;
     private final ParliamentSession parliamentSession;
+    private final PersonalityLegislator villagerLegislator;
     private final Campaign campaign;
     private final ContractUseCases contracts;
     private final RunContracts runContracts;
@@ -138,7 +139,7 @@ public final class CivApplication {
     private final FoundParty foundParty;
     private final JoinParty joinParty;
     private final LeaveParty leaveParty;
-    private final ChangePartyProfile changePartyProfile;
+    private final ChangePartyProgram changePartyProgram;
     private final MoveSeat moveSeat;
     private final OpenShop openShop;
     private final CloseShop closeShop;
@@ -220,8 +221,8 @@ public final class CivApplication {
         this.community = new CommunityUseCases(aggregates, ids);
         this.makePromise = new MakePromise(aggregates);
         this.putUpPoster = new PutUpPoster(aggregates);
-        this.parliamentSession = new ParliamentSession(aggregates, ids,
-                new PersonalityLegislator(effectiveLaws, partyOf));
+        this.villagerLegislator = new PersonalityLegislator(effectiveLaws, partyOf);
+        this.parliamentSession = new ParliamentSession(aggregates, ids, villagerLegislator);
         this.foundFederation = new FoundFederation(aggregates, ids);
         this.joinFederation = new JoinFederation(aggregates);
         this.proclaimConstitution = new ProclaimConstitution(aggregates);
@@ -243,7 +244,7 @@ public final class CivApplication {
                 contracts, buyPlot);
         this.joinParty = new JoinParty(aggregates);
         this.leaveParty = new LeaveParty(aggregates, dissolvePolity);
-        this.changePartyProfile = new ChangePartyProfile(aggregates);
+        this.changePartyProgram = new ChangePartyProgram(aggregates, ids, proposeMotion);
         this.moveSeat = new MoveSeat(aggregates);
         this.openShop = new OpenShop(aggregates);
         this.closeShop = new CloseShop(aggregates);
@@ -379,6 +380,11 @@ public final class CivApplication {
         return parliamentSession;
     }
 
+    /** Wie Dorfbewohner über Recht entscheiden; genutzt im Parlament und für kommissarisch regierende Dorfbewohner. */
+    public PersonalityLegislator villagerLegislator() {
+        return villagerLegislator;
+    }
+
     public TallyProposals tallyProposals() {
         return tallyProposals;
     }
@@ -435,8 +441,8 @@ public final class CivApplication {
         return leaveParty;
     }
 
-    public ChangePartyProfile changePartyProfile() {
-        return changePartyProfile;
+    public ChangePartyProgram changePartyProgram() {
+        return changePartyProgram;
     }
 
     public Trading trading() {

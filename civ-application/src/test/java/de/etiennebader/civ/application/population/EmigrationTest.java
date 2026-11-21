@@ -84,6 +84,20 @@ class EmigrationTest {
         assertTrue(Emigration.chance(-80, new Personality(0, 0, -50)) > Emigration.chance(-80, new Personality(0, 0, 80)));
     }
 
+    @Test
+    @DisplayName("chance(score, personality, loyalty): Loyalität dämpft die Abwanderungswahrscheinlichkeit, aber nie unter die Hälfte")
+    void loyaltyDampensChance() {
+        Personality restless = new Personality(0, 0, -100);
+        double unloyal = Emigration.chance(-80, restless, 0);
+        double fullyLoyal = Emigration.chance(-80, restless, 100);
+        double partlyLoyal = Emigration.chance(-80, restless, 50);
+
+        assertEquals(unloyal, Emigration.chance(-80, restless), 1e-9, "ohne Loyalität wie die alte Formel");
+        assertEquals(unloyal * 0.5, fullyLoyal, 1e-9, "bei voller Loyalität höchstens die Hälfte");
+        assertTrue(partlyLoyal < unloyal && partlyLoyal > fullyLoyal, "teilweise Loyalität dämpft nur teilweise");
+        assertEquals(unloyal, Emigration.chance(-80, restless, -20), 1e-9, "negative Loyalität dämpft nicht zusätzlich");
+    }
+
     private List<PersonRef> settle(PolityId town, int count) {
         List<PersonRef> villagers = new ArrayList<>();
         for (int i = 0; i < count; i++) {

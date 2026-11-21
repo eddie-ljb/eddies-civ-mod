@@ -24,7 +24,10 @@ public final class SchemaMigrations {
             "V013__parties.sql",
             "V014__parliament.sql",
             "V015__campaign.sql",
-            "V016__civil.sql", "V017__exchange_press.sql", "V018__civic_justice.sql", "V019__production.sql");
+            "V016__civil.sql", "V017__exchange_press.sql", "V018__civic_justice.sql", "V019__production.sql",
+            "V020__party_program_mode.sql",
+            "V021__polity_image.sql",
+            "V022__party_area.sql");
 
     private SchemaMigrations() {
     }

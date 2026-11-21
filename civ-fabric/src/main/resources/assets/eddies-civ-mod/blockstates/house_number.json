@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=south": {
+      "model": "eddies-civ-mod:block/house_number"
+    },
+    "facing=west": {
+      "model": "eddies-civ-mod:block/house_number",
+      "y": 90
+    },
+    "facing=north": {
+      "model": "eddies-civ-mod:block/house_number",
+      "y": 180
+    },
+    "facing=east": {
+      "model": "eddies-civ-mod:block/house_number",
+      "y": 270
+    }
+  }
+}

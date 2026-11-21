@@ -26,6 +26,7 @@ Wer eine Gemeinde betritt oder verlässt, sieht ihren Namen als Titel. Auf Grund
 **Gemeindehaus verlegen:** Der Bürgermeister setzt ein neues Gemeindehaus irgendwo im eigenen Gebiet. Das alte verschwindet und landet wieder im Inventar.
 
 ### Dorfbewohner
+- Dorfbewohner erhalten dauerhaft einen Vor- und Nachnamen. Schleichen + Rechtsklick mit leerer Hand zeigt auch die eindeutige Registernummer. `/civ dorfbewohner register [Seite]` listet Spieler und Dorfbewohner der eigenen Gemeinde.
 - Dorfbewohner, die das Gebiet einer Gemeinde betreten, werden dort Einwohner. In der Wildnis bleiben sie in ihrer bisherigen Gemeinde gemeldet. Stirbt ein Dorfbewohner, tritt er aus.
 - Jeder Dorfbewohner erwirtschaftet täglich Geld für die Gemeindekasse; Standard ist ¼ Smaragd. Zufriedene leisten bis zu 50 % mehr, Unzufriedene bis zu 50 % weniger.
 - **Persönlichkeit:** Jeder Dorfbewohner hat feste Ansichten auf drei Achsen: *Ordnung ↔ Freiheit*, *Sparsamkeit ↔ Großzügigkeit* und *Heimatverbundenheit*.
@@ -123,6 +124,7 @@ Neben den Regelungen gibt es **Paragraphen**: Titel plus frei formulierter Text.
 ### Parteien
 Parteien sind Zusammenschlüsse von Personen (Spieler und Dorfbewohner) über alle Gemeinden hinweg. Jede Person gehört höchstens einer Partei an.
 
+- **Geltungsgebiet:** `/civ partei gebiet` zeigt es an, `gebiet setzen <Gemeinde oder Bund>` beschränkt Kandidaturen auf dieses Gebiet und seine Glieder, `gebiet leeren` hebt die Beschränkung auf. Ob der Vorsitz entscheidet oder die Mitglieder abstimmen, richtet sich nach dem Programmmodus.
 - **Richtung:** zwei Achsen von -100 bis 100: Ordnung (− Freiheit, + Ordnung) und Wirtschaft (− niedrige Steuern, + Ausbau). Die stärkere Achse ergibt das Wahlprogramm der Partei.
 - **Befehle:** `/civ partei gruenden <ordnung|freiheit|steuern|ausbau|mitte> <Name>`, `beitreten <Name>`, `austreten`, `info [Name]`, `liste`, `menue`; nur der Vorsitz: `richtung <Ordnung> <Wirtschaft>`, `wappen` (Item in der Hand wird Logo), `aufloesen`. Geht das letzte Mitglied, löst sich die Partei auf.
 - **Menü:** im Gemeindehaus unten rechts „Parteien“: Klick tritt bei, Umschalt-Klick auf die eigene tritt aus.
@@ -213,6 +215,7 @@ Im Gemeindegebiet gilt Folgendes, solange das Recht nichts anderes erlaubt:
 - Bürgermeister oder Bauamt markieren eine Straße mit dem Grundstücksstab (zwei Ecken) und legen sie mit `/civ strasse anlegen <Name>` an; `aufheben <Name>` und `liste` gibt es auch.
 - Jede Gemeinde hat eine feste Postleitzahl. Grundstücke bis 12 Blöcke neben einer Straße bekommen Hausnummern: ungerade auf der einen, gerade auf der anderen Seite, aufsteigend entlang der Straße.
 - `/civ adresse [Spieler]` zeigt die Anschrift (Wohngrundstück, sonst gemietetes, sonst eigenes Grundstück); `/civ adressen` listet die Straßen der Gemeinde. Dorfbewohner nennen ihre Anschrift beim Anklicken.
+- Aufstellbare Schilder zeigen Straßenname, Hausnummer oder Gebietsdaten direkt auf dem Block. Ein Amboss-Name überschreibt die automatische Beschriftung; `|` trennt bis zu drei Zeilen auf Orts-, Länder- und Nationenschildern.
 
 ### Verträge
 `/civ vertrag` (oder Gemeindehaus → Verträge, oder die Webseite) verwaltet alle Verträge. Ein Angebot gilt, sobald die Gegenseite unterschreibt; für eine Gemeinde unterschreibt der Bürgermeister.

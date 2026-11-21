@@ -1,6 +1,7 @@
 package de.etiennebader.civ.application.office;
 
 import de.etiennebader.civ.application.polity.Citizens;
+import de.etiennebader.civ.application.query.WorldQueries;
 import de.etiennebader.civ.application.support.Aggregates;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
@@ -42,9 +43,11 @@ public final class StandForElection {
     }
 
     private final Aggregates aggregates;
+    private final WorldQueries queries;
 
     public StandForElection(Aggregates aggregates) {
         this.aggregates = Objects.requireNonNull(aggregates, "aggregates");
+        this.queries = new WorldQueries(aggregates.repositories());
     }
 
     public void execute(Command command) {
@@ -52,6 +55,13 @@ public final class StandForElection {
         if (!villagerMayStand(polity, command.citizen())) {
             Citizens.require(polity, command.citizen());
         }
+        Citizens.require(polity, command.citizen());
+        queries.partyOf(command.citizen())
+                .filter(party -> !queries.partyEligibleIn(party, polity.id()))
+                .ifPresent(party -> {
+                    throw new OutsidePartyAreaException(party.name().value(),
+                            party.partyProfile().orElseThrow().area().orElseThrow());
+                });
         requireTermLimit(polity, command);
         polity.standForElection(command.election(), command.citizen(), command.platform(), command.day());
         aggregates.commit(polity);

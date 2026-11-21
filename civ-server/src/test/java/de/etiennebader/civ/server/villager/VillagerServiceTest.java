@@ -4,6 +4,7 @@ import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.actor.PlayerRef;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.polity.SettlementTier;
+import de.etiennebader.civ.domain.population.VillagerIdentity;
 import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.PersonId;
 import de.etiennebader.civ.domain.shared.PlayerId;
@@ -15,6 +16,7 @@ import de.etiennebader.civ.server.Announcement;
 import de.etiennebader.civ.server.CivServerFixture;
 import de.etiennebader.civ.server.ServerSettings;
 import de.etiennebader.civ.server.command.Caller;
+import de.etiennebader.civ.server.command.Message;
 import de.etiennebader.civ.server.command.MessageKey;
 import de.etiennebader.civ.server.command.Reply;
 import org.junit.jupiter.api.DisplayName;
@@ -76,7 +78,9 @@ class VillagerServiceTest {
         assertTrue(productivity >= 9 * 50 && productivity <= 9 * 150, "je Dorfbewohner 50 bis 150 %");
         var announcements = villagers.endOfDay(DAY);
 
-        assertEquals(25 * productivity / 100,
+        long baseIncome = 25 * productivity / 100;
+        double conjunctureMultiplier = server.conjuncture().multiplierOf(nordhain, DAY);
+        assertEquals(Math.round(baseIncome * conjunctureMultiplier),
                 server.queries().ledger().balanceOf(nordhain.asActor(), nordhain.currency()).amount());
         assertEquals(SettlementTier.MARKET_TOWN, server.queries().polity(nordhain.id()).orElseThrow().tier());
         assertEquals(1, announcements.size());
@@ -132,6 +136,31 @@ class VillagerServiceTest {
     }
 
     @Test
+    @DisplayName("Gleiche Identität in Auskunft und Einwohnerregister; andere Gemeinden bleiben außen vor")
+    void residentRegisterUsesTheCivilIdentity() {
+        server.playerJoined(alice, "Alice");
+        found(alice, "Nordhain", 0);
+        found(bob, "Eichenfurt", 10);
+        Caller caller = new Caller(alice, "Alice", pos(2, 2));
+        PersonRef resident = new PersonRef(PersonId.generate(ids));
+        PersonRef visitor = new PersonRef(PersonId.generate(ids));
+        villagers.seen(resident, pos(2, 2), DAY);
+        villagers.seen(visitor, pos(163, 163), DAY);
+        VillagerIdentity identity = VillagerIdentity.of(resident);
+        Message row = Message.of(MessageKey.VILLAGER_IDENTITY, identity.fullName(), identity.registerNumber());
+
+        assertTrue(villagers.describe(resident).lines().contains(row));
+        Reply register = villagers.residentRegister(caller, 1);
+        assertTrue(register.success());
+        assertEquals(3, register.lines().size()); // Überschrift, Spieler und Dorfbewohner
+        assertTrue(register.lines().contains(row));
+        assertTrue(register.lines().contains(Message.of(MessageKey.VILLAGER_REGISTER_PLAYER, "Alice")));
+        assertFalse(villagers.residentRegister(caller, 2).success());
+        villagers.gone(resident, DAY);
+        assertFalse(villagers.residentRegister(caller, 1).lines().contains(row));
+    }
+
+    @Test
     @DisplayName("Abwanderung: unter erdrückenden Steuern ziehen Dorfbewohner weg; das Spiel holt sie ab")
     void emigration() {
         ServerSettings base = CivServerFixture.SETTINGS;
@@ -177,6 +206,113 @@ class VillagerServiceTest {
         Optional<PolityView> newHome = server.queries().municipalityOf(departed);
         assertEquals(newHome.flatMap(PolityView::seat), pending.destination());
         assertTrue(villagers.takeDeparture(departed).isEmpty());
+    }
+
+    @Test
+    @DisplayName("Reden: ein heimatloser Dorfbewohner antwortet neutral, je nach Thema")
+    void talkRespondsByMood() {
+        PersonRef villager = new PersonRef(PersonId.generate(ids));
+        Reply reply = villagers.talk(villager, de.etiennebader.civ.application.population.VillagerDialogue.Topic.WEATHER);
+        assertTrue(reply.success());
+        assertEquals(MessageKey.VILLAGER_TALK_NEUTRAL.key(), reply.lines().getFirst().key());
+    }
+
+    @Test
+    @DisplayName("Beeinflussen: wirkt einmal, dann greift die Abklingzeit; danach steigt die Zufriedenheit sichtbar")
+    void influenceLiftsSatisfactionWithCooldown() {
+        found(alice, "Nordhain", 0);
+        PersonRef villager = new PersonRef(PersonId.generate(ids));
+        villagers.seen(villager, pos(2, 2), DAY);
+        int before = villagers.satisfactionOf(villager).orElseThrow().score();
+
+        Reply first = villagers.influence(new Caller(alice, "Alice", pos(2, 2)), villager);
+        assertTrue(first.success());
+        assertEquals(MessageKey.VILLAGER_INFLUENCE_OK.key(), first.lines().getFirst().key());
+        assertTrue(villagers.satisfactionOf(villager).orElseThrow().score() > before);
+
+        Reply second = villagers.influence(new Caller(alice, "Alice", pos(2, 2)), villager);
+        assertFalse(second.success());
+        assertEquals(MessageKey.VILLAGER_INFLUENCE_COOLDOWN.key(), second.lines().getFirst().key());
+    }
+
+    @Test
+    @DisplayName("Post: eine gesendete Nachricht erscheint als letzte Post in der Dorfbewohner-Auskunft")
+    void mailShowsUpInDescribe() {
+        found(alice, "Nordhain", 0);
+        PersonRef villager = new PersonRef(PersonId.generate(ids));
+        villagers.seen(villager, pos(2, 2), DAY);
+
+        Reply sent = villagers.sendMail(alice, villager, "greeting");
+        assertTrue(sent.success());
+        Reply info = villagers.describe(villager);
+        assertTrue(info.lines().stream().anyMatch(line -> line.key().equals(MessageKey.VILLAGER_MAIL_LATEST.key())));
+    }
+
+    @Test
+    @DisplayName("Straftat-Verdacht: ein sehr unzufriedener, freiheitsliebender Dorfbewohner fällt irgendwann auf")
+    void crimeSuspicionEventuallyFires() {
+        ServerSettings base = CivServerFixture.SETTINGS;
+        CivServerFixture crimeServer = CivServerFixture.start(ids, new ServerSettings(base.ticksPerDay(),
+                base.claimBase(), base.claimPerMember(), base.currency(), base.priceReference(), base.villagerIncome(),
+                new ServerSettings.TierThresholds(500, 600, 700), base.web(), false));
+        VillagerService crimeVillagers = crimeServer.villagers();
+        crimeServer.commands().found(new Caller(alice, "Alice", pos(2, 2)), "Nordhain");
+        Caller mayor = new Caller(alice, "Alice", pos(2, 2));
+        crimeServer.commands().amendLaw(mayor, "sales_tax_percent", "90");
+        crimeServer.commands().amendLaw(mayor, "land_tax_per_block", "90");
+        crimeServer.commands().amendLaw(mayor, "explosions_allowed", "nein");
+        crimeServer.commands().amendLaw(mayor, "fire_spread_allowed", "nein");
+        List<PersonRef> candidates = new ArrayList<>();
+        for (int i = 0; i < 60; i++) {
+            PersonRef villager = new PersonRef(PersonId.generate(ids));
+            crimeVillagers.seen(villager, pos(2, 2), DAY);
+            candidates.add(villager);
+        }
+        crimeServer.takeAnnouncements();
+        boolean suspected = false;
+        for (long day = 1; day <= 120 && !suspected; day++) {
+            crimeVillagers.endOfDay(Day.of(day));
+            suspected = crimeServer.takeAnnouncements().stream()
+                    .anyMatch(a -> a.message().key().equals(MessageKey.VILLAGER_CRIME_SUSPECTED.key()));
+        }
+        assertTrue(suspected, "unter mindestens einem der sehr unzufriedenen, freiheitsliebenden Dorfbewohner "
+                + "sollte binnen 120 Tagen ein Verdacht aufkommen");
+    }
+  
+    @DisplayName("villager_politics_enabled: ohne Spieler-Bürgermeister regiert der dienstälteste Dorfbewohner "
+            + "kommissarisch, beansprucht selbstständig Nachbar-Chunks bis zum Limit und nimmt Bund-Einladungen an")
+    void villagerPoliticsWhenMayorless() {
+        found(alice, "Nordhain", 0);
+        List<PersonRef> residents = new ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            PersonRef villager = new PersonRef(PersonId.generate(ids));
+            residents.add(villager);
+            villagers.seen(villager, pos(2, 2), DAY);
+        }
+        PolityView nordhain = town(residents.getFirst());
+        assertTrue(nordhain.mayor().map(alice::equals).orElse(false), "zunächst regiert noch Alice");
+
+        assertTrue(server.commands().leave(new Caller(alice, "Alice", pos(2, 2))).success());
+        PolityView afterLeave = server.queries().polity(nordhain.id()).orElseThrow();
+        assertTrue(afterLeave.mayor().isEmpty(), "ohne villagerPolitics kein Bürgermeister mehr");
+        assertEquals(residents.getFirst(), afterLeave.mayor(true).orElseThrow(),
+                "kommissarisch regiert der dienstälteste Dorfbewohner");
+
+        int limit = server.towns().overview(afterLeave, residents.getFirst()).claimLimit();
+        int before = server.queries().territory().territoryOf(afterLeave.id()).size();
+        for (long day = 2; day <= 2 + limit; day++) {
+            villagers.endOfDay(Day.of(day));
+        }
+        int after = server.queries().territory().territoryOf(afterLeave.id()).size();
+        assertEquals(limit, after, "beansprucht Tag für Tag Nachbar-Chunks bis zum Limit (" + before + " -> " + after + ")");
+
+        found(bob, "Westmark-Sitz", 20);
+        assertTrue(server.federations().found(new Caller(bob, "Bob", pos(323, 323)), "land", "Westmark").success());
+        assertTrue(server.federations().invite(new Caller(bob, "Bob", pos(323, 323)), "Nordhain").success());
+        server.federations().autoDecideInvitations(Day.of(100), true);
+        Optional<de.etiennebader.civ.server.command.Message> belongsTo = server.federations()
+                .belongsTo(server.queries().polity(nordhain.id()).orElseThrow());
+        assertTrue(belongsTo.isPresent(), "Nordhain hat die Einladung angenommen oder zumindest entschieden");
     }
 
     private static BlockPosition pos(int x, int z) {

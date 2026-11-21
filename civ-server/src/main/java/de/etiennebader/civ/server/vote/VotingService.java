@@ -188,6 +188,9 @@ public final class VotingService {
                 case ParliamentSession.Tabled tabled -> announcements.add(Announcement.toTown(outcome.polity(),
                         Message.of(MessageKey.PARLIAMENT_MOTION_TABLED, name, texts.actor(tabled.member()),
                                 subject(tabled.motion()), proposed(tabled.motion()))));
+                case ParliamentSession.AgendaAnnounced announced -> announcements.add(Announcement.toTown(
+                        outcome.polity(), Message.of(MessageKey.PARLIAMENT_AGENDA_ANNOUNCED, name,
+                                announced.agenda())));
                 case ParliamentSession.Voted voted -> announcements.add(Announcement.toTown(outcome.polity(),
                         Message.of(MessageKey.PARLIAMENT_VILLAGERS_VOTED, name, subject(voted.proposal().motion()),
                                 voted.inFavour(), voted.against())));
@@ -209,6 +212,7 @@ public final class VotingService {
             case Motion.Change change -> Message.of(TranslationKeys.law(change.change().key()));
             case Motion.Enact enact -> Message.of(TranslationKeys.MOTION_PARAGRAPH, enact.title());
             case Motion.Repeal repeal -> Message.of(TranslationKeys.MOTION_PARAGRAPH, repeal.title());
+            case Motion.PartyProgram ignored -> Message.of(TranslationKeys.MOTION_PARTY_PROGRAM);
         };
     }
 
@@ -218,6 +222,7 @@ public final class VotingService {
             case Motion.Change change -> texts.lawValue(change.change().value());
             case Motion.Enact enact -> Message.of(TranslationKeys.MOTION_ENACT, enact.values().size());
             case Motion.Repeal ignored -> Message.of(TranslationKeys.MOTION_REPEAL);
+            case Motion.PartyProgram ignored -> Message.of(TranslationKeys.MOTION_PARTY_PROGRAM_VALUE);
         };
     }
 

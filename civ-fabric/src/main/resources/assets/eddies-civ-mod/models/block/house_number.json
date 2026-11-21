@@ -1,0 +1,6 @@
+{
+  "parent": "eddies-civ-mod:block/label_house",
+  "textures": {
+    "front": "eddies-civ-mod:block/house_number_face"
+  }
+}

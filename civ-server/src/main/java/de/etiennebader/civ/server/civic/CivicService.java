@@ -7,7 +7,9 @@ import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.civic.Anthem;
 import de.etiennebader.civ.domain.civic.Area;
 import de.etiennebader.civ.domain.civic.Constituency;
+import de.etiennebader.civ.domain.civic.CustomImage;
 import de.etiennebader.civ.domain.civic.Flag;
+import de.etiennebader.civ.domain.civic.ImageKind;
 import de.etiennebader.civ.domain.polity.Membership;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.shared.DomainException;
@@ -86,6 +88,34 @@ public final class CivicService {
             Constituency updated = app.civic().addTown(caller.player(), polity.id(), name, town.get().id(),
                     calendar.today());
             return Reply.success(Message.of(MessageKey.CONSTITUENCY_TOWN_ADDED, town.get().name().value(),
+                    updated.name()));
+        });
+    }
+
+    /** {@code wahlkreis gebiet-entfernen <Name>}: das mit dem Grundstücksstab markierte Rechteck herausnehmen. */
+    public Reply removeArea(Caller caller, PolityView polity, String name) {
+        PlotService.Selection selection = plots.selection(caller.player());
+        if (selection.first().isEmpty() || selection.second().isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.CONSTITUENCY_NEEDS_SELECTION));
+        }
+        return attempt(() -> {
+            Area area = Area.between(selection.first().get(), selection.second().get());
+            Constituency updated = app.civic().removeArea(caller.player(), polity.id(), name, area, calendar.today());
+            return Reply.success(Message.of(MessageKey.CONSTITUENCY_AREA_REMOVED, area.blocks(), updated.name(),
+                    updated.areas().size()));
+        });
+    }
+
+    /** {@code wahlkreis gemeinde-entfernen <Name> <Gemeinde>} */
+    public Reply removeTown(Caller caller, PolityView polity, String name, String townName) {
+        Optional<PolityView> town = queries.polityNamed(townName.strip());
+        if (town.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.UNKNOWN_POLITY_NAMED, townName.strip()));
+        }
+        return attempt(() -> {
+            Constituency updated = app.civic().removeTown(caller.player(), polity.id(), name, town.get().id(),
+                    calendar.today());
+            return Reply.success(Message.of(MessageKey.CONSTITUENCY_TOWN_REMOVED, town.get().name().value(),
                     updated.name()));
         });
     }
@@ -190,6 +220,46 @@ public final class CivicService {
 
     public Optional<Anthem> anthemOf(PolityId polity) {
         return queries.civic().anthemOf(polity);
+    }
+
+    // ---- Eigene Bilder (Wappen, Wahlplakat, Leuchtreklame) ----
+
+    /**
+     * Hinterlegt ein per Webseite hochgeladenes Bild. Verdrängte Bilder (bei einem Wappen-Wechsel das alte)
+     * übergibt {@code onDisplaced} dem Aufrufer, damit er deren Dateien von der Platte löscht.
+     */
+    public Reply uploadImage(Caller caller, PolityView polity, ImageKind kind, String hash, int width, int height,
+                             java.util.function.Consumer<CustomImage> onDisplaced) {
+        return attempt(() -> {
+            app.civic().uploadImage(caller.player(), polity.id(), kind, hash, width, height, calendar.today(),
+                    onDisplaced);
+            announcements.add(Announcement.toTown(polity.id(), Message.of(MessageKey.IMAGE_SET,
+                    polity.name().value(), kind.name().toLowerCase(java.util.Locale.ROOT))));
+            return Reply.success(Message.of(MessageKey.IMAGE_SET, polity.name().value(),
+                    kind.name().toLowerCase(java.util.Locale.ROOT)));
+        });
+    }
+
+    /** @return das entfernte Bild, dessen Datei der Aufrufer von der Platte löscht; leer ohne Berechtigung/Fund */
+    public Optional<CustomImage> removeImage(Caller caller, String id) {
+        try {
+            return app.civic().removeImage(caller.player(), id, calendar.today());
+        } catch (de.etiennebader.civ.domain.shared.DomainException | IllegalArgumentException
+                | IllegalStateException e) {
+            return Optional.empty();
+        }
+    }
+
+    public List<CustomImage> imagesOf(PolityId polity) {
+        return queries.civic().imagesOf(polity);
+    }
+
+    public List<CustomImage> imagesOf(PolityId polity, ImageKind kind) {
+        return queries.civic().imagesOf(polity, kind);
+    }
+
+    public Optional<CustomImage> image(String id) {
+        return queries.civic().image(id);
     }
 
     private Reply attempt(Supplier<Reply> action) {

@@ -60,7 +60,9 @@ public final class MarketService {
 
     /** Das aktuelle Preisniveau aus Geldmenge und Zahl der bekannten Spieler. */
     public PriceLevel priceLevel() {
-        return queries.priceLevel(Math.max(1, players.all().size()), settings.priceReference());
+        ServerSettings.EconomySettings economy = settings.economy();
+        return queries.priceLevel(Math.max(1, players.all().size()), settings.priceReference(),
+                economy.priceLevelMin(), economy.priceLevelMax(), economy.priceLevelDamping());
     }
 
     /** {@code /civ preis}: Preise des Items in der Hand. */

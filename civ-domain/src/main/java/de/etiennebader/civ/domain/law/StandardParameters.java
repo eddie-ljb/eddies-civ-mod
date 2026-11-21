@@ -30,6 +30,14 @@ public final class StandardParameters {
     public static final ParameterKey<Integer> MAX_OUTPOSTS =
             ParameterKey.constrained("max_outposts", Integer.class, 0, max -> max >= 0);
 
+    /**
+     * Kosten für einen Chunk-Claim in kleinster Währungseinheit (100 = ein Smaragd), fällig aus der
+     * Gemeindekasse. Reicht die Kasse nicht, wird der Claim abgelehnt. 0 (Standard) = kostenlos, wie
+     * bisher; ein Beispielwert für eine spürbare Gebühr wäre 200 (2 Smaragde).
+     */
+    public static final ParameterKey<Long> CLAIM_COST_PER_CHUNK =
+            ParameterKey.constrained("claim_cost_per_chunk", Long.class, 0L, cost -> cost >= 0);
+
     /** Ob Nicht-Mitglieder im Gebiet bauen und abbauen dürfen. */
     public static final ParameterKey<Boolean> OUTSIDERS_MAY_BUILD =
             ParameterKey.of("outsiders_may_build", Boolean.class, false);
@@ -111,6 +119,21 @@ public final class StandardParameters {
             ParameterKey.of("ballot_box_required", Boolean.class, false);
 
     /**
+     * Wie viele Tage ein Antrag mindestens offen sein muss, bevor im Parlament darüber abgestimmt wird; verhindert,
+     * dass ein Antrag noch am Tag seiner Stellung entschieden wird, bevor Spieler mitstimmen konnten.
+     */
+    public static final ParameterKey<Long> PARLIAMENT_MOTION_MIN_OPEN_DAYS =
+            ParameterKey.constrained("parliament_motion_min_open_days", Long.class, 1L, days -> days >= 0 && days <= 30);
+
+    /**
+     * Ob das Ergebnis einer Abstimmung erst verkündet wird, nachdem alle Stimmberechtigten (Abgeordnete bzw. Bürger)
+     * abgestimmt haben, statt schon bei rechnerisch sicherer Mehrheit. Die Frist ({@link #VOTE_DAYS}) zählt trotzdem
+     * aus, falls nicht alle abstimmen.
+     */
+    public static final ParameterKey<Boolean> FULL_TURNOUT_REQUIRED =
+            ParameterKey.of("full_turnout_required", Boolean.class, false);
+
+    /**
      * Alle wie viele Tage das Parlament tagt: Nur an Sitzungstagen stimmen Dorfbewohner-Abgeordnete ab, stellen Anträge
      * und werden fällige Anträge ausgezählt.
      */
@@ -181,16 +204,78 @@ public final class StandardParameters {
     public static final ParameterKey<Long> COURT_FEE =
             ParameterKey.constrained("court_fee", Long.class, 100L, fee -> fee >= 0 && fee <= 100_000);
 
-    /** Alle Standardparameter in fester Reihenfolge. */
+    /**
+     * Regierungsmaßnahme gegen die Konjunktur: dämpft die Auswirkung der aktuellen Konjunkturphase auf
+     * Firmenproduktion, Dorfbewohner-Einkommen und Aktienkurse dieser Wirtschaftszone in Prozent; 100 dämpft am
+     * stärksten, neutralisiert die Phase aber nicht vollständig.
+     */
+    public static final ParameterKey<Long> CONJUNCTURE_STIMULUS_PERCENT =
+            ParameterKey.constrained("conjuncture_stimulus_percent", Long.class, 0L,
+                    percent -> percent >= 0 && percent <= 100);
+    /**
+     * Die Parteiliste einer Partei für Listenwahlen: Mitglieder in Reihenfolge, kodiert wie
+     * {@code PLAYER:<uuid>,PERSON:<uuid>,...}; leer, solange keine gesetzt wurde (dann gilt die
+     * Reihenfolge der Kandidatur). Siehe {@code de.etiennebader.civ.domain.polity.PartyList}.
+     */
+    public static final ParameterKey<String> PARTY_LIST = ParameterKey.of("party_list", String.class, "");
+
+    /**
+     * Ob die Parteiliste ({@link #PARTY_LIST}) nur per Abstimmung der Parteimitglieder geändert werden kann, statt
+     * allein vom Parteivorsitz.
+     */
+    public static final ParameterKey<Boolean> PARTY_LIST_BY_VOTE =
+            ParameterKey.of("party_list_by_vote", Boolean.class, false);
+
+     /** Alle Standardparameter in fester Reihenfolge. */
     public static List<ParameterKey<?>> all() {
-        return List.of(LAND_TAX_PER_BLOCK, LAND_TAX_FREE_BLOCKS, LAND_TAX_GRACE_DAYS, TAX_EMBASSIES, MAX_OUTPOSTS,
-                OUTSIDERS_MAY_BUILD, OUTSIDERS_MAY_INTERACT, OUTSIDERS_MAY_OPEN_CONTAINERS, EXPLOSIONS_ALLOWED,
-                FIRE_SPREAD_ALLOWED, LAWS_BY_VOTE, VOTE_DAYS, SALES_TAX_PERCENT, TERM_DAYS, ELECTION_DAYS,
-                VILLAGER_VOTE_PERCENT, AMENDMENT_MAJORITY_PERCENT, FEDERAL_LAW_PREVAILS, PVP_ALLOWED, HOSTILE_MOBS_ALLOWED,
-                OUTSIDERS_MAY_HURT_ANIMALS, FEDERAL_LEVY_PERCENT, PARLIAMENT_SEATS, SESSION_DAYS, BALLOT_BOX_REQUIRED,
-                POSTAL_VOTE_ALLOWED, OFFICE_SALARY, OFFICE_VOTING, PARLIAMENT_VOTING, BALLOT_TYPE, THRESHOLD_PERCENT,
-                TERM_LIMIT, COMPULSORY_VOTING, VOTING_FINE, ELECTION_DEBATES, PRESS_FREEDOM, JURY_SIZE, MAX_FINE,
-                EXILE_ALLOWED, COURT_FEE);
+        return List.of(
+                LAND_TAX_PER_BLOCK,
+                LAND_TAX_FREE_BLOCKS,
+                LAND_TAX_GRACE_DAYS,
+                TAX_EMBASSIES,
+                MAX_OUTPOSTS,
+                CLAIM_COST_PER_CHUNK,
+                OUTSIDERS_MAY_BUILD,
+                OUTSIDERS_MAY_INTERACT,
+                OUTSIDERS_MAY_OPEN_CONTAINERS,
+                EXPLOSIONS_ALLOWED,
+                FIRE_SPREAD_ALLOWED,
+                LAWS_BY_VOTE,
+                VOTE_DAYS,
+                SALES_TAX_PERCENT,
+                TERM_DAYS,
+                ELECTION_DAYS,
+                VILLAGER_VOTE_PERCENT,
+                AMENDMENT_MAJORITY_PERCENT,
+                FEDERAL_LAW_PREVAILS,
+                PVP_ALLOWED,
+                HOSTILE_MOBS_ALLOWED,
+                OUTSIDERS_MAY_HURT_ANIMALS,
+                FEDERAL_LEVY_PERCENT,
+                PARLIAMENT_SEATS,
+                SESSION_DAYS,
+                BALLOT_BOX_REQUIRED,
+                PARLIAMENT_MOTION_MIN_OPEN_DAYS,
+                FULL_TURNOUT_REQUIRED,
+                POSTAL_VOTE_ALLOWED,
+                OFFICE_SALARY,
+                OFFICE_VOTING,
+                PARLIAMENT_VOTING,
+                BALLOT_TYPE,
+                THRESHOLD_PERCENT,
+                TERM_LIMIT,
+                COMPULSORY_VOTING,
+                VOTING_FINE,
+                ELECTION_DEBATES,
+                PRESS_FREEDOM,
+                JURY_SIZE,
+                MAX_FINE,
+                EXILE_ALLOWED,
+                COURT_FEE,
+                CONJUNCTURE_STIMULUS_PERCENT,
+                PARTY_LIST,
+                PARTY_LIST_BY_VOTE
+        );
     }
 
     /**

@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=south": {
+      "model": "eddies-civ-mod:block/country_sign"
+    },
+    "facing=west": {
+      "model": "eddies-civ-mod:block/country_sign",
+      "y": 90
+    },
+    "facing=north": {
+      "model": "eddies-civ-mod:block/country_sign",
+      "y": 180
+    },
+    "facing=east": {
+      "model": "eddies-civ-mod:block/country_sign",
+      "y": 270
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "parent": "eddies-civ-mod:block/label_post",
+  "textures": {
+    "front": "eddies-civ-mod:block/country_sign_face"
+  }
+}

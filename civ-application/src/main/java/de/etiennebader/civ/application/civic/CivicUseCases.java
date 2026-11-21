@@ -8,7 +8,9 @@ import de.etiennebader.civ.domain.civic.Area;
 import de.etiennebader.civ.domain.civic.CivicRegistry;
 import de.etiennebader.civ.domain.civic.Constituency;
 import de.etiennebader.civ.domain.civic.ConstituencyId;
+import de.etiennebader.civ.domain.civic.CustomImage;
 import de.etiennebader.civ.domain.civic.Flag;
+import de.etiennebader.civ.domain.civic.ImageKind;
 import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.Polity;
 import de.etiennebader.civ.domain.polity.PolityView;
@@ -65,6 +67,22 @@ public final class CivicUseCases {
         return updated;
     }
 
+    public Constituency removeArea(ActorRef head, PolityId polity, String name, Area area, Day day) {
+        requireReshapable(head, polity);
+        CivicRegistry registry = aggregates.civic();
+        Constituency updated = registry.removeArea(require(registry, polity, name).id(), area, day);
+        aggregates.commit(registry);
+        return updated;
+    }
+
+    public Constituency removeTown(ActorRef head, PolityId polity, String name, PolityId town, Day day) {
+        requireReshapable(head, polity);
+        CivicRegistry registry = aggregates.civic();
+        Constituency updated = registry.removeTown(require(registry, polity, name).id(), town, day);
+        aggregates.commit(registry);
+        return updated;
+    }
+
     public void remove(ActorRef head, PolityId polity, String name, Day day) {
         requireReshapable(head, polity);
         CivicRegistry registry = aggregates.civic();
@@ -84,6 +102,40 @@ public final class CivicUseCases {
         CivicRegistry registry = aggregates.civic();
         registry.setAnthem(polity, anthem, day);
         aggregates.commit(registry);
+    }
+
+    /**
+     * Hinterlegt ein hochgeladenes Bild. Nur die Spitze der Polity darf das.
+     *
+     * @return die Bilder, die dadurch verdrängt wurden (bei einem Wappen-Wechsel das alte); der Aufrufer
+     *         löscht deren Dateien
+     */
+    public CustomImage uploadImage(ActorRef head, PolityId polity, ImageKind kind, String hash, int width, int height,
+                                   Day day, java.util.function.Consumer<CustomImage> onDisplaced) {
+        requireHead(head, aggregates.polity(polity));
+        CivicRegistry registry = aggregates.civic();
+        String id = ids.next().toString();
+        java.util.List<CustomImage> displaced = registry.addImage(id, polity, kind, hash, width, height, day);
+        aggregates.commit(registry);
+        displaced.forEach(onDisplaced);
+        return registry.image(id).orElseThrow();
+    }
+
+    /**
+     * Entfernt ein hochgeladenes Bild. Nur die Spitze seiner Polity darf das.
+     *
+     * @return das entfernte Bild, dessen Datei der Aufrufer löscht
+     */
+    public Optional<CustomImage> removeImage(ActorRef head, String id, Day day) {
+        CivicRegistry registry = aggregates.civic();
+        Optional<CustomImage> found = registry.image(id);
+        if (found.isEmpty()) {
+            return Optional.empty();
+        }
+        requireHead(head, aggregates.polity(found.get().polity()));
+        Optional<CustomImage> removed = registry.removeImage(id, day);
+        aggregates.commit(registry);
+        return removed;
     }
 
     /** Aufgelöste Polity: ihre Wahlkreise und Hoheitszeichen verschwinden. */

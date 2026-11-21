@@ -8,6 +8,7 @@ import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.population.Personality;
 import de.etiennebader.civ.domain.shared.Day;
+import de.etiennebader.civ.domain.shared.ErrorCode;
 import de.etiennebader.civ.domain.shared.PersonId;
 import de.etiennebader.civ.domain.shared.PlayerId;
 import de.etiennebader.civ.domain.shared.SeededIdGenerator;
@@ -62,6 +63,32 @@ class PartyServiceTest {
         assertTrue(server.parties().leave(caller(bob)).success());
         assertTrue(server.parties().dissolve(caller(alice)).success());
         assertTrue(server.queries().parties().isEmpty());
+    }
+
+    @Test
+    @DisplayName("Parteigebiet gilt in der gewählten Polity und ihren Gliedern, nicht darüber")
+    void partyAreaControlsEligibility() {
+        town();
+        assertTrue(server.federations().found(caller(alice), "land", "Westmark").success());
+        PolityView land = server.queries().polityNamed("Westmark").orElseThrow();
+        assertTrue(server.parties().found(caller(alice), "ordnung", "Regionalpartei").success());
+        assertTrue(server.parties().join(caller(bob), "Regionalpartei").success());
+        assertFalse(server.parties().setArea(caller(bob), Optional.of("Nordhain")).success());
+        assertFalse(server.parties().setArea(caller(alice), Optional.of("Regionalpartei")).success());
+        assertTrue(server.parties().setArea(caller(alice), Optional.of("nordhain")).success());
+        assertTrue(server.parties().area(caller(alice)).lines().getFirst().args().contains("Nordhain"));
+
+        assertTrue(server.offices().callElection(caller(alice), land, "buergermeister").success());
+        var denied = server.offices().stand(caller(alice), land.id(), Office.MAYOR, Platform.FREEDOM);
+        assertFalse(denied.success());
+        assertEquals(ErrorCode.CANDIDACY_OUTSIDE_PARTY_AREA.translationKey(), denied.lines().getFirst().key());
+
+        assertTrue(server.parties().setArea(caller(alice), Optional.of("Westmark")).success());
+        assertTrue(server.offices().callElection(caller(alice), "buergermeister").success());
+        assertTrue(server.offices().stand(caller(bob), "buergermeister").success(), "Gemeinde unter dem Land");
+        assertTrue(server.offices().stand(caller(alice), land.id(), Office.MAYOR, Platform.NONE).success());
+        assertTrue(server.parties().setArea(caller(alice), Optional.empty()).success());
+        assertTrue(server.queries().partyOf(alice).orElseThrow().partyProfile().orElseThrow().area().isEmpty());
     }
 
     @Test

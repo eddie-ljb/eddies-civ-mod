@@ -5,8 +5,11 @@ import de.etiennebader.civ.application.media.PressUseCases;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.actor.PlayerRef;
+import de.etiennebader.civ.domain.civic.CustomImage;
+import de.etiennebader.civ.domain.civic.ImageKind;
 import de.etiennebader.civ.domain.exchange.Side;
 import de.etiennebader.civ.domain.market.Quote;
+import de.etiennebader.civ.domain.polity.ElectionResult;
 import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.Platform;
 import de.etiennebader.civ.domain.polity.PolityKind;
@@ -34,6 +37,8 @@ import de.etiennebader.civ.server.command.TranslationKeys;
 import de.etiennebader.civ.server.community.LetterView;
 import de.etiennebader.civ.server.company.HoldingView;
 import de.etiennebader.civ.server.company.OrderView;
+import de.etiennebader.civ.server.election.ElectionMapColor;
+import de.etiennebader.civ.server.level.TerritoryColor;
 import de.etiennebader.civ.server.market.ItemTraits;
 import de.etiennebader.civ.server.market.MarketOffer;
 import de.etiennebader.civ.server.office.ElectionView;
@@ -43,9 +48,16 @@ import de.etiennebader.civ.server.press.ArticleView;
 import de.etiennebader.civ.server.town.TownOverview;
 import de.etiennebader.civ.server.vote.ProposalView;
 
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Collection;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -54,6 +66,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.imageio.ImageIO;
 
 /**
  * Die Endpunkte der Webseite.
@@ -209,8 +222,17 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                 case "GET /", "GET /index.html" ->
                         new HttpResponse(200, "text/html; charset=utf-8", page, Map.of("Cache-Control", "no-cache"));
                 case "GET /api/world" -> HttpResponse.json(200, game.call(() -> world(texts)));
-                case "GET /api/map" -> HttpResponse.json(200, game.call(() ->
-                        map(new DimensionId(request.query().getOrDefault("dim", DimensionId.OVERWORLD.value())))));
+                case "GET /api/map" -> HttpResponse.json(200, game.call(() -> {
+                    DimensionId dimension = new DimensionId(request.query().getOrDefault("dim", DimensionId.OVERWORLD.value()));
+                    String electionParam = request.query().get("election");
+                    if (electionParam != null && !electionParam.isBlank()) {
+                        PolityId electionPolity = new PolityId(UUID.fromString(electionParam));
+                        Optional<Office> office = Optional.ofNullable(request.query().get("office"))
+                                .filter(v -> !v.isBlank()).map(Office::valueOf);
+                        return mapElection(dimension, electionPolity, office);
+                    }
+                    return map(dimension, Optional.ofNullable(request.query().get("level")).filter(v -> !v.isBlank()));
+                }));
                 case "GET /api/market" -> HttpResponse.json(200, game.call(this::market));
                 case "GET /api/elections" -> HttpResponse.json(200, game.call(() -> elections(texts)));
                 case "GET /api/shops" -> HttpResponse.json(200, game.call(this::shops));
@@ -285,6 +307,12 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                         justiceAction(login, body)), texts));
                 case "GET /api/show" -> HttpResponse.json(200, game.call(() -> show(texts)));
                 case "GET /api/civic" -> HttpResponse.json(200, game.call(() -> civic(texts)));
+                case "POST /api/image" -> withLogin(request, login -> imageUpload(request, login, texts));
+                case "GET /api/image" -> imageGet(request.query().getOrDefault("id", ""));
+                case "POST /api/image/remove" -> withLogin(request, login -> {
+                    Map<String, String> body = Json.parseFlat(request.body());
+                    return domain(texts, () -> game.call(() -> imageRemove(login, body.getOrDefault("id", ""))));
+                });
                 case "POST /api/login" -> login(request);
                 case "POST /api/logout" -> logout(request);
                 case "GET /api/me" -> withLogin(request, login -> HttpResponse.json(200, game.call(() -> me(login, texts))));
@@ -383,6 +411,12 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                 .put("players", civ.players().all().size())
                 .raw("towns", "[" + String.join(",", towns) + "]")
                 .raw("federations", "[" + String.join(",", federations) + "]")
+                .raw("levels", Json.array(civ.federations().levels().all(), lvl -> Json.object()
+                        .put("id", lvl.id())
+                        .put("name", lvl.displayName() instanceof Message message ? texts.translate(message)
+                                : lvl.displayName().toString())
+                        .put("rank", lvl.rank())
+                        .build()))
                 .raw("parties", Json.array(civ.parties().parties(ANONYMOUS),
                         party -> Json.object()
                                 .put("id", party.id().value().toString())
@@ -430,6 +464,12 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                                 .put("party", district.leaderParty().orElse(""))
                                 .put("key", district.leaderKey())
                                 .put("votes", CampaignService.votes(district.votes()))
+                                .raw("lines", Json.array(district.lines(), line -> Json.object()
+                                        .put("name", line.name())
+                                        .put("party", line.party().orElse(""))
+                                        .put("votes", CampaignService.votes(line.votes()))
+                                        .put("percent", line.percent())
+                                        .build()))
                                 .build()))
                         .build());
             }
@@ -480,10 +520,20 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                 .collect(Collectors.joining(" · "));
     }
 
-    private String map(DimensionId dimension) {
+    /**
+     * @param level Ebene, nach der Gebiete eingefärbt werden (z. B. {@code nation}); leer für die höchste Ebene des
+     *              Bundes, dem eine Gemeinde angehört. Siehe {@link de.etiennebader.civ.server.level.TerritoryColor}.
+     */
+    private String map(DimensionId dimension, Optional<String> level) {
         List<String> chunks = new ArrayList<>();
         for (PolityView polity : civ.queries().polities()) {
-            for (ChunkCoord chunk : civ.queries().territory().territoryOf(polity.id())) {
+            Collection<ChunkCoord> territory = civ.queries().territory().territoryOf(polity.id());
+            if (territory.isEmpty()) {
+                continue;
+            }
+            String group = TerritoryColor.groupOf(polity, civ.queries().ancestorsOf(polity.id()), level)
+                    .value().toString();
+            for (ChunkCoord chunk : territory) {
                 if (!chunk.dimension().equals(dimension) || chunks.size() >= MAX_MAP_CHUNKS) {
                     continue;
                 }
@@ -492,6 +542,59 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                         .put("x", chunk.x())
                         .put("z", chunk.z())
                         .put("town", polity.id().value().toString())
+                        .put("group", group)
+                        .put("outpost", claim.map(c -> c.type().name().equals("OUTPOST")).orElse(false))
+                        .build());
+            }
+        }
+        List<String> seats = new ArrayList<>();
+        for (PolityView polity : civ.queries().polities()) {
+            polity.seat().filter(seat -> seat.dimension().equals(dimension)).ifPresent(seat -> seats.add(Json.object()
+                    .put("town", polity.id().value().toString())
+                    .put("name", polity.name().value())
+                    .put("x", seat.x())
+                    .put("z", seat.z())
+                    .build()));
+        }
+        return Json.object()
+                .put("dimension", dimension.value())
+                .raw("chunks", "[" + String.join(",", chunks) + "]")
+                .raw("seats", "[" + String.join(",", seats) + "]")
+                .build();
+    }
+
+    /**
+     * Wie {@link #map(DimensionId, Optional)}, aber jedes Feld trägt zusätzlich seinen Wahlbezirk ({@code district})
+     * und seine Kartenfarbe richtet sich nach dem Wahlergebnis von {@code electionPolity} statt nach der
+     * Bundeshierarchie (#9). Nutzt dieselbe Bezirks- und Farbauflösung wie die Ingame-Karte, siehe
+     * {@link ElectionMapColor} und {@link de.etiennebader.civ.server.town.TownService#mapByElection}.
+     */
+    private String mapElection(DimensionId dimension, PolityId electionPolity, Optional<Office> office) {
+        Optional<PolityView> target = civ.queries().polity(electionPolity);
+        Optional<ElectionResult> result = target.flatMap(found -> office.isPresent()
+                ? ElectionMapColor.latestResult(found, office.get()) : ElectionMapColor.latestResult(found));
+        List<String> chunks = new ArrayList<>();
+        for (PolityView polity : civ.queries().polities()) {
+            Collection<ChunkCoord> territory = civ.queries().territory().territoryOf(polity.id());
+            if (territory.isEmpty()) {
+                continue;
+            }
+            for (ChunkCoord chunk : territory) {
+                if (!chunk.dimension().equals(dimension) || chunks.size() >= MAX_MAP_CHUNKS) {
+                    continue;
+                }
+                Optional<BlockPosition> representative = Optional.of(chunk.center(64));
+                Optional<Claim> claim = civ.queries().territory().claimAt(chunk);
+                PolityId district = ElectionMapColor.districtOf(civ.queries().civic(), electionPolity, representative,
+                        polity.id());
+                String group = ElectionMapColor.colorOf(civ.queries().civic(), electionPolity, representative,
+                        polity.id(), result, civ.queries()::partyOf).orElseThrow();
+                chunks.add(Json.object()
+                        .put("x", chunk.x())
+                        .put("z", chunk.z())
+                        .put("town", polity.id().value().toString())
+                        .put("group", group)
+                        .put("district", district.value().toString())
                         .put("outpost", claim.map(c -> c.type().name().equals("OUTPOST")).orElse(false))
                         .build());
             }
@@ -1036,6 +1139,106 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
         }
     }
 
+    // ---- Eigene Bilder (Wappen, Wahlplakat, Leuchtreklame) ----
+
+    /**
+     * {@code POST /api/image}: {@code {"polity": "<Name>", "kind": "WAPPEN|WAHLPLAKAT|LEUCHTREKLAME",
+     * "data": "<PNG als Base64>"}}. Nur die Spitze der Einheit darf hochladen.
+     */
+    private HttpResponse imageUpload(HttpRequest request, WebSessions.Login login, Translator texts) {
+        Map<String, String> body = Json.parseFlat(request.body());
+        Optional<PolityView> polity = game.call(() -> civ.queries().polityNamed(body.getOrDefault("polity", "")));
+        if (polity.isEmpty()) {
+            return HttpResponse.error(400, "Unbekannte Einheit");
+        }
+        ImageKind kind = ImageKind.valueOf(body.getOrDefault("kind", "").toUpperCase(Locale.ROOT));
+        byte[] bytes;
+        try {
+            bytes = Base64.getDecoder().decode(body.getOrDefault("data", ""));
+        } catch (IllegalArgumentException e) {
+            return invalidImage(texts);
+        }
+        if (bytes.length < 8 || bytes[0] != (byte) 0x89 || bytes[1] != 'P' || bytes[2] != 'N' || bytes[3] != 'G') {
+            return invalidImage(texts);
+        }
+        BufferedImage image;
+        try {
+            image = ImageIO.read(new ByteArrayInputStream(bytes));
+        } catch (IOException e) {
+            image = null;
+        }
+        if (image == null) {
+            return invalidImage(texts);
+        }
+        if (image.getWidth() > CustomImage.MAX_DIMENSION || image.getHeight() > CustomImage.MAX_DIMENSION) {
+            return HttpResponse.json(422, Json.object().put("ok", false)
+                    .put("message", texts.translate(Message.of(MessageKey.IMAGE_TOO_LARGE, CustomImage.MAX_DIMENSION,
+                            CustomImage.MAX_DIMENSION)))
+                    .build());
+        }
+        Optional<java.nio.file.Path> dir = civ.imagesDirectory();
+        if (dir.isEmpty()) {
+            return HttpResponse.error(503, "Bild-Ablage nicht verfügbar");
+        }
+        String hash = sha256Hex(bytes);
+        try {
+            Files.createDirectories(dir.get());
+            java.nio.file.Path file = dir.get().resolve(hash + ".png");
+            if (!Files.exists(file)) {
+                Files.write(file, bytes);
+            }
+        } catch (IOException e) {
+            return HttpResponse.error(500, "Bild konnte nicht gespeichert werden");
+        }
+        int width = image.getWidth();
+        int height = image.getHeight();
+        PolityView target = polity.get();
+        return domain(texts, () -> game.call(() -> civ.civic().uploadImage(caller(login), target, kind, hash, width,
+                height, displaced -> {
+                    /* Verdrängte Bild-Dateien (altes Wappen) bleiben absichtlich auf der Platte: der Hash ist
+                       inhaltsadressiert, mehrere Einträge können dieselbe Datei referenzieren. Aufräumen
+                       verwaister Dateien ist ein dokumentiertes Follow-up, kein Datenverlust. */
+                })));
+    }
+
+    private static HttpResponse invalidImage(Translator texts) {
+        return HttpResponse.json(422, Json.object().put("ok", false)
+                .put("message", texts.translate(Message.of(MessageKey.IMAGE_INVALID))).build());
+    }
+
+    private static String sha256Hex(byte[] bytes) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(bytes));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 nicht verfügbar", e);
+        }
+    }
+
+    /** {@code GET /api/image?id=<Kennung>}: die PNG-Bytes des hochgeladenen Bildes. */
+    private HttpResponse imageGet(String id) {
+        Optional<CustomImage> image = game.call(() -> civ.civic().image(id));
+        if (image.isEmpty()) {
+            return HttpResponse.error(404, "Bild nicht gefunden");
+        }
+        Optional<java.nio.file.Path> dir = civ.imagesDirectory();
+        if (dir.isEmpty()) {
+            return HttpResponse.error(404, "Bild-Ablage nicht verfügbar");
+        }
+        try {
+            byte[] bytes = Files.readAllBytes(dir.get().resolve(image.get().hash() + ".png"));
+            return new HttpResponse(200, "image/png", bytes, Map.of("Cache-Control", "public, max-age=86400"));
+        } catch (IOException e) {
+            return HttpResponse.error(404, "Bilddatei fehlt");
+        }
+    }
+
+    private Reply imageRemove(WebSessions.Login login, String id) {
+        Optional<CustomImage> removed = civ.civic().removeImage(caller(login), id);
+        return removed.isPresent() ? Reply.success(Message.of(MessageKey.IMAGE_REMOVED))
+                : Reply.failure(Message.of(MessageKey.CIVIC_REFUSED, "Bild nicht gefunden oder keine Berechtigung"));
+    }
+
     // ---- Justiz ----
 
     private String justice(Translator texts, Optional<WebSessions.Login> login) {
@@ -1199,6 +1402,13 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                                             .put("t", note.ticks())
                                             .build()))
                                     .build()).orElse("null"))
+                            .raw("wappenImage", civic.imagesOf(polity.id(), ImageKind.WAPPEN).stream().findFirst()
+                                    .map(found -> Json.string(found.id())).orElse("null"))
+                            .raw("images", Json.array(civic.imagesOf(polity.id()).stream()
+                                    .filter(found -> found.kind() != ImageKind.WAPPEN).toList(), found -> Json.object()
+                                            .put("id", found.id())
+                                            .put("kind", found.kind().name())
+                                            .build()))
                             .raw("constituencies", Json.array(civic.constituenciesOf(polity.id()), constituency ->
                                     Json.object()
                                             .put("name", constituency.name())

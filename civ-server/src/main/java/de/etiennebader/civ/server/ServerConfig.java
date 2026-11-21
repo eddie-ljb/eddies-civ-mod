@@ -30,6 +30,7 @@ public final class ServerConfig {
     static final String METROPOLIS_AT = "metropolis_inhabitants";
     static final String EMIGRATION = "villager_emigration";
     static final String AMBITIONS = "villager_ambitions";
+    static final String VILLAGER_POLITICS = "villager_politics_enabled";
     static final String LEVELS = "federation_levels";
     static final String VILLAGER_PARTIES = "villager_parties";
     static final String PARTY_FOUNDERS = "villager_party_founders";
@@ -45,8 +46,12 @@ public final class ServerConfig {
     static final String ANTHEM_ON_ENTER = "anthem_on_enter";
     static final String WORLD_MAP = "world_map";
     static final String MAP_RADIUS = "world_map_radius_chunks";
+    static final String PRICE_LEVEL_MIN = "price_level_min";
+    static final String PRICE_LEVEL_MAX = "price_level_max";
+    static final String PRICE_LEVEL_DAMPING = "price_level_damping";
     private static final java.util.List<String> KEYS = java.util.List.of(LIVE_COUNT, LIVE_COUNT_SECONDS, PROJECTIONS,
-            DEBATE_MINUTES, ANTHEM_ON_ENTER, WORLD_MAP, MAP_RADIUS, WEB_TRUST_PROXY);
+            DEBATE_MINUTES, ANTHEM_ON_ENTER, WORLD_MAP, MAP_RADIUS, WEB_TRUST_PROXY, VILLAGER_POLITICS,
+            PRICE_LEVEL_MIN, PRICE_LEVEL_MAX, PRICE_LEVEL_DAMPING);
 
     private static final String HEADER = """
             Eddies Civ Mod
@@ -57,6 +62,8 @@ public final class ServerConfig {
             market_town_inhabitants, city_inhabitants, metropolis_inhabitants: Einwohner fuer die Siedlungsstufen
             villager_emigration: ob sehr unzufriedene Dorfbewohner ihre Gemeinde verlassen (true/false)
             villager_ambitions: ob ehrgeizige Dorfbewohner Firmen, Parteien und Buende gruenden, kandidieren und Firmen uebernehmen (true/false)
+            villager_politics_enabled: ob Dorfbewohner ohne Spieler-Buergermeister kommissarisch regieren,
+              Buenden beitreten/gruenden und Firmen gruenden duerfen (true/false)
             federation_levels: eigene Ebenen fuer Buende als id:Name:Rang, z. B. kreis:Kreis:10,bund:Bund:40
               (eingebaut: gemeinde 0, land 20, nation 30; ein Bund steht immer hoeher als seine Glieder)
             villager_parties: ob Dorfbewohner Parteien beitreten und gruenden (true/false)
@@ -68,7 +75,10 @@ public final class ServerConfig {
             live_count_seconds: Dauer der Live-Auszaehlung (5-600); live_count_projections: Hochrechnungen (true/false)
             debate_minutes: Laenge einer Wahldebatte in Minuten (0 = keine Debatten)
             anthem_on_enter: Hymne beim Betreten einer Gemeinde abspielen (true/false)
-            world_map: gerenderte Weltkarte auf der Webseite (true/false); world_map_radius_chunks: Umkreis um Spieler""";
+            world_map: gerenderte Weltkarte auf der Webseite (true/false); world_map_radius_chunks: Umkreis um Spieler
+            price_level_min, price_level_max: Grenzen des Marktpreisfaktors (Standard 0.5 .. 4.0)
+            price_level_damping: Daempfung der Preisreaktion auf die Geldmenge je Kopf (Standard 0.5 = Quadratwurzel;
+              1.0 liesse Preise proportional zur Geldmenge je Kopf schwanken, staerkere Inflation/Deflation)""";
 
     private ServerConfig() {
     }
@@ -121,6 +131,7 @@ public final class ServerConfig {
                 Money.of(MoneyFormat.emeralds(reference), defaults.currency()), Money.of(income, defaults.currency()),
                 tiers, web, Boolean.parseBoolean(properties.getProperty(EMIGRATION,
                         Boolean.toString(defaults.emigration())).strip()),
+                flag(properties, VILLAGER_POLITICS, defaults.villagerPolitics()),
                 Levels.parse(properties.getProperty(LEVELS, defaults.levels().spec())),
                 new ServerSettings.PartySettings(
                         Boolean.parseBoolean(properties.getProperty(VILLAGER_PARTIES,
@@ -128,6 +139,18 @@ public final class ServerConfig {
                         (int) number(properties, PARTY_FOUNDERS, defaults.parties().founders(), 2)),
                 show(properties, defaults.show()),
                 Boolean.parseBoolean(properties.getProperty(AMBITIONS, Boolean.toString(defaults.ambitions())).strip()));
+                show(properties, defaults.show()), economy(properties, defaults.economy()));
+    }
+
+    private static ServerSettings.EconomySettings economy(Properties properties, ServerSettings.EconomySettings defaults) {
+        try {
+            return new ServerSettings.EconomySettings(
+                    decimal(properties, PRICE_LEVEL_MIN, defaults.priceLevelMin()),
+                    decimal(properties, PRICE_LEVEL_MAX, defaults.priceLevelMax()),
+                    decimal(properties, PRICE_LEVEL_DAMPING, defaults.priceLevelDamping()));
+        } catch (IllegalArgumentException e) {
+            return defaults;
+        }
     }
 
     private static ServerSettings.ShowSettings show(Properties properties, ServerSettings.ShowSettings defaults) {
@@ -162,6 +185,7 @@ public final class ServerConfig {
         properties.setProperty(METROPOLIS_AT, Integer.toString(settings.tiers().metropolis()));
         properties.setProperty(EMIGRATION, Boolean.toString(settings.emigration()));
         properties.setProperty(AMBITIONS, Boolean.toString(settings.ambitions()));
+        properties.setProperty(VILLAGER_POLITICS, Boolean.toString(settings.villagerPolitics()));
         properties.setProperty(LEVELS, settings.levels().spec());
         properties.setProperty(VILLAGER_PARTIES, Boolean.toString(settings.parties().villagers()));
         properties.setProperty(PARTY_FOUNDERS, Integer.toString(settings.parties().founders()));
@@ -177,6 +201,9 @@ public final class ServerConfig {
         properties.setProperty(ANTHEM_ON_ENTER, Boolean.toString(settings.show().anthemOnEnter()));
         properties.setProperty(WORLD_MAP, Boolean.toString(settings.show().worldMap()));
         properties.setProperty(MAP_RADIUS, Integer.toString(settings.show().mapRadius()));
+        properties.setProperty(PRICE_LEVEL_MIN, Double.toString(settings.economy().priceLevelMin()));
+        properties.setProperty(PRICE_LEVEL_MAX, Double.toString(settings.economy().priceLevelMax()));
+        properties.setProperty(PRICE_LEVEL_DAMPING, Double.toString(settings.economy().priceLevelDamping()));
         try {
             Files.createDirectories(file.toAbsolutePath().getParent());
             try (Writer writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
@@ -195,6 +222,18 @@ public final class ServerConfig {
         try {
             long parsed = Long.parseLong(value.strip());
             return parsed >= minimum ? parsed : fallback;
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
+    }
+
+    private static double decimal(Properties properties, String key, double fallback) {
+        String value = properties.getProperty(key);
+        if (value == null) {
+            return fallback;
+        }
+        try {
+            return Double.parseDouble(value.strip());
         } catch (NumberFormatException e) {
             return fallback;
         }

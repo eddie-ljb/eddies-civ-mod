@@ -1,0 +1,6 @@
+{
+  "parent": "eddies-civ-mod:block/label_street",
+  "textures": {
+    "front": "eddies-civ-mod:block/street_sign_face"
+  }
+}

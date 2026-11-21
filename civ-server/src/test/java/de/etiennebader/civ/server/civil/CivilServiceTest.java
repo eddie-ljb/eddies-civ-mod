@@ -8,6 +8,7 @@ import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.domain.territory.DimensionId;
 import de.etiennebader.civ.server.Announcement;
 import de.etiennebader.civ.server.CivServerFixture;
+import de.etiennebader.civ.server.civil.CivilService.SignType;
 import de.etiennebader.civ.server.command.Caller;
 import de.etiennebader.civ.server.command.MessageKey;
 import de.etiennebader.civ.server.command.Reply;
@@ -60,6 +61,10 @@ class CivilServiceTest {
         server.plots().selectCorner(at(alice, "Alice", 0, 0), 1);
         server.plots().selectCorner(at(alice, "Alice", 3, 3), 2);
         assertTrue(server.plots().createFromSelection(mayor, PlotService.typeNames().getFirst()).success());
+        assertEquals(List.of("Hauptstraße"), server.civil().signLines(SignType.STREET, at(alice, "Alice", 2, 8).position()));
+        assertEquals(List.of("Hauptstraße"), server.civil().signLines(SignType.STREET, mayor.position()));
+        assertEquals(List.of("1"), server.civil().signLines(SignType.HOUSE, mayor.position()));
+        assertEquals(List.of(), server.civil().signLines(SignType.HOUSE, at(alice, "Alice", 2, 8).position()));
         server.takeAnnouncements();
 
         Reply offered = server.civil().offerLease(mayor, "Bob", "1", Optional.of("2"), 0);
@@ -81,6 +86,22 @@ class CivilServiceTest {
         assertTrue(server.takeAnnouncements().stream()
                 .anyMatch(a -> a.message().key().equals(MessageKey.CONTRACT_ENDED.key())));
         assertFalse(server.civil().show(tenant, 99).success());
+    }
+
+    @Test
+    @DisplayName("Ort, Land und Nation erscheinen abhängig vom Schildtyp und vom tatsächlichen Aufstellort")
+    void territorialSignLines() {
+        setUpTown();
+        Caller mayor = at(alice, "Alice", 8, 8);
+        assertEquals(List.of("Gemeinde: Nordhain"), server.civil().signLines(SignType.TOWN, mayor.position()));
+        assertEquals(List.of(), server.civil().signLines(SignType.COUNTRY, mayor.position()));
+        assertTrue(server.federations().found(mayor, "land", "Ost").success());
+        assertTrue(server.federations().found(mayor, "nation", "Reich").success());
+        assertEquals(List.of("Gemeinde: Nordhain", "Land: Ost", "Nation: Reich"),
+                server.civil().signLines(SignType.TOWN, mayor.position()));
+        assertEquals(List.of("Land: Ost", "Nation: Reich"), server.civil().signLines(SignType.COUNTRY, mayor.position()));
+        assertEquals(List.of("Nation: Reich"), server.civil().signLines(SignType.NATION, mayor.position()));
+        assertEquals(List.of(), server.civil().signLines(SignType.TOWN, at(alice, "Alice", 500, 500).position()));
     }
 
     @Test

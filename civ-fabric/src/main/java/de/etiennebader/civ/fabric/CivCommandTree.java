@@ -13,12 +13,15 @@ import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import de.etiennebader.civ.EddiesCivMod;
+import de.etiennebader.civ.application.population.VillagerDialogue;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
+import de.etiennebader.civ.domain.population.VillagerIdentity;
 import de.etiennebader.civ.domain.exchange.Side;
 import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.Polity;
 import de.etiennebader.civ.domain.polity.PolityView;
+import de.etiennebader.civ.domain.polity.ProgramMode;
 import de.etiennebader.civ.domain.shared.PersonId;
 import de.etiennebader.civ.domain.territory.ClaimType;
 import de.etiennebader.civ.fabric.content.LawBooks;
@@ -109,6 +112,7 @@ import java.util.function.Function;
  * /civ wahl ausrufen &lt;Amt&gt;         Wahl ausrufen (Bürgermeister; andere bei freiem Amt)
  * /civ wahl kandidieren &lt;Amt&gt; [Programm]  kandidieren (nur Bürger); ordnung|freiheit|steuern|ausbau|ohne
  * /civ stimmung                    Stimmung der Dorfbewohner der eigenen Gemeinde
+ * /civ konjunktur                   Konjunkturphase der Wirtschaftszone der eigenen Gemeinde
  * /civ wahl stimmen &lt;Amt&gt; &lt;Name&gt;  wählen (nur Bürger), bis zum Ende der Wahl änderbar
  * /civ amt ernennen &lt;Amt&gt; &lt;Name&gt;  Schatzmeister oder Bauamt ernennen (Bürgermeister)
  * /civ amt entlassen &lt;Amt&gt;         Amt frei machen (Bürgermeister)
@@ -164,6 +168,7 @@ public final class CivCommandTree {
     private static final String LEVEL = "ebene";
     private static final String ARTICLE = "artikel";
     private static final String TEXT = "text";
+    private static final String TOPIC = "thema";
     private static final String TOWN = "gemeinde";
     private static final String NUMBER = "nr";
     private static final String DEPOSIT = "kaution";
@@ -171,6 +176,7 @@ public final class CivCommandTree {
     private static final int VILLAGER_REACH = 6;
     private static final String ORDER_AXIS = "ordnung";
     private static final String ECONOMY_AXIS = "wirtschaft";
+    private static final String PROGRAM_MODE = "modus";
     private static final List<String> YES_NO = List.of("ja", "nein");
 
     private final CivServerHost host;
@@ -262,6 +268,34 @@ public final class CivCommandTree {
                                                 Players.caller(player), IntegerArgumentType.getInteger(context, COUNT), false))))))
                 .then(Commands.literal("stimmung")
                         .executes(context -> withCiv(context, (civ, player) -> civ.villagers().mood(Players.caller(player)))))
+                .then(Commands.literal("dorfbewohner")
+                        .then(Commands.literal("register")
+                                .executes(context -> withCiv(context, (civ, player) -> civ.villagers()
+                                        .residentRegister(Players.caller(player), 1)))
+                                .then(Commands.argument(COUNT, IntegerArgumentType.integer(1))
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.villagers()
+                                                .residentRegister(Players.caller(player),
+                                                        IntegerArgumentType.getInteger(context, COUNT))))))
+                        .then(Commands.literal("reden")
+                                .then(Commands.argument(TOPIC, StringArgumentType.word())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                VillagerDialogue.Topic.words(), builder))
+                                        .executes(context -> withCiv(context, (civ, player) -> talkToVillager(civ,
+                                                player, StringArgumentType.getString(context, TOPIC))))))
+                        .then(Commands.literal("beeinflussen")
+                                .executes(context -> withCiv(context, (civ, player) -> villagerRef(player)
+                                        .map(villager -> civ.villagers().influence(Players.caller(player), villager))
+                                        .orElseGet(() -> Reply.failure(Message.of(MessageKey.VILLAGER_NONE_NEAR))))))
+                        .then(Commands.literal("post")
+                                .then(Commands.argument(TOPIC, StringArgumentType.word())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                VillagerDialogue.Topic.words(), builder))
+                                        .executes(context -> withCiv(context, (civ, player) -> villagerRef(player)
+                                                .map(villager -> civ.villagers().sendMail(Players.ref(player), villager,
+                                                        StringArgumentType.getString(context, TOPIC)))
+                                                .orElseGet(() -> Reply.failure(Message.of(MessageKey.VILLAGER_NONE_NEAR))))))))
+                .then(Commands.literal("konjunktur")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.villagers().conjunctureReply(Players.caller(player)))))
                 .then(Commands.literal("aemter")
                         .executes(context -> withCiv(context, (civ, player) -> civ.offices().list(Players.caller(player)))))
                 .then(Commands.literal("wahl")
@@ -457,7 +491,22 @@ public final class CivCommandTree {
                         Optional.empty())))
                 .then(Commands.literal("liste")
                         .executes(context -> withCiv(context, (civ, player) -> civ.parties().list(
-                                Players.caller(player)))))
+                                Players.caller(player))))
+                        .then(Commands.literal("zeigen")
+                                .executes(context -> withCiv(context, (civ, player) -> civ.parties().partyList(
+                                        Players.caller(player)))))
+                        .then(Commands.literal("setzen")
+                                .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.parties()
+                                                .setPartyList(Players.caller(player),
+                                                        List.of(name(context).split("\\s+")))))))
+                        .then(Commands.literal("modus")
+                                .then(Commands.literal("abstimmung")
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.parties()
+                                                .setPartyListMode(Players.caller(player), true))))
+                                .then(Commands.literal("vorsitz")
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.parties()
+                                                .setPartyListMode(Players.caller(player), false))))))
                 .then(Commands.literal("menue")
                         .executes(context -> withCiv(context, (civ, player) -> {
                             Feedback.click(player);
@@ -490,6 +539,19 @@ public final class CivCommandTree {
                 .then(Commands.literal("aufloesen")
                         .executes(context -> withCiv(context, (civ, player) -> civ.parties().dissolve(
                                 Players.caller(player)))))
+                .then(Commands.literal("gebiet")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.parties().area(
+                                Players.caller(player))))
+                        .then(Commands.literal("setzen")
+                                .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                host.current().map(civ -> civ.parties().areaNames())
+                                                        .orElse(List.of()), builder))
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.parties()
+                                                .setArea(Players.caller(player), Optional.of(name(context)))))))
+                        .then(Commands.literal("leeren")
+                                .executes(context -> withCiv(context, (civ, player) -> civ.parties()
+                                        .setArea(Players.caller(player), Optional.empty())))))
                 .then(Commands.literal("wappen")
                         .executes(context -> withCiv(context, (civ, player) -> player.getMainHandItem().isEmpty()
                                 ? Reply.failure(Message.of(MessageKey.INVALID_EMBLEM))
@@ -501,7 +563,22 @@ public final class CivCommandTree {
                                         .executes(context -> withCiv(context, (civ, player) -> civ.parties()
                                                 .setDirection(Players.caller(player),
                                                         IntegerArgumentType.getInteger(context, ORDER_AXIS),
-                                                        IntegerArgumentType.getInteger(context, ECONOMY_AXIS)))))));
+                                                        IntegerArgumentType.getInteger(context, ECONOMY_AXIS)))))))
+                .then(Commands.literal("programmodus")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.parties()
+                                .programMode(Players.caller(player), Optional.empty())))
+                        .then(Commands.argument(PROGRAM_MODE, StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                        List.of("abstimmung", "vorsitz", "vote", "chair"), builder))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.parties()
+                                        .programMode(Players.caller(player),
+                                                Optional.of(parseProgramMode(StringArgumentType.getString(context,
+                                                        PROGRAM_MODE))))))));
+    }
+
+    private static ProgramMode parseProgramMode(String word) {
+        return "abstimmung".equalsIgnoreCase(word) || "vote".equalsIgnoreCase(word)
+                ? ProgramMode.VOTE : ProgramMode.CHAIR;
     }
 
     private CompletableFuture<Suggestions> suggestPartyNames(CommandContext<CommandSourceStack> context,
@@ -842,6 +919,7 @@ public final class CivCommandTree {
                                         Players.caller(player), level.apply(context)))))
                         .then(constituencyAction("anlegen", level))
                         .then(constituencyAction("gebiet", level))
+                        .then(constituencyAction("gebiet-entfernen", level))
                         .then(constituencyAction("leeren", level))
                         .then(constituencyAction("aufloesen", level))
                         .then(Commands.literal("gemeinde")
@@ -849,6 +927,14 @@ public final class CivCommandTree {
                                         .then(Commands.argument(TOWN, StringArgumentType.greedyString())
                                                 .executes(context -> withCiv(context, (civ, player) ->
                                                         civ.levels().constituencyTown(Players.caller(player),
+                                                                level.apply(context),
+                                                                StringArgumentType.getString(context, NAME),
+                                                                StringArgumentType.getString(context, TOWN)))))))
+                        .then(Commands.literal("gemeinde-entfernen")
+                                .then(Commands.argument(NAME, StringArgumentType.string())
+                                        .then(Commands.argument(TOWN, StringArgumentType.greedyString())
+                                                .executes(context -> withCiv(context, (civ, player) ->
+                                                        civ.levels().constituencyTownRemove(Players.caller(player),
                                                                 level.apply(context),
                                                                 StringArgumentType.getString(context, NAME),
                                                                 StringArgumentType.getString(context, TOWN))))))))
@@ -1155,8 +1241,12 @@ public final class CivCommandTree {
                     .flatMap(polity -> civ.offices().officesOf(polity, Players.ref(player)).stream()
                             .filter(view -> view.office() == office.get()).findFirst())
                     .flatMap(OfficeView::election)
-                    .ifPresent(election -> election.candidates().forEach(candidate ->
-                            names.add(StringArgumentType.escapeIfRequired(candidate.name()))));
+                    .ifPresent(election -> election.candidates().forEach(candidate -> {
+                        names.add(StringArgumentType.escapeIfRequired(candidate.name()));
+                        if (candidate.actor() instanceof PersonRef villager) {
+                            names.add(VillagerIdentity.of(villager).registerNumber());
+                        }
+                    }));
         });
         return SharedSuggestionProvider.suggest(names, builder);
     }
@@ -1569,6 +1659,15 @@ public final class CivCommandTree {
                 .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
                         .executes(context -> withCiv(context, (civ, player) -> action.execute(civ, player,
                                 IntegerArgumentType.getInteger(context, NUMBER)))));
+    }
+
+    /** Redet mit dem angesehenen oder nächsten Dorfbewohner über ein Thema (Issue #18); unbekannte Themenwörter
+     * werden wie {@code greeting} behandelt. */
+    private static Reply talkToVillager(CivServer civ, ServerPlayer player, String topicWord) {
+        VillagerDialogue.Topic topic = VillagerDialogue.parseTopic(topicWord).orElse(VillagerDialogue.Topic.GREETING);
+        return villagerRef(player)
+                .map(villager -> civ.villagers().talk(villager, topic))
+                .orElseGet(() -> Reply.failure(Message.of(MessageKey.VILLAGER_NONE_NEAR)));
     }
 
     /** Stellt den nächsten Dorfbewohner in Reichweite ein. */

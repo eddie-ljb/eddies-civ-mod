@@ -16,6 +16,8 @@ import de.etiennebader.civ.domain.polity.Membership;
 import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.polity.PolityName;
 import de.etiennebader.civ.domain.polity.PolityView;
+import de.etiennebader.civ.domain.population.Personality;
+import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.DomainException;
 import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.server.Announcement;
@@ -324,6 +326,51 @@ public final class FederationService {
         queries.parentOf(federation.id()).ifPresent(parent -> lines.add(Message.of(MessageKey.FEDERATION_INFO_PARENT,
                 link(parent))));
         return lines;
+    }
+
+    /**
+     * Tagesabschluss: Dorfbewohner-Anführer entscheiden selbst über offene Einladungen, nach ihrer Persönlichkeit
+     * (Ordnungsliebende und Heimatverbundene schließen sich eher einem Bund an). Nur für Gemeinden, deren
+     * kommissarischer Bürgermeister ({@link PolityView#mayor(boolean)}) ein Dorfbewohner ist; führt ein Spieler die
+     * Gemeinde, entscheidet weiterhin er selbst per {@code /civ bund beitreten}.
+     */
+    public List<Message> autoDecideInvitations(Day day, boolean villagerPolitics) {
+        if (!villagerPolitics) {
+            return List.of();
+        }
+        List<Message> decisions = new ArrayList<>();
+        for (PolityId guestId : List.copyOf(invitations.keySet())) {
+            Optional<PolityView> guest = queries.polity(guestId);
+            Set<PolityId> hosts = invitations.get(guestId);
+            if (guest.isEmpty() || hosts == null || hosts.isEmpty()) {
+                continue;
+            }
+            if (!(guest.get().mayor(true).orElse(null) instanceof PersonRef villagerHead)) {
+                continue;
+            }
+            PolityId hostId = hosts.iterator().next();
+            Optional<PolityView> host = queries.polity(hostId);
+            invitations.remove(guestId);
+            if (host.isEmpty()) {
+                continue;
+            }
+            Personality personality = Personality.of(villagerHead);
+            boolean accepts = personality.order() + personality.belonging() >= 0;
+            if (!accepts) {
+                continue;
+            }
+            try {
+                app.joinFederation().execute(new JoinFederation.Command(hostId, guestId, day));
+                Message joined = Message.of(MessageKey.FEDERATION_JOINED, guest.get().name().value(),
+                        host.get().name().value());
+                announcements.add(Announcement.toTown(hostId, joined));
+                announcements.add(Announcement.toTown(guestId, joined));
+                decisions.add(joined);
+            } catch (DomainException e) {
+                // Zwischenzeitlich ungültig geworden (z. B. Gastgeber aufgelöst); Einladung bleibt verworfen.
+            }
+        }
+        return decisions;
     }
 
     private Optional<PolityView> headedFederation(PlayerRef player) {

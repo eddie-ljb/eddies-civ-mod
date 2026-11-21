@@ -1,0 +1,46 @@
+# Karte
+
+Es gibt zwei Karten: die **Web-Karte** (eingebettete Webseite, Reiter „Karte") und die **Ingame-Karte**
+(`/civ karte`, oder im Gemeindehaus-Menü der Punkt „Karte").
+
+## Farben
+
+Jede Gemeinde gehört zu höchstens einem Bund je Ebene (z. B. Land, Nation). Auf beiden Karten färbt sich das Gebiet
+einer Gemeinde standardmäßig nach dem **höchsten Bund**, dem sie angehört (Nation > Land > Gemeinde): Alle
+Gemeinden derselben Nation erscheinen zusammenhängend in einer Farbe. Gehört eine Gemeinde keinem Bund an, zeigt
+ihr Gebiet ihre eigene Farbe.
+
+## Ebenen-Filter
+
+Über den Filter **„Ebene"** lässt sich die Einfärbung auf eine bestimmte Ebene eingrenzen, statt immer die höchste
+zu zeigen:
+
+- **Web-Karte:** Auswahlfeld „Ebene" über der Karte. „Höchste Ebene" ist die Voreinstellung; wählt man z. B.
+  „Land", erscheinen alle Gemeinden desselben Landes zusammenhängend in einer Farbe, auch wenn sie zusätzlich zu
+  verschiedenen Nationen gehören.
+- **Ingame-Karte:** Der Kompass-Knopf unten rechts (Kartenbeschriftung) wechselt bei jedem Klick zur nächsten
+  Ebene, von der höchsten abwärts bis zur Gemeinde, und beginnt danach wieder von vorn.
+
+Außenposten bleiben schraffiert dargestellt, eigenes und fremdes Gebiet bleiben zusätzlich an Namen bzw.
+Textfarbe (grün/rot) erkennbar; nur die Flächenfarbe folgt dem Bund.
+
+## Wahlkarte
+
+Statt der Bundesfarbe lässt sich die **Wahlkarte** einer vergangenen Wahl einblenden: Jeder Chunk zeigt die Farbe
+der Partei (bzw. des Kandidaten ohne Partei), die in seinem eigenen Wahlbezirk vorn liegt – nicht nur je Gemeinde,
+sondern tatsächlich je Bezirk. Hat eine Gemeinde mehrere Wahlbezirke definiert, erscheinen diese dadurch getrennt
+auf der Karte, auch ohne Ergebnis schon anhand fester Bezirksfarben, mit einer nachgezogenen Grenzlinie zwischen
+benachbarten Bezirken.
+
+- **Web-Karte:** Auswahlfeld „Ansicht" über der Karte; „Gebiete" zeigt die normale Bundeseinfärbung, jeder weitere
+  Eintrag eine vergangene Wahl. Dabei erscheint ein eigener Filter „Partei" (grenzt die Kartenfarbe auf eine Partei
+  ein, unabhängig vom Partei-Filter im Reiter „Wahlen") sowie der Schalter „Bezirksgrenzen" (zeichnet die Grenze
+  zwischen Wahlbezirken nach, standardmäßig an). Die Legende listet jeden Bezirk mit seinem Führenden; „Rangfolge"
+  klappt darunter die vollständige Kandidatenliste mit Stimmanteilen auf, nicht nur den Sieger.
+- **Ingame-Karte:** Knopf „Wahlkarte: an/aus" neben dem Ebenen-Filter schaltet für die eigene Gemeinde auf die
+  Wahlkarte des jeweils letzten Ergebnisses um.
+
+## Für Server-Betreiber
+
+Die Ebenen selbst (Kennung, Rang, Anzeigename) kommen aus `federation_levels`, siehe README. Eigene Ebenen
+erscheinen automatisch im Ebenen-Filter beider Karten.

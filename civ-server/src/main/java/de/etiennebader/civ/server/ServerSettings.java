@@ -1,6 +1,7 @@
 package de.etiennebader.civ.server;
 
 import de.etiennebader.civ.application.day.Calendar;
+import de.etiennebader.civ.domain.market.PriceLevel;
 import de.etiennebader.civ.domain.polity.SettlementTier;
 import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.Money;
@@ -25,6 +26,8 @@ import java.util.Objects;
  * @param tiers          ab wie vielen Einwohnern eine Gemeinde welche Stufe erreicht
  * @param web            die eingebettete Webseite
  * @param emigration     ob sehr unzufriedene Dorfbewohner ihre Gemeinde verlassen
+ * @param villagerPolitics ob Dorfbewohner ohne Spieler-Bürgermeister kommissarisch regieren, Bünde gründen/beitreten
+ *                         und Firmen gründen dürfen
  * @param levels         politische Ebenen, auf denen Bünde gegründet werden können
  * @param parties        ob und ab wie vielen Gleichgesinnten Dorfbewohner Parteien gründen
  * @param show           Inszenierung: Live-Auszählung, Debatten, Hymnen, Weltkarte
@@ -42,13 +45,56 @@ public record ServerSettings(long ticksPerDay, int claimBase, int claimPerMember
         this(ticksPerDay, claimBase, claimPerMember, currency, priceReference, villagerIncome, tiers, web, emigration,
                 levels, parties, show, true);
     }
+ * @param economy        Fein-tuning der Marktpreissimulation (Preisfaktor-Grenzen und -Dämpfung)
+ */
+public record ServerSettings(long ticksPerDay, int claimBase, int claimPerMember, CurrencyId currency,
+                             Money priceReference, Money villagerIncome, TierThresholds tiers, WebSettings web,
+                             boolean emigration, boolean villagerPolitics, Levels levels, PartySettings parties,
+                             ShowSettings show, EconomySettings economy) {
 
-    /** Mit Standard-Inszenierung. */
+    /** Mit Standard-Wirtschaftssimulation. */
+    public ServerSettings(long ticksPerDay, int claimBase, int claimPerMember, CurrencyId currency,
+                          Money priceReference, Money villagerIncome, TierThresholds tiers, WebSettings web,
+                          boolean emigration, boolean villagerPolitics, Levels levels, PartySettings parties,
+                          ShowSettings show) {
+        this(ticksPerDay, claimBase, claimPerMember, currency, priceReference, villagerIncome, tiers, web, emigration,
+                villagerPolitics, levels, parties, show, EconomySettings.DEFAULT);
+    }
+
+    /** Mit Standard-Inszenierung und -Wirtschaftssimulation. */
     public ServerSettings(long ticksPerDay, int claimBase, int claimPerMember, CurrencyId currency,
                           Money priceReference, Money villagerIncome, TierThresholds tiers, WebSettings web,
                           boolean emigration, Levels levels, PartySettings parties) {
         this(ticksPerDay, claimBase, claimPerMember, currency, priceReference, villagerIncome, tiers, web, emigration,
-                levels, parties, ShowSettings.DEFAULT);
+                true, levels, parties, ShowSettings.DEFAULT, EconomySettings.DEFAULT);
+    }
+
+    /**
+     * Fein-tuning der Marktpreissimulation ({@link de.etiennebader.civ.domain.market.PriceLevel}).
+     *
+     * @param priceLevelMin     kleinster Preisfaktor bei sehr geringer Geldmenge je Kopf, mindestens
+     *                          {@value de.etiennebader.civ.domain.market.PriceLevel#MIN}
+     * @param priceLevelMax     größter Preisfaktor bei sehr hoher Geldmenge je Kopf (Inflation), höchstens
+     *                          {@value de.etiennebader.civ.domain.market.PriceLevel#MAX}
+     * @param priceLevelDamping Dämpfung der Preisreaktion auf die Geldmenge je Kopf; 0,5 entspricht der
+     *                          bisherigen festen Formel (Quadratwurzel), höhere Werte lassen die Preise
+     *                          stärker auf Inflation/Deflation reagieren
+     */
+    public record EconomySettings(double priceLevelMin, double priceLevelMax, double priceLevelDamping) {
+
+        public static final EconomySettings DEFAULT =
+                new EconomySettings(PriceLevel.MIN, PriceLevel.MAX, PriceLevel.DEFAULT_DAMPING);
+
+        public EconomySettings {
+            if (!(priceLevelMin >= PriceLevel.MIN && priceLevelMin < priceLevelMax && priceLevelMax <= PriceLevel.MAX)) {
+                throw new IllegalArgumentException(
+                        "price_level_min/price_level_max außerhalb von " + PriceLevel.MIN + ".." + PriceLevel.MAX
+                                + " oder min >= max: " + priceLevelMin + ".." + priceLevelMax);
+            }
+            if (!(priceLevelDamping > 0)) {
+                throw new IllegalArgumentException("price_level_damping muss positiv sein: " + priceLevelDamping);
+            }
+        }
     }
 
     /**
@@ -85,7 +131,7 @@ public record ServerSettings(long ticksPerDay, int claimBase, int claimPerMember
                           Money priceReference, Money villagerIncome, TierThresholds tiers, WebSettings web,
                           boolean emigration, Levels levels) {
         this(ticksPerDay, claimBase, claimPerMember, currency, priceReference, villagerIncome, tiers, web, emigration,
-                levels, PartySettings.DEFAULT);
+                true, levels, PartySettings.DEFAULT, ShowSettings.DEFAULT);
     }
 
     /**
@@ -110,7 +156,7 @@ public record ServerSettings(long ticksPerDay, int claimBase, int claimPerMember
                           Money priceReference, Money villagerIncome, TierThresholds tiers, WebSettings web,
                           boolean emigration) {
         this(ticksPerDay, claimBase, claimPerMember, currency, priceReference, villagerIncome, tiers, web, emigration,
-                Levels.DEFAULT);
+                true, Levels.DEFAULT, PartySettings.DEFAULT, ShowSettings.DEFAULT);
     }
 
     /** Mit Abwanderung. */
@@ -190,6 +236,7 @@ public record ServerSettings(long ticksPerDay, int claimBase, int claimPerMember
         Objects.requireNonNull(web, "web");
         Objects.requireNonNull(levels, "levels");
         Objects.requireNonNull(parties, "parties");
+        Objects.requireNonNull(economy, "economy");
     }
 
     /** Wie {@link #defaults()}, aber mit eigener Tageslänge, z. B. für Tests. */
@@ -199,6 +246,8 @@ public record ServerSettings(long ticksPerDay, int claimBase, int claimPerMember
                 defaults.priceReference(), defaults.villagerIncome(), defaults.tiers(), defaults.web().disabled(),
                 defaults.emigration(), defaults.levels(), defaults.parties(),
                 new ShowSettings(false, 60, true, 5, false, false, 6), defaults.ambitions());
+                defaults.emigration(), defaults.villagerPolitics(), defaults.levels(), defaults.parties(),
+                new ShowSettings(false, 60, true, 5, false, false, 6));
     }
 
     /**
