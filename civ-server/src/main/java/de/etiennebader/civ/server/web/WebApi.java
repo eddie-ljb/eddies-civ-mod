@@ -255,6 +255,19 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                         }
                     }));
                 });
+                case "GET /api/blueprints" -> HttpResponse.json(200, game.call(() -> Json.array(
+                        civ.construction().library().all(), plan -> Json.object()
+                                .put("name", plan.name()).put("style", plan.style()).put("units", plan.units())
+                                .put("sizeX", plan.sizeX()).put("sizeY", plan.sizeY()).put("sizeZ", plan.sizeZ())
+                                .put("blocks", plan.blockCount()).build())));
+                case "POST /api/blueprints" -> withLogin(request, login -> action(request, body -> game.call(() -> {
+                    try {
+                        byte[] bytes = java.util.Base64.getDecoder().decode(body.getOrDefault("data", ""));
+                        return civ.construction().importPlan(body.getOrDefault("name", ""), bytes);
+                    } catch (IllegalArgumentException e) {
+                        return Reply.failure(Message.of(MessageKey.BUILD_PLAN_INVALID, "Base64"));
+                    }
+                }), texts));
                 case "GET /api/friends" -> withLogin(request, login -> HttpResponse.json(200, game.call(() ->
                         friends(login))));
                 case "POST /api/friends" -> withLogin(request, login -> action(request, body -> game.call(() ->

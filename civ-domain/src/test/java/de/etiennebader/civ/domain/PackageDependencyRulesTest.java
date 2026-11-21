@@ -34,6 +34,7 @@ class PackageDependencyRulesTest {
     /** Welche Pakete ein Paket verwenden darf; das eigene Paket ist immer erlaubt. */
     private static final Map<String, Set<String>> ALLOWED_DEPENDENCIES = Map.ofEntries(
             Map.entry("shared", Set.of()),
+            Map.entry("construction", Set.of()),
             Map.entry("actor", Set.of("shared")),
             Map.entry("law", Set.of("shared")),
             Map.entry("territory", Set.of("shared", "actor")),

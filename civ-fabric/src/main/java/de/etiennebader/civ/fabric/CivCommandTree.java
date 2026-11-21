@@ -233,6 +233,7 @@ public final class CivCommandTree {
                                                         caller, StringArgumentType.getString(context, LAW),
                                                         StringArgumentType.getString(context, VALUE))))))))
                 .then(plotCommands())
+                .then(constructionCommands())
                 .then(Commands.literal("laden")
                         .then(Commands.literal("eroeffnen")
                                 .then(Commands.argument(PRICE, StringArgumentType.word())
@@ -1292,6 +1293,38 @@ public final class CivCommandTree {
                                                                   SuggestionsBuilder builder) {
         return SharedSuggestionProvider.suggest(host.current().map(civ -> civ.federations().federationNames())
                 .orElse(List.of()), builder);
+    }
+
+    /** {@code /civ bau}: Baupläne ansehen, Bauaufträge vergeben, Bauamt entscheidet (Issue #19). */
+    private LiteralArgumentBuilder<CommandSourceStack> constructionCommands() {
+        return Commands.literal("bau")
+                .then(Commands.literal("plaene")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.construction().plans())))
+                .then(Commands.literal("liste")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.construction()
+                                .list(Players.caller(player)))))
+                .then(Commands.literal("beauftragen")
+                        .then(Commands.argument(TYPE, StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                        host.current().map(civ -> civ.construction().library().all().stream()
+                                                .map(plan -> plan.name()).toList())
+                                                .orElse(java.util.List.of()), builder))
+                                .then(Commands.argument(COMPANY, StringArgumentType.string())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.construction()
+                                                .order(Players.caller(player), StringArgumentType.getString(context, TYPE),
+                                                        StringArgumentType.getString(context, COMPANY)))))))
+                .then(Commands.literal("genehmigen")
+                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.construction()
+                                        .approve(Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))))
+                .then(Commands.literal("ablehnen")
+                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.construction()
+                                        .reject(Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))))
+                .then(Commands.literal("abbrechen")
+                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.construction()
+                                        .cancel(Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> plotCommands() {
