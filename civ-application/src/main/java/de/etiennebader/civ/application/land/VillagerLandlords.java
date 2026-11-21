@@ -95,7 +95,7 @@ public final class VillagerLandlords {
                 .sorted(Comparator.comparing(plot -> plot.id().value())).toList();
         Money rent = Money.of(rentPerDay(personality), town.currency());
         Optional<Plot> vacant = owned.stream()
-                .filter(plot -> world.leaseOf(town.id(), plot.id()).isEmpty()).findFirst();
+                .filter(plot -> world.hasFreeUnit(town, plot.id())).findFirst();
         if (vacant.isPresent()) {
             Optional<PersonRef> tenant = tenantFor(world, town, landlord, rent);
             if (tenant.isPresent()) {

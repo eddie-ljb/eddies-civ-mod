@@ -145,6 +145,20 @@ public final class WorldQueries {
         return users.stream().anyMatch(user -> user instanceof PlayerRef owner && community.trusts(owner, friend));
     }
 
+    /** Alle geltenden Mietverträge eines Grundstücks (mehrere bei Mehrfamilienhäusern, Issue #19). */
+    public List<Contract> leasesOf(PolityId polity, PlotId plot) {
+        Contract.PlotRef ref = new Contract.PlotRef(polity, plot);
+        return contracts().active().stream()
+                .filter(contract -> contract.kind() == ContractKind.LEASE && contract.plot().filter(ref::equals).isPresent())
+                .toList();
+    }
+
+    /** Ob das Grundstück noch einen Mieter aufnehmen darf, je nach Gesetz {@code max_tenants_per_plot}. */
+    public boolean hasFreeUnit(PolityView polity, PlotId plot) {
+        return leasesOf(polity.id(), plot).size() < effectiveLaws(polity).valueOf(
+                de.etiennebader.civ.domain.law.StandardParameters.MAX_TENANTS_PER_PLOT);
+    }
+
     /** Der geltende Mietvertrag eines Grundstücks. */
     public Optional<Contract> leaseOf(PolityId polity, PlotId plot) {
         Contract.PlotRef ref = new Contract.PlotRef(polity, plot);
