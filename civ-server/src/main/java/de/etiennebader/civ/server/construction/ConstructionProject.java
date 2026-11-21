@@ -6,7 +6,9 @@ import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.territory.DimensionId;
 
+import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 import java.util.OptionalInt;
 import java.util.UUID;
 
@@ -19,11 +21,14 @@ import java.util.UUID;
  * @param total    Zahl der zu setzenden Blöcke
  * @param price    Gesamtpreis in kleinster Währungseinheit, inklusive Material und Lohn der Bauarbeiter
  * @param paid     bisher an die Firma gezahlt
+ * @param rotation Drehung des Plans in Vierteln im Uhrzeigersinn (0 bis 3)
+ * @param selfSupplied ob der Bauherr das Material selbst liefert; dann kostet nur die Arbeit
+ * @param depot    vom Bauherrn gelieferte, noch nicht verbaute Baustoffe (Blockname mit Anzahl)
  */
 public record ConstructionProject(UUID id, int number, PolityId town, PlotId plot, ActorRef client, PolityId builder,
                                   String blueprint, DimensionId dimension, int originX, OptionalInt originY,
                                   int originZ, Status status, int placed, int total, long price, long paid,
-                                  Day orderedOn) {
+                                  Day orderedOn, int rotation, boolean selfSupplied, Map<String, Integer> depot) {
 
     /** Stand des Auftrags. */
     public enum Status {
@@ -51,6 +56,10 @@ public record ConstructionProject(UUID id, int number, PolityId town, PlotId plo
         Objects.requireNonNull(originY, "originY");
         Objects.requireNonNull(status, "status");
         Objects.requireNonNull(orderedOn, "orderedOn");
+        depot = Map.copyOf(new TreeMap<>(depot));
+        if (rotation < 0 || rotation > 3) {
+            throw new IllegalArgumentException("rotation");
+        }
         if (placed < 0 || placed > total || price < 0 || paid < 0) {
             throw new IllegalArgumentException("Werte außerhalb des erlaubten Bereichs");
         }
@@ -58,18 +67,24 @@ public record ConstructionProject(UUID id, int number, PolityId town, PlotId plo
 
     public ConstructionProject withStatus(Status next) {
         return new ConstructionProject(id, number, town, plot, client, builder, blueprint, dimension, originX,
-                originY, originZ, next, placed, total, price, paid, orderedOn);
+                originY, originZ, next, placed, total, price, paid, orderedOn, rotation, selfSupplied, depot);
     }
 
     public ConstructionProject withOriginY(int y) {
         return new ConstructionProject(id, number, town, plot, client, builder, blueprint, dimension, originX,
-                OptionalInt.of(y), originZ, status, placed, total, price, paid, orderedOn);
+                OptionalInt.of(y), originZ, status, placed, total, price, paid, orderedOn, rotation, selfSupplied, depot);
+    }
+
+    public ConstructionProject withDepot(Map<String, Integer> next) {
+        return new ConstructionProject(id, number, town, plot, client, builder, blueprint, dimension, originX,
+                originY, originZ, status, placed, total, price, paid, orderedOn, rotation, selfSupplied, next);
     }
 
     /** Nach {@code count} weiteren Blöcken und einer Zahlung; fertig, wenn alle Blöcke stehen. */
-    public ConstructionProject progressed(int count, long payment) {
+    public ConstructionProject progressed(int count, long payment, Map<String, Integer> newDepot) {
         int next = placed + count;
         return new ConstructionProject(id, number, town, plot, client, builder, blueprint, dimension, originX,
-                originY, originZ, next >= total ? Status.DONE : status, next, total, price, paid + payment, orderedOn);
+                originY, originZ, next >= total ? Status.DONE : status, next, total, price, paid + payment, orderedOn, rotation, selfSupplied,
+                newDepot);
     }
 }

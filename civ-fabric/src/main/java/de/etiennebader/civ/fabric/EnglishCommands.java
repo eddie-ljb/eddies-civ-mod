@@ -51,7 +51,7 @@ final class EnglishCommands {
             Map.entry("kuendigen", "terminate"),
             Map.entry("laden", "shop"), Map.entry("lager", "stock"), Map.entry("land", "state"),
             Map.entry("leeren", "clear"), Map.entry("lesen", "read"), Map.entry("liste", "list"),
-            Map.entry("menue", "menu"), Map.entry("miete", "lease"), Map.entry("misstrauen", "distrust"),
+            Map.entry("material", "material"), Map.entry("menue", "menu"), Map.entry("miete", "lease"), Map.entry("misstrauen", "distrust"),
             Map.entry("nachricht", "message"), Map.entry("nein", "no"), Map.entry("parlament", "parliament"),
             Map.entry("partei", "party"), Map.entry("plaedoyer", "plead"), Map.entry("post", "mail"),
             Map.entry("programmodus", "programmode"),

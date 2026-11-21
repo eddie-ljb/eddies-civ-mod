@@ -1310,9 +1310,35 @@ public final class CivCommandTree {
                                                 .map(plan -> plan.name()).toList())
                                                 .orElse(java.util.List.of()), builder))
                                 .then(Commands.argument(COMPANY, StringArgumentType.string())
-                                        .executes(context -> withCiv(context, (civ, player) -> civ.construction()
-                                                .order(Players.caller(player), StringArgumentType.getString(context, TYPE),
-                                                        StringArgumentType.getString(context, COMPANY)))))))
+                                        .executes(context -> order(context, false, 0))
+                                        .then(Commands.literal("material")
+                                                .then(Commands.literal("firma")
+                                                        .executes(context -> order(context, false, 0))
+                                                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(0, 270))
+                                                                .executes(context -> order(context, false,
+                                                                        IntegerArgumentType.getInteger(context, COUNT)))))
+                                                .then(Commands.literal("selbst")
+                                                        .executes(context -> order(context, true, 0))
+                                                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(0, 270))
+                                                                .executes(context -> order(context, true,
+                                                                        IntegerArgumentType.getInteger(context, COUNT))))))
+                                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(0, 270))
+                                                .executes(context -> order(context, false,
+                                                        IntegerArgumentType.getInteger(context, COUNT)))))))
+                .then(Commands.literal("material")
+                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                                .executes(context -> withCiv(context, (civ, player) -> {
+                                    int number = IntegerArgumentType.getInteger(context, NUMBER);
+                                    int given = ConstructionSites.deliver(player, civ, number);
+                                    Reply left = civ.construction().materials(Players.caller(player), number);
+                                    if (given == 0) {
+                                        return left;
+                                    }
+                                    java.util.List<Message> lines = new java.util.ArrayList<>();
+                                    lines.add(Message.of(MessageKey.BUILD_DELIVERED, given, number));
+                                    lines.addAll(left.lines());
+                                    return left.success() ? Reply.success(lines) : left;
+                                }))))
                 .then(Commands.literal("genehmigen")
                         .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.construction()
@@ -1325,6 +1351,13 @@ public final class CivCommandTree {
                         .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.construction()
                                         .cancel(Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))));
+    }
+
+    private int order(CommandContext<CommandSourceStack> context, boolean selfSupplied, int degrees)
+            throws CommandSyntaxException {
+        return withCiv(context, (civ, player) -> civ.construction().order(Players.caller(player),
+                StringArgumentType.getString(context, TYPE), StringArgumentType.getString(context, COMPANY),
+                selfSupplied, degrees));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> plotCommands() {

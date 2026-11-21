@@ -14,22 +14,33 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.npc.villager.Villager;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Setzt die Blöcke der Bauaufträge (Issue #19) sichtbar Stück für Stück in die Welt. Alle {@value #INTERVAL} Ticks
  * fragt es den {@link ConstructionService}, was die Bauarbeiter seither geschafft haben, und setzt das in geladenen
- * Chunks. Auf nicht geladenem Gelände ruht die Baustelle.
+ * Chunks. Die Bauarbeiter (angestellte Dorfbewohner) laufen zur Baustelle und schwingen den Arm. Unter der untersten
+ * Ebene wird bis zum Boden ein Fundament aus demselben Block gegossen. Nichts Gebautes wird überschrieben: das
+ * Baufeld muss frei sein, bevor die Arbeit beginnt, und einzelne Blöcke werden nur über Luft, Pflanzen, Laub und
+ * Holz gesetzt.
  */
 final class ConstructionSites {
 
     private static final int INTERVAL = 40;
+    private static final int MAX_FOUNDATION = 12;
 
     private final Map<String, BlockState> parsed = new HashMap<>();
     private int ticks;
@@ -40,8 +51,7 @@ final class ConstructionSites {
         }
         long elapsed = ticks;
         ticks = 0;
-        for (ConstructionService.Build build : civ.construction().advance(elapsed,
-                position -> isLoaded(server, position), position -> surface(server, position))) {
+        for (ConstructionService.Build build : civ.construction().advance(elapsed, terrain(server))) {
             place(server, build);
         }
     }
@@ -52,15 +62,49 @@ final class ConstructionSites {
                 : Optional.ofNullable(server.getLevel(ResourceKey.create(Registries.DIMENSION, dimension)));
     }
 
-    private static boolean isLoaded(MinecraftServer server, BlockPosition position) {
-        return levelOf(server, position).map(level -> level.isLoaded(new BlockPos(position.x(), 64, position.z())))
-                .orElse(false);
+    private static ConstructionService.Terrain terrain(MinecraftServer server) {
+        return new ConstructionService.Terrain() {
+            @Override
+            public boolean isLoaded(BlockPosition position) {
+                return levelOf(server, position)
+                        .map(level -> level.isLoaded(new BlockPos(position.x(), 64, position.z()))).orElse(false);
+            }
+
+            @Override
+            public int groundLevel(BlockPosition min, int sizeX, int sizeZ) {
+                ServerLevel level = levelOf(server, min).orElseThrow();
+                int highest = level.getMinY();
+                for (int x = 0; x < sizeX; x++) {
+                    for (int z = 0; z < sizeZ; z++) {
+                        highest = Math.max(highest, level.getHeight(Heightmap.Types.WORLD_SURFACE, min.x() + x,
+                                min.z() + z));
+                    }
+                }
+                return highest;
+            }
+
+            @Override
+            public boolean isClear(BlockPosition min, int sizeX, int sizeY, int sizeZ) {
+                ServerLevel level = levelOf(server, min).orElseThrow();
+                BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+                for (int y = 0; y < sizeY; y++) {
+                    for (int x = 0; x < sizeX; x++) {
+                        for (int z = 0; z < sizeZ; z++) {
+                            pos.set(min.x() + x, min.y() + y, min.z() + z);
+                            if (!replaceable(level.getBlockState(pos))) {
+                                return false;
+                            }
+                        }
+                    }
+                }
+                return true;
+            }
+        };
     }
 
-    private static int surface(MinecraftServer server, BlockPosition position) {
-        return levelOf(server, position)
-                .map(level -> level.getHeight(Heightmap.Types.WORLD_SURFACE, position.x(), position.z()))
-                .orElse(64);
+    /** Luft, Pflanzen und andere ersetzbare Blöcke, Laub und Holz (Bäume) darf ein Bau verdrängen. */
+    private static boolean replaceable(BlockState state) {
+        return state.isAir() || state.canBeReplaced() || state.is(BlockTags.LEAVES) || state.is(BlockTags.LOGS);
     }
 
     private void place(MinecraftServer server, ConstructionService.Build build) {
@@ -69,30 +113,93 @@ final class ConstructionSites {
             return;
         }
         ServerLevel level = found.get();
+        Rotation rotation = switch (build.rotation()) {
+            case 1 -> Rotation.CLOCKWISE_90;
+            case 2 -> Rotation.CLOCKWISE_180;
+            case 3 -> Rotation.COUNTERCLOCKWISE_90;
+            default -> Rotation.NONE;
+        };
         BlockPos last = null;
         for (Blueprint.Placement placement : build.blocks()) {
             BlockState state = stateOf(placement.state());
             BlockPos pos = new BlockPos(build.origin().x() + placement.x(), build.origin().y() + placement.y(),
                     build.origin().z() + placement.z());
-            if (level.isLoaded(pos) && state != null) {
-                level.setBlock(pos, state, Block.UPDATE_ALL);
-                last = pos;
+            if (state == null || !level.isLoaded(pos) || !replaceable(level.getBlockState(pos))) {
+                continue;
             }
+            BlockState turned = state.rotate(rotation);
+            level.setBlock(pos, turned, Block.UPDATE_ALL);
+            if (placement.y() == 0) {
+                foundation(level, pos, turned);
+            }
+            last = pos;
         }
         if (last != null) {
             level.sendParticles(ParticleTypes.CLOUD, last.getX() + 0.5, last.getY() + 1.0, last.getZ() + 0.5, 6, 0.4,
                     0.2, 0.4, 0.01);
+            moveWorkers(level, build, last);
+        }
+    }
+
+    /** Füllt unter der untersten Ebene bis zum festen Boden auf, damit nichts in der Luft hängt. */
+    private static void foundation(ServerLevel level, BlockPos floor, BlockState state) {
+        if (!state.isSolid()) {
+            return;
+        }
+        BlockPos below = floor.below();
+        for (int depth = 0; depth < MAX_FOUNDATION && level.isLoaded(below)
+                && replaceable(level.getBlockState(below)); depth++) {
+            level.setBlock(below, state, Block.UPDATE_ALL);
+            below = below.below();
+        }
+    }
+
+    /** Die Bauarbeiter gehen zur zuletzt gebauten Stelle und schwingen den Arm. */
+    private static void moveWorkers(ServerLevel level, ConstructionService.Build build, BlockPos site) {
+        for (UUID id : build.workers()) {
+            if (level.getEntity(id) instanceof Villager worker) {
+                if (worker.blockPosition().distSqr(site) > 9) {
+                    worker.getNavigation().moveTo(site.getX() + 0.5, site.getY(), site.getZ() + 0.5, 0.6);
+                } else {
+                    worker.swingForAttack(InteractionHand.MAIN_HAND);
+                }
+            }
         }
     }
 
     /** Wandelt einen Blockzustand als Text in einen Zustand um; Unbekanntes wird übersprungen. */
     private BlockState stateOf(String text) {
-        return parsed.computeIfAbsent(text, key -> {
-            try {
-                return BlockStateParser.parseForBlock(BuiltInRegistries.BLOCK, key, false).blockState();
-            } catch (CommandSyntaxException | RuntimeException e) {
-                return null;
+        BlockState cached = parsed.get(text);
+        if (cached != null) {
+            return cached;
+        }
+        try {
+            BlockState state = BlockStateParser.parseForBlock(BuiltInRegistries.BLOCK, text, false).blockState();
+            parsed.put(text, state);
+            return state;
+        } catch (CommandSyntaxException | RuntimeException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Nimmt dem Spieler die Baustoffe ab, die ein Auftrag mit eigenem Material noch braucht.
+     *
+     * @return wie viele Stück abgegeben wurden
+     */
+    static int deliver(ServerPlayer player, CivServer civ, int number) {
+        int total = 0;
+        for (Map.Entry<String, Integer> need : civ.construction().missing(number).entrySet()) {
+            for (ItemStack stack : player.getInventory().getNonEquipmentItems()) {
+                if (stack.isEmpty()
+                        || !BuiltInRegistries.ITEM.getKey(stack.getItem()).toString().equals(need.getKey())) {
+                    continue;
+                }
+                int taken = civ.construction().deliver(Players.ref(player), number, need.getKey(), stack.getCount());
+                stack.shrink(taken);
+                total += taken;
             }
-        });
+        }
+        return total;
     }
 }

@@ -170,7 +170,7 @@ public final class CivServer {
         this.plots = new PlotService(app, calendar, players, texts);
         this.construction = new de.etiennebader.civ.server.construction.ConstructionService(app, calendar, texts,
                 settings.ticksPerDay(), new de.etiennebader.civ.server.construction.BlueprintLibrary(
-                dataDirectory.map(dir -> dir.resolve("blueprints"))), dataDirectory.map(dir -> dir.resolve("construction.tsv")));
+                dataDirectory.map(dir -> dir.resolve("blueprints"))), dataDirectory.map(dir -> dir.resolve("construction.tsv")), announcements);
         this.villagerFederations = new VillagerFederations(app, federations, announcements);
         this.conjuncture = new de.etiennebader.civ.server.conjuncture.ConjunctureService(app.queries());
         this.villagers = new VillagerService(app, settings, texts, announcements, conjuncture, calendar);

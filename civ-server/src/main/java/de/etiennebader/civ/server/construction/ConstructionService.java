@@ -67,13 +67,35 @@ public final class ConstructionService {
     public static final int BLOCKS_PER_WORKER_DAY = 120;
     /** Preis je Block in kleinster Währungseinheit, inklusive Material und Lohn. */
     public static final long PRICE_PER_BLOCK = 25;
+    /** Anteil des Preises, der bei eigenem Material für Arbeit bleibt, in Prozent. */
+    static final int LABOUR_PERCENT = 40;
+    /** Ticks, nach denen ein blockiertes Baufeld erneut geprüft wird. */
+    static final long RECHECK_TICKS = 600;
     /** Höchstens so viele Blöcke je Aufruf von {@link #advance} und Baustelle. */
     static final int MAX_BLOCKS_PER_CALL = 200;
     /** Tageswahrscheinlichkeit, dass ein Dorfbewohner einen Bau in Auftrag gibt. */
     static final double VILLAGER_ORDERS = 0.2;
 
-    /** Zu setzende Blöcke einer Baustelle, in Weltkoordinaten. */
-    public record Build(UUID project, BlockPosition origin, List<Blueprint.Placement> blocks) {
+    /**
+     * Zu setzende Blöcke einer Baustelle. Die Blöcke liegen bereits gedreht relativ zur Ecke {@code origin}; das Spiel
+     * dreht nur noch die Blockzustände um {@code rotation} Vierteldrehungen.
+     *
+     * @param workers die Bauarbeiter (Angestellte der Firma), die sichtbar zur Baustelle gehen sollen
+     */
+    public record Build(UUID project, BlockPosition origin, int rotation, List<Blueprint.Placement> blocks,
+                        List<UUID> workers) {
+    }
+
+    /** Was das Spiel über das Gelände einer Baustelle weiß. */
+    public interface Terrain {
+
+        boolean isLoaded(BlockPosition position);
+
+        /** Höchste Geländehöhe (erste freie Ebene über dem Boden) im Rechteck; die unterste Ebene des Plans liegt dort. */
+        int groundLevel(BlockPosition min, int sizeX, int sizeZ);
+
+        /** Ob im Quader nur Luft und Natur (Pflanzen, Laub, Holz) stehen, also nichts Gebautes überschrieben würde. */
+        boolean isClear(BlockPosition min, int sizeX, int sizeY, int sizeZ);
     }
 
     private final CivApplication app;
@@ -84,11 +106,16 @@ public final class ConstructionService {
     private final ProjectStore store;
     private final Map<UUID, ConstructionProject> projects = new java.util.LinkedHashMap<>();
     private final Map<UUID, Double> carry = new HashMap<>();
+    private final Map<UUID, Long> blockedUntil = new HashMap<>();
+    private final de.etiennebader.civ.server.Announcements announcements;
+    private long clock;
     private final long ticksPerDay;
     private int lastNumber;
 
     public ConstructionService(CivApplication app, de.etiennebader.civ.application.day.Calendar calendar, Texts texts,
-                               long ticksPerDay, BlueprintLibrary library, Optional<java.nio.file.Path> file) {
+                               long ticksPerDay, BlueprintLibrary library, Optional<java.nio.file.Path> file,
+                               de.etiennebader.civ.server.Announcements announcements) {
+        this.announcements = Objects.requireNonNull(announcements, "announcements");
         this.ticksPerDay = ticksPerDay;
         this.app = Objects.requireNonNull(app, "app");
         this.queries = app.queries();
@@ -114,6 +141,20 @@ public final class ConstructionService {
 
     /** Beauftragt die Baufirma, auf dem Grundstück unter dem Spieler zu bauen. */
     public synchronized Reply order(Caller caller, String planName, String firmName) {
+        return order(caller, planName, firmName, false, 0);
+    }
+
+    /**
+     * Wie {@link #order(Caller, String, String)}, aber mit Wahl des Materials und der Drehung.
+     *
+     * @param selfSupplied ob der Bauherr das Material selbst liefert ({@link #deliver}); dann kostet nur die Arbeit
+     * @param degrees      Drehung des Plans: 0, 90, 180 oder 270 Grad im Uhrzeigersinn
+     */
+    public synchronized Reply order(Caller caller, String planName, String firmName, boolean selfSupplied,
+                                    int degrees) {
+        if (degrees < 0 || degrees % 90 != 0 || degrees > 270) {
+            return Reply.failure(Message.of(MessageKey.BUILD_BAD_ROTATION));
+        }
         Optional<Blueprint> plan = library.find(planName);
         if (plan.isEmpty()) {
             return Reply.failure(Message.of(MessageKey.BUILD_UNKNOWN_PLAN, planName.strip()));
@@ -131,7 +172,7 @@ public final class ConstructionService {
         }
         try {
             ConstructionProject project = place(caller.player(), town.get(), plot.get(), plan.get(), firm.get(),
-                    calendar.today());
+                    calendar.today(), selfSupplied, degrees / 90);
             Message price = texts.money(Money.of(project.price(), firm.get().currency()));
             return Reply.success(Message.of(project.status() == ConstructionProject.Status.AWAITING_PERMIT
                             ? MessageKey.BUILD_ORDERED_PERMIT : MessageKey.BUILD_ORDERED, project.number(),
@@ -219,7 +260,7 @@ public final class ConstructionService {
      * @throws BuildRefused wenn Inhaber, Firma oder Größe nicht stimmen
      */
     private ConstructionProject place(ActorRef client, PolityId townId, Plot plot, Blueprint plan, PolityView firm,
-                                      Day day) {
+                                      Day day, boolean selfSupplied, int rotation) {
         PolityView town = queries.polity(townId).orElseThrow();
         boolean holder = plot.holder().equals(client);
         boolean townPlot = plot.holder().equals(town.asActor()) && mayDecide(client, townId);
@@ -229,18 +270,24 @@ public final class ConstructionService {
         if (queries.production().enterpriseOf(firm.id()).map(e -> e.branch() != Branch.CONSTRUCTION).orElse(true)) {
             throw new BuildRefused(Message.of(MessageKey.BUILD_NOT_CONSTRUCTION, firm.name().value()));
         }
-        if (plan.sizeX() > plot.area().width() || plan.sizeZ() > plot.area().depth()) {
-            throw new BuildRefused(Message.of(MessageKey.BUILD_TOO_BIG, plan.name(), plan.sizeX(), plan.sizeZ(),
+        int footprintX = plan.footprintX(rotation);
+        int footprintZ = plan.footprintZ(rotation);
+        if (footprintX > plot.area().width() || footprintZ > plot.area().depth()) {
+            throw new BuildRefused(Message.of(MessageKey.BUILD_TOO_BIG, plan.name(), footprintX, footprintZ,
                     plot.area().width(), plot.area().depth()));
         }
         if (projects.values().stream().anyMatch(p -> p.plot().equals(plot.id()) && p.status().isActive())) {
             throw new BuildRefused(Message.of(MessageKey.BUILD_ALREADY));
         }
         boolean permit = queries.effectiveLaws(town).valueOf(StandardParameters.BUILD_PERMIT_REQUIRED);
+        int originX = plot.area().minX() + (int) ((plot.area().width() - footprintX) / 2);
+        int originZ = plot.area().minZ() + (int) ((plot.area().depth() - footprintZ) / 2);
+        long price = selfSupplied ? priceOf(plan) * LABOUR_PERCENT / 100 : priceOf(plan);
         ConstructionProject project = new ConstructionProject(UUID.randomUUID(), ++lastNumber, townId, plot.id(),
-                client, firm.id(), plan.name(), plot.area().dimension(), plot.area().minX(), OptionalInt.empty(),
-                plot.area().minZ(), permit ? ConstructionProject.Status.AWAITING_PERMIT
-                : ConstructionProject.Status.BUILDING, 0, plan.blockCount(), priceOf(plan), 0, day);
+                client, firm.id(), plan.name(), plot.area().dimension(), originX, OptionalInt.empty(),
+                originZ, permit ? ConstructionProject.Status.AWAITING_PERMIT
+                : ConstructionProject.Status.BUILDING, 0, plan.blockCount(), price, 0, day, rotation, selfSupplied,
+                Map.of());
         put(project);
         return project;
     }
@@ -292,14 +339,15 @@ public final class ConstructionService {
     /**
      * Gibt die Blöcke zurück, die jetzt zu setzen sind. Das Spiel setzt sie und ruft dies regelmäßig auf.
      *
-     * @param ticks    vergangene Spielticks seit dem letzten Aufruf
-     * @param loaded   ob die Baustelle geladen ist; sonst ruht sie
-     * @param surfaceY Geländehöhe an einer Position, wird einmal je Baustelle gebraucht
+     * <p>Eine Baustelle ruht, solange ihr Gelände nicht geladen ist, solange das Baufeld nicht frei ist (der Bauherr
+     * erfährt davon), solange bei eigenem Material Baustoffe fehlen oder dem Bauherrn das Geld fehlt.
+     *
+     * @param ticks vergangene Spielticks seit dem letzten Aufruf
      */
-    public synchronized List<Build> advance(long ticks, Predicate<BlockPosition> loaded,
-                                            ToIntFunction<BlockPosition> surfaceY) {
+    public synchronized List<Build> advance(long ticks, Terrain terrain) {
+        clock += ticks;
         List<Build> builds = new ArrayList<>();
-        long ticksPerDay = Math.max(1, this.ticksPerDay);
+        long perDay = Math.max(1, this.ticksPerDay);
         for (ConstructionProject project : new ArrayList<>(projects.values())) {
             if (project.status() != ConstructionProject.Status.BUILDING) {
                 continue;
@@ -310,20 +358,45 @@ public final class ConstructionService {
                 put(project.withStatus(ConstructionProject.Status.CANCELLED));
                 continue;
             }
-            BlockPosition ground = new BlockPosition(project.dimension(), project.originX(), 0, project.originZ());
-            if (!loaded.test(ground)) {
+            int fx = plan.get().footprintX(project.rotation());
+            int fz = plan.get().footprintZ(project.rotation());
+            BlockPosition corner = new BlockPosition(project.dimension(), project.originX(), 0, project.originZ());
+            BlockPosition far = new BlockPosition(project.dimension(), project.originX() + fx - 1, 0,
+                    project.originZ() + fz - 1);
+            if (!terrain.isLoaded(corner) || !terrain.isLoaded(far)) {
                 continue;
             }
             ConstructionProject current = project;
-            if (current.originY().isEmpty()) {
-                current = current.withOriginY(surfaceY.applyAsInt(ground));
+            if (current.placed() == 0 && blockedUntil.getOrDefault(current.id(), 0L) <= clock) {
+                int y = terrain.groundLevel(corner, fx, fz);
+                BlockPosition min = new BlockPosition(project.dimension(), project.originX(), y, project.originZ());
+                if (!terrain.isClear(min, fx, plan.get().sizeY(), fz)) {
+                    blockedUntil.put(current.id(), clock + RECHECK_TICKS);
+                    if (current.client() instanceof PlayerRef player) {
+                        announcements.add(de.etiennebader.civ.server.Announcement.toPlayer(player,
+                                Message.of(MessageKey.BUILD_SITE_BLOCKED, current.number())));
+                    }
+                    continue;
+                }
+                blockedUntil.remove(current.id());
+                current = current.withOriginY(y);
                 put(current);
             }
+            if (current.originY().isEmpty() || blockedUntil.containsKey(current.id())) {
+                continue;
+            }
             double budget = carry.getOrDefault(current.id(), 0.0)
-                    + (double) workers(firm.get()) * BLOCKS_PER_WORKER_DAY * ticks / ticksPerDay;
-            int count = (int) Math.min(Math.min(budget, MAX_BLOCKS_PER_CALL), current.total() - current.placed());
-            if (count <= 0) {
+                    + (double) Math.max(1, workers(firm.get()).size()) * BLOCKS_PER_WORKER_DAY * ticks / perDay;
+            int wanted = (int) Math.min(Math.min(budget, MAX_BLOCKS_PER_CALL), current.total() - current.placed());
+            if (wanted <= 0) {
                 carry.put(current.id(), budget);
+                continue;
+            }
+            List<Blueprint.Placement> next = plan.get().placements(current.placed(), wanted);
+            Map<String, Integer> depot = new java.util.TreeMap<>(current.depot());
+            int count = current.selfSupplied() ? coveredBy(next, depot) : next.size();
+            if (count <= 0) {
+                carry.put(current.id(), Math.min(budget, MAX_BLOCKS_PER_CALL));
                 continue;
             }
             long due = current.price() * (current.placed() + count) / current.total() - current.paid();
@@ -331,13 +404,104 @@ public final class ConstructionService {
                 carry.put(current.id(), Math.min(budget, MAX_BLOCKS_PER_CALL));
                 continue;
             }
-            List<Blueprint.Placement> blocks = plan.get().placements(current.placed(), count);
+            List<Blueprint.Placement> blocks = new ArrayList<>(count);
+            for (int i = 0; i < count; i++) {
+                blocks.add(plan.get().rotated(next.get(i), project.rotation()));
+            }
             carry.put(current.id(), budget - count);
-            put(current.progressed(blocks.size(), Math.max(0, due)));
+            put(current.progressed(blocks.size(), Math.max(0, due), depot));
             builds.add(new Build(current.id(), new BlockPosition(current.dimension(), current.originX(),
-                    current.originY().orElseThrow(), current.originZ()), blocks));
+                    current.originY().orElseThrow(), current.originZ()), current.rotation(), blocks,
+                    workers(firm.get()).stream().map(ActorRef::uuid).toList()));
         }
         return builds;
+    }
+
+    /** Wie viele der nächsten Blöcke aus dem Lager gedeckt sind; verbraucht die Baustoffe im {@code depot}. */
+    private static int coveredBy(List<Blueprint.Placement> next, Map<String, Integer> depot) {
+        int covered = 0;
+        for (Blueprint.Placement placement : next) {
+            if (Blueprint.needsItem(placement.state())) {
+                String item = Blueprint.baseName(placement.state());
+                int have = depot.getOrDefault(item, 0);
+                if (have <= 0) {
+                    break;
+                }
+                depot.put(item, have - 1);
+            }
+            covered++;
+        }
+        return covered;
+    }
+
+    /**
+     * Der Bauherr liefert Baustoffe für einen Auftrag mit eigenem Material.
+     *
+     * @return wie viele Stück das Lager aufgenommen hat; überzählige gibt das Spiel zurück
+     */
+    public synchronized int deliver(PlayerRef player, int number, String item, int count) {
+        Optional<ConstructionProject> project = byNumber(number)
+                .filter(found -> found.status().isActive() && found.selfSupplied()
+                        && found.client().equals(player));
+        Optional<Blueprint> plan = project.flatMap(found -> library.find(found.blueprint()));
+        if (plan.isEmpty() || count <= 0) {
+            return 0;
+        }
+        int needed = plan.get().materials().getOrDefault(item, 0);
+        int open = needed - usedOf(project.get(), plan.get(), item) - project.get().depot().getOrDefault(item, 0);
+        int taken = Math.max(0, Math.min(count, open));
+        if (taken > 0) {
+            Map<String, Integer> depot = new java.util.TreeMap<>(project.get().depot());
+            depot.merge(item, taken, Integer::sum);
+            put(project.get().withDepot(depot));
+        }
+        return taken;
+    }
+
+    /** Wie viele Stück einer Sorte für die schon gesetzten Blöcke verbraucht wurden. */
+    private static int usedOf(ConstructionProject project, Blueprint plan, String item) {
+        int used = 0;
+        for (Blueprint.Placement placement : plan.placements(0, project.placed())) {
+            if (Blueprint.needsItem(placement.state()) && Blueprint.baseName(placement.state()).equals(item)) {
+                used++;
+            }
+        }
+        return used;
+    }
+
+    /** Was für einen Auftrag mit eigenem Material noch fehlt: Blockname mit Anzahl. */
+    public synchronized Map<String, Integer> missing(int number) {
+        Map<String, Integer> missing = new java.util.TreeMap<>();
+        byNumber(number).filter(found -> found.status().isActive() && found.selfSupplied()).ifPresent(project ->
+                library.find(project.blueprint()).ifPresent(plan -> plan.materials().forEach((item, total) -> {
+                    int open = total - usedOf(project, plan, item) - project.depot().getOrDefault(item, 0);
+                    if (open > 0) {
+                        missing.put(item, open);
+                    }
+                })));
+        return missing;
+    }
+
+    /** Nummern der aktiven Aufträge dieses Spielers mit eigenem Material. */
+    public synchronized List<Integer> selfSuppliedOf(PlayerRef player) {
+        return projects.values().stream().filter(project -> project.status().isActive() && project.selfSupplied()
+                && project.client().equals(player)).map(ConstructionProject::number).toList();
+    }
+
+    /** Textzeilen zu dem, was noch fehlt. */
+    public synchronized Reply materials(Caller caller, int number) {
+        Optional<ConstructionProject> project = byNumber(number)
+                .filter(found -> found.client().equals(caller.player()) && found.status().isActive());
+        if (project.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.BUILD_UNKNOWN_PROJECT, number));
+        }
+        if (!project.get().selfSupplied()) {
+            return Reply.failure(Message.of(MessageKey.BUILD_FIRM_SUPPLIES, number));
+        }
+        List<Message> lines = new ArrayList<>();
+        missing(number).forEach((item, open) -> lines.add(Message.of(MessageKey.BUILD_MATERIAL_LINE, item, open)));
+        return lines.isEmpty() ? Reply.success(Message.of(MessageKey.BUILD_MATERIAL_COMPLETE, number))
+                : Reply.success(lines);
     }
 
     private boolean pay(ConstructionProject project, PolityView firm, long amount) {
@@ -350,12 +514,13 @@ public final class ConstructionService {
         }
     }
 
-    /** Beschäftigte der Firma; der Chef arbeitet immer mit. */
-    private int workers(PolityView firm) {
-        long employees = queries.contracts().active().stream()
+    /** Beschäftigte der Firma (Bauarbeiter); der Chef arbeitet immer mit, ist aber nicht darunter, wenn er allein ist. */
+    private List<ActorRef> workers(PolityView firm) {
+        List<ActorRef> employees = queries.contracts().active().stream()
                 .filter(contract -> contract.kind() == ContractKind.EMPLOYMENT
-                        && contract.offeror().equals(firm.asActor())).count();
-        return (int) Math.max(1, employees);
+                        && contract.offeror().equals(firm.asActor()))
+                .map(de.etiennebader.civ.domain.contract.Contract::payee).toList();
+        return employees.isEmpty() ? List.of() : employees;
     }
 
     // ------------------------------------------------------------------ Dorfbewohner
@@ -428,7 +593,7 @@ public final class ConstructionService {
             return false;
         }
         try {
-            place(villager, town.id(), plot, affordable.get(), firm, day);
+            place(villager, town.id(), plot, affordable.get(), firm, day, false, 0);
             return true;
         } catch (BuildRefused | DomainException e) {
             return false;

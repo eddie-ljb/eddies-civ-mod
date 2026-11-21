@@ -75,7 +75,24 @@ final class ProjectStore {
                 p.originY().isPresent() ? Integer.toString(p.originY().getAsInt()) : "-",
                 Integer.toString(p.originZ()), p.status().name(), Integer.toString(p.placed()),
                 Integer.toString(p.total()), Long.toString(p.price()), Long.toString(p.paid()),
-                Long.toString(p.orderedOn().value()));
+                Long.toString(p.orderedOn().value()), Integer.toString(p.rotation()),
+                p.selfSupplied() ? "1" : "0", depotText(p.depot()));
+    }
+
+    private static String depotText(java.util.Map<String, Integer> depot) {
+        return depot.entrySet().stream().map(e -> e.getKey() + "=" + e.getValue())
+                .collect(java.util.stream.Collectors.joining(";"));
+    }
+
+    private static java.util.Map<String, Integer> depotOf(String text) {
+        java.util.Map<String, Integer> depot = new java.util.TreeMap<>();
+        for (String entry : text.split(";")) {
+            int eq = entry.indexOf('=');
+            if (eq > 0) {
+                depot.put(entry.substring(0, eq), Integer.parseInt(entry.substring(eq + 1)));
+            }
+        }
+        return depot;
     }
 
     private static ConstructionProject parse(String line) {
@@ -85,6 +102,8 @@ final class ProjectStore {
                 new PolityId(UUID.fromString(f[5])), f[6], new DimensionId(f[7]), Integer.parseInt(f[8]),
                 f[9].equals("-") ? OptionalInt.empty() : OptionalInt.of(Integer.parseInt(f[9])),
                 Integer.parseInt(f[10]), ConstructionProject.Status.valueOf(f[11]), Integer.parseInt(f[12]),
-                Integer.parseInt(f[13]), Long.parseLong(f[14]), Long.parseLong(f[15]), Day.of(Long.parseLong(f[16])));
+                Integer.parseInt(f[13]), Long.parseLong(f[14]), Long.parseLong(f[15]), Day.of(Long.parseLong(f[16])),
+                f.length > 17 ? Integer.parseInt(f[17]) : 0, f.length > 18 && f[18].equals("1"),
+                f.length > 19 ? depotOf(f[19]) : java.util.Map.of());
     }
 }

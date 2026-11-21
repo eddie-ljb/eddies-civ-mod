@@ -354,6 +354,7 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
       <a href="#justiz">Justiz</a>
       <a href="#post">Post<span class="badge" id="b-post"></span></a>
       <a href="#chat">Chat<span class="badge" id="b-chat"></span></a>
+      <a href="#bauen">Bauen</a>
       <a href="#freunde">Freunde<span class="badge" id="b-friends"></span></a>
       <a href="#ich">Mein Bereich<span class="badge" id="b-me"></span></a>
     </nav>
@@ -596,6 +597,17 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
     <div class="msg err" id="chatmsg"></div>
   </section>
 
+  <section data-page="bauen">
+    <div class="pagehead"><div><h2>Bauen</h2><p>Baupläne für Baufirmen. Beauftragt wird im Spiel mit <code>/civ bau beauftragen</code>. Eigene Pläne lädst du hier als Litematica (<code>.litematic</code>) oder Sponge Schematic (<code>.schem</code>, z. B. aus WorldEdit) hoch; der Dateiname ist der Planname.</p></div></div>
+    <div data-locked></div>
+    <form class="row" id="planform" data-unlocked>
+      <input type="file" id="planfile" accept=".litematic,.schem" aria-label="Bauplandatei">
+      <button class="btn primary">Plan hochladen</button>
+    </form>
+    <div class="msg" id="planmsg"></div>
+    <div id="planlist"></div>
+  </section>
+
   <section data-page="freunde">
     <div class="pagehead">
       <div><h2>Freunde</h2><p>Eine Anfrage wird zur Freundschaft, sobald beide Seiten zugestimmt haben.</p></div>
@@ -743,7 +755,7 @@ const head = name => el("img", { className: "avatar", alt: "", loading: "lazy", 
 const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
 /* Seiten */
-const pages = ["start", "welt", "karte", "wahlen", "markt", "boerse", "presse", "staat", "justiz", "post", "chat", "freunde", "ich"];
+const pages = ["start", "welt", "karte", "wahlen", "markt", "boerse", "presse", "staat", "justiz", "post", "chat", "bauen", "freunde", "ich"];
 let page = "start";
 function route() {
   const wanted = location.hash.slice(1).split("/")[0];
@@ -752,7 +764,7 @@ function route() {
   document.querySelectorAll(".nav a").forEach(a => { if (a.getAttribute("href") === "#" + page) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
   const loaders = { start: loadStart, welt: loadWorld, karte: openMap, wahlen: loadElections, markt: loadMarket,
     boerse: loadExchange, presse: loadPress, staat: loadState, justiz: loadJustice, post: loadLetters,
-    chat: openChat, freunde: loadFriends, ich: loadMe };
+    chat: openChat, bauen: loadPlans, freunde: loadFriends, ich: loadMe };
   loaders[page]();
   if (page !== "chat") stopChat();
   if (page !== "staat") clearTimeout(stateTimer);
@@ -1751,6 +1763,30 @@ $("chatform").addEventListener("submit", async e => {
   if (!text) return;
   const r = await api("/api/chat", channel ? { text, to: channel } : { text });
   if (r.ok) { $("chatinput").value = ""; say("chatmsg", "", true); pollChat(); } else say("chatmsg", r.data.message || r.data.error, false);
+});
+
+/* Bauen */
+async function loadPlans() {
+  const user = await refreshMe();
+  locked("bauen", !user);
+  const r = await api("/api/blueprints");
+  if (!r.ok) return;
+  const table = el("table", {}, el("thead", {}, el("tr", {}, ...["Plan", "Stil", "Größe (B x H x T)", "Blöcke", "Einheiten"].map(h => el("th", { textContent: h })))),
+    el("tbody", {}, ...r.data.map(p => el("tr", {}, el("td", { textContent: p.name }), el("td", { textContent: p.style }),
+      el("td", { textContent: p.sizeX + " x " + p.sizeY + " x " + p.sizeZ }), el("td", { textContent: p.blocks }), el("td", { textContent: p.units })))));
+  $("planlist").replaceChildren(r.data.length ? table : el("div", { className: "empty", textContent: "Noch keine Pläne." }));
+}
+$("planform").addEventListener("submit", async e => {
+  e.preventDefault();
+  const file = $("planfile").files[0];
+  if (!file) return say("planmsg", "Wähle zuerst eine Datei.", false);
+  if (file.size > 4 * 1024 * 1024) return say("planmsg", "Die Datei ist größer als 4 MB.", false);
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  const r = await api("/api/blueprints", { name: file.name, data: btoa(binary) });
+  say("planmsg", r.data.message || r.data.error, r.ok);
+  if (r.ok) { $("planfile").value = ""; loadPlans(); }
 });
 
 /* Freunde */

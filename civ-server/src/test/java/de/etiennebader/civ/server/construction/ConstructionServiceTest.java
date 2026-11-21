@@ -30,6 +30,27 @@ class ConstructionServiceTest {
     private final PlayerRef alice = new PlayerRef(PlayerId.generate(ids));
     private final Caller aliceAt = new Caller(alice, "Alice", new BlockPosition(DimensionId.OVERWORLD, 8, 64, 8));
 
+    /** Ebenes Gelände: alles geladen, Höhe fest, Baufeld frei oder nicht. */
+    private record Flat(boolean loaded, boolean clear, int ground) implements ConstructionService.Terrain {
+
+        @Override
+        public boolean isLoaded(BlockPosition position) {
+            return loaded;
+        }
+
+        @Override
+        public int groundLevel(BlockPosition min, int sizeX, int sizeZ) {
+            return ground;
+        }
+
+        @Override
+        public boolean isClear(BlockPosition min, int sizeX, int sizeY, int sizeZ) {
+            return clear;
+        }
+    }
+
+    private static final Flat FLAT = new Flat(true, true, 70);
+
     private static boolean has(Reply reply, MessageKey key) {
         return reply.lines().stream().anyMatch(line -> line.key().equals(key.key()));
     }
@@ -53,8 +74,7 @@ class ConstructionServiceTest {
         Blueprint plan = server.construction().library().find("holz-huette").orElseThrow();
         int placed = 0;
         for (int step = 0; step < 100 && placed < plan.blockCount(); step++) {
-            for (ConstructionService.Build build : server.construction().advance(2_000, position -> true,
-                    position -> 70)) {
+            for (ConstructionService.Build build : server.construction().advance(2_000, FLAT)) {
                 assertEquals(70, build.origin().y());
                 placed += build.blocks().size();
             }
@@ -70,7 +90,7 @@ class ConstructionServiceTest {
     void unloadedSiteWaits() {
         setUp();
         assertTrue(server.construction().order(aliceAt, "holz-huette", "Bau AG").success());
-        assertTrue(server.construction().advance(100_000, position -> false, position -> 70).isEmpty());
+        assertTrue(server.construction().advance(100_000, new Flat(false, true, 70)).isEmpty());
     }
 
     @Test
@@ -80,9 +100,9 @@ class ConstructionServiceTest {
         assertTrue(server.commands().amendLaw(aliceAt, "build_permit_required", "true").success());
         Reply ordered = server.construction().order(aliceAt, "holz-huette", "Bau AG");
         assertTrue(has(ordered, MessageKey.BUILD_ORDERED_PERMIT), ordered.toString());
-        assertTrue(server.construction().advance(100_000, position -> true, position -> 70).isEmpty());
+        assertTrue(server.construction().advance(100_000, FLAT).isEmpty());
         assertTrue(server.construction().approve(aliceAt, 1).success());
-        assertFalse(server.construction().advance(100_000, position -> true, position -> 70).isEmpty());
+        assertFalse(server.construction().advance(100_000, FLAT).isEmpty());
     }
 
     @Test
@@ -92,6 +112,61 @@ class ConstructionServiceTest {
         assertTrue(has(server.construction().order(aliceAt, "gibtsnicht", "Bau AG"), MessageKey.BUILD_UNKNOWN_PLAN));
         assertTrue(has(server.construction().order(aliceAt, "holz-huette", "Nirgends AG"),
                 MessageKey.BUILD_UNKNOWN_FIRM));
+    }
+
+    @Test
+    @DisplayName("Platzierung: mittig auf dem Grundstück, Drehung vertauscht die Maße und dreht die Blöcke")
+    void centredAndRotated() {
+        setUp();
+        assertTrue(has(server.construction().order(aliceAt, "holz-mehrfamilienhaus", "Bau AG", false, 45),
+                MessageKey.BUILD_BAD_ROTATION));
+        assertTrue(server.construction().order(aliceAt, "holz-mehrfamilienhaus", "Bau AG", false, 90).success());
+        var build = server.construction().advance(2_000, FLAT).getFirst();
+        Blueprint plan = server.construction().library().find("holz-mehrfamilienhaus").orElseThrow();
+        // Grundstück = Chunk 0 (0..15): 7 x 11 nach Drehung, mittig bei (4, 2)
+        assertEquals(4, build.origin().x());
+        assertEquals(2, build.origin().z());
+        assertEquals(1, build.rotation());
+        assertTrue(build.blocks().stream().allMatch(block -> block.x() < plan.sizeZ() && block.z() < plan.sizeX()));
+    }
+
+    @Test
+    @DisplayName("Ist das Baufeld nicht frei, ruht die Baustelle und der Bauherr bekommt eine Nachricht")
+    void blockedSite() {
+        setUp();
+        assertTrue(server.construction().order(aliceAt, "holz-huette", "Bau AG").success());
+        server.takeAnnouncements();
+        assertTrue(server.construction().advance(100_000, new Flat(true, false, 70)).isEmpty());
+        assertTrue(server.takeAnnouncements().stream()
+                .anyMatch(a -> a.message().key().equals(MessageKey.BUILD_SITE_BLOCKED.key())));
+        server.construction().advance(600, FLAT);
+        assertFalse(server.construction().advance(100_000, FLAT).isEmpty(), "nach dem Räumen geht es weiter");
+    }
+
+    @Test
+    @DisplayName("Eigenes Material: nur Arbeit kostet, gebaut wird nur, was geliefert wurde")
+    void selfSuppliedMaterial() {
+        setUp();
+        Blueprint plan = server.construction().library().find("holz-huette").orElseThrow();
+        assertTrue(server.construction().order(aliceAt, "holz-huette", "Bau AG", true, 0).success());
+        var project = server.construction().projects().getFirst();
+        assertEquals(ConstructionService.priceOf(plan) * 40 / 100, project.price());
+        assertTrue(server.construction().advance(100_000, FLAT).isEmpty(), "ohne Material kein Bau");
+        assertFalse(server.construction().missing(1).isEmpty());
+
+        assertEquals(10, server.construction().deliver(alice, 1, "minecraft:spruce_planks", 10));
+        int placed = server.construction().advance(100_000, FLAT).stream().mapToInt(b -> b.blocks().size()).sum();
+        assertEquals(10, placed, "nur so viele Bodenplatten wie geliefert");
+        for (var need : server.construction().missing(1).entrySet()) {
+            server.construction().deliver(alice, 1, need.getKey(), need.getValue());
+        }
+        int rest = 0;
+        for (int step = 0; step < 50; step++) {
+            rest += server.construction().advance(100_000, FLAT).stream().mapToInt(b -> b.blocks().size()).sum();
+        }
+        assertEquals(plan.blockCount(), placed + rest);
+        assertTrue(server.construction().missing(1).isEmpty());
+        assertEquals(ConstructionProject.Status.DONE, server.construction().projects().getFirst().status());
     }
 
     @Test
@@ -115,6 +190,16 @@ class ConstructionServiceTest {
         assertEquals("minecraft:stone", plan.placements().getFirst().state());
         assertThrows(SchematicReader.InvalidSchematicException.class,
                 () -> SchematicReader.read("kaputt.schem", "kaputt", "eigen", new byte[] {1, 2, 3}));
+    }
+
+    @Test
+    @DisplayName("Upload: gültige Datei wird aufgenommen, Müll und Namensdoppel werden abgelehnt")
+    void importsUploads() throws Exception {
+        setUp();
+        assertTrue(server.construction().importPlan("Kiste.schem", spongeFile()).success());
+        assertTrue(server.construction().library().find("kiste").isPresent());
+        assertTrue(has(server.construction().importPlan("holz-haus.schem", spongeFile()), MessageKey.BUILD_PLAN_INVALID));
+        assertTrue(has(server.construction().importPlan("x.schem", new byte[] {1, 2}), MessageKey.BUILD_PLAN_INVALID));
     }
 
     /** Eine 2x1x2-Sponge-v2-Datei: Stein, Stein, Luft, Holz. */

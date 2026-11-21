@@ -111,11 +111,35 @@ public record Blueprint(String name, String style, int units, int sizeX, int siz
     public Map<String, Integer> materials() {
         Map<String, Integer> counts = new LinkedHashMap<>();
         for (int index : blocks) {
-            if (index != 0) {
+            if (index != 0 && needsItem(palette.get(index))) {
                 counts.merge(baseName(palette.get(index)), 1, Integer::sum);
             }
         }
         return counts;
+    }
+
+    /** Ob für den Block ein eigener Gegenstand verbraucht wird; die obere Türhälfte gehört zur unteren. */
+    public static boolean needsItem(String state) {
+        return !state.contains("half=upper");
+    }
+
+    /** Größe in Blöcken nach {@code quarters} Vierteldrehungen: bei ungeraden vertauschen sich X und Z. */
+    public int footprintX(int quarters) {
+        return quarters % 2 == 0 ? sizeX : sizeZ;
+    }
+
+    public int footprintZ(int quarters) {
+        return quarters % 2 == 0 ? sizeZ : sizeX;
+    }
+
+    /** Ein Block nach {@code quarters} Vierteldrehungen im Uhrzeigersinn (von oben gesehen). */
+    public Placement rotated(Placement p, int quarters) {
+        return switch (quarters % 4) {
+            case 1 -> new Placement(sizeZ - 1 - p.z(), p.y(), p.x(), p.state());
+            case 2 -> new Placement(sizeX - 1 - p.x(), p.y(), sizeZ - 1 - p.z(), p.state());
+            case 3 -> new Placement(p.z(), p.y(), sizeX - 1 - p.x(), p.state());
+            default -> p;
+        };
     }
 
     /** {@code minecraft:oak_door[half=lower]} wird zu {@code minecraft:oak_door}. */
