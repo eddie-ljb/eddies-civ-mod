@@ -18,6 +18,18 @@ public enum ErrorCode {
     /** Argumente: ungültiger Code. */
     INVALID_CURRENCY_CODE,
 
+    // economy / currencies
+    /** Argumente: Währungscode. */
+    UNKNOWN_CURRENCY,
+    /** Argumente: Währungscode oder Symbol, das schon vergeben ist. */
+    CURRENCY_ALREADY_EXISTS,
+    /** Argumente: Währungscode der eingebauten, unveränderlichen Währung. */
+    CURRENCY_PROTECTED,
+    /** Argumente: Währungscode, Akteur. */
+    NOT_CURRENCY_GOVERNOR,
+    /** Argumente: Betrag, der nicht negativ sein darf. */
+    NEGATIVE_CONVERSION_AMOUNT,
+
     // law
     /** Argumente: Titel, Mindestlänge, Höchstlänge. */
     INVALID_STATUTE_TITLE,
