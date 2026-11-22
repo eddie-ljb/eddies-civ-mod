@@ -124,6 +124,41 @@ class HomePortServiceTest {
         assertEquals(MessageKey.PORT_ENTRY_SEAT.key(), list.lines().get(1).key());
     }
 
+    @Test
+    @DisplayName("Wartezeit: nach einem Teleport gilt sie, 0 im Recht hebt sie auf")
+    void cooldown() {
+        setUp();
+        HomePortService.Trip trip = server.homePorts().prepare(caller(bob, FAR), Optional.empty()).trip().orElseThrow();
+        assertTrue(server.homePorts().pay(caller(bob, FAR), trip).success());
+
+        HomePortService.Outcome again = server.homePorts().prepare(caller(bob, FAR), Optional.empty());
+        assertTrue(again.trip().isEmpty());
+        assertEquals(MessageKey.PORT_COOLDOWN.key(), again.refusal().orElseThrow().lines().getFirst().key());
+        assertTrue(server.homePorts().prepare(caller(alice, FAR), Optional.empty()).trip().isPresent(),
+                "die Wartezeit gilt je Spieler");
+
+        assertTrue(server.levels().amendLaw(caller(alice, HOME), "gemeinde", "home_port_cooldown_seconds", "0").success());
+        assertTrue(server.homePorts().prepare(caller(bob, FAR), Optional.empty()).trip().isPresent());
+    }
+
+    @Test
+    @DisplayName("Krieg: Häfen einer Gemeinde im Krieg sind für Fremde (auch bei Zugang alle) gesperrt, Bürger dürfen")
+    void war() {
+        setUp();
+        PolityView town = server.queries().polityNamed("Nordhain").orElseThrow();
+        assertTrue(server.homePorts().setAccess(caller(alice, HOME), town, "alle").success());
+        assertTrue(server.commands().found(caller(eve, FAR), "Südtal").success());
+        PolityView other = server.queries().polityNamed("Südtal").orElseThrow();
+        assertTrue(server.homePorts().prepare(caller(eve, FAR), Optional.of("Nordhain")).trip().isPresent());
+
+        server.war().registry().declareWar(ids, other.id(), town.id(), de.etiennebader.civ.domain.shared.Day.of(0));
+        HomePortService.Outcome blocked = server.homePorts().prepare(caller(eve, FAR), Optional.of("Nordhain"));
+        assertTrue(blocked.trip().isEmpty());
+        assertEquals(MessageKey.PORT_WAR.key(), blocked.refusal().orElseThrow().lines().getFirst().key());
+        assertTrue(server.homePorts().prepare(caller(bob, FAR), Optional.empty()).trip().isPresent(),
+                "Bürger dürfen weiter heim");
+    }
+
     private static Caller caller(PlayerRef player, BlockPosition position) {
         return new Caller(player, "Spieler", position);
     }

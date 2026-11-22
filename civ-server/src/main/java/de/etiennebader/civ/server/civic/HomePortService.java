@@ -8,7 +8,10 @@ import de.etiennebader.civ.application.query.WorldQueries;
 import de.etiennebader.civ.domain.civic.HomePort;
 import de.etiennebader.civ.domain.civic.PortAccess;
 import de.etiennebader.civ.domain.civic.PortSettings;
+import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.economy.TransferReason;
+import de.etiennebader.civ.domain.law.StandardParameters;
+import de.etiennebader.civ.domain.war.WarView;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.shared.DomainException;
 import de.etiennebader.civ.domain.shared.Money;
@@ -24,6 +27,9 @@ import de.etiennebader.civ.server.command.Texts;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.LongSupplier;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -56,12 +62,22 @@ public final class HomePortService {
     private final WorldQueries queries;
     private final Calendar calendar;
     private final Texts texts;
+    private final Supplier<WarView> wars;
+    private final LongSupplier clock;
+    /** Zeitpunkt (ms) des letzten Teleports je Spieler; nur im Speicher, ein Neustart setzt die Wartezeit zurück. */
+    private final Map<ActorRef, Long> lastTrip = new ConcurrentHashMap<>();
 
-    public HomePortService(CivApplication app, Calendar calendar, Texts texts) {
+    public HomePortService(CivApplication app, Calendar calendar, Texts texts, Supplier<WarView> wars) {
+        this(app, calendar, texts, wars, System::currentTimeMillis);
+    }
+
+    HomePortService(CivApplication app, Calendar calendar, Texts texts, Supplier<WarView> wars, LongSupplier clock) {
         this.app = Objects.requireNonNull(app, "app");
         this.queries = app.queries();
         this.calendar = Objects.requireNonNull(calendar, "calendar");
         this.texts = Objects.requireNonNull(texts, "texts");
+        this.wars = Objects.requireNonNull(wars, "wars");
+        this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     // ---- Einstellungen der Polity (Spitze) ----
@@ -175,12 +191,19 @@ public final class HomePortService {
             }
             polity = named.get();
         }
+        if (!isHead(caller, polity) && atWar(polity) && !isCitizen(caller, polity)) {
+            return Outcome.refused(Message.of(MessageKey.PORT_WAR, polity.name().value()));
+        }
         if (!mayUse(caller, polity)) {
             return Outcome.refused(Message.of(MessageKey.PORT_NOT_ALLOWED, polity.name().value()));
         }
         Optional<BlockPosition> target = slot == 1 ? polity.seat() : validExtra(polity, slot);
         if (target.isEmpty()) {
             return Outcome.refused(Message.of(MessageKey.PORT_NONE, polity.name().value(), slot));
+        }
+        long waitSeconds = cooldownLeft(caller, polity);
+        if (waitSeconds > 0) {
+            return Outcome.refused(Message.of(MessageKey.PORT_COOLDOWN, waitSeconds, polity.name().value()));
         }
         long fee = isHead(caller, polity) ? 0 : queries.civic().portSettingsOf(polity.id()).fee();
         return Outcome.of(new Trip(polity, slot, target.get(), fee));
@@ -189,6 +212,7 @@ public final class HomePortService {
     /** Bucht den Preis des Teleports vom Spieler an die Polity. Schlägt fehl, wenn das Geld nicht reicht. */
     public Reply pay(Caller caller, Trip trip) {
         if (trip.fee() <= 0) {
+            lastTrip.put(caller.player(), clock.getAsLong());
             return Reply.success(Message.of(MessageKey.PORT_ARRIVED, trip.polity().name().value()));
         }
         Money price = Money.of(trip.fee(), trip.polity().currency());
@@ -198,11 +222,31 @@ public final class HomePortService {
         } catch (DomainException e) {
             return Reply.failure(texts.error(e));
         }
+        lastTrip.put(caller.player(), clock.getAsLong());
         return Reply.success(Message.of(MessageKey.PORT_ARRIVED_PAID, trip.polity().name().value(),
                 texts.money(price)));
     }
 
     // ---- Regeln ----
+
+    /** Verbleibende Wartezeit in ganzen Sekunden (aufgerundet); 0, wenn der Spieler reisen darf. */
+    private long cooldownLeft(Caller caller, PolityView polity) {
+        long cooldownMillis = queries.effectiveLaws(polity).valueOf(StandardParameters.HOME_PORT_COOLDOWN_SECONDS)
+                * 1_000L;
+        Long last = lastTrip.get(caller.player());
+        if (cooldownMillis <= 0 || last == null) {
+            return 0;
+        }
+        long left = last + cooldownMillis - clock.getAsLong();
+        return left <= 0 ? 0 : (left + 999) / 1_000;
+    }
+
+    /** Im Krieg stehen die Häfen einer Polity (und der Bünde, denen sie angehört) nur noch ihren Bürgern offen. */
+    private boolean atWar(PolityView polity) {
+        WarView registry = wars.get();
+        return !registry.ongoingWarsOf(polity.id()).isEmpty() || queries.ancestorsOf(polity.id()).stream()
+                .anyMatch(up -> !registry.ongoingWarsOf(up.id()).isEmpty());
+    }
 
     /** Wer darf? Die Spitze immer, sonst nach der Zugangsregel der Polity. */
     boolean mayUse(Caller caller, PolityView polity) {

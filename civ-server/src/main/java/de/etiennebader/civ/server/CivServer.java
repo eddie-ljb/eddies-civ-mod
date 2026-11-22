@@ -192,7 +192,7 @@ public final class CivServer {
         this.companies.pricing(market::priceLevel);
         this.press = new PressService(app, calendar, players, settings.currency(), texts, announcements);
         this.civic = new CivicService(app, calendar, texts, announcements, plots);
-        this.homePorts = new HomePortService(app, calendar, texts);
+        this.homePorts = new HomePortService(app, calendar, texts, war::registry);
         this.justice = new JusticeService(app, calendar, players, texts, announcements);
         this.liveCount = new LiveCountService(announcements, settings.show().liveCount(),
                 settings.show().liveCountSeconds(), settings.show().projections());
