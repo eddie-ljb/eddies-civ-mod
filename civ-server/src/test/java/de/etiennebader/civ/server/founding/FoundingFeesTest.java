@@ -93,6 +93,20 @@ class FoundingFeesTest {
     }
 
     @Test
+    @DisplayName("Serverkonto: Gebühren erhöhen die Geldmenge für das Preisniveau nicht")
+    void serverAccountIsNotMarketSupply() {
+        deposit(25);
+        var currency = CivServerFixture.SETTINGS.currency();
+        long before = server.queries().marketSupply(currency).amount();
+        assertEquals(MoneyFormat.emeralds(25), before);
+
+        assertTrue(server.commands().foundWithTownHall(alice(), Optional.of("Nordhain"), alice().position()).success());
+
+        assertEquals(MoneyFormat.emeralds(10), server.rankings().serverBalance().amount());
+        assertEquals(MoneyFormat.emeralds(15), server.queries().marketSupply(currency).amount());
+    }
+
+    @Test
     @DisplayName("Ranglisten: Serverkonto zählt nicht mit, Ebenenfilter und Reihenfolge")
     void rankingsExcludeServerAccount() {
         deposit(15);
