@@ -5,6 +5,7 @@ import de.etiennebader.civ.application.civic.CivicUseCases;
 import de.etiennebader.civ.application.civil.Addresses;
 import de.etiennebader.civ.application.civil.CommunityUseCases;
 import de.etiennebader.civ.application.civil.ContractUseCases;
+import de.etiennebader.civ.application.civil.IdCards;
 import de.etiennebader.civ.application.civil.RunContracts;
 import de.etiennebader.civ.application.civil.StreetUseCases;
 import de.etiennebader.civ.application.company.CompanyUseCases;
@@ -378,6 +379,11 @@ public final class CivApplication {
     /** Hausnummern und Wohnsitze. */
     public Addresses addresses() {
         return new Addresses(queries);
+    }
+
+    /** Personalausweise (#20). */
+    public IdCards idCards() {
+        return new IdCards(queries);
     }
 
     public Campaign campaign() {
