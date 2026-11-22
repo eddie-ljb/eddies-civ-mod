@@ -92,6 +92,21 @@ class VillagerFoundationsTest {
     }
 
     @Test
+    @DisplayName("Mit Gründungsgebühr gründen mittellose Dorfbewohner keine Gemeinde")
+    void poorVillagersCannotAffordFounding() {
+        nordhainWithVillagers(6, true);
+        VillagerFoundations paying = new VillagerFoundations(server.app(),
+                villager -> Optional.ofNullable(seen.get(villager)), new Announcements(),
+                de.etiennebader.civ.server.founding.FoundingFees.DEFAULT);
+        for (int i = 0; i < 300; i++) {
+            assertFalse(paying.endOfDay(Day.of(10 + i)));
+        }
+        assertEquals(1, towns());
+        assertEquals(1, server.queries().polityNamed("Nordhain").orElseThrow().members().stream()
+                .filter(m -> m.member() instanceof de.etiennebader.civ.domain.actor.PlayerRef).count() + 0);
+    }
+
+    @Test
     @DisplayName("Ohne Ehrgeiz oder in kleinen Gemeinden gründet niemand etwas")
     void nothingWithoutAmbitionOrSize() {
         nordhainWithVillagers(6, false);

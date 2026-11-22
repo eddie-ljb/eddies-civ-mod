@@ -178,6 +178,8 @@ public final class CivCommandTree {
     private static final String ECONOMY_AXIS = "wirtschaft";
     private static final String PROGRAM_MODE = "modus";
     private static final List<String> YES_NO = List.of("ja", "nein");
+    private static final List<String> RANKINGS = List.of("spieler", "dorfbewohner", "staedte", "firmen", "buende",
+            "groesste-staedte", "groesste-firmen", "groesste-buende");
 
     private final CivServerHost host;
 
@@ -221,6 +223,16 @@ public final class CivCommandTree {
                                         (commands, caller) -> commands.describe(caller, Optional.of(name(context)))))))
                 .then(Commands.literal("liste")
                         .executes(context -> run(context.getSource(), CivCommands::list)))
+                .then(Commands.literal("rangliste")
+                        .then(Commands.argument(NAME, StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(RANKINGS, builder))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.rankings().show(
+                                        StringArgumentType.getString(context, NAME), Optional.empty())))
+                                .then(Commands.argument(LEVEL, StringArgumentType.word())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(levelIds(), builder))
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.rankings().show(
+                                                StringArgumentType.getString(context, NAME),
+                                                Optional.of(StringArgumentType.getString(context, LEVEL))))))))
                 .then(Commands.literal("recht")
                         .executes(context -> asPlayer(context,
                                 (commands, caller) -> commands.laws(caller, Optional.empty())))

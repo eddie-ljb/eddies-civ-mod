@@ -349,6 +349,7 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
       <a href="#wahlen">Wahlen</a>
       <a href="#markt">Markt</a>
       <a href="#boerse">Börse</a>
+      <a href="#ranglisten">Ranglisten</a>
       <a href="#presse">Presse</a>
       <a href="#staat">Staat</a>
       <a href="#krieg">Krieg</a>
@@ -511,6 +512,22 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
         <div class="tablewrap"><table><thead><tr><th>Firma</th><th class="num">Stück</th><th class="num">Kurs</th><th>Käufer</th><th>Verkäufer</th></tr></thead><tbody id="trades"></tbody></table></div>
       </div>
       <div id="stock"></div>
+    </div>
+  </section>
+
+  <section data-page="ranglisten">
+    <div class="pagehead">
+      <div><h2>Ranglisten</h2><p id="rankhint">Die Reichsten und Größten der Welt. Das Serverkonto zählt nicht mit.</p></div>
+      <div class="row">
+        <select id="rankcat" aria-label="Rangliste"></select>
+        <select id="ranklevel" aria-label="Ebene" hidden></select>
+      </div>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th class="num">#</th><th>Name</th><th id="rankvalhead" class="num">Wert</th></tr></thead>
+        <tbody id="ranking"></tbody>
+      </table>
     </div>
   </section>
 
@@ -763,7 +780,7 @@ const head = name => el("img", { className: "avatar", alt: "", loading: "lazy", 
 const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
 /* Seiten */
-const pages = ["start", "welt", "karte", "wahlen", "markt", "boerse", "presse", "krieg", "staat", "justiz", "post", "chat", "bauen", "freunde", "ich"];
+const pages = ["start", "welt", "karte", "wahlen", "markt", "boerse", "ranglisten", "presse", "krieg", "staat", "justiz", "post", "chat", "bauen", "freunde", "ich"];
 let page = "start";
 function route() {
   const wanted = location.hash.slice(1).split("/")[0];
@@ -771,7 +788,7 @@ function route() {
   document.querySelectorAll("section[data-page]").forEach(s => s.classList.toggle("on", s.dataset.page === page));
   document.querySelectorAll(".nav a").forEach(a => { if (a.getAttribute("href") === "#" + page) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
   const loaders = { start: loadStart, welt: loadWorld, karte: openMap, wahlen: loadElections, markt: loadMarket,
-    boerse: loadExchange, presse: loadPress, krieg: loadWar, staat: loadState, justiz: loadJustice, post: loadLetters,
+    boerse: loadExchange, ranglisten: loadRankings, presse: loadPress, krieg: loadWar, staat: loadState, justiz: loadJustice, post: loadLetters,
     chat: openChat, bauen: loadPlans, freunde: loadFriends, ich: loadMe };
   loaders[page]();
   if (page !== "chat") stopChat();
@@ -1235,6 +1252,47 @@ $("esearch").addEventListener("input", renderElections);
 
 /* Markt */
 let offers = [], shopList = [], sortKey = "name", sortDir = 1;
+/* Ranglisten */
+const rankTitles = { spieler: "Reichste Spieler", dorfbewohner: "Reichste Dorfbewohner", staedte: "Reichste Städte", firmen: "Reichste Firmen",
+  buende: "Reichste Bünde (Länder, Nationen …)", "groesste-staedte": "Größte Städte (Einwohner)",
+  "groesste-firmen": "Größte Firmen (Beschäftigte)", "groesste-buende": "Größte Bünde (Einwohner)" };
+const rankValues = { "groesste-staedte": "Einwohner", "groesste-firmen": "Beschäftigte", "groesste-buende": "Einwohner" };
+let rankData = null;
+async function loadRankings() {
+  const r = await api("/api/rankings");
+  if (!r.ok) return;
+  rankData = r.data;
+  const sel = $("rankcat"), keep = sel.value;
+  sel.replaceChildren(...rankData.categories.map(c => el("option", { value: c.id, textContent: rankTitles[c.id] || c.id })));
+  if (keep) sel.value = keep;
+  renderRanking();
+}
+function renderRanking() {
+  if (!rankData) return;
+  const cat = rankData.categories.find(c => c.id === $("rankcat").value) || rankData.categories[0];
+  if (!cat) return;
+  const federal = cat.id === "buende" || cat.id === "groesste-buende";
+  const levelSel = $("ranklevel");
+  levelSel.hidden = !federal;
+  if (federal) {
+    const seen = new Map();
+    cat.entries.forEach(e => seen.set(e.level, e.levelName));
+    const keep = levelSel.value;
+    levelSel.replaceChildren(el("option", { value: "", textContent: "Alle Ebenen" }), ...[...seen].map(([id, name]) => el("option", { value: id, textContent: name })));
+    levelSel.value = seen.has(keep) ? keep : "";
+  }
+  const level = federal ? levelSel.value : "";
+  const rows = cat.entries.filter(e => !level || e.level === level).slice(0, 10);
+  $("rankvalhead").textContent = rankValues[cat.id] || "Vermögen";
+  const fmt = v => cat.money ? (v / 100).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " Smaragde" : v;
+  $("ranking").replaceChildren(...(rows.length ? rows.map((e, i) => el("tr", {}, el("td", { className: "num", textContent: i + 1 }),
+    el("td", { textContent: e.name + (federal && e.levelName ? " (" + e.levelName + ")" : "") }), el("td", { className: "num", textContent: fmt(e.value) })))
+    : [el("tr", {}, el("td", { colSpan: 3, className: "muted", textContent: "Noch keine Einträge." }))]));
+  $("rankhint").textContent = "Die Reichsten und Größten der Welt. Das Serverkonto (" + (rankData.serverAccount / 100).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " Smaragde Gründungsgebühren) zählt nicht mit.";
+}
+$("rankcat").addEventListener("change", renderRanking);
+$("ranklevel").addEventListener("change", renderRanking);
+
 async function loadMarket() {
   const [m, s] = await Promise.all([api("/api/market"), api("/api/shops")]);
   if (m.ok) { offers = m.data.offers; $("level").textContent = "Preise in Smaragden, Preisniveau " + m.data.priceLevel + " %. Viel Lager drückt den Preis; das Lager schrumpft jeden Tag."; }

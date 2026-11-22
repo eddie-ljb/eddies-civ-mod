@@ -94,4 +94,23 @@ class ServerConfigTest {
 
         assertEquals(written.economy(), ServerConfig.load(file).economy());
     }
+
+    @Test
+    @DisplayName("Config: Kosten und Pflicht überstehen Schreiben und Lesen; Standard schreibt sich selbst")
+    void foundingCostsConfig() {
+        Properties properties = new Properties();
+        properties.setProperty("founding_cost_municipality", "7");
+        properties.setProperty("founding_cost_levels", "land:11, kreis:3, kaputt:x");
+        properties.setProperty("founding_require_previous_level", "false");
+
+        de.etiennebader.civ.server.founding.FoundingFees fees = ServerConfig.of(properties).founding();
+
+        assertEquals(de.etiennebader.civ.server.command.MoneyFormat.emeralds(7), fees.municipality());
+        assertEquals(de.etiennebader.civ.server.command.MoneyFormat.emeralds(11), fees.federation("land"));
+        assertEquals(de.etiennebader.civ.server.command.MoneyFormat.emeralds(3), fees.federation("kreis"));
+        assertEquals(de.etiennebader.civ.server.founding.FoundingFees.DEFAULT.federationDefault(), fees.federation("unbekannt"));
+        assertEquals(false, fees.requirePreviousLevel());
+        assertEquals(de.etiennebader.civ.server.founding.FoundingFees.DEFAULT, ServerConfig.of(new Properties()).founding());
+        assertEquals(de.etiennebader.civ.server.founding.FoundingFees.DEFAULT, ServerSettings.defaults().founding());
+    }
 }

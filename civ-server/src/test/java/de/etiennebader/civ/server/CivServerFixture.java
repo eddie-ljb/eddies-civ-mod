@@ -127,6 +127,10 @@ public final class CivServerFixture {
         return server.levels();
     }
 
+    public de.etiennebader.civ.server.ranking.RankingService rankings() {
+        return server.rankings();
+    }
+
     public de.etiennebader.civ.server.civil.CivilService civil() {
         return server.civil();
     }

@@ -17,6 +17,7 @@ import de.etiennebader.civ.domain.shared.DomainException;
 import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.server.Announcement;
+import de.etiennebader.civ.server.founding.FoundingFees;
 import de.etiennebader.civ.server.Announcements;
 import de.etiennebader.civ.server.command.Message;
 import de.etiennebader.civ.server.command.MessageKey;
@@ -54,12 +55,20 @@ public final class VillagerFoundations {
     /** So viele Dorfbewohner bleiben mindestens in der alten Gemeinde zurück. */
     static final int MIN_LEFT_BEHIND = 2;
 
+    private final FoundingFees fees;
     private final CivApplication app;
     private final Function<PersonRef, Optional<BlockPosition>> lastSeen;
     private final Announcements announcements;
 
     public VillagerFoundations(CivApplication app, Function<PersonRef, Optional<BlockPosition>> lastSeen,
                                Announcements announcements) {
+        this(app, lastSeen, announcements, FoundingFees.FREE);
+    }
+
+    /** Mit Gründungskosten: der Dorfbewohner zahlt aus seinem eigenen Konto. */
+    public VillagerFoundations(CivApplication app, Function<PersonRef, Optional<BlockPosition>> lastSeen,
+                               Announcements announcements, FoundingFees fees) {
+        this.fees = Objects.requireNonNull(fees, "fees");
         this.app = Objects.requireNonNull(app, "app");
         this.lastSeen = Objects.requireNonNull(lastSeen, "lastSeen");
         this.announcements = Objects.requireNonNull(announcements, "announcements");
@@ -112,13 +121,20 @@ public final class VillagerFoundations {
         } catch (DomainException ignored) {
             return false;
         }
+        FoundingFees.Billing billing = fees.billing(app, home.currency());
+        if (billing.shortfallBalance(villager, fees.municipality()) != null) {
+            return false; // zu arm für die Gründungsgebühr: bleibt, wo er ist
+        }
         try {
             app.leavePolity().execute(new LeavePolity.Command(home.id(), villager, day));
         } catch (DomainException ignored) {
             return false; // z. B. Amtsinhaber, die nicht gehen dürfen
         }
         try {
-            app.foundPolity().execute(new FoundPolity.Command(name, villager, home.currency(), seat.get(), day));
+            billing.chargeAfter(villager, fees.municipality(), day, () -> {
+                app.foundPolity().execute(new FoundPolity.Command(name, villager, home.currency(), seat.get(), day));
+                return null;
+            });
         } catch (DomainException rejected) {
             rejoin(home, villager, day); // Claim-Regeln oder Namenskollision: der Dorfbewohner bleibt, wo er war
             return false;
