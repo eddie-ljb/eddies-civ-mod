@@ -8,6 +8,7 @@ import de.etiennebader.civ.domain.shared.SeededIdGenerator;
 import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.domain.territory.DimensionId;
 import de.etiennebader.civ.server.CivServerFixture;
+import de.etiennebader.civ.server.ServerSettings;
 import de.etiennebader.civ.server.command.Caller;
 import de.etiennebader.civ.server.command.MessageKey;
 import de.etiennebader.civ.server.command.Reply;
@@ -157,6 +158,33 @@ class HomePortServiceTest {
         assertEquals(MessageKey.PORT_WAR.key(), blocked.refusal().orElseThrow().lines().getFirst().key());
         assertTrue(server.homePorts().prepare(caller(bob, FAR), Optional.empty()).trip().isPresent(),
                 "Bürger dürfen weiter heim");
+    }
+
+    @Test
+    @DisplayName("war_port_lock=enemies: nur Kriegsgegner sind gesperrt, Unbeteiligte und Verbündete nicht")
+    void warLockEnemiesOnly() {
+        ServerSettings base = ServerSettings.defaults();
+        CivServerFixture lenient = CivServerFixture.start(ids, new ServerSettings(base.ticksPerDay(), base.claimBase(),
+                base.claimPerMember(), base.currency(), base.priceReference(), base.villagerIncome(), base.tiers(),
+                base.web(), base.emigration(), base.villagerPolitics(), base.levels(), base.parties(), base.show(),
+                base.economy(), base.ambitions(), ServerSettings.WarPortLock.ENEMIES));
+        PlayerRef carol = new PlayerRef(PlayerId.generate(ids));
+        for (PlayerRef player : new PlayerRef[]{alice, eve, carol}) {
+            lenient.playerJoined(player, "P");
+        }
+        assertTrue(lenient.commands().found(caller(alice, HOME), "Nordhain").success());
+        assertTrue(lenient.commands().found(caller(eve, FAR), "Südtal").success());
+        BlockPosition third = new BlockPosition(DimensionId.OVERWORLD, -5_000, 64, -5_000);
+        assertTrue(lenient.commands().found(caller(carol, third), "Ostburg").success());
+        PolityView north = lenient.queries().polityNamed("Nordhain").orElseThrow();
+        PolityView south = lenient.queries().polityNamed("Südtal").orElseThrow();
+        assertTrue(lenient.homePorts().setAccess(caller(alice, HOME), north, "alle").success());
+
+        lenient.war().registry().declareWar(ids, south.id(), north.id(), de.etiennebader.civ.domain.shared.Day.of(0));
+        assertTrue(lenient.homePorts().prepare(caller(eve, FAR), Optional.of("Nordhain")).trip().isEmpty(),
+                "Südtal ist Kriegsgegner");
+        assertTrue(lenient.homePorts().prepare(caller(carol, third), Optional.of("Nordhain")).trip().isPresent(),
+                "Ostburg ist unbeteiligt");
     }
 
     private static Caller caller(PlayerRef player, BlockPosition position) {

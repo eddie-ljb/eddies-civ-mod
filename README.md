@@ -438,6 +438,7 @@ Der Bürgermeister (oder mit Abstimmungen die Bürger) stellt diese Regelungen i
 | `villager_income_hundredths_per_day` | Einnahmen je Dorfbewohner und Tag; 100 = 1 Smaragd |
 | `villager_emigration` | ob sehr unzufriedene Dorfbewohner wegziehen (Standard `true`) |
 | `villager_ambitions` | ob ehrgeizige Dorfbewohner Firmen, Parteien und Bünde gründen, kandidieren und Firmen übernehmen (Standard `true`) |
+| `war_port_lock` | wer sich im Krieg nicht mehr zu den Heimat-Häfen einer kriegführenden Polity porten darf: `all-outsiders` (alle Nicht-Bürger, Standard), `enemies` (nur Bürger der Kriegsgegner) oder `none` (keine Sperre, es gilt nur die Zugangsregel) |
 | `villager_parties`, `villager_party_founders` | ob Dorfbewohner Parteien beitreten und gründen (Standard `true`) und ab wie vielen Gleichgesinnten (Standard 5) |
 | `federation_levels` | eigene Ebenen als `id:Name:Rang`, durch Kommas getrennt, z. B. `kreis:Kreis:10,bund:Bund:40`; eingebaut sind `gemeinde` 0, `land` 20, `nation` 30 |
 | `market_town_inhabitants`, `city_inhabitants`, `metropolis_inhabitants` | Einwohner für die Siedlungsstufen |

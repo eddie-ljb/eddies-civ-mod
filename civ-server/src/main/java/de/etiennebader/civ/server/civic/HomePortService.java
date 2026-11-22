@@ -22,6 +22,7 @@ import de.etiennebader.civ.server.command.Message;
 import de.etiennebader.civ.server.command.MessageKey;
 import de.etiennebader.civ.server.command.MoneyFormat;
 import de.etiennebader.civ.server.command.Reply;
+import de.etiennebader.civ.server.ServerSettings;
 import de.etiennebader.civ.server.command.Texts;
 
 import java.util.ArrayList;
@@ -64,14 +65,18 @@ public final class HomePortService {
     private final Texts texts;
     private final Supplier<WarView> wars;
     private final LongSupplier clock;
+    private final ServerSettings.WarPortLock warLock;
     /** Zeitpunkt (ms) des letzten Teleports je Spieler; nur im Speicher, ein Neustart setzt die Wartezeit zurück. */
     private final Map<ActorRef, Long> lastTrip = new ConcurrentHashMap<>();
 
-    public HomePortService(CivApplication app, Calendar calendar, Texts texts, Supplier<WarView> wars) {
-        this(app, calendar, texts, wars, System::currentTimeMillis);
+    public HomePortService(CivApplication app, Calendar calendar, Texts texts, Supplier<WarView> wars,
+                           ServerSettings.WarPortLock warLock) {
+        this(app, calendar, texts, wars, warLock, System::currentTimeMillis);
     }
 
-    HomePortService(CivApplication app, Calendar calendar, Texts texts, Supplier<WarView> wars, LongSupplier clock) {
+    HomePortService(CivApplication app, Calendar calendar, Texts texts, Supplier<WarView> wars,
+                    ServerSettings.WarPortLock warLock, LongSupplier clock) {
+        this.warLock = Objects.requireNonNull(warLock, "warLock");
         this.app = Objects.requireNonNull(app, "app");
         this.queries = app.queries();
         this.calendar = Objects.requireNonNull(calendar, "calendar");
@@ -191,7 +196,7 @@ public final class HomePortService {
             }
             polity = named.get();
         }
-        if (!isHead(caller, polity) && atWar(polity) && !isCitizen(caller, polity)) {
+        if (!isHead(caller, polity) && !isCitizen(caller, polity) && lockedByWar(caller, polity)) {
             return Outcome.refused(Message.of(MessageKey.PORT_WAR, polity.name().value()));
         }
         if (!mayUse(caller, polity)) {
@@ -239,6 +244,29 @@ public final class HomePortService {
         }
         long left = last + cooldownMillis - clock.getAsLong();
         return left <= 0 ? 0 : (left + 999) / 1_000;
+    }
+
+    /** Ob der Krieg diesem Nicht-Bürger den Zugang nach der Server-Einstellung {@code war_port_lock} verwehrt. */
+    private boolean lockedByWar(Caller caller, PolityView polity) {
+        return switch (warLock) {
+            case ALL_OUTSIDERS -> atWar(polity);
+            case ENEMIES -> isEnemy(caller, polity);
+            case NONE -> false;
+        };
+    }
+
+    /** Ob die Gemeinde (oder ein Bund) des Spielers mit der Polity oder einem ihrer Bünde im Krieg steht. */
+    private boolean isEnemy(Caller caller, PolityView polity) {
+        List<PolityId> own = new ArrayList<>();
+        queries.municipalityOf(caller.player()).ifPresent(town -> {
+            own.add(town.id());
+            queries.ancestorsOf(town.id()).forEach(up -> own.add(up.id()));
+        });
+        List<PolityId> target = new ArrayList<>(List.of(polity.id()));
+        queries.ancestorsOf(polity.id()).forEach(up -> target.add(up.id()));
+        WarView registry = wars.get();
+        return own.stream().anyMatch(mine -> target.stream()
+                .anyMatch(theirs -> registry.ongoingWarBetween(mine, theirs).isPresent()));
     }
 
     /** Im Krieg stehen die Häfen einer Polity (und der Bünde, denen sie angehört) nur noch ihren Bürgern offen. */

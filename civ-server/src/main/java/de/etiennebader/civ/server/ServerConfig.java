@@ -31,6 +31,7 @@ public final class ServerConfig {
     static final String EMIGRATION = "villager_emigration";
     static final String VILLAGER_POLITICS = "villager_politics_enabled";
     static final String AMBITIONS = "villager_ambitions";
+    static final String WAR_PORT_LOCK = "war_port_lock";
     static final String LEVELS = "federation_levels";
     static final String VILLAGER_PARTIES = "villager_parties";
     static final String PARTY_FOUNDERS = "villager_party_founders";
@@ -51,7 +52,7 @@ public final class ServerConfig {
     static final String PRICE_LEVEL_DAMPING = "price_level_damping";
     private static final java.util.List<String> KEYS = java.util.List.of(LIVE_COUNT, LIVE_COUNT_SECONDS, PROJECTIONS,
             DEBATE_MINUTES, ANTHEM_ON_ENTER, WORLD_MAP, MAP_RADIUS, WEB_TRUST_PROXY, VILLAGER_POLITICS,
-            AMBITIONS,
+            AMBITIONS, WAR_PORT_LOCK,
             PRICE_LEVEL_MIN, PRICE_LEVEL_MAX, PRICE_LEVEL_DAMPING);
 
     private static final String HEADER = """
@@ -66,6 +67,8 @@ public final class ServerConfig {
               Buenden beitreten/gruenden und Firmen gruenden duerfen (true/false)
             villager_ambitions: ob ehrgeizige Dorfbewohner Firmen, Parteien und Buende gruenden, kandidieren, Gebiet
               beanspruchen, Firmen uebernehmen und fuehren (true/false)
+            war_port_lock: wer sich im Krieg nicht mehr zu den Heimat-Haefen einer kriegfuehrenden Polity porten darf:
+              all-outsiders (alle Nicht-Buerger, Standard), enemies (nur Buerger der Kriegsgegner) oder none (keine Sperre)
             federation_levels: eigene Ebenen fuer Buende als id:Name:Rang, z. B. kreis:Kreis:10,bund:Bund:40
               (eingebaut: gemeinde 0, land 20, nation 30; ein Bund steht immer hoeher als seine Glieder)
             villager_parties: ob Dorfbewohner Parteien beitreten und gruenden (true/false)
@@ -140,7 +143,9 @@ public final class ServerConfig {
                                 Boolean.toString(defaults.parties().villagers())).strip()),
                         (int) number(properties, PARTY_FOUNDERS, defaults.parties().founders(), 2)),
                 show(properties, defaults.show()), economy(properties, defaults.economy()),
-                flag(properties, AMBITIONS, defaults.ambitions()));
+                flag(properties, AMBITIONS, defaults.ambitions()),
+                ServerSettings.WarPortLock.parse(properties.getProperty(WAR_PORT_LOCK,
+                        defaults.warPortLock().key()), defaults.warPortLock()));
     }
 
     private static ServerSettings.EconomySettings economy(Properties properties, ServerSettings.EconomySettings defaults) {
@@ -187,6 +192,7 @@ public final class ServerConfig {
         properties.setProperty(EMIGRATION, Boolean.toString(settings.emigration()));
         properties.setProperty(VILLAGER_POLITICS, Boolean.toString(settings.villagerPolitics()));
         properties.setProperty(AMBITIONS, Boolean.toString(settings.ambitions()));
+        properties.setProperty(WAR_PORT_LOCK, settings.warPortLock().key());
         properties.setProperty(LEVELS, settings.levels().spec());
         properties.setProperty(VILLAGER_PARTIES, Boolean.toString(settings.parties().villagers()));
         properties.setProperty(PARTY_FOUNDERS, Integer.toString(settings.parties().founders()));
