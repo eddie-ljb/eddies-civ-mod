@@ -167,6 +167,10 @@ public final class CivServerFixture {
         return server.app();
     }
 
+    public de.etiennebader.civ.server.villager.VillagerFoundations villagerFoundations() {
+        return server.villagerFoundations();
+    }
+
     public de.etiennebader.civ.server.federation.VillagerFederations villagerFederations() {
         return server.villagerFederations();
     }

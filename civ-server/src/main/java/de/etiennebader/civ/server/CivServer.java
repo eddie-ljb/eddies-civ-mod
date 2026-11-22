@@ -105,6 +105,7 @@ public final class CivServer {
     private final de.etiennebader.civ.server.war.WarService war;
     private final VillagerService villagers;
     private final VillagerFederations villagerFederations;
+    private final de.etiennebader.civ.server.villager.VillagerFoundations villagerFoundations;
     private final de.etiennebader.civ.server.conjuncture.ConjunctureService conjuncture;
     private final Announcements announcements = new Announcements();
     private final VotingService voting;
@@ -177,6 +178,8 @@ public final class CivServer {
         this.villagerFederations = new VillagerFederations(app, federations, announcements);
         this.conjuncture = new de.etiennebader.civ.server.conjuncture.ConjunctureService(app.queries());
         this.villagers = new VillagerService(app, settings, texts, announcements, conjuncture, calendar);
+        this.villagerFoundations = new de.etiennebader.civ.server.villager.VillagerFoundations(app, villagers::lastSeen,
+                announcements);
         this.townHalls = new TownHallService(app, calendar, texts, announcements);
         this.shops = new ShopService(app, calendar, settings.currency(), texts);
         this.civil = new CivilService(app, calendar, players, settings.currency(), texts, announcements,
@@ -255,6 +258,7 @@ public final class CivServer {
         parties.endOfDay(day);
         villagers.endOfDay(day);
         if (settings.ambitions()) {
+            villagerFoundations.endOfDay(day);
             villagerFederations.endOfDay(day);
             construction.villagersOrder(day);
         }
@@ -573,6 +577,10 @@ public final class CivServer {
 
     public PlayerDirectory players() {
         return players;
+    }
+
+    public de.etiennebader.civ.server.villager.VillagerFoundations villagerFoundations() {
+        return villagerFoundations;
     }
 
     public VillagerFederations villagerFederations() {
