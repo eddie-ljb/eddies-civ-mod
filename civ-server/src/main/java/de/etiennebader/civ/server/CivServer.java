@@ -127,6 +127,7 @@ public final class CivServer {
     private final CivilService civil;
     private final CommunityService community;
     private final CompanyService companies;
+    private final de.etiennebader.civ.server.ranking.RankingService rankings;
     private final PressService press;
     private final TownHallService townHalls;
     private final ShopService shops;
@@ -181,7 +182,7 @@ public final class CivServer {
         this.conjuncture = new de.etiennebader.civ.server.conjuncture.ConjunctureService(app.queries());
         this.villagers = new VillagerService(app, settings, texts, announcements, conjuncture, calendar);
         this.villagerFoundations = new de.etiennebader.civ.server.villager.VillagerFoundations(app, villagers::lastSeen,
-                announcements);
+                announcements, settings.founding());
         this.townHalls = new TownHallService(app, calendar, texts, announcements);
         this.shops = new ShopService(app, calendar, settings.currency(), texts);
         this.civil = new CivilService(app, calendar, players, settings.currency(), texts, announcements,
@@ -189,7 +190,10 @@ public final class CivServer {
         this.community = new CommunityService(app, calendar, players, texts, announcements, Clock.systemUTC());
         this.companies = new CompanyService(app, calendar, players, settings.currency(), texts, announcements,
                 conjuncture, settings.founding());
+        app.companies().foundingFee(settings.founding().company());
         this.companies.pricing(market::priceLevel);
+        this.rankings = new de.etiennebader.civ.server.ranking.RankingService(app, texts, settings.currency(),
+                companies, federations);
         this.press = new PressService(app, calendar, players, settings.currency(), texts, announcements);
         this.civic = new CivicService(app, calendar, texts, announcements, plots);
         this.justice = new JusticeService(app, calendar, players, texts, announcements);
@@ -438,6 +442,10 @@ public final class CivServer {
 
     public CommunityService community() {
         return community;
+    }
+
+    public de.etiennebader.civ.server.ranking.RankingService rankings() {
+        return rankings;
     }
 
     public CompanyService companies() {

@@ -30,6 +30,7 @@ import de.etiennebader.civ.server.campaign.ResultView;
 import de.etiennebader.civ.server.civil.ContractView;
 import de.etiennebader.civ.server.command.Caller;
 import de.etiennebader.civ.server.command.Message;
+import de.etiennebader.civ.server.ranking.RankingService;
 import de.etiennebader.civ.server.command.MessageKey;
 import de.etiennebader.civ.server.command.MoneyFormat;
 import de.etiennebader.civ.server.command.Reply;
@@ -236,6 +237,7 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                 case "GET /api/market" -> HttpResponse.json(200, game.call(this::market));
                 case "GET /api/elections" -> HttpResponse.json(200, game.call(() -> elections(texts)));
                 case "GET /api/shops" -> HttpResponse.json(200, game.call(this::shops));
+                case "GET /api/rankings" -> HttpResponse.json(200, game.call(() -> rankings(texts)));
                 case "GET /api/stats" -> HttpResponse.json(200, game.call(this::stats));
                 case "GET /api/streets" -> HttpResponse.json(200, game.call(this::streets));
                 case "GET /api/chat" -> withLogin(request, login -> HttpResponse.json(200, game.call(() ->
@@ -900,6 +902,34 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                 .put("articles", civ.queries().press().articles().size())
                 .put("elections", elections)
                 .put("priceLevel", civ.market().priceLevelPercent())
+                .build();
+    }
+
+    /**
+     * Ranglisten der Reichsten und Größten; ohne Anmeldung. Das Serverkonto steht getrennt und in keiner Liste.
+     * Geldwerte in Hundertsteln eines Smaragds; Bünde tragen ihre Ebene, damit die Seite nach Land, Nation usw. filtert.
+     */
+    private String rankings(Translator texts) {
+        List<String> categories = new ArrayList<>();
+        for (RankingService.Category category : RankingService.Category.values()) {
+            boolean federal = category == RankingService.Category.RICHEST_FEDERATIONS
+                    || category == RankingService.Category.LARGEST_FEDERATIONS;
+            List<RankingService.Entry> entries = civ.rankings().top(category, Optional.empty(),
+                    federal ? 100 : RankingService.DEFAULT_LIMIT);
+            categories.add(Json.object()
+                    .put("id", category.id())
+                    .put("money", category.money())
+                    .raw("entries", Json.array(entries, entry -> Json.object()
+                            .put("name", entry.name())
+                            .put("level", entry.levelId())
+                            .put("levelName", entry.levelName() instanceof Message message ? texts.translate(message)
+                                    : entry.levelName().toString())
+                            .put("value", entry.value()).build()))
+                    .build());
+        }
+        return Json.object()
+                .raw("categories", "[" + String.join(",", categories) + "]")
+                .put("serverAccount", civ.rankings().serverBalance().amount())
                 .build();
     }
 

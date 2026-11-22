@@ -10,6 +10,7 @@ import de.etiennebader.civ.server.command.Caller;
 import de.etiennebader.civ.server.command.MessageKey;
 import de.etiennebader.civ.server.command.MoneyFormat;
 import de.etiennebader.civ.server.command.Reply;
+import de.etiennebader.civ.server.ranking.RankingService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -67,25 +68,46 @@ class FoundingFeesTest {
 
         assertTrue(server.commands().foundWithTownHall(alice(), Optional.of("Nordhain"), alice().position()).success());
         assertEquals(MoneyFormat.emeralds(15), balance());
+        assertEquals(MoneyFormat.emeralds(10), server.rankings().serverBalance().amount());
     }
 
     @Test
-    @DisplayName("Bund: Vorgänger-Ebene ist Pflicht, Kosten je Ebene, Abbuchung nur bei Erfolg")
-    void federationNeedsPreviousLevelAndPays() {
+    @DisplayName("Bund: Vorgänger-Ebene ist Pflicht, die Gemeindekasse zahlt, Abbuchung nur bei Erfolg")
+    void federationNeedsPreviousLevelAndTreasuryPays() {
         deposit(40);
         assertTrue(server.commands().found(alice(), "Nordhain").success()); // Admin-Weg ist kostenlos
-        assertEquals(MoneyFormat.emeralds(40), balance());
+        assertTrue(server.bank().payIntoTreasury(alice(), "25").success());
+        assertEquals(MoneyFormat.emeralds(15), balance());
 
         Reply skipped = server.federations().found(alice(), "nation", "Reich");
         assertEquals(MessageKey.FEDERATION_NEEDS_PREVIOUS_LEVEL.key(), skipped.lines().getFirst().key());
-        assertEquals(MoneyFormat.emeralds(40), balance());
+        assertEquals(0, server.rankings().serverBalance().amount());
 
         assertTrue(server.federations().found(alice(), "land", "Westmark").success());
-        assertEquals(MoneyFormat.emeralds(20), balance());
+        assertEquals(MoneyFormat.emeralds(15), balance(), "der Gründer zahlt nicht privat");
+        assertEquals(MoneyFormat.emeralds(20), server.rankings().serverBalance().amount());
 
         Reply poor = server.federations().found(alice(), "nation", "Reich");
         assertEquals(MessageKey.FOUNDING_NOT_ENOUGH_MONEY.key(), poor.lines().getFirst().key());
-        assertEquals(MoneyFormat.emeralds(20), balance());
+        assertEquals(MoneyFormat.emeralds(20), server.rankings().serverBalance().amount());
+    }
+
+    @Test
+    @DisplayName("Ranglisten: Serverkonto zählt nicht mit, Ebenenfilter und Reihenfolge")
+    void rankingsExcludeServerAccount() {
+        deposit(15);
+        assertTrue(server.commands().foundWithTownHall(alice(), Optional.of("Nordhain"), alice().position()).success());
+        assertTrue(server.companies().found(alice(), "1", "Acme").success() == false); // unter Mindestkapital
+
+        var players = server.rankings().top(RankingService.Category.RICHEST_PLAYERS, Optional.empty(), 10);
+        assertEquals(1, players.size());
+        assertEquals("Alice", players.getFirst().name());
+        assertEquals(MoneyFormat.emeralds(5), players.getFirst().value());
+        assertEquals(MoneyFormat.emeralds(10), server.rankings().serverBalance().amount());
+        assertEquals(1, server.rankings().top(RankingService.Category.LARGEST_TOWNS, Optional.empty(), 10).size());
+        assertTrue(server.rankings().show("gibtsnicht", Optional.empty()).lines().getFirst().key()
+                .equals(MessageKey.RANKING_UNKNOWN_CATEGORY.key()));
+        assertTrue(server.rankings().show("spieler", Optional.empty()).success());
     }
 
     @Test

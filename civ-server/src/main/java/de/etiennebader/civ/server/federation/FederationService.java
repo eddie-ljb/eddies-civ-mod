@@ -28,6 +28,7 @@ import de.etiennebader.civ.server.command.MessageKey;
 import de.etiennebader.civ.server.command.Reply;
 import de.etiennebader.civ.server.command.Texts;
 import de.etiennebader.civ.server.founding.FoundingFees;
+import de.etiennebader.civ.domain.actor.PolityRef;
 import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.Money;
 
@@ -74,12 +75,22 @@ public final class FederationService {
         this.announcements = Objects.requireNonNull(announcements, "announcements");
     }
 
-    /** Mit Gründungskosten; die Gebühr zahlt das Staatsoberhaupt, das gründet. */
+    /** Mit Gründungskosten; die Gebühr zahlt die Kasse der Gliedkörperschaft, aus der gegründet wird. */
     public FederationService(CivApplication app, Calendar calendar, Levels levels, Texts texts,
                              Announcements announcements, FoundingFees fees, CurrencyId currency) {
         this(app, calendar, levels, texts, announcements);
         this.fees = Objects.requireNonNull(fees, "fees");
         this.currency = Objects.requireNonNull(currency, "currency");
+    }
+
+    /** Gründungskosten einer Bundebene in Währungseinheiten. */
+    public long foundingCost(Level level) {
+        return fees.federation(level.id());
+    }
+
+    /** Abrechnung der Gründungsgebühr (Prüfung vorab, Abbuchung nach der Gründung). */
+    public FoundingFees.Billing billing() {
+        return fees.billing(app, currency);
     }
 
     public Levels levels() {
@@ -157,13 +168,14 @@ public final class FederationService {
             }
         }
         long cost = fees.federation(level.get().id());
+        PolityRef payer = new PolityRef(constituent.id());
         FoundingFees.Billing billing = fees.billing(app, currency);
-        Money balance = billing.shortfallBalance(caller.player(), cost);
+        Money balance = billing.shortfallBalance(payer, cost);
         if (balance != null) {
             return Reply.failure(Message.of(MessageKey.FOUNDING_NOT_ENOUGH_MONEY,
                     texts.money(Money.of(cost, currency)), texts.money(balance)));
         }
-        return attempt(() -> billing.chargeAfter(caller.player(), cost, calendar.today(), () -> {
+        return attempt(() -> billing.chargeAfter(payer, cost, calendar.today(), () -> {
             PolityName federationName = PolityName.of(name);
             app.foundFederation().execute(new FoundFederation.Command(federationName, level.get().id(),
                     constituent.id(), caller.player(), calendar.today()));

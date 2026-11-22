@@ -21,7 +21,5 @@ public enum SupplyChange {
     /** Ausbildung, Ausrüstung und Lazarett einer Garnison; das Geld verlässt den Umlauf. */
     MILITARY_SPENDING,
     /** Eingriff eines Administrators. */
-    ADMIN,
-    /** Gründungsgebühr für Gemeinde, Bund oder Firma; das Geld verlässt den Umlauf. */
-    FOUNDING_FEE
+    ADMIN
 }

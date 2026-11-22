@@ -110,9 +110,9 @@ public final class CompanyService {
                 return Reply.failure(Message.of(MessageKey.FOUNDING_NOT_ENOUGH_MONEY,
                         texts.money(Money.of(fees.company() + capital.amount(), currency)), texts.money(balance)));
             }
-            PolityId id = billing.chargeAfter(caller.player(), fees.company(), calendar.today(),
-                    () -> app.companies().foundCompany(caller.player(), PolityName.of(name.strip()), capital,
-                            calendar.today()));
+            // Die Gebühr bucht foundCompany zusammen mit dem Kapital ab (CivServer setzt sie).
+            PolityId id = app.companies().foundCompany(caller.player(), PolityName.of(name.strip()), capital,
+                    calendar.today());
             Listing listing = queries.exchange().listing(id).orElseThrow();
             return Reply.success(Message.of(MessageKey.COMPANY_FOUNDED, name.strip(), texts.money(capital),
                     listing.totalShares(), money(listing.initialPrice())));

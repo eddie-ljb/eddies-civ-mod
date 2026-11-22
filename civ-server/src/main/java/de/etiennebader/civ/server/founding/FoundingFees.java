@@ -1,9 +1,10 @@
 package de.etiennebader.civ.server.founding;
 
 import de.etiennebader.civ.application.CivApplication;
-import de.etiennebader.civ.application.economy.SpendFunds;
+import de.etiennebader.civ.application.economy.TransferFunds;
 import de.etiennebader.civ.domain.actor.ActorRef;
-import de.etiennebader.civ.domain.economy.SupplyChange;
+import de.etiennebader.civ.domain.economy.ServerAccount;
+import de.etiennebader.civ.domain.economy.TransferReason;
 import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.Money;
@@ -14,8 +15,8 @@ import java.util.Objects;
 import java.util.function.Supplier;
 
 /**
- * Gründungskosten für Gemeinden, Bünde und Firmen. Die Gebühr verlässt den Umlauf
- * ({@link SupplyChange#FOUNDING_FEE}); sie wird erst abgebucht, wenn die Gründung gelungen ist.
+ * Gründungskosten für Gemeinden, Bünde und Firmen. Die Gebühr fließt
+ * auf das {@link ServerAccount Serverkonto}; sie wird erst abgebucht, wenn die Gründung gelungen ist.
  * Scheitert die Gründung, wird also nichts abgebucht, und es gibt nie doppelte Abbuchungen.
  *
  * @param municipality         Kosten einer Gemeinde in Hundertsteln eines Smaragds
@@ -81,8 +82,8 @@ public record FoundingFees(long municipality, long company, Map<String, Long> fe
         public <T> T chargeAfter(ActorRef payer, long cost, Day day, Supplier<T> founding) {
             T result = founding.get();
             if (cost > 0) {
-                app.spendFunds().execute(new SpendFunds.Command(payer, Money.of(cost, currency),
-                        SupplyChange.FOUNDING_FEE, day));
+                app.transferFunds().execute(new TransferFunds.Command(payer, ServerAccount.REF,
+                        Money.of(cost, currency), TransferReason.FEE, day));
             }
             return result;
         }
