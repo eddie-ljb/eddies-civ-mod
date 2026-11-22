@@ -156,8 +156,10 @@ public final class CivServer {
         this.protection = new ProtectionService(app.queries(), texts);
         this.voting = new VotingService(app, calendar, texts, announcements);
         this.offices = new OfficeService(app, calendar, players, texts, announcements);
-        this.federations = new FederationService(app, calendar, settings.levels(), texts, announcements);
-        this.commands = new CivCommands(app, calendar, settings.currency(), texts, protection, voting);
+        this.federations = new FederationService(app, calendar, settings.levels(), texts, announcements,
+                settings.founding(), settings.currency());
+        this.commands = new CivCommands(app, calendar, settings.currency(), texts, protection, voting,
+                settings.founding());
         this.parties = new PartyService(app, calendar, settings.currency(), settings.parties(), players, texts,
                 announcements);
         this.lawBooks = new LawBookService(app, calendar, texts, announcements, federations);
@@ -186,7 +188,7 @@ public final class CivServer {
                 player -> plots.selection(player).area());
         this.community = new CommunityService(app, calendar, players, texts, announcements, Clock.systemUTC());
         this.companies = new CompanyService(app, calendar, players, settings.currency(), texts, announcements,
-                conjuncture);
+                conjuncture, settings.founding());
         this.companies.pricing(market::priceLevel);
         this.press = new PressService(app, calendar, players, settings.currency(), texts, announcements);
         this.civic = new CivicService(app, calendar, texts, announcements, plots);

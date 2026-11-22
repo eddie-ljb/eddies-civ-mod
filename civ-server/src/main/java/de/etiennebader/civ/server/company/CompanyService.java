@@ -39,6 +39,7 @@ import de.etiennebader.civ.server.command.MessageKey;
 import de.etiennebader.civ.server.command.MoneyFormat;
 import de.etiennebader.civ.server.command.Reply;
 import de.etiennebader.civ.server.command.Texts;
+import de.etiennebader.civ.server.founding.FoundingFees;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -67,6 +68,7 @@ public final class CompanyService {
 
     private static final int TOP_HOLDERS = 8;
 
+    private final FoundingFees fees;
     private final CivApplication app;
     private final WorldQueries queries;
     private final Calendar calendar;
@@ -79,6 +81,13 @@ public final class CompanyService {
     public CompanyService(CivApplication app, Calendar calendar, PlayerDirectory players, CurrencyId currency,
                           Texts texts, Announcements announcements,
                           de.etiennebader.civ.server.conjuncture.ConjunctureService conjuncture) {
+        this(app, calendar, players, currency, texts, announcements, conjuncture, FoundingFees.FREE);
+    }
+
+    public CompanyService(CivApplication app, Calendar calendar, PlayerDirectory players, CurrencyId currency,
+                          Texts texts, Announcements announcements,
+                          de.etiennebader.civ.server.conjuncture.ConjunctureService conjuncture, FoundingFees fees) {
+        this.fees = Objects.requireNonNull(fees, "fees");
         this.app = Objects.requireNonNull(app, "app");
         this.queries = app.queries();
         this.calendar = Objects.requireNonNull(calendar, "calendar");
@@ -94,8 +103,16 @@ public final class CompanyService {
     /** {@code /civ firma gruenden <Kapital> <Name>} */
     public Reply found(Caller caller, String capitalInput, String name) {
         return withAmount(capitalInput, capital -> attempt(() -> {
-            PolityId id = app.companies().foundCompany(caller.player(), PolityName.of(name.strip()), capital,
-                    calendar.today());
+            FoundingFees.Billing billing = fees.billing(app, currency);
+            // Gebühr und Kapital zusammen müssen gedeckt sein, sonst würde die Gebühr erst nach dem Kapital scheitern.
+            Money balance = billing.shortfallBalance(caller.player(), Math.addExact(fees.company(), capital.amount()));
+            if (balance != null) {
+                return Reply.failure(Message.of(MessageKey.FOUNDING_NOT_ENOUGH_MONEY,
+                        texts.money(Money.of(fees.company() + capital.amount(), currency)), texts.money(balance)));
+            }
+            PolityId id = billing.chargeAfter(caller.player(), fees.company(), calendar.today(),
+                    () -> app.companies().foundCompany(caller.player(), PolityName.of(name.strip()), capital,
+                            calendar.today()));
             Listing listing = queries.exchange().listing(id).orElseThrow();
             return Reply.success(Message.of(MessageKey.COMPANY_FOUNDED, name.strip(), texts.money(capital),
                     listing.totalShares(), money(listing.initialPrice())));

@@ -491,6 +491,8 @@
   "eddies-civ-mod.command.level_too_low": "Ein Bund der Ebene %1$s muss höher stehen als %2$s (%3$s).",
   "eddies-civ-mod.command.villager_town_founded": "Dorfbewohner gründen die Gemeinde %1$s und verlassen %2$s (%3$s Mitglieder).",
   "eddies-civ-mod.command.federation_announced": "%1$s gründet die Ebene %2$s: %3$s, erstes Glied ist %4$s.",
+  "eddies-civ-mod.command.federation_needs_previous_level": "Für einen %1$s fehlt die Vorstufe: Gründe zuerst einen %2$s (Vorgänger-Ebene ist Pflicht).",
+  "eddies-civ-mod.command.founding_not_enough_money": "Die Gründung kostet %1$s, du hast nur %2$s.",
   "eddies-civ-mod.command.federation_founded": "%1$s (%2$s) gegründet; %3$s ist erstes Glied. Weitere einladen: /civ bund einladen <Gemeinde>",
   "eddies-civ-mod.command.federation_guest_taken": "%1$s gehört bereits zu %2$s.",
   "eddies-civ-mod.command.federation_invitation": "%1$s lädt %2$s ein. Wer %2$s führt, nimmt an mit /civ bund beitreten %1$s",

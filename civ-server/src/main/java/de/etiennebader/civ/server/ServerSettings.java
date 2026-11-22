@@ -32,13 +32,25 @@ import java.util.Objects;
  * @param parties        ob und ab wie vielen Gleichgesinnten Dorfbewohner Parteien gründen
  * @param show           Inszenierung: Live-Auszählung, Debatten, Hymnen, Weltkarte
  * @param economy        Fein-tuning der Marktpreissimulation (Preisfaktor-Grenzen und -Dämpfung)
+ * @param founding       Gründungskosten und Vorgänger-Pflicht für Gemeinden, Bünde und Firmen
  * @param ambitions      ob ehrgeizige Dorfbewohner Firmen, Parteien und Bünde gründen, kandidieren, Gebiet beanspruchen,
  *                       Firmen übernehmen und führen
  */
 public record ServerSettings(long ticksPerDay, int claimBase, int claimPerMember, CurrencyId currency,
                              Money priceReference, Money villagerIncome, TierThresholds tiers, WebSettings web,
                              boolean emigration, boolean villagerPolitics, Levels levels, PartySettings parties,
-                             ShowSettings show, EconomySettings economy, boolean ambitions) {
+                             ShowSettings show, EconomySettings economy, boolean ambitions,
+                             de.etiennebader.civ.server.founding.FoundingFees founding) {
+
+    /** Ohne Gründungskosten. */
+    public ServerSettings(long ticksPerDay, int claimBase, int claimPerMember, CurrencyId currency,
+                          Money priceReference, Money villagerIncome, TierThresholds tiers, WebSettings web,
+                          boolean emigration, boolean villagerPolitics, Levels levels, PartySettings parties,
+                          ShowSettings show, EconomySettings economy, boolean ambitions) {
+        this(ticksPerDay, claimBase, claimPerMember, currency, priceReference, villagerIncome, tiers, web, emigration,
+                villagerPolitics, levels, parties, show, economy, ambitions,
+                de.etiennebader.civ.server.founding.FoundingFees.FREE);
+    }
 
     /** Mit ehrgeizigen Dorfbewohnern. */
     public ServerSettings(long ticksPerDay, int claimBase, int claimPerMember, CurrencyId currency,
@@ -252,7 +264,13 @@ public record ServerSettings(long ticksPerDay, int claimBase, int claimPerMember
     public static ServerSettings defaults() {
         return new ServerSettings(Calendar.MINECRAFT_DAY_TICKS, 9, 4, CurrencyId.EMERALD,
                 Money.of(50 * 100, CurrencyId.EMERALD), Money.of(25, CurrencyId.EMERALD), TierThresholds.DEFAULT,
-                WebSettings.DEFAULT);
+                WebSettings.DEFAULT).withFounding(de.etiennebader.civ.server.founding.FoundingFees.DEFAULT);
+    }
+
+    /** Dieselben Einstellungen mit anderen Gründungskosten. */
+    public ServerSettings withFounding(de.etiennebader.civ.server.founding.FoundingFees fees) {
+        return new ServerSettings(ticksPerDay, claimBase, claimPerMember, currency, priceReference, villagerIncome,
+                tiers, web, emigration, villagerPolitics, levels, parties, show, economy, ambitions, fees);
     }
 
     /** Zusammenhängendes Kerngebiet, begrenzte Außenposten, Größe nach Mitgliederzahl. */
