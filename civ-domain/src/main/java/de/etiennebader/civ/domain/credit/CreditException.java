@@ -46,4 +46,16 @@ public final class CreditException extends DomainException {
     public static CreditException lendingNotAllowed() {
         return new CreditException(ErrorCode.LENDING_NOT_ALLOWED);
     }
+
+    public static CreditException unknownOffer(LoanId id) {
+        return new CreditException(ErrorCode.UNKNOWN_LOAN_OFFER, id.value());
+    }
+
+    public static CreditException notOfferRecipient(LoanId id, ActorRef actor) {
+        return new CreditException(ErrorCode.NOT_OFFER_PARTY, id.value(), actor);
+    }
+
+    public static CreditException notSelfService(ActorRef bank) {
+        return new CreditException(ErrorCode.BANK_NOT_SELF_SERVICE, bank);
+    }
 }

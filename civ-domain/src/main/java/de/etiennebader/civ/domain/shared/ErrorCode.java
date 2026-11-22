@@ -49,6 +49,12 @@ public enum ErrorCode {
     CREDIT_SCORE_TOO_LOW,
     /** Keine Argumente. */
     LENDING_NOT_ALLOWED,
+    /** Argumente: Angebots-ID. */
+    UNKNOWN_LOAN_OFFER,
+    /** Argumente: Angebots-ID, Akteur. */
+    NOT_OFFER_PARTY,
+    /** Argumente: Bank. */
+    BANK_NOT_SELF_SERVICE,
 
     // law
     /** Argumente: Titel, Mindestlänge, Höchstlänge. */

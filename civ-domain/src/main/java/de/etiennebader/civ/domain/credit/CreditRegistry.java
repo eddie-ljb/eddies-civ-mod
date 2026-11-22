@@ -26,6 +26,8 @@ public final class CreditRegistry extends AggregateRoot<CreditEvent> implements 
     public static final int MAX_RATE_BASIS_POINTS = 100_000;
 
     private final Set<ActorRef> banks = new LinkedHashSet<>();
+    private final Set<ActorRef> selfService = new LinkedHashSet<>();
+    private final Map<LoanId, LoanOffer> offers = new LinkedHashMap<>();
     private final Map<ActorRef, Integer> scores = new LinkedHashMap<>();
     private final Map<LoanId, Loan> loans = new LinkedHashMap<>();
 
@@ -38,7 +40,15 @@ public final class CreditRegistry extends AggregateRoot<CreditEvent> implements 
 
     public static CreditRegistry restore(Collection<ActorRef> banks, Map<ActorRef, Integer> scores,
                                          Collection<Loan> loans) {
+        return restore(banks, Set.of(), scores, loans, List.of());
+    }
+
+    public static CreditRegistry restore(Collection<ActorRef> banks, Collection<ActorRef> selfService,
+                                         Map<ActorRef, Integer> scores, Collection<Loan> loans,
+                                         Collection<LoanOffer> offers) {
         CreditRegistry registry = new CreditRegistry();
+        selfService.stream().filter(banks::contains).forEach(registry.selfService::add);
+        offers.forEach(offer -> registry.offers.put(offer.id(), offer));
         registry.banks.addAll(banks);
         scores.forEach((actor, score) -> registry.scores.put(actor, CreditScore.clamp(score)));
         loans.forEach(loan -> registry.loans.put(loan.id(), loan));
@@ -58,7 +68,83 @@ public final class CreditRegistry extends AggregateRoot<CreditEvent> implements 
         if (!banks.remove(Objects.requireNonNull(bank, "bank"))) {
             throw CreditException.notABank(bank);
         }
+        selfService.remove(bank);
+        List.copyOf(offers.values()).stream().filter(offer -> offer.lender().equals(bank))
+                .forEach(offer -> closeOffer(offer.id(), day));
         raise(new CreditEvent.BankClosed(bank, day));
+    }
+
+    /** Erlaubt oder verbietet Kredite ohne Angebot („Selbstbedienung“); die Bank muss lizenziert sein. */
+    public void setSelfService(ActorRef bank, boolean enabled, Day day) {
+        if (!banks.contains(Objects.requireNonNull(bank, "bank"))) {
+            throw CreditException.notABank(bank);
+        }
+        if (enabled ? selfService.add(bank) : selfService.remove(bank)) {
+            raise(new CreditEvent.SelfServiceChanged(bank, enabled, day));
+        }
+    }
+
+    /**
+     * Legt ein Kreditangebot vor. Der Kreditnehmer nimmt es mit {@link #takeOffer} an, die Auszahlung bucht der Aufrufer.
+     */
+    public LoanOffer offer(LoanId id, ActorRef lender, ActorRef borrower, CurrencyId currency, long principal,
+                           long termDays, Day day) {
+        LoanOffer offer;
+        try {
+            offer = new LoanOffer(id, lender, borrower, currency, principal, termDays, day,
+                    day.plus(LoanOffer.VALID_DAYS));
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw CreditException.invalidTerms();
+        }
+        if (offers.containsKey(id)) {
+            throw CreditException.invalidTerms();
+        }
+        offers.put(id, offer);
+        raise(new CreditEvent.OfferMade(id, day));
+        return offer;
+    }
+
+    /**
+     * Nimmt ein Angebot aus dem Register (angenommen oder abgelehnt). Nur der Kreditnehmer darf.
+     *
+     * @throws CreditException wenn es das Angebot nicht gibt, es abgelaufen ist oder {@code actor} nicht der
+     *                         Kreditnehmer ist
+     */
+    public LoanOffer takeOffer(LoanId id, ActorRef actor, Day day) {
+        LoanOffer offer = offers.get(Objects.requireNonNull(id, "id"));
+        if (offer == null || day.isAfter(offer.expiresOn())) {
+            throw CreditException.unknownOffer(id);
+        }
+        if (!offer.borrower().equals(actor)) {
+            throw CreditException.notOfferRecipient(id, actor);
+        }
+        closeOffer(id, day);
+        return offer;
+    }
+
+    /** Zieht ein Angebot zurück oder verwirft es; nur Kreditgeber oder Kreditnehmer dürfen. */
+    public void cancelOffer(LoanId id, ActorRef actor, Day day) {
+        LoanOffer offer = offers.get(Objects.requireNonNull(id, "id"));
+        if (offer == null) {
+            throw CreditException.unknownOffer(id);
+        }
+        if (!offer.lender().equals(actor) && !offer.borrower().equals(actor)) {
+            throw CreditException.notOfferRecipient(id, actor);
+        }
+        closeOffer(id, day);
+    }
+
+    /** Entfernt abgelaufene Angebote. */
+    public List<LoanOffer> expireOffers(Day today) {
+        List<LoanOffer> expired = offers.values().stream().filter(offer -> today.isAfter(offer.expiresOn())).toList();
+        expired.forEach(offer -> closeOffer(offer.id(), today));
+        return expired;
+    }
+
+    private void closeOffer(LoanId id, Day day) {
+        if (offers.remove(id) != null) {
+            raise(new CreditEvent.OfferClosed(id, day));
+        }
     }
 
     /**
@@ -155,6 +241,21 @@ public final class CreditRegistry extends AggregateRoot<CreditEvent> implements 
     @Override
     public Set<ActorRef> banks() {
         return Set.copyOf(banks);
+    }
+
+    @Override
+    public Set<ActorRef> selfServiceBanks() {
+        return Set.copyOf(selfService);
+    }
+
+    @Override
+    public Optional<LoanOffer> offer(LoanId id) {
+        return Optional.ofNullable(offers.get(id));
+    }
+
+    @Override
+    public List<LoanOffer> offers() {
+        return List.copyOf(offers.values());
     }
 
     @Override

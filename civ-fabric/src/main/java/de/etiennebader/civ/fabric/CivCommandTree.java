@@ -169,6 +169,7 @@ public final class CivCommandTree {
     private static final String PERCENT = "prozent";
     private static final String DAYS = "tage";
     private static final String LOAN = "kredit";
+    private static final String POLITY = "polity";
     private static final String RECIPIENT = "empfaenger";
     private static final String OFFICE = "amt";
     private static final String CANDIDATE = "kandidat";
@@ -512,51 +513,14 @@ public final class CivCommandTree {
                                                                         StringArgumentType.getString(context, AMOUNT),
                                                                         StringArgumentType.getString(context, CURRENCY),
                                                                         StringArgumentType.getString(context, TARGET)))))))))
-                .then(Commands.literal("bank")
-                        .then(Commands.literal("gruenden")
-                                .executes(context -> withCiv(context, (civ, player) ->
-                                        civ.credit().openBank(Players.caller(player)))))
-                        .then(Commands.literal("schliessen")
-                                .executes(context -> withCiv(context, (civ, player) ->
-                                        civ.credit().closeBank(Players.caller(player))))))
-                .then(Commands.literal("kredit")
-                        .then(Commands.literal("zins")
-                                .then(Commands.argument(RECIPIENT, StringArgumentType.string())
-                                        .suggests(this::suggestRecipients)
-                                        .then(Commands.argument(CURRENCY, StringArgumentType.word())
-                                                .suggests(this::suggestCurrencies)
-                                                .executes(context -> withCiv(context, (civ, player) ->
-                                                        civ.credit().quote(Players.caller(player),
-                                                                StringArgumentType.getString(context, RECIPIENT),
-                                                                StringArgumentType.getString(context, CURRENCY)))))))
-                        .then(Commands.literal("nehmen")
-                                .then(Commands.argument(RECIPIENT, StringArgumentType.string())
-                                        .suggests(this::suggestRecipients)
-                                        .then(Commands.argument(AMOUNT, StringArgumentType.word())
-                                                .then(Commands.argument(DAYS, IntegerArgumentType.integer(1, 3_650))
-                                                        .executes(context -> withCiv(context, (civ, player) ->
-                                                                civ.credit().take(Players.caller(player),
-                                                                        StringArgumentType.getString(context, RECIPIENT),
-                                                                        StringArgumentType.getString(context, AMOUNT),
-                                                                        IntegerArgumentType.getInteger(context, DAYS), "")))
-                                                        .then(Commands.argument(CURRENCY, StringArgumentType.word())
-                                                                .suggests(this::suggestCurrencies)
-                                                                .executes(context -> withCiv(context, (civ, player) ->
-                                                                        civ.credit().take(Players.caller(player),
-                                                                                StringArgumentType.getString(context, RECIPIENT),
-                                                                                StringArgumentType.getString(context, AMOUNT),
-                                                                                IntegerArgumentType.getInteger(context, DAYS),
-                                                                                StringArgumentType.getString(context, CURRENCY)))))))))
-                        .then(Commands.literal("zurueckzahlen")
-                                .then(Commands.argument(LOAN, StringArgumentType.word())
-                                        .then(Commands.argument(AMOUNT, StringArgumentType.word())
-                                                .executes(context -> withCiv(context, (civ, player) ->
-                                                        civ.credit().repay(Players.caller(player),
-                                                                StringArgumentType.getString(context, LOAN),
-                                                                StringArgumentType.getString(context, AMOUNT)))))))
-                        .then(Commands.literal("liste")
-                                .executes(context -> withCiv(context, (civ, player) ->
-                                        civ.credit().overview(Players.caller(player))))))
+                .then(attachBank(Commands.literal("bank"), context -> "").then(Commands.literal("als")
+                        .then(attachBank(Commands.argument(POLITY, StringArgumentType.string())
+                                .suggests(this::suggestRecipients),
+                                context -> StringArgumentType.getString(context, POLITY)))))
+                .then(attachCredit(Commands.literal("kredit"), context -> "").then(Commands.literal("als")
+                        .then(attachCredit(Commands.argument(POLITY, StringArgumentType.string())
+                                .suggests(this::suggestRecipients),
+                                context -> StringArgumentType.getString(context, POLITY)))))
                 .then(Commands.literal("kasse")
                         .then(Commands.literal("einzahlen")
                                 .then(Commands.argument(AMOUNT, StringArgumentType.word())
@@ -1710,6 +1674,96 @@ public final class CivCommandTree {
                                                              SuggestionsBuilder builder) {
         host.current().ifPresent(civ -> civ.currencies().currencyCodes().forEach(builder::suggest));
         return builder.buildFuture();
+    }
+
+    private <T extends com.mojang.brigadier.builder.ArgumentBuilder<CommandSourceStack, T>> T attachBank(
+            T parent, java.util.function.Function<CommandContext<CommandSourceStack>, String> as) {
+        return parent
+                .then(Commands.literal("gruenden")
+                        .executes(context -> withCiv(context, (civ, player) ->
+                                civ.credit().openBank(Players.caller(player), as.apply(context)))))
+                .then(Commands.literal("schliessen")
+                        .executes(context -> withCiv(context, (civ, player) ->
+                                civ.credit().closeBank(Players.caller(player), as.apply(context)))))
+                .then(Commands.literal("selbstbedienung")
+                        .then(Commands.literal("an")
+                                .executes(context -> withCiv(context, (civ, player) ->
+                                        civ.credit().setSelfService(Players.caller(player), as.apply(context), true))))
+                        .then(Commands.literal("aus")
+                                .executes(context -> withCiv(context, (civ, player) ->
+                                        civ.credit().setSelfService(Players.caller(player), as.apply(context), false)))));
+    }
+
+    private <T extends com.mojang.brigadier.builder.ArgumentBuilder<CommandSourceStack, T>> T attachCredit(
+            T parent, java.util.function.Function<CommandContext<CommandSourceStack>, String> as) {
+        return parent
+                .then(Commands.literal("zins")
+                        .then(Commands.argument(RECIPIENT, StringArgumentType.string())
+                                .suggests(this::suggestRecipients)
+                                .then(Commands.argument(CURRENCY, StringArgumentType.word())
+                                        .suggests(this::suggestCurrencies)
+                                        .executes(context -> withCiv(context, (civ, player) ->
+                                                civ.credit().quote(Players.caller(player), as.apply(context),
+                                                        StringArgumentType.getString(context, RECIPIENT),
+                                                        StringArgumentType.getString(context, CURRENCY)))))))
+                .then(Commands.literal("nehmen")
+                        .then(Commands.argument(RECIPIENT, StringArgumentType.string())
+                                .suggests(this::suggestRecipients)
+                                .then(Commands.argument(AMOUNT, StringArgumentType.word())
+                                        .then(Commands.argument(DAYS, IntegerArgumentType.integer(1, 3_650))
+                                                .executes(context -> withCiv(context, (civ, player) ->
+                                                        civ.credit().take(Players.caller(player), as.apply(context),
+                                                                StringArgumentType.getString(context, RECIPIENT),
+                                                                StringArgumentType.getString(context, AMOUNT),
+                                                                IntegerArgumentType.getInteger(context, DAYS), "")))
+                                                .then(Commands.argument(CURRENCY, StringArgumentType.word())
+                                                        .suggests(this::suggestCurrencies)
+                                                        .executes(context -> withCiv(context, (civ, player) ->
+                                                                civ.credit().take(Players.caller(player),
+                                                                        as.apply(context),
+                                                                        StringArgumentType.getString(context, RECIPIENT),
+                                                                        StringArgumentType.getString(context, AMOUNT),
+                                                                        IntegerArgumentType.getInteger(context, DAYS),
+                                                                        StringArgumentType.getString(context, CURRENCY)))))))))
+                .then(Commands.literal("anbieten")
+                        .then(Commands.argument(RECIPIENT, StringArgumentType.string())
+                                .suggests(this::suggestRecipients)
+                                .then(Commands.argument(AMOUNT, StringArgumentType.word())
+                                        .then(Commands.argument(DAYS, IntegerArgumentType.integer(1, 3_650))
+                                                .executes(context -> withCiv(context, (civ, player) ->
+                                                        civ.credit().offer(Players.caller(player), as.apply(context),
+                                                                StringArgumentType.getString(context, RECIPIENT),
+                                                                StringArgumentType.getString(context, AMOUNT),
+                                                                IntegerArgumentType.getInteger(context, DAYS), "")))
+                                                .then(Commands.argument(CURRENCY, StringArgumentType.word())
+                                                        .suggests(this::suggestCurrencies)
+                                                        .executes(context -> withCiv(context, (civ, player) ->
+                                                                civ.credit().offer(Players.caller(player),
+                                                                        as.apply(context),
+                                                                        StringArgumentType.getString(context, RECIPIENT),
+                                                                        StringArgumentType.getString(context, AMOUNT),
+                                                                        IntegerArgumentType.getInteger(context, DAYS),
+                                                                        StringArgumentType.getString(context, CURRENCY)))))))))
+                .then(Commands.literal("annehmen")
+                        .then(Commands.argument(LOAN, StringArgumentType.word())
+                                .executes(context -> withCiv(context, (civ, player) ->
+                                        civ.credit().accept(Players.caller(player), as.apply(context),
+                                                StringArgumentType.getString(context, LOAN))))))
+                .then(Commands.literal("ablehnen")
+                        .then(Commands.argument(LOAN, StringArgumentType.word())
+                                .executes(context -> withCiv(context, (civ, player) ->
+                                        civ.credit().decline(Players.caller(player), as.apply(context),
+                                                StringArgumentType.getString(context, LOAN))))))
+                .then(Commands.literal("zurueckzahlen")
+                        .then(Commands.argument(LOAN, StringArgumentType.word())
+                                .then(Commands.argument(AMOUNT, StringArgumentType.word())
+                                        .executes(context -> withCiv(context, (civ, player) ->
+                                                civ.credit().repay(Players.caller(player), as.apply(context),
+                                                        StringArgumentType.getString(context, LOAN),
+                                                        StringArgumentType.getString(context, AMOUNT)))))))
+                .then(Commands.literal("liste")
+                        .executes(context -> withCiv(context, (civ, player) ->
+                                civ.credit().overview(Players.caller(player), as.apply(context)))));
     }
 
     private static Reply setCurrencyItem(CivServer civ, ServerPlayer player, String code, String itemId) {

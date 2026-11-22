@@ -60,11 +60,21 @@ class CurrencyServiceTest {
     }
 
     @Test
+    void unknownPolityCannotActAsBank() {
+        assertFalse(server.credit().openBank(at(alice), "Nirgendwo").success());
+        assertFalse(server.credit().setSelfService(at(alice), "", true).success()); // noch keine Bank
+        assertTrue(server.credit().openBank(at(alice), "").success());
+        assertTrue(server.credit().setSelfService(at(alice), "", true).success());
+        assertFalse(server.credit().accept(at(bob), "", "deadbeef").success());
+        assertFalse(server.credit().decline(at(bob), "", "deadbeef").success());
+    }
+
+    @Test
     void loansThroughCreditService() {
         server.bank().deposit(at(alice), 50);
-        assertFalse(server.credit().take(at(bob), "Spieler", "5", 30, "EMERALD").success());
-        assertTrue(server.credit().openBank(at(alice)).success());
-        assertFalse(server.credit().openBank(at(alice)).success());
-        assertTrue(server.credit().overview(at(bob)).success());
+        assertFalse(server.credit().take(at(bob), "", "Spieler", "5", 30, "EMERALD").success());
+        assertTrue(server.credit().openBank(at(alice), "").success());
+        assertFalse(server.credit().openBank(at(alice), "").success());
+        assertTrue(server.credit().overview(at(bob), "").success());
     }
 }

@@ -12,6 +12,9 @@ Rezept: Gold, Eisen, Smaragd, Steinziegel (`GIG / IEI / SSS`). Per Rechtsklick z
 - **Standardwährung:** Per Gesetz oder Verfassung (`/civ recht setzen default_currency <Code>`). Die Dorfbewohner des Gebiets wirtschaften in ihr; leer = Gründungswährung.
 - **Bank:** Im Bank-Bildschirm wechselt der Knopf oben links die Auszahlungswährung. `/civ abheben <Anzahl> <Währung>` und `/civ einzahlen <Anzahl> <Währung>` tun dasselbe per Befehl. Bargeld einer eigenen Währung ist ein gekennzeichnetes Item; gewöhnliche Items gleicher Art nimmt die Bank nicht an.
 - **Kredite:** `/civ bank gruenden` macht dich zur Bank. Kreditnehmer: `/civ kredit zins <Bank> <Währung>` (Zinsangebot), `/civ kredit nehmen <Bank> <Betrag> <Tage> [Währung]`, `/civ kredit zurueckzahlen <Kennung> <Betrag>`, `/civ kredit liste`. Jahreszins = Leitzins + Aufschlag nach **Kreditscore** (300–850, Start 600). Rückzahlung erhöht den Score, Zahlungsausfall senkt ihn. Der Zentralbank-Vorsitzende leiht Banken zum reinen Leitzins.
+- **Angebote und Selbstbedienung:** Banken können Kredite anbieten (`/civ kredit anbieten <Kreditnehmer> <Betrag> <Tage> [Währung]`); der Kreditnehmer nimmt mit `/civ kredit annehmen <Kennung>` an oder lehnt mit `ablehnen` ab (sieben Tage gültig). Mit `/civ bank selbstbedienung an` darf man ohne Angebot direkt leihen (`/civ kredit nehmen …`); Standard ist aus.
+- **Firmen und Gemeinden:** `als <Name>` vor dem Unterbefehl, z. B. `/civ bank als Nordbank gruenden`, `/civ kredit als Nordbank anbieten …`. Berechtigt sind Firmenleitung bzw. Bürgermeister/Schatzmeister.
+- **Dorfbewohner** leihen sich bei knapper Kasse kleine Beträge bei Banken mit Selbstbedienung und zahlen zurück, sobald es geht.
 - **Gesetze:** `bank_lending_allowed`, `bank_max_interest_percent`, `bank_min_credit_score`, `central_bank_max_base_rate_percent`.
 
 ## Markt (Block)

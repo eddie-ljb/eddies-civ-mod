@@ -393,6 +393,7 @@ public final class VillagerService {
             app.villagerBusiness().execute(day);
             app.villagerJobSearch().execute(day, villager -> false);
             app.villagerLandlords().execute(day);
+            app.villagerBorrowing().execute(day);
         }
         return changes;
     }

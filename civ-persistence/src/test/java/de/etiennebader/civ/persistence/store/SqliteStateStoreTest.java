@@ -122,6 +122,8 @@ class SqliteStateStoreTest {
         assertTrue(saved.contains("street|Hauptstraße"), saved);
         assertTrue(saved.contains("currency|GOLD|Gold|G|1/10|"), saved);
         assertTrue(saved.contains("|DEFAULTED"), saved);
+        assertTrue(saved.contains("selfservice|"), saved);
+        assertTrue(saved.contains("offer|"), saved);
         assertTrue(saved.contains("score|"), saved);
         assertTrue(saved.contains("contract|1|"), saved);
         assertTrue(saved.contains("contract|2|"), saved);
@@ -481,7 +483,9 @@ class SqliteStateStoreTest {
             app.depositEmeralds().execute(new de.etiennebader.civ.application.economy.DepositEmeralds.Command(alice,
                     Money.of(5_000, CurrencyId.EMERALD), DAY));
             app.credit().licenseBank(alice, DAY);
+            app.credit().setSelfService(alice, true, DAY);
             app.credit().takeLoan(alice, bertram, Money.of(1_000, CurrencyId.EMERALD), 30, DAY);
+            app.credit().offerLoan(alice, dora, Money.of(300, CurrencyId.EMERALD), 14, DAY.plus(40));
             app.credit().endOfDay(DAY.plus(40)); // Kredit fällt aus, Kreditscore sinkt
             app.endOfDay().execute(DAY);
             app.runElections().execute(DAY.plus(1));

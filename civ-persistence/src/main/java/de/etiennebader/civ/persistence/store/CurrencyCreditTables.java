@@ -79,11 +79,16 @@ final class CurrencyCreditTables {
 
     void writeCredit(Connection connection, CreditView credit) throws SQLException {
         try (Statement clear = connection.createStatement()) {
+            clear.executeUpdate("DELETE FROM loan_offer");
             clear.executeUpdate("DELETE FROM loan");
             clear.executeUpdate("DELETE FROM credit_score");
             clear.executeUpdate("DELETE FROM bank");
         }
-        try (PreparedStatement bank = connection.prepareStatement("INSERT INTO bank (actor, seq) VALUES (?, ?)");
+        try (PreparedStatement bank = connection.prepareStatement(
+                     "INSERT INTO bank (actor, seq, self_service) VALUES (?, ?, ?)");
+             PreparedStatement offer = connection.prepareStatement("""
+                     INSERT INTO loan_offer (id, lender, borrower, currency, principal, term_days, offered_on,
+                         expires_on, seq) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""");
              PreparedStatement score = connection.prepareStatement(
                      "INSERT INTO credit_score (actor, score) VALUES (?, ?)");
              PreparedStatement loan = connection.prepareStatement("""
@@ -93,6 +98,7 @@ final class CurrencyCreditTables {
             for (ActorRef actor : credit.banks().stream().sorted(ActorRef.CANONICAL_ORDER).toList()) {
                 bank.setString(1, ActorCodec.encode(actor));
                 bank.setInt(2, seq++);
+                bank.setInt(3, credit.isSelfService(actor) ? 1 : 0);
                 bank.addBatch();
             }
             for (Map.Entry<ActorRef, Integer> entry : credit.scores().entrySet()) {
@@ -116,7 +122,21 @@ final class CurrencyCreditTables {
                 loan.setInt(12, seq++);
                 loan.addBatch();
             }
+            seq = 0;
+            for (var found : credit.offers()) {
+                offer.setString(1, found.id().value().toString());
+                offer.setString(2, ActorCodec.encode(found.lender()));
+                offer.setString(3, ActorCodec.encode(found.borrower()));
+                offer.setString(4, found.currency().code());
+                offer.setLong(5, found.principal());
+                offer.setLong(6, found.termDays());
+                offer.setLong(7, found.offeredOn().value());
+                offer.setLong(8, found.expiresOn().value());
+                offer.setInt(9, seq++);
+                offer.addBatch();
+            }
             bank.executeBatch();
+            offer.executeBatch();
             score.executeBatch();
             loan.executeBatch();
         }
@@ -124,12 +144,30 @@ final class CurrencyCreditTables {
 
     CreditRegistry loadCredit(Connection connection) throws SQLException {
         List<ActorRef> banks = new ArrayList<>();
+        List<ActorRef> selfService = new ArrayList<>();
+        List<de.etiennebader.civ.domain.credit.LoanOffer> offers = new ArrayList<>();
         Map<ActorRef, Integer> scores = new LinkedHashMap<>();
         List<Loan> loans = new ArrayList<>();
         try (Statement select = connection.createStatement()) {
-            try (ResultSet rows = select.executeQuery("SELECT actor FROM bank ORDER BY seq")) {
+            try (ResultSet rows = select.executeQuery("SELECT actor, self_service FROM bank ORDER BY seq")) {
                 while (rows.next()) {
-                    banks.add(ActorCodec.decode(rows.getString("actor")));
+                    ActorRef bank = ActorCodec.decode(rows.getString("actor"));
+                    banks.add(bank);
+                    if (rows.getInt("self_service") == 1) {
+                        selfService.add(bank);
+                    }
+                }
+            }
+            try (ResultSet rows = select.executeQuery("""
+                    SELECT id, lender, borrower, currency, principal, term_days, offered_on, expires_on
+                    FROM loan_offer ORDER BY seq""")) {
+                while (rows.next()) {
+                    offers.add(new de.etiennebader.civ.domain.credit.LoanOffer(
+                            new LoanId(UUID.fromString(rows.getString("id"))),
+                            ActorCodec.decode(rows.getString("lender")), ActorCodec.decode(rows.getString("borrower")),
+                            new CurrencyId(rows.getString("currency")), rows.getLong("principal"),
+                            rows.getLong("term_days"), Day.of(rows.getLong("offered_on")),
+                            Day.of(rows.getLong("expires_on"))));
                 }
             }
             try (ResultSet rows = select.executeQuery("SELECT actor, score FROM credit_score")) {
@@ -150,6 +188,6 @@ final class CurrencyCreditTables {
                 }
             }
         }
-        return CreditRegistry.restore(banks, scores, loans);
+        return CreditRegistry.restore(banks, selfService, scores, loans, offers);
     }
 }

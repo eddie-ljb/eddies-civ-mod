@@ -251,6 +251,12 @@ public final class StateDump {
                         Integer.toString(currency.baseRatePercent()), currency.itemId().orElse("-"))));
         world.credit().banks().stream().map(StateDump::actor).sorted()
                 .forEach(bank -> lines.add("bank|" + bank));
+        world.credit().selfServiceBanks().stream().map(StateDump::actor).sorted()
+                .forEach(bank -> lines.add("selfservice|" + bank));
+        world.credit().offers().stream().sorted(java.util.Comparator.comparing(offer -> offer.id().value().toString()))
+                .forEach(offer -> lines.add(String.join("|", "offer", offer.id().value().toString(), actor(offer.lender()),
+                        actor(offer.borrower()), offer.currency().code(), Long.toString(offer.principal()),
+                        Long.toString(offer.termDays()), day(offer.offeredOn().value()), day(offer.expiresOn().value()))));
         world.credit().scores().entrySet().stream().map(entry -> "score|" + actor(entry.getKey()) + "|" + entry.getValue())
                 .sorted().forEach(lines::add);
         world.credit().loans().stream().sorted(java.util.Comparator.comparing(loan -> loan.id().value().toString()))

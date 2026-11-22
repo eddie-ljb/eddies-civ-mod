@@ -14,6 +14,17 @@ public interface CreditView {
 
     Set<ActorRef> banks();
 
+    /** Banken, bei denen Kreditnehmer ohne Angebot direkt Kredite aufnehmen dürfen. */
+    Set<ActorRef> selfServiceBanks();
+
+    default boolean isSelfService(ActorRef bank) {
+        return selfServiceBanks().contains(bank);
+    }
+
+    Optional<LoanOffer> offer(LoanId id);
+
+    List<LoanOffer> offers();
+
     /** Kreditscore; Akteure ohne Verlauf haben {@link CreditScore#START}. */
     int scoreOf(ActorRef actor);
 

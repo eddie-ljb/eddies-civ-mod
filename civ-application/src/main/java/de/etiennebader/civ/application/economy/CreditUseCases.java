@@ -8,6 +8,7 @@ import de.etiennebader.civ.domain.credit.CreditRegistry;
 import de.etiennebader.civ.domain.credit.CreditScore;
 import de.etiennebader.civ.domain.credit.Loan;
 import de.etiennebader.civ.domain.credit.LoanId;
+import de.etiennebader.civ.domain.credit.LoanOffer;
 import de.etiennebader.civ.domain.economy.Currency;
 import de.etiennebader.civ.domain.economy.InsufficientFundsException;
 import de.etiennebader.civ.domain.economy.Ledger;
@@ -53,6 +54,66 @@ public final class CreditUseCases {
     public void closeBank(ActorRef bank, Day day) {
         CreditRegistry credit = aggregates.credit();
         credit.closeBank(bank, day);
+        aggregates.commit(credit);
+    }
+
+    /** Erlaubt oder verbietet Kredite ohne Angebot bei dieser Bank. */
+    public void setSelfService(ActorRef bank, boolean enabled, Day day) {
+        CreditRegistry credit = aggregates.credit();
+        credit.setSelfService(bank, enabled, day);
+        aggregates.commit(credit);
+    }
+
+    /**
+     * Wie {@link #takeLoan}, aber ohne Angebot: Die Bank muss „Selbstbedienung“ erlaubt haben.
+     *
+     * @throws CreditException wenn die Bank keine Selbstbedienung anbietet
+     */
+    public Loan takeSelfService(ActorRef lender, ActorRef borrower, Money principal, long termDays, Day day) {
+        if (!queries.credit().isSelfService(lender)) {
+            throw CreditException.notSelfService(lender);
+        }
+        return takeLoan(lender, borrower, principal, termDays, day);
+    }
+
+    /**
+     * Legt dem Kreditnehmer ein Angebot vor (sieben Tage gültig). Kreditgeber ist eine Bank oder, gegenüber einer Bank,
+     * die Zentralbank der Währung. Geprüft und gebucht wird erst bei der Annahme.
+     */
+    public LoanOffer offerLoan(ActorRef lender, ActorRef borrower, Money principal, long termDays, Day day) {
+        Currency currency = queries.currencies().require(principal.currency());
+        if (!isCentralBankLoan(lender, borrower, currency) && !queries.credit().isBank(lender)) {
+            throw CreditException.notABank(lender);
+        }
+        CreditRegistry credit = aggregates.credit();
+        LoanOffer offer = credit.offer(LoanId.generate(ids), lender, borrower, principal.currency(),
+                principal.amount(), termDays, day);
+        aggregates.commit(credit);
+        return offer;
+    }
+
+    /**
+     * Nimmt ein Angebot an: Der Kredit wird nach den dann geltenden Regeln ausgezahlt. Scheitert das, bleibt das
+     * Angebot bestehen.
+     */
+    public Loan acceptOffer(LoanId offerId, ActorRef borrower, Day day) {
+        LoanOffer offer = queries.credit().offer(offerId).filter(found -> !day.isAfter(found.expiresOn()))
+                .orElseThrow(() -> CreditException.unknownOffer(offerId));
+        if (!offer.borrower().equals(borrower)) {
+            throw CreditException.notOfferRecipient(offerId, borrower);
+        }
+        Loan loan = takeLoan(offer.lender(), borrower, Money.of(offer.principal(), offer.currency()),
+                offer.termDays(), day);
+        CreditRegistry credit = aggregates.credit();
+        credit.takeOffer(offerId, borrower, day);
+        aggregates.commit(credit);
+        return loan;
+    }
+
+    /** Lehnt ein Angebot ab oder zieht es zurück (Kreditnehmer oder Kreditgeber). */
+    public void cancelOffer(LoanId offerId, ActorRef actor, Day day) {
+        CreditRegistry credit = aggregates.credit();
+        credit.cancelOffer(offerId, actor, day);
         aggregates.commit(credit);
     }
 
@@ -138,6 +199,7 @@ public final class CreditUseCases {
     /** Tagesabschluss: überfällige Kredite fallen aus, der Kreditscore der Schuldner sinkt. */
     public List<Loan> endOfDay(Day today) {
         CreditRegistry credit = aggregates.credit();
+        credit.expireOffers(today);
         List<Loan> defaulted = credit.markOverdue(today);
         aggregates.commit(credit);
         return defaulted;

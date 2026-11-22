@@ -21,4 +21,13 @@ public sealed interface CreditEvent extends DomainEvent {
 
     record LoanDefaulted(LoanId loan, Day occurredOn) implements CreditEvent {
     }
+
+    record OfferMade(LoanId offer, Day occurredOn) implements CreditEvent {
+    }
+
+    record OfferClosed(LoanId offer, Day occurredOn) implements CreditEvent {
+    }
+
+    record SelfServiceChanged(ActorRef bank, boolean enabled, Day occurredOn) implements CreditEvent {
+    }
 }

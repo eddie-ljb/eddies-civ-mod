@@ -168,4 +168,63 @@ class CurrencyCreditUseCasesTest {
         // Ein Nicht-Bank-Kreditnehmer bekäme von der Zentralbank nichts.
         assertEquals(ErrorCode.NOT_A_BANK, codeOf(() -> credit.takeLoan(chair, bob, Money.of(1, GOLD), 10, DAY)));
     }
+
+    @Test
+    void selfServiceIsRequiredForDirectLoans() {
+        fund(bank, 100);
+        credit.licenseBank(bank, DAY);
+        assertEquals(ErrorCode.BANK_NOT_SELF_SERVICE,
+                codeOf(() -> credit.takeSelfService(bank, bob, emeralds(5), 10, DAY)));
+        credit.setSelfService(bank, true, DAY);
+        credit.takeSelfService(bank, bob, emeralds(5), 10, DAY);
+        credit.closeBank(bank, DAY);
+        assertTrue(fixture.app.queries().credit().selfServiceBanks().isEmpty());
+    }
+
+    @Test
+    void offerCanBeAcceptedDeclinedAndExpires() {
+        fund(bank, 100);
+        credit.licenseBank(bank, DAY);
+        assertEquals(ErrorCode.NOT_A_BANK, codeOf(() -> credit.offerLoan(alice, bob, emeralds(5), 10, DAY)));
+        var offer = credit.offerLoan(bank, bob, emeralds(5), 10, DAY);
+
+        assertEquals(ErrorCode.NOT_OFFER_PARTY, codeOf(() -> credit.acceptOffer(offer.id(), alice, DAY)));
+        Loan loan = credit.acceptOffer(offer.id(), bob, DAY.plus(1));
+        assertEquals(emeralds(5), ledger.balanceOf(bob, EMERALD));
+        assertEquals(bob, loan.borrower());
+        assertTrue(fixture.app.queries().credit().offers().isEmpty());
+        assertEquals(ErrorCode.UNKNOWN_LOAN_OFFER, codeOf(() -> credit.acceptOffer(offer.id(), bob, DAY.plus(2))));
+
+        var declined = credit.offerLoan(bank, bob, emeralds(5), 10, DAY);
+        credit.cancelOffer(declined.id(), bob, DAY);
+        assertTrue(fixture.app.queries().credit().offers().isEmpty());
+
+        var stale = credit.offerLoan(bank, bob, emeralds(5), 10, DAY);
+        assertEquals(ErrorCode.UNKNOWN_LOAN_OFFER, codeOf(() -> credit.acceptOffer(stale.id(), bob, DAY.plus(8))));
+        credit.endOfDay(DAY.plus(8));
+        assertTrue(fixture.app.queries().credit().offers().isEmpty());
+    }
+
+    @Test
+    void failedAcceptanceKeepsTheOffer() {
+        credit.licenseBank(bank, DAY); // Bank ohne Guthaben
+        var offer = credit.offerLoan(bank, bob, emeralds(5), 10, DAY);
+        assertEquals(ErrorCode.INSUFFICIENT_FUNDS, codeOf(() -> credit.acceptOffer(offer.id(), bob, DAY)));
+        assertEquals(1, fixture.app.queries().credit().offers().size());
+        assertTrue(fixture.app.queries().credit().loans().isEmpty());
+    }
+
+    @Test
+    void polityCanBorrowAndLendLikeAnyActor() {
+        PolityId nordhain = fixture.found("Nordhain", alice, 0, 0);
+        var town = fixture.app.queries().polity(nordhain).orElseThrow().asActor();
+        fund(bank, 100);
+        credit.licenseBank(bank, DAY);
+        credit.setSelfService(bank, true, DAY);
+        Loan loan = credit.takeSelfService(bank, town, emeralds(5), 10, DAY);
+        assertEquals(emeralds(5), ledger.balanceOf(town, EMERALD));
+        credit.repay(loan.id(), town, 1, DAY);
+        credit.licenseBank(town, DAY); // auch Gemeinden/Firmen dürfen Bank sein
+        assertTrue(fixture.app.queries().credit().isBank(town));
+    }
 }

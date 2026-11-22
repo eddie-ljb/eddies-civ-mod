@@ -302,7 +302,8 @@ public record StateDelta(List<PolityChange> polities, List<ClaimChange> claims, 
     }
 
     private static CreditRegistry copyOf(CreditView credit) {
-        return CreditRegistry.restore(credit.banks(), credit.scores(), credit.loans());
+        return CreditRegistry.restore(credit.banks(), credit.selfServiceBanks(), credit.scores(), credit.loans(),
+                credit.offers());
     }
 
 
