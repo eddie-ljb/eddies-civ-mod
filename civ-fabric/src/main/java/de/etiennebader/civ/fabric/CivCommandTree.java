@@ -259,6 +259,7 @@ public final class CivCommandTree {
                 .then(plotCommands())
                 .then(constructionCommands())
                 .then(warCommands())
+                .then(familyCommands())
                 .then(Commands.literal("laden")
                         .then(Commands.literal("eroeffnen")
                                 .then(Commands.argument(PRICE, StringArgumentType.word())
@@ -1450,6 +1451,15 @@ public final class CivCommandTree {
                         .executes(context -> withCiv(context, (civ, player) -> civ.war().campaign(
                                 Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER), kind,
                                 IntegerArgumentType.getInteger(context, COUNT)))));
+    }
+
+    /** {@code /civ familie}: Ehepaare und Kinder der eigenen Gemeinde (Issue #27). */
+    private LiteralArgumentBuilder<CommandSourceStack> familyCommands() {
+        return Commands.literal("familie")
+                .then(Commands.literal("liste")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.family().couples(Players.caller(player)))))
+                .then(Commands.literal("kinder")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.family().kids(Players.caller(player)))));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> warCommands() {
