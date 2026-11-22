@@ -39,6 +39,7 @@ class DistrictCandidacyTest {
         for (PlayerRef player : new PlayerRef[]{bob, carla}) {
             fixture.app.joinPolity().execute(new JoinPolity.Command(nordhain, player, MembershipType.CITIZEN, DAY));
         }
+        fixture.app.civic().define(alice, nordhain, "Nord", DAY);
         north = fixture.app.civic().addTown(alice, nordhain, "Nord", nordhain, DAY).id().asDistrict();
         south = fixture.app.civic().define(alice, nordhain, "Sued", DAY).id().asDistrict();
         fixture.app.amendLaw().execute(new AmendLaw.Command(nordhain, alice,
