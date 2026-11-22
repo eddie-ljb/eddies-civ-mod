@@ -108,6 +108,7 @@ public final class CivServer {
     private final PlotService plots;
     private final de.etiennebader.civ.server.construction.ConstructionService construction;
     private final de.etiennebader.civ.server.war.WarService war;
+    private final de.etiennebader.civ.server.family.FamilyService family;
     private final VillagerService villagers;
     private final VillagerFederations villagerFederations;
     private final de.etiennebader.civ.server.villager.VillagerFoundations villagerFoundations;
@@ -190,6 +191,9 @@ public final class CivServer {
         this.villagerFederations = new VillagerFederations(app, federations, announcements);
         this.conjuncture = new de.etiennebader.civ.server.conjuncture.ConjunctureService(app.queries());
         this.villagers = new VillagerService(app, settings, texts, announcements, conjuncture, calendar);
+        this.family = new de.etiennebader.civ.server.family.FamilyService(app.queries(), announcements,
+                dataDirectory.map(dir -> dir.resolve("family.tsv")));
+        villagers.familyLines(family::describe);
         this.villagerFoundations = new de.etiennebader.civ.server.villager.VillagerFoundations(app, villagers::lastSeen,
                 announcements, settings.founding());
         this.townHalls = new TownHallService(app, calendar, texts, announcements);
@@ -278,6 +282,7 @@ public final class CivServer {
             villagerFoundations.endOfDay(day);
             villagerFederations.endOfDay(day);
             construction.villagersOrder(day);
+            family.endOfDay(day);
         }
         federations.autoDecideInvitations(day, settings.villagerPolitics());
         campaigns.endOfDay(day);
@@ -429,6 +434,11 @@ public final class CivServer {
 
     public de.etiennebader.civ.server.war.WarService war() {
         return war;
+    }
+
+    /** Heirat, Scheidung und Kinder der Dorfbewohner. */
+    public de.etiennebader.civ.server.family.FamilyService family() {
+        return family;
     }
 
     public de.etiennebader.civ.server.construction.ConstructionService construction() {

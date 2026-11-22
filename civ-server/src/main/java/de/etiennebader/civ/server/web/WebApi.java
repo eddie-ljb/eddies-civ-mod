@@ -305,6 +305,7 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                 case "POST /api/exchange" -> withLogin(request, login -> action(request, body -> game.call(() ->
                         exchangeAction(login, body)), texts));
                 case "GET /api/war" -> HttpResponse.json(200, game.call(this::war));
+                case "GET /api/families" -> HttpResponse.json(200, game.call(this::families));
                 case "GET /api/press" -> HttpResponse.json(200, game.call(this::press));
                 case "POST /api/press" -> withLogin(request, login -> action(request, body -> game.call(() ->
                         civ.press().publish(login.player(), body.getOrDefault("paper", ""),
@@ -855,6 +856,27 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                                 .put("on", campaign.on().value()).build()))
                         .build()))
                 .raw("alliances", "[" + String.join(",", pairs) + "]")
+                .build();
+    }
+
+    /** Ehen, Kinder und Scheidungen der Dorfbewohner je Gemeinde; ohne Anmeldung. */
+    private String families() {
+        var registry = civ.family().registry();
+        java.util.function.Function<de.etiennebader.civ.domain.actor.PersonRef, String> name = person ->
+                de.etiennebader.civ.domain.population.VillagerIdentity.of(person).fullName();
+        return Json.object()
+                .raw("marriages", Json.array(registry.marriages(), marriage -> Json.object()
+                        .put("first", name.apply(marriage.first()))
+                        .put("second", name.apply(marriage.second()))
+                        .put("since", marriage.since().value())
+                        .put("children", marriage.children())
+                        .put("bond", registry.bond(marriage.first(), marriage.second())).build()))
+                .raw("divorces", Json.array(registry.divorces(), divorce -> Json.object()
+                        .put("first", name.apply(divorce.first()))
+                        .put("second", name.apply(divorce.second()))
+                        .put("married", divorce.married().value())
+                        .put("divorced", divorce.divorced().value()).build()))
+                .put("children", registry.children().size())
                 .build();
     }
 

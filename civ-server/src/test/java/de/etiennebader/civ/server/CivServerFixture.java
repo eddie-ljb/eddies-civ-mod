@@ -63,6 +63,10 @@ public final class CivServerFixture {
         return server.villagers();
     }
 
+    public de.etiennebader.civ.server.family.FamilyService family() {
+        return server.family();
+    }
+
     public de.etiennebader.civ.server.war.WarService war() {
         return server.war();
     }

@@ -88,6 +88,8 @@ public final class VillagerService {
     private final Map<PersonRef, BlockPosition> lastSeen = new HashMap<>();
     /** Politische Beeinflussung und Dorfbewohner-Kontakte (Issue #18); wie {@link #departures} nur im Speicher. */
     private final SocialEffects social = new SocialEffects();
+    /** Familienangaben für die Auskunft über einen Dorfbewohner; vom Server gesetzt. */
+    private java.util.function.Function<PersonRef, List<Message>> familyLines = villager -> List.of();
     /** Post zwischen Spielern und Dorfbewohnern bzw. unter Dorfbewohnern (Issue #18); wie {@link #social} nur im Speicher. */
     private final VillagerMailbox mailbox = new VillagerMailbox();
     /** Wie oft je 100 Chancen pro Tag ein sehr unzufriedener, freiheitsliebender Dorfbewohner auffällt. */
@@ -209,6 +211,10 @@ public final class VillagerService {
                         .withSocial(social.pointsOf(villager)));
     }
 
+    public void familyLines(java.util.function.Function<PersonRef, List<Message>> lines) {
+        this.familyLines = Objects.requireNonNull(lines, "lines");
+    }
+
     /** Auskunft über einen Dorfbewohner, z. B. beim Anschauen mit Schleichen und Rechtsklick. */
     public Reply describe(PersonRef villager) {
         Personality personality = Personality.of(villager);
@@ -245,6 +251,7 @@ public final class VillagerService {
                         texts.actor(contract.offeror()), contract.number())));
         mailbox.latest(villager).ifPresent(mail -> lines.add(Message.of(MessageKey.VILLAGER_MAIL_LATEST,
                 texts.actor(mail.from()), mail.sent().value())));
+        lines.addAll(familyLines.apply(villager));
         lines.add(identity);
         return Reply.success(lines);
     }
