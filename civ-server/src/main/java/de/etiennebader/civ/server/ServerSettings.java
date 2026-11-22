@@ -34,11 +34,45 @@ import java.util.Objects;
  * @param economy        Fein-tuning der Marktpreissimulation (Preisfaktor-Grenzen und -Dämpfung)
  * @param ambitions      ob ehrgeizige Dorfbewohner Firmen, Parteien und Bünde gründen, kandidieren, Gebiet beanspruchen,
  *                       Firmen übernehmen und führen
+ * @param warPortLock    wer sich im Krieg nicht mehr zu den Heimat-Häfen einer Polity porten darf
  */
 public record ServerSettings(long ticksPerDay, int claimBase, int claimPerMember, CurrencyId currency,
                              Money priceReference, Money villagerIncome, TierThresholds tiers, WebSettings web,
                              boolean emigration, boolean villagerPolitics, Levels levels, PartySettings parties,
-                             ShowSettings show, EconomySettings economy, boolean ambitions) {
+                             ShowSettings show, EconomySettings economy, boolean ambitions,
+                             WarPortLock warPortLock) {
+
+    /** Wer im Krieg die Heimat-Häfen einer kriegführenden Polity nicht mehr nutzen darf (außer ihren Bürgern). */
+    public enum WarPortLock {
+        /** Alle Nicht-Bürger; auch Verbündete und Fremde bei Zugang „alle“. */
+        ALL_OUTSIDERS,
+        /** Nur Bürger der Kriegsgegner. */
+        ENEMIES,
+        /** Keine Sperre; es gilt allein die Zugangsregel der Polity. */
+        NONE;
+
+        public String key() {
+            return name().toLowerCase(java.util.Locale.ROOT).replace('_', '-');
+        }
+
+        public static WarPortLock parse(String input, WarPortLock fallback) {
+            return switch (input.strip().toLowerCase(java.util.Locale.ROOT)) {
+                case "all-outsiders", "all_outsiders", "alle", "fremde" -> ALL_OUTSIDERS;
+                case "enemies", "feinde", "gegner" -> ENEMIES;
+                case "none", "off", "keine", "aus" -> NONE;
+                default -> fallback;
+            };
+        }
+    }
+
+    /** Mit Standard-Kriegssperre für Häfen. */
+    public ServerSettings(long ticksPerDay, int claimBase, int claimPerMember, CurrencyId currency,
+                          Money priceReference, Money villagerIncome, TierThresholds tiers, WebSettings web,
+                          boolean emigration, boolean villagerPolitics, Levels levels, PartySettings parties,
+                          ShowSettings show, EconomySettings economy, boolean ambitions) {
+        this(ticksPerDay, claimBase, claimPerMember, currency, priceReference, villagerIncome, tiers, web, emigration,
+                villagerPolitics, levels, parties, show, economy, ambitions, WarPortLock.ALL_OUTSIDERS);
+    }
 
     /** Mit ehrgeizigen Dorfbewohnern. */
     public ServerSettings(long ticksPerDay, int claimBase, int claimPerMember, CurrencyId currency,

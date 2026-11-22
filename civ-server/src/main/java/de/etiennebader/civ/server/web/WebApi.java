@@ -574,6 +574,7 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                 .put("dimension", dimension.value())
                 .raw("chunks", "[" + String.join(",", chunks) + "]")
                 .raw("seats", "[" + String.join(",", seats) + "]")
+                .raw("ports", ports(dimension))
                 .build();
     }
 
@@ -626,7 +627,30 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                 .put("dimension", dimension.value())
                 .raw("chunks", "[" + String.join(",", chunks) + "]")
                 .raw("seats", "[" + String.join(",", seats) + "]")
+                .raw("ports", ports(dimension))
                 .build();
+    }
+
+    /**
+     * Die zusätzlichen Heimat-Häfen auf der Karte. Häfen, zu denen die Polity niemanden lässt, bleiben verborgen,
+     * damit die öffentliche Karte keine gesperrten Orte verrät; das Gemeindehaus (Hafen 1) zeigt der Stern ohnehin.
+     */
+    private String ports(de.etiennebader.civ.domain.territory.DimensionId dimension) {
+        List<String> ports = new ArrayList<>();
+        for (de.etiennebader.civ.domain.civic.HomePort port : civ.queries().civic().ports()) {
+            if (!port.position().dimension().equals(dimension)
+                    || civ.queries().civic().portSettingsOf(port.polity()).access()
+                    == de.etiennebader.civ.domain.civic.PortAccess.NOBODY) {
+                continue;
+            }
+            civ.queries().polity(port.polity()).ifPresent(polity -> ports.add(Json.object()
+                    .put("town", port.polity().value().toString())
+                    .put("name", polity.name().value() + " " + port.slot())
+                    .put("x", port.position().x())
+                    .put("z", port.position().z())
+                    .build()));
+        }
+        return "[" + String.join(",", ports) + "]";
     }
 
     private String market() {

@@ -947,7 +947,7 @@ $("worldsearch").addEventListener("input", renderWorld);
 
 /* Karte */
 const canvas = $("canvas"), ctx = canvas.getContext("2d");
-let view = { x: 0, z: 0, scale: 12 }, mapData = { chunks: [], seats: [] }, drag = null, centered = false;
+let view = { x: 0, z: 0, scale: 12 }, mapData = { chunks: [], seats: [], ports: [] }, drag = null, centered = false;
 let electionData = { results: [], polls: [] };
 async function openMap() {
   if (!world.towns.length) await fetchWorld();
@@ -1126,6 +1126,14 @@ function draw() {
     if (view.scale >= 4) {
       ctx.lineWidth = 3 * devicePixelRatio; ctx.strokeStyle = css("--surface"); ctx.strokeText(seat.name, px, pz - 9 * devicePixelRatio);
       ctx.fillText(seat.name, px, pz - 9 * devicePixelRatio);
+    }
+  }
+  for (const port of mapData.ports || []) {
+    const [px, pz] = toScreen(port.x / 16, port.z / 16);
+    ctx.fillStyle = css("--ink"); ctx.fillText("◆", px, pz + 4 * devicePixelRatio);
+    if (view.scale >= 6) {
+      ctx.lineWidth = 3 * devicePixelRatio; ctx.strokeStyle = css("--surface"); ctx.strokeText(port.name, px, pz - 9 * devicePixelRatio);
+      ctx.fillText(port.name, px, pz - 9 * devicePixelRatio);
     }
   }
 }

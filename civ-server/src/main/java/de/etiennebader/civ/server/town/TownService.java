@@ -33,6 +33,7 @@ import de.etiennebader.civ.server.territory.TerritoryWatcher;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -160,6 +161,7 @@ public final class TownService {
         Objects.requireNonNull(level, "level");
         ChunkCoord center = caller.chunk();
         TerritoryView land = queries.territory();
+        Map<ChunkCoord, String> ports = portsByChunk();
         List<MapCell> cells = new ArrayList<>(width * height);
         for (int row = 0; row < height; row++) {
             for (int column = 0; column < width; column++) {
@@ -171,7 +173,8 @@ public final class TownService {
                         .map(owner -> TerritoryColor.groupOf(owner, queries.ancestorsOf(owner.id()), level)
                                 .value().toString());
                 cells.add(new MapCell(chunk, relation, claim.map(found -> texts.polityName(found.polity())),
-                        claim.map(Claim::type), chunk.equals(center), group));
+                        claim.map(Claim::type), chunk.equals(center), group,
+                        Optional.ofNullable(ports.get(chunk))));
             }
         }
         return new ChunkMap(width, height, cells);
@@ -191,6 +194,7 @@ public final class TownService {
                 ? ElectionMapColor.latestResult(found, office.get()) : ElectionMapColor.latestResult(found));
         ChunkCoord center = caller.chunk();
         TerritoryView land = queries.territory();
+        Map<ChunkCoord, String> ports = portsByChunk();
         List<MapCell> cells = new ArrayList<>(width * height);
         for (int row = 0; row < height; row++) {
             for (int column = 0; column < width; column++) {
@@ -202,10 +206,32 @@ public final class TownService {
                         ElectionMapColor.colorOf(queries.civic(), electionPolity,
                                 Optional.of(chunk.center(caller.position().y())), townId, result, queries::partyOf));
                 cells.add(new MapCell(chunk, relation, claim.map(found -> texts.polityName(found.polity())),
-                        claim.map(Claim::type), chunk.equals(center), group));
+                        claim.map(Claim::type), chunk.equals(center), group,
+                        Optional.ofNullable(ports.get(chunk))));
             }
         }
         return new ChunkMap(width, height, cells);
+    }
+
+    /**
+     * Chunks, in denen ein Heimat-Hafen liegt, mit den Slotnummern (z. B. „1“ oder „1, 3“). Häfen, zu denen die
+     * Polity niemanden lässt, bleiben verborgen; das Gemeindehaus (Hafen 1) ist ohnehin sichtbar.
+     */
+    private Map<ChunkCoord, String> portsByChunk() {
+        Map<ChunkCoord, List<Integer>> slots = new java.util.HashMap<>();
+        for (PolityView polity : queries.polities()) {
+            polity.seat().ifPresent(seat -> slots.computeIfAbsent(seat.chunk(), key -> new ArrayList<>()).add(1));
+        }
+        for (de.etiennebader.civ.domain.civic.HomePort port : queries.civic().ports()) {
+            if (queries.civic().portSettingsOf(port.polity()).access()
+                    != de.etiennebader.civ.domain.civic.PortAccess.NOBODY) {
+                slots.computeIfAbsent(port.position().chunk(), key -> new ArrayList<>()).add(port.slot());
+            }
+        }
+        Map<ChunkCoord, String> labels = new java.util.HashMap<>();
+        slots.forEach((chunk, list) -> labels.put(chunk, String.join(", ",
+                list.stream().sorted().map(String::valueOf).toList())));
+        return labels;
     }
 
     /** Beansprucht einen Chunk aus der Karte für die eigene Gemeinde. */

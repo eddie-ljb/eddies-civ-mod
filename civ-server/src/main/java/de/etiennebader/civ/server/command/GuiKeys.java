@@ -56,6 +56,7 @@ public enum GuiKeys {
     MAP_FOREIGN,
     MAP_COORDS,
     MAP_HERE,
+    MAP_PORT,
     MAP_CLAIM_HINT,
     MAP_OUTPOST_HINT,
     MAP_LEVEL_HIGHEST,

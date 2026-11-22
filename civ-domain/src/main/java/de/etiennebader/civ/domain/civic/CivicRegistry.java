@@ -3,6 +3,7 @@ package de.etiennebader.civ.domain.civic;
 import de.etiennebader.civ.domain.shared.AggregateRoot;
 import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.PolityId;
+import de.etiennebader.civ.domain.territory.BlockPosition;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -23,6 +24,8 @@ public final class CivicRegistry extends AggregateRoot<CivicEvent> implements Ci
     private final Map<PolityId, Flag> flags = new LinkedHashMap<>();
     private final Map<PolityId, Anthem> anthems = new LinkedHashMap<>();
     private final Map<String, CustomImage> images = new LinkedHashMap<>();
+    private final Map<PolityId, PortSettings> portSettings = new LinkedHashMap<>();
+    private final List<HomePort> ports = new ArrayList<>();
 
     private CivicRegistry() {
     }
@@ -38,7 +41,15 @@ public final class CivicRegistry extends AggregateRoot<CivicEvent> implements Ci
 
     public static CivicRegistry restore(Collection<Constituency> constituencies, Map<PolityId, Flag> flags,
                                         Map<PolityId, Anthem> anthems, Map<String, CustomImage> images) {
+        return restore(constituencies, flags, anthems, images, Map.of(), List.of());
+    }
+
+    public static CivicRegistry restore(Collection<Constituency> constituencies, Map<PolityId, Flag> flags,
+                                        Map<PolityId, Anthem> anthems, Map<String, CustomImage> images,
+                                        Map<PolityId, PortSettings> portSettings, Collection<HomePort> ports) {
         CivicRegistry registry = new CivicRegistry();
+        registry.portSettings.putAll(portSettings);
+        registry.ports.addAll(ports);
         registry.constituencies.addAll(constituencies);
         registry.flags.putAll(flags);
         registry.anthems.putAll(anthems);
@@ -132,6 +143,8 @@ public final class CivicRegistry extends AggregateRoot<CivicEvent> implements Ci
         List<String> ownImages = imagesOf(polity).stream().map(CustomImage::id).toList();
         ownImages.forEach(images::remove);
         symbols |= !ownImages.isEmpty();
+        symbols |= portSettings.remove(polity) != null;
+        symbols |= ports.removeIf(port -> port.polity().equals(polity));
         if (symbols) {
             raise(new CivicEvent.SymbolChanged(polity, "all", day));
         }
@@ -202,6 +215,47 @@ public final class CivicRegistry extends AggregateRoot<CivicEvent> implements Ci
         raise(new CivicEvent.SymbolChanged(removed.polity(),
                 "image:" + removed.kind().name().toLowerCase(java.util.Locale.ROOT), day));
         return Optional.of(removed);
+    }
+
+    // ---- Heimat-Häfen ----
+
+    public void setPortSettings(PolityId polity, PortSettings settings, Day day) {
+        Objects.requireNonNull(polity, "polity");
+        Objects.requireNonNull(settings, "settings");
+        if (settings.equals(PortSettings.DEFAULT)) {
+            portSettings.remove(polity);
+        } else {
+            portSettings.put(polity, settings);
+        }
+        raise(new CivicEvent.SymbolChanged(polity, "port-settings", day));
+    }
+
+    /** Setzt (oder verlegt) einen zusätzlichen Hafen; ein belegter Slot wird überschrieben. */
+    public HomePort setPort(PolityId polity, int slot, BlockPosition position, Day day) {
+        HomePort port = new HomePort(polity, slot, position);
+        ports.removeIf(existing -> existing.polity().equals(polity) && existing.slot() == slot);
+        ports.add(port);
+        raise(new CivicEvent.SymbolChanged(polity, "port:" + slot, day));
+        return port;
+    }
+
+    public Optional<HomePort> removePort(PolityId polity, int slot, Day day) {
+        Optional<HomePort> found = port(polity, slot);
+        found.ifPresent(port -> {
+            ports.remove(port);
+            raise(new CivicEvent.SymbolChanged(polity, "port:" + slot, day));
+        });
+        return found;
+    }
+
+    @Override
+    public Map<PolityId, PortSettings> portSettings() {
+        return Map.copyOf(portSettings);
+    }
+
+    @Override
+    public List<HomePort> ports() {
+        return List.copyOf(ports);
     }
 
     @Override
