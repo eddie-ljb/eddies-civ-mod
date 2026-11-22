@@ -12,6 +12,7 @@ import de.etiennebader.civ.application.office.ElectionCount;
 import de.etiennebader.civ.application.office.ParliamentCount;
 import de.etiennebader.civ.application.office.RunElections;
 import de.etiennebader.civ.application.office.StandForElection;
+import de.etiennebader.civ.domain.polity.InvalidCandidacyDistrictException;
 import de.etiennebader.civ.application.query.WorldQueries;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
@@ -171,7 +172,7 @@ public final class OfficeService {
         if (platform.isEmpty()) {
             return Reply.failure(Message.of(MessageKey.UNKNOWN_PLATFORM, platformInput.orElse("").strip()));
         }
-        return withElectionIn(polity, officeInput, (town, election) -> stand(caller, town, election, platform.get()));
+        return withElectionIn(polity, officeInput, (town, election) -> stand(caller, town, election, platform.get(), Optional.empty()));
     }
 
     /** {@code /civ <Ebene> wahl stimmen <Amt> <Kandidat>} */
@@ -220,29 +221,56 @@ public final class OfficeService {
     }
 
     private Reply stand(Caller caller, String officeInput, Platform platform) {
-        return withElection(caller, officeInput, (town, election) -> stand(caller, town, election, platform));
+        return stand(caller, officeInput, platform, Optional.empty());
+    }
+
+    private Reply stand(Caller caller, String officeInput, Platform platform, Optional<String> districtName) {
+        return withElection(caller, officeInput,
+                (town, election) -> stand(caller, town, election, platform, districtName));
+    }
+
+    /** {@code /civ wahl kandidieren <Amt> <Programm> <Wahlkreis>}: bei Wahlkreiswahlen in genau diesem Wahlkreis (#47). */
+    public Reply stand(Caller caller, String officeInput, String platformInput, String districtName) {
+        Optional<Platform> platform = parsePlatform(platformInput);
+        if (platform.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.UNKNOWN_PLATFORM, platformInput.strip()));
+        }
+        return stand(caller, officeInput, platform.get(), Optional.of(districtName));
     }
 
     /** Kandidatur in einer bestimmten Gemeinde oder einem Bund. */
     public Reply stand(Caller caller, PolityId polity, Office office, Platform platform) {
         return withPolity(polity, town -> town.electionFor(office)
-                .map(election -> stand(caller, town, election, platform))
+                .map(election -> stand(caller, town, election, platform, Optional.empty()))
                 .orElseGet(() -> Reply.failure(Message.of(MessageKey.NO_ELECTION_FOR, officeName(town, office)))));
     }
 
-    private Reply stand(Caller caller, PolityView town, Election election, Platform chosen) {
+    private Reply stand(Caller caller, PolityView town, Election election, Platform chosen,
+                        Optional<String> districtName) {
         Optional<PolityView> party = queries.partyOf(caller.player());
         Platform platform = chosen != Platform.NONE ? chosen : party
                 .flatMap(PolityView::partyProfile).map(PartyProfile::platform).orElse(Platform.NONE);
         return attempt(() -> {
             app.standForElection().execute(new StandForElection.Command(town.id(), election.id(), caller.player(),
-                    platform, calendar.today()));
+                    platform, calendar.today(), candidacyDistrict(caller, town, districtName)));
             Message programme = platformName(platform);
             Message office = officeName(town, election.office());
             announcements.add(Announcement.toTown(town.id(), Message.of(MessageKey.CANDIDACY_ANNOUNCED, caller.name(),
                     office, programme)));
             return Reply.success(Message.of(MessageKey.CANDIDACY_DECLARED, office, programme));
         });
+    }
+
+    /**
+     * Wahlkreis einer Kandidatur (#47): der genannte, sonst der des Kandidaten (Wohnsitz bzw. Gemeinde). Ob die
+     * Wahl überhaupt nach Wahlkreisen läuft und der Wahlkreis passt, prüft {@link StandForElection}.
+     */
+    private Optional<PolityId> candidacyDistrict(Caller caller, PolityView town, Optional<String> districtName) {
+        if (districtName.isEmpty()) {
+            return app.runElections().districtOf(town).apply(caller.player());
+        }
+        return Optional.of(queries.civic().constituencyNamed(town.id(), districtName.get())
+                .orElseThrow(() -> new InvalidCandidacyDistrictException(districtName.get())).id().asDistrict());
     }
 
     /** {@code /civ wahl stimmen <Amt> <Spieler>} */
