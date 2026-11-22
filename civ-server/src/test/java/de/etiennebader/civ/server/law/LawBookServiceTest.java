@@ -130,6 +130,25 @@ class LawBookServiceTest {
                 Optional.empty(), "zu viel", ""));
     }
 
+    @Test
+    @DisplayName("Optional: Entwürfe überstehen einen Neustart, auch mit Tab, Zeilenumbruch und Backslash")
+    void draftsPersistWhenEnabled(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) {
+        town();
+        java.nio.file.Path file = dir.resolve("law-drafts.tsv");
+        var first = new LawBookService(server.app(), server.calendar(), server.texts(), new de.etiennebader.civ.server.Announcements(),
+                server.federations(), Optional.of(file));
+        var saved = first.saveDraft(caller(alice), Optional.empty(), Optional.of(named("Nordhain").id()), "A\tB",
+                "Zeile 1\nZeile 2 \\ Ende");
+        var second = new LawBookService(server.app(), server.calendar(), server.texts(), new de.etiennebader.civ.server.Announcements(),
+                server.federations(), Optional.of(file));
+        assertEquals(List.of(saved), second.draftsVisibleTo(caller(alice)));
+        assertTrue(second.deleteDraft(caller(alice), saved.id()));
+        assertTrue(new LawBookService(server.app(), server.calendar(), server.texts(), new de.etiennebader.civ.server.Announcements(),
+                server.federations(), Optional.of(file)).draftsVisibleTo(caller(alice)).isEmpty());
+        assertTrue(new LawBookService(server.app(), server.calendar(), server.texts(), new de.etiennebader.civ.server.Announcements(),
+                server.federations()).draftsVisibleTo(caller(alice)).isEmpty(), "Standard: flüchtig");
+    }
+
     private void town() {
         server.playerJoined(alice, "Alice");
         server.playerJoined(bob, "Bob");

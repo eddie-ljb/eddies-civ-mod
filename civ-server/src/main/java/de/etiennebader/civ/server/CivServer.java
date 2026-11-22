@@ -169,7 +169,8 @@ public final class CivServer {
                 settings.founding());
         this.parties = new PartyService(app, calendar, settings.currency(), settings.parties(), players, texts,
                 announcements);
-        this.lawBooks = new LawBookService(app, calendar, texts, announcements, federations);
+        this.lawBooks = new LawBookService(app, calendar, texts, announcements, federations,
+                settings.persistLawDrafts() ? dataDirectory.map(dir -> dir.resolve("law-drafts.tsv")) : Optional.empty());
         this.parliaments = new ParliamentService(app, texts, offices, voting);
         this.campaigns = new CampaignService(app, calendar, texts, offices);
         this.constitutions = new ConstitutionService(app, calendar, texts, announcements, commands, offices, voting,

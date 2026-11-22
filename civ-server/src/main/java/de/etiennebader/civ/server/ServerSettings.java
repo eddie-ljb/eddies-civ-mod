@@ -33,6 +33,7 @@ import java.util.Objects;
  * @param show           Inszenierung: Live-Auszählung, Debatten, Hymnen, Weltkarte
  * @param economy        Fein-tuning der Marktpreissimulation (Preisfaktor-Grenzen und -Dämpfung)
  * @param founding       Gründungskosten und Vorgänger-Pflicht für Gemeinden, Bünde und Firmen
+ * @param persistLawDrafts ob Gesetzesvorlagen des Web-Editors dauerhaft gespeichert werden (Standard aus)
  * @param ambitions      ob ehrgeizige Dorfbewohner Firmen, Parteien und Bünde gründen, kandidieren, Gebiet beanspruchen,
  *                       Firmen übernehmen und führen
  * @param warPortLock    wer sich im Krieg nicht mehr zu den Heimat-Häfen einer Polity porten darf
@@ -42,7 +43,18 @@ public record ServerSettings(long ticksPerDay, int claimBase, int claimPerMember
                              boolean emigration, boolean villagerPolitics, Levels levels, PartySettings parties,
                              ShowSettings show, EconomySettings economy, boolean ambitions,
                              WarPortLock warPortLock,
-                             de.etiennebader.civ.server.founding.FoundingFees founding) {
+                             de.etiennebader.civ.server.founding.FoundingFees founding,
+                             boolean persistLawDrafts) {
+
+    /** Wie der kanonische Konstruktor, Gesetzesvorlagen bleiben flüchtig (Standard). */
+    public ServerSettings(long ticksPerDay, int claimBase, int claimPerMember, CurrencyId currency,
+                          Money priceReference, Money villagerIncome, TierThresholds tiers, WebSettings web,
+                          boolean emigration, boolean villagerPolitics, Levels levels, PartySettings parties,
+                          ShowSettings show, EconomySettings economy, boolean ambitions, WarPortLock warPortLock,
+                          de.etiennebader.civ.server.founding.FoundingFees founding) {
+        this(ticksPerDay, claimBase, claimPerMember, currency, priceReference, villagerIncome, tiers, web, emigration,
+                villagerPolitics, levels, parties, show, economy, ambitions, warPortLock, founding, false);
+    }
 
     /** Wer im Krieg die Heimat-Häfen einer kriegführenden Polity nicht mehr nutzen darf (außer ihren Bürgern). */
     public enum WarPortLock {
@@ -315,7 +327,14 @@ public record ServerSettings(long ticksPerDay, int claimBase, int claimPerMember
     /** Dieselben Einstellungen mit anderen Gründungskosten. */
     public ServerSettings withFounding(de.etiennebader.civ.server.founding.FoundingFees fees) {
         return new ServerSettings(ticksPerDay, claimBase, claimPerMember, currency, priceReference, villagerIncome,
-                tiers, web, emigration, villagerPolitics, levels, parties, show, economy, ambitions, warPortLock, fees);
+                tiers, web, emigration, villagerPolitics, levels, parties, show, economy, ambitions, warPortLock, fees, persistLawDrafts);
+    }
+
+    /** Dieselben Einstellungen, Gesetzesvorlagen aus dem Web-Editor werden (nicht) dauerhaft gespeichert. */
+    public ServerSettings withPersistLawDrafts(boolean persist) {
+        return new ServerSettings(ticksPerDay, claimBase, claimPerMember, currency, priceReference, villagerIncome,
+                tiers, web, emigration, villagerPolitics, levels, parties, show, economy, ambitions, warPortLock,
+                founding, persist);
     }
 
     /** Zusammenhängendes Kerngebiet, begrenzte Außenposten, Größe nach Mitgliederzahl. */

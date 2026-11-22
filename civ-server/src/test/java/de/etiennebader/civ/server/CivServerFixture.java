@@ -179,6 +179,14 @@ public final class CivServerFixture {
         return server.protection();
     }
 
+    public de.etiennebader.civ.server.command.Texts texts() {
+        return server.texts();
+    }
+
+    public de.etiennebader.civ.application.day.Calendar calendar() {
+        return server.calendar();
+    }
+
     public de.etiennebader.civ.application.CivApplication app() {
         return server.app();
     }

@@ -1740,7 +1740,7 @@ function renderLawEditor() {
     if (r.ok) loadLaws();
   });
   const drafts = el("div", { className: "article" }, el("h3", { textContent: "Gesetzesvorlagen" }),
-    el("p", { className: "muted small", textContent: "Eigene Entwürfe und die deiner Partei. Sie bleiben bis zum nächsten Serverneustart erhalten." }),
+    el("p", { className: "muted small", textContent: "Eigene Entwürfe und die deiner Partei. Ob sie einen Serverneustart überstehen, entscheidet der Server-Admin." }),
     ...(lawData.drafts.length ? lawData.drafts.map(d => el("div", { className: "row" },
       el("span", { textContent: d.title + " – " + d.author + (d.target ? " (für " + lawName(d.target) + ")" : "") + ", Tag " + d.savedOn }),
       el("button", { className: "btn small", textContent: "Laden", onclick: () => { lawDraftId = d.mine ? d.id : ""; renderLawEditor(); const f = $("laweditor").querySelector("input"); f.value = d.title; $("laweditor").querySelector("textarea").value = d.text; $("laweditor").querySelector("textarea").dispatchEvent(new Event("input")); } }),
