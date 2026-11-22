@@ -57,7 +57,7 @@ public final class ServerConfig {
     static final String PRICE_LEVEL_DAMPING = "price_level_damping";
     private static final java.util.List<String> KEYS = java.util.List.of(LIVE_COUNT, LIVE_COUNT_SECONDS, PROJECTIONS,
             DEBATE_MINUTES, ANTHEM_ON_ENTER, WORLD_MAP, MAP_RADIUS, WEB_TRUST_PROXY, VILLAGER_POLITICS,
-            AMBITIONS,
+            AMBITIONS, WAR_PORT_LOCK,
             PRICE_LEVEL_MIN, PRICE_LEVEL_MAX, PRICE_LEVEL_DAMPING, COST_MUNICIPALITY, COST_COMPANY, COST_LEVELS,
             COST_LEVEL_DEFAULT, REQUIRE_PREVIOUS);
 
@@ -153,7 +153,10 @@ public final class ServerConfig {
                                 Boolean.toString(defaults.parties().villagers())).strip()),
                         (int) number(properties, PARTY_FOUNDERS, defaults.parties().founders(), 2)),
                 show(properties, defaults.show()), economy(properties, defaults.economy()),
-                flag(properties, AMBITIONS, defaults.ambitions()), founding(properties, defaults.founding()));
+                flag(properties, AMBITIONS, defaults.ambitions()),
+                ServerSettings.WarPortLock.parse(properties.getProperty(WAR_PORT_LOCK,
+                        defaults.warPortLock().key()), defaults.warPortLock()),
+                founding(properties, defaults.founding()));
     }
 
     private static de.etiennebader.civ.server.founding.FoundingFees founding(Properties properties,
