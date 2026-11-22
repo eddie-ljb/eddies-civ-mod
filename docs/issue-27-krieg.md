@@ -20,16 +20,17 @@
   - Ehepaare mit dauerhaft schlechter Verträglichkeit lassen sich scheiden; höhere *Bildung* (stabiler Grundwert aus der
     Identität, +1 je 30 Tage im Dorf, bis +20) macht das seltener und senkt die Wunschzahl an Kindern.
   - Kinder: ab Beziehung 40, höchstens 4, Wunschzahl aus Gemeinsinn, Heimatverbundenheit und Bildung, mindestens 10 Tage
-    Abstand. Auskunft beim Schleichen+Rechtsklick (Ehepartner, Kinder); Web: `GET /api/families`.
+    Abstand. Auskunft beim Schleichen+Rechtsklick (Ehepartner, Kinder); Befehl `/civ familie liste|kinder` (en: `/civ family list|children`);
+    Webseite „Familien“ (`GET /api/families`).
+  - **Kinder im Spiel:** `VillagerCensus` bringt vorgemerkte Geburten (`FamilyService.pendingBirths()`) als Baby-Dorfbewohner
+    mit der Kennung des Kindes neben einem geladenen Elternteil zur Welt (`born` quittiert); ist kein Elternteil geladen,
+    bleibt die Geburt vorgemerkt. Sobald das Baby erwachsen ist, meldet es der Census wie jeden Dorfbewohner.
   - Abschaltbar mit `villager_ambitions=false`.
 
 ## Noch offen
-- **Kinder im Spiel:** `FamilyService.takeBirths()` liefert Geburten, aber der Fabric-Teil, der daraus ein Baby-Dorfbewohner-
-  Entity erzeugt (`setUUID(child.id())`), ist nicht angebunden (kann ohne Fabric-Build nicht geprüft werden). Bis dahin
-  existieren Kinder nur im Register; sie zählen als Dorfbewohner, sobald das Spiel sie als Erwachsene meldet.
-- Kein Befehl und keine Webseite für Familien (nur API); Bildung kennt noch keine Schulen.
+- Bildung kennt noch keine Schulen; Kinder wachsen mit der normalen Dorfbewohner-Reifezeit heran.
 
 ## Testen
 1. Krieg: zwei Gemeinden gründen, `/civ krieg anspruch`/`erklaeren`, `dienen`, `front`, `gefecht`, `frieden`.
-2. Familien: Gemeinde mit mehreren Dorfbewohnern, Tage vergehen lassen; `GET /api/families` und Dorfbewohner anschleichen.
+2. Familien: Gemeinde mit mehreren Dorfbewohnern, Tage vergehen lassen; `/civ familie liste`, `/civ familie kinder`, Seite „Familien“, Dorfbewohner anschleichen; Babys erscheinen neben den Eltern.
 Automatisch: `./gradlew :civ-domain:test :civ-application:test :civ-server:test` (`FamilyTest`, `FamilyServiceTest`).

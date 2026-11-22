@@ -12,7 +12,9 @@ import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.server.Announcement;
 import de.etiennebader.civ.server.Announcements;
 import de.etiennebader.civ.server.command.Message;
+import de.etiennebader.civ.server.command.Caller;
 import de.etiennebader.civ.server.command.MessageKey;
+import de.etiennebader.civ.server.command.Reply;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -57,6 +59,59 @@ public final class FamilyService {
         List<FamilyRegistry.Child> births = List.copyOf(pendingBirths);
         pendingBirths.clear();
         return births;
+    }
+
+    /** Geburten, die das Spiel noch nicht als Baby-Dorfbewohner auf die Welt gebracht hat (ohne sie zu entfernen). */
+    public synchronized List<FamilyRegistry.Child> pendingBirths() {
+        return List.copyOf(pendingBirths);
+    }
+
+    /** Das Spiel hat das Kind auf die Welt gebracht; es muss nicht mehr abgeholt werden. */
+    public synchronized void born(de.etiennebader.civ.domain.shared.PersonId child) {
+        pendingBirths.removeIf(pending -> pending.id().equals(child));
+    }
+
+    /** {@code /civ familie liste}: Ehepaare der eigenen Gemeinde. */
+    public synchronized Reply couples(Caller caller) {
+        Optional<PolityView> town = queries.municipalityOf(caller.player());
+        if (town.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.NOT_IN_MUNICIPALITY));
+        }
+        Set<PersonRef> members = new HashSet<>(adultsOf(town.get()));
+        List<Message> lines = new ArrayList<>();
+        for (FamilyRegistry.Marriage marriage : registry.marriages()) {
+            if (members.contains(marriage.first()) || members.contains(marriage.second())) {
+                lines.add(Message.of(MessageKey.FAMILY_LIST_ENTRY, VillagerIdentity.of(marriage.first()).fullName(),
+                        VillagerIdentity.of(marriage.second()).fullName(), marriage.since().value(),
+                        marriage.children(), registry.bond(marriage.first(), marriage.second())));
+            }
+        }
+        if (lines.isEmpty()) {
+            return Reply.success(Message.of(MessageKey.FAMILY_LIST_EMPTY, town.get().name().toString()));
+        }
+        lines.add(0, Message.of(MessageKey.FAMILY_LIST_HEADER, town.get().name().toString(), lines.size()));
+        return Reply.success(lines);
+    }
+
+    /** {@code /civ familie kinder}: Kinder der Ehepaare der eigenen Gemeinde. */
+    public synchronized Reply kids(Caller caller) {
+        Optional<PolityView> town = queries.municipalityOf(caller.player());
+        if (town.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.NOT_IN_MUNICIPALITY));
+        }
+        Set<PersonRef> members = new HashSet<>(adultsOf(town.get()));
+        List<Message> lines = new ArrayList<>();
+        for (FamilyRegistry.Child child : registry.children()) {
+            if (members.contains(child.parent1()) || members.contains(child.parent2())) {
+                lines.add(Message.of(MessageKey.FAMILY_CHILD_ENTRY, VillagerIdentity.of(child.ref()).fullName(),
+                        VillagerIdentity.of(child.parent1()).fullName(), VillagerIdentity.of(child.parent2()).fullName(),
+                        child.born().value()));
+            }
+        }
+        if (lines.isEmpty()) {
+            return Reply.success(Message.of(MessageKey.FAMILY_CHILDREN_EMPTY, town.get().name().toString()));
+        }
+        return Reply.success(lines);
     }
 
     /** Ein Dorfbewohner ist gestorben oder verschwunden: Ehe endet, Beziehungen verfallen. */

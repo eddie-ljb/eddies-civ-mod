@@ -353,6 +353,7 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
       <a href="#presse">Presse</a>
       <a href="#staat">Staat</a>
       <a href="#krieg">Krieg</a>
+      <a href="#familien">Familien</a>
       <a href="#recht">Recht</a>
       <a href="#justiz">Justiz</a>
       <a href="#post">Post<span class="badge" id="b-post"></span></a>
@@ -553,6 +554,13 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
     <div class="register" id="wars"></div>
     <h3 style="margin:32px 0 12px">Bündnisse</h3>
     <div class="register" id="alliances"></div>
+  </section>
+
+  <section data-page="familien">
+    <div class="pagehead"><div><h2>Familien</h2><p>Ehen, Scheidungen und Kinder der Dorfbewohner. Wer zueinander passt, kommt sich näher und heiratet; wer sich auseinanderlebt, trennt sich. Bildung, Gemeinsinn und Heimatverbundenheit bestimmen mit, wie viele Kinder es werden.</p></div></div>
+    <div class="register" id="marriages"></div>
+    <h3 style="margin:32px 0 12px">Scheidungen</h3>
+    <div class="register" id="divorces"></div>
   </section>
 
   <section data-page="staat">
@@ -795,7 +803,7 @@ const head = name => el("img", { className: "avatar", alt: "", loading: "lazy", 
 const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
 /* Seiten */
-const pages = ["start", "welt", "karte", "wahlen", "markt", "boerse", "ranglisten", "presse", "krieg", "staat", "recht", "justiz", "post", "chat", "bauen", "freunde", "ich"];
+const pages = ["start", "welt", "karte", "wahlen", "markt", "boerse", "ranglisten", "presse", "krieg", "familien", "staat", "recht", "justiz", "post", "chat", "bauen", "freunde", "ich"];
 let page = "start";
 function route() {
   const wanted = location.hash.slice(1).split("/")[0];
@@ -803,7 +811,7 @@ function route() {
   document.querySelectorAll("section[data-page]").forEach(s => s.classList.toggle("on", s.dataset.page === page));
   document.querySelectorAll(".nav a").forEach(a => { if (a.getAttribute("href") === "#" + page) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
   const loaders = { start: loadStart, welt: loadWorld, karte: openMap, wahlen: loadElections, markt: loadMarket,
-    boerse: loadExchange, ranglisten: loadRankings, presse: loadPress, krieg: loadWar, staat: loadState, recht: loadLaws, justiz: loadJustice, post: loadLetters,
+    boerse: loadExchange, ranglisten: loadRankings, presse: loadPress, krieg: loadWar, familien: loadFamilies, staat: loadState, recht: loadLaws, justiz: loadJustice, post: loadLetters,
     chat: openChat, bauen: loadPlans, freunde: loadFriends, ich: loadMe };
   loaders[page]();
   if (page !== "chat") stopChat();
@@ -1467,6 +1475,17 @@ async function loadWar() {
   }) : [el("div", { className: "empty", style: "border:none", textContent: "Es herrscht Frieden." })]));
   $("alliances").replaceChildren(...(r.data.alliances.length ? r.data.alliances.map(a => el("div", { className: "card" }, el("p", { textContent: a.first + " ↔ " + a.second })))
     : [el("div", { className: "empty", style: "border:none", textContent: "Keine Bündnisse." })]));
+}
+async function loadFamilies() {
+  const r = await api("/api/families");
+  if (!r.ok) return;
+  $("marriages").replaceChildren(...(r.data.marriages.length ? r.data.marriages.map(m => el("div", { className: "card" },
+    el("h3", { textContent: m.first + " & " + m.second }),
+    el("p", { textContent: "verheiratet seit Tag " + m.since + " · Kinder " + m.children + " · Beziehung " + m.bond + "/100" })))
+    : [el("div", { className: "empty", style: "border:none", textContent: "Noch keine Ehepaare." })]));
+  $("divorces").replaceChildren(...(r.data.divorces.length ? r.data.divorces.map(d => el("div", { className: "card" },
+    el("p", { textContent: d.first + " & " + d.second + " · verheiratet an Tag " + d.married + ", geschieden an Tag " + d.divorced })))
+    : [el("div", { className: "empty", style: "border:none", textContent: "Keine Scheidungen." })]));
 }
 async function loadPress() {
   const [p, user] = await Promise.all([api("/api/press"), refreshMe()]);

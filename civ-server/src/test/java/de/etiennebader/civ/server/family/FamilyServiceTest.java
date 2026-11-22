@@ -117,4 +117,37 @@ class FamilyServiceTest {
         PersonRef married = family.registry().marriages().get(0).first();
         assertFalse(family.describe(married).isEmpty());
     }
+
+    @Test
+    @DisplayName("Geburten bleiben vorgemerkt, bis das Spiel sie auf die Welt gebracht hat")
+    void pendingBirthsUntilBorn() {
+        populate(16);
+        FamilyService family = server.family();
+        run(family, 400);
+        var pending = family.pendingBirths();
+        assertFalse(pending.isEmpty());
+        assertEquals(pending, family.pendingBirths(), "Ansehen entfernt nichts");
+        family.born(pending.get(0).id());
+        assertEquals(pending.size() - 1, family.pendingBirths().size());
+    }
+
+    @Test
+    @DisplayName("Befehle zeigen Ehepaare und Kinder der eigenen Gemeinde")
+    void commands() {
+        populate(16);
+        Caller alice = new Caller(this.alice, "Alice", HERE);
+        assertEquals(de.etiennebader.civ.server.command.MessageKey.FAMILY_LIST_EMPTY.key(),
+                server.family().couples(alice).lines().getFirst().key());
+        assertEquals(de.etiennebader.civ.server.command.MessageKey.FAMILY_CHILDREN_EMPTY.key(),
+                server.family().kids(alice).lines().getFirst().key());
+        run(server.family(), 400);
+        var couples = server.family().couples(alice);
+        assertTrue(couples.success());
+        assertEquals(de.etiennebader.civ.server.command.MessageKey.FAMILY_LIST_HEADER.key(),
+                couples.lines().getFirst().key());
+        assertEquals(server.family().registry().marriages().size() + 1, couples.lines().size());
+        assertEquals(de.etiennebader.civ.server.command.MessageKey.FAMILY_CHILD_ENTRY.key(),
+                server.family().kids(alice).lines().getFirst().key());
+        assertFalse(server.family().couples(new Caller(new PlayerRef(PlayerId.generate(ids)), "Nobody", HERE)).success());
+    }
 }
