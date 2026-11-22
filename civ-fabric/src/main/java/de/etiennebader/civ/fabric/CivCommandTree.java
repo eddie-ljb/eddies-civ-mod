@@ -771,6 +771,13 @@ public final class CivCommandTree {
             }
         }
         dispatcher.register(Commands.literal("civ")
+                .then(Commands.literal("heim")
+                        .executes(context -> withCiv(context, (civ, player) -> HomePorts.travel(civ, player,
+                                Optional.empty())))
+                        .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                                .suggests(this::suggestPolityNames)
+                                .executes(context -> withCiv(context, (civ, player) -> HomePorts.travel(civ, player,
+                                        Optional.of(StringArgumentType.getString(context, TEXT)))))))
                 .then(Commands.literal("ebenen")
                         .executes(context -> withCiv(context, (civ, player) -> civ.levels().overview(
                                 Players.caller(player)))))
@@ -966,6 +973,38 @@ public final class CivCommandTree {
                         .then(Commands.literal("entfernen")
                                 .executes(context -> withCiv(context, (civ, player) -> civ.levels().setFlag(
                                         Players.caller(player), level.apply(context), Optional.empty())))))
+                .then(Commands.literal("heim")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(
+                                Players.caller(player), level.apply(context), civ.homePorts()::list)))
+                        .then(Commands.literal("liste")
+                                .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(
+                                        Players.caller(player), level.apply(context), civ.homePorts()::list))))
+                        .then(Commands.literal("setzen")
+                                .then(Commands.argument(COUNT, IntegerArgumentType.integer(2, 3))
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(
+                                                Players.caller(player), level.apply(context),
+                                                polity -> civ.homePorts().set(Players.caller(player), polity,
+                                                        IntegerArgumentType.getInteger(context, COUNT)))))))
+                        .then(Commands.literal("entfernen")
+                                .then(Commands.argument(COUNT, IntegerArgumentType.integer(2, 3))
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(
+                                                Players.caller(player), level.apply(context),
+                                                polity -> civ.homePorts().remove(Players.caller(player), polity,
+                                                        IntegerArgumentType.getInteger(context, COUNT)))))))
+                        .then(Commands.literal("zugang")
+                                .then(Commands.argument(TEXT, StringArgumentType.word())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                java.util.List.of("keiner", "buerger", "verbuendete", "alle"), builder))
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(
+                                                Players.caller(player), level.apply(context),
+                                                polity -> civ.homePorts().setAccess(Players.caller(player), polity,
+                                                        StringArgumentType.getString(context, TEXT)))))))
+                        .then(Commands.literal("preis")
+                                .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(
+                                                Players.caller(player), level.apply(context),
+                                                polity -> civ.homePorts().setFee(Players.caller(player), polity,
+                                                        StringArgumentType.getString(context, TEXT))))))))
                 .then(Commands.literal("hymne")
                         .executes(context -> withCiv(context, (civ, player) -> playAnthem(civ, player,
                                 level.apply(context))))
