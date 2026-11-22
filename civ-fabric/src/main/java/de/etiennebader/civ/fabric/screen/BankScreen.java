@@ -15,7 +15,12 @@ import de.etiennebader.civ.server.command.MessageKey;
 import de.etiennebader.civ.server.command.Reply;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
+import de.etiennebader.civ.domain.economy.Currency;
+import de.etiennebader.civ.domain.shared.CurrencyId;
+import de.etiennebader.civ.fabric.CurrencyItems;
+import de.etiennebader.civ.fabric.BankTransfers;
 
 import java.util.Optional;
 
@@ -26,8 +31,16 @@ public final class BankScreen extends MenuScreen {
 
     private static final int[] AMOUNTS = {1, 16, 64};
 
+    private final CurrencyId payout;
+
     public BankScreen(CivServer civ, ServerPlayer player) {
+        this(civ, player, CurrencyId.EMERALD);
+    }
+
+    /** Mit gewählter Auszahlungswährung (Bargeld-Item der Währung; Smaragd ist der Standard). */
+    private BankScreen(CivServer civ, ServerPlayer player, CurrencyId payout) {
         super(civ, player, Optional.empty());
+        this.payout = payout;
     }
 
     @Override
@@ -61,34 +74,45 @@ public final class BankScreen extends MenuScreen {
         }
         canvas.set(13, Icon.of(Items.EMERALD_BLOCK).name(GuiKeys.BANK_DEPOSIT_ALL.text(), Icon.GOOD)
                 .line(GuiKeys.BANK_DEPOSIT.text(carried)).build(), click -> deposit(click, Emeralds.count(player)));
+        canvas.set(2, payoutIcon(), click -> Screens.open(click.player(), new BankScreen(civ, player, nextPayout())));
         canvas.set(22, Icon.of(Items.BARRIER).name(GuiKeys.BACK.text()).build(),
                 click -> Screens.close(click.player()));
     }
 
+    private Currency payoutCurrency() {
+        return civ.currencies().find(payout.code()).orElseGet(Currency::emerald);
+    }
+
+    /** Das Bargeld-Item der Auszahlungswährung als Symbol; ohne gültiges Item ein Goldklumpen. */
+    private net.minecraft.world.item.ItemStack payoutIcon() {
+        Currency currency = payoutCurrency();
+        Item item = currency.itemId().flatMap(CurrencyItems::item).orElse(Items.GOLD_NUGGET);
+        return Icon.of(item).name(GuiKeys.BANK_PAYOUT_CURRENCY.text(currency.name()))
+                .line(GuiKeys.BANK_PAYOUT_HINT.text()).glint().build();
+    }
+
+    /** Die nächste Währung mit Bargeld-Item; nach der letzten wieder Smaragd. */
+    private CurrencyId nextPayout() {
+        java.util.List<Currency> options = civ.currencies().payoutCurrencies().stream()
+                .filter(currency -> currency.id().equals(CurrencyId.EMERALD) || currency.itemId().filter(CurrencyItems::exists).isPresent())
+                .toList();
+        for (int index = 0; index < options.size(); index++) {
+            if (options.get(index).id().equals(payout)) {
+                return options.get((index + 1) % options.size()).id();
+            }
+        }
+        return CurrencyId.EMERALD;
+    }
+
     private void deposit(Click click, int wanted) {
-        int taken = Emeralds.take(player, wanted);
-        if (taken == 0) {
-            report(click, Reply.failure(Message.of(MessageKey.BANK_NOTHING_TO_DEPOSIT)));
-            return;
-        }
-        Reply reply = civ.bank().deposit(caller(), taken);
-        if (!reply.success()) {
-            Emeralds.give(player, taken);
-        }
+        Reply reply = BankTransfers.depositIn(civ, player, wanted, payout.code());
         report(click, reply);
-        if (reply.success()) {
-            Feedback.money(player);
-        }
     }
 
     private void withdraw(Click click, int wanted) {
-        long available = civ.bank().withdrawableEmeralds(Players.ref(player));
-        int amount = (int) Math.min(wanted, Math.max(available, 1));
-        Reply reply = civ.bank().withdraw(caller(), amount);
-        if (reply.success()) {
-            Emeralds.give(player, amount);
-            Feedback.money(player);
-        }
-        report(click, reply);
+        int amount = payout.equals(CurrencyId.EMERALD)
+                ? (int) Math.min(wanted, Math.max(civ.bank().withdrawableEmeralds(Players.ref(player)), 1))
+                : (int) Math.min(wanted, Math.max(civ.bank().withdrawableIn(Players.ref(player), payout), 1));
+        report(click, BankTransfers.withdrawIn(civ, player, amount, payout.code()));
     }
 }

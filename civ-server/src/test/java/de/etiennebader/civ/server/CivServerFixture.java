@@ -83,6 +83,14 @@ public final class CivServerFixture {
         return server.townHalls();
     }
 
+    public de.etiennebader.civ.server.currency.CurrencyService currencies() {
+        return server.currencies();
+    }
+
+    public de.etiennebader.civ.server.credit.CreditService credit() {
+        return server.credit();
+    }
+
     public de.etiennebader.civ.server.shop.ShopService shops() {
         return server.shops();
     }

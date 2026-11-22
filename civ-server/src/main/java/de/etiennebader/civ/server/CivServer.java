@@ -27,6 +27,8 @@ import de.etiennebader.civ.domain.shared.IdGenerator;
 import de.etiennebader.civ.domain.shared.RandomIdGenerator;
 import de.etiennebader.civ.persistence.store.SqliteStateStore;
 import de.etiennebader.civ.server.bank.BankService;
+import de.etiennebader.civ.server.credit.CreditService;
+import de.etiennebader.civ.server.currency.CurrencyService;
 import de.etiennebader.civ.server.campaign.CampaignService;
 import de.etiennebader.civ.server.civil.CivilService;
 import de.etiennebader.civ.server.command.Caller;
@@ -98,6 +100,8 @@ public final class CivServer {
     private final CivCommands commands;
     private final ProtectionService protection;
     private final BankService bank;
+    private final CurrencyService currencyService;
+    private final CreditService creditService;
     private final MarketService market;
     private final TerritoryWatcher territory;
     private final TownService towns;
@@ -171,6 +175,8 @@ public final class CivServer {
         this.constitutions = new ConstitutionService(app, calendar, texts, announcements, commands, offices, voting,
                 federations);
         this.bank = new BankService(app, calendar, settings.currency(), players, texts);
+        this.currencyService = new CurrencyService(app, calendar, players, texts);
+        this.creditService = new CreditService(app, calendar, players, texts);
         this.market = new MarketService(app, calendar, settings, players, texts);
         this.territory = new TerritoryWatcher(app.queries(), texts);
         this.towns = new TownService(app.queries(), settings, texts, commands, territory);
@@ -266,6 +272,7 @@ public final class CivServer {
         offices.endOfDay(day);
         parties.endOfDay(day);
         villagers.endOfDay(day);
+        app.credit().endOfDay(day); // überfällige Kredite fallen aus
         if (settings.ambitions()) {
             villagerFoundations.endOfDay(day);
             villagerFederations.endOfDay(day);
@@ -396,6 +403,14 @@ public final class CivServer {
 
     public BankService bank() {
         return bank;
+    }
+
+    public CurrencyService currencies() {
+        return currencyService;
+    }
+
+    public CreditService credit() {
+        return creditService;
     }
 
     public MarketService market() {

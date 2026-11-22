@@ -18,6 +18,44 @@ public enum ErrorCode {
     /** Argumente: ungültiger Code. */
     INVALID_CURRENCY_CODE,
 
+    // economy / currencies
+    /** Argumente: Währungscode. */
+    UNKNOWN_CURRENCY,
+    /** Argumente: Währungscode oder Symbol, das schon vergeben ist. */
+    CURRENCY_ALREADY_EXISTS,
+    /** Argumente: Währungscode der eingebauten, unveränderlichen Währung. */
+    CURRENCY_PROTECTED,
+    /** Argumente: Währungscode, Akteur. */
+    NOT_CURRENCY_GOVERNOR,
+    /** Argumente: Betrag, der nicht negativ sein darf. */
+    NEGATIVE_CONVERSION_AMOUNT,
+
+    // credit
+    /** Argumente: Akteur. */
+    NOT_A_BANK,
+    /** Argumente: Akteur. */
+    ALREADY_A_BANK,
+    /** Keine Argumente. */
+    INVALID_LOAN_TERMS,
+    /** Argumente: Kredit-ID. */
+    UNKNOWN_LOAN,
+    /** Argumente: Kredit-ID. */
+    LOAN_NOT_ACTIVE,
+    /** Argumente: Kredit-ID, Akteur. */
+    NOT_LOAN_BORROWER,
+    /** Argumente: Zins in Prozent, erlaubter Höchstzins in Prozent. */
+    INTEREST_ABOVE_LIMIT,
+    /** Argumente: Kreditscore, Mindestscore. */
+    CREDIT_SCORE_TOO_LOW,
+    /** Keine Argumente. */
+    LENDING_NOT_ALLOWED,
+    /** Argumente: Angebots-ID. */
+    UNKNOWN_LOAN_OFFER,
+    /** Argumente: Angebots-ID, Akteur. */
+    NOT_OFFER_PARTY,
+    /** Argumente: Bank. */
+    BANK_NOT_SELF_SERVICE,
+
     // law
     /** Argumente: Titel, Mindestlänge, Höchstlänge. */
     INVALID_STATUTE_TITLE,

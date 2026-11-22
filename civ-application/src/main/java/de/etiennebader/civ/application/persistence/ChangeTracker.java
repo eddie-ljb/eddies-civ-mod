@@ -2,6 +2,8 @@ package de.etiennebader.civ.application.persistence;
 
 import de.etiennebader.civ.domain.justice.JusticeEvent;
 import de.etiennebader.civ.domain.civic.CivicEvent;
+import de.etiennebader.civ.domain.credit.CreditEvent;
+import de.etiennebader.civ.domain.economy.CurrencyEvent;
 import de.etiennebader.civ.domain.production.ProductionEvent;
 import de.etiennebader.civ.application.port.DomainEventPublisher;
 import de.etiennebader.civ.domain.community.CommunityEvent;
@@ -55,6 +57,8 @@ public final class ChangeTracker implements DomainEventPublisher {
     private boolean civic;
     private boolean justice;
     private boolean production;
+    private boolean currencyRegistry;
+    private boolean credit;
 
     @Override
     public void publish(List<? extends DomainEvent> published) {
@@ -79,6 +83,8 @@ public final class ChangeTracker implements DomainEventPublisher {
             case CivicEvent ignored -> civic = true;
             case JusticeEvent ignored -> justice = true;
             case ProductionEvent ignored -> production = true;
+            case CurrencyEvent ignored -> currencyRegistry = true;
+            case CreditEvent ignored -> credit = true;
             default -> {
                 // Events anderer Bereiche ändern keinen gespeicherten Zustand, landen aber im Audit-Log.
             }
@@ -119,8 +125,10 @@ public final class ChangeTracker implements DomainEventPublisher {
     /** Liefert alle Änderungen seit dem letzten Aufruf und beginnt von vorn. */
     public ChangeSet takeChanges() {
         ChangeSet changes = new ChangeSet(polities, chunks, plots, accounts, currencies, commodities, shops, events,
-                contracts, community, exchange, press, civic, justice, production);
+                contracts, community, exchange, press, civic, justice, production, currencyRegistry, credit);
         production = false;
+        currencyRegistry = false;
+        credit = false;
         civic = false;
         justice = false;
         contracts = false;
@@ -157,6 +165,8 @@ public final class ChangeTracker implements DomainEventPublisher {
         civic |= failed.civic();
         justice |= failed.justice();
         production |= failed.production();
+        currencyRegistry |= failed.currencyRegistry();
+        credit |= failed.credit();
         events.addAll(0, failed.events());
     }
 }

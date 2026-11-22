@@ -1,5 +1,7 @@
 package de.etiennebader.civ.application;
 
+import de.etiennebader.civ.domain.credit.CreditRepository;
+import de.etiennebader.civ.domain.economy.CurrencyRepository;
 import de.etiennebader.civ.domain.justice.JusticeRepository;
 import de.etiennebader.civ.domain.civic.CivicRepository;
 import de.etiennebader.civ.domain.production.ProductionRepository;
@@ -29,7 +31,19 @@ public record Repositories(PolityRepository polities, TerritoryRepository territ
                            LandRepository land, LedgerRepository ledger, MarketRepository market,
                            ShopRegistryRepository shops, ContractRegistryRepository contracts,
                            CommunityRepository community, StockExchangeRepository exchange, PressRepository press,
-                           CivicRepository civic, JusticeRepository justice, ProductionRepository production) {
+                           CivicRepository civic, JusticeRepository justice, ProductionRepository production,
+                           CurrencyRepository currencies, CreditRepository credit) {
+
+    /** Ohne Währungen und Kredite (im Speicher). */
+    public Repositories(PolityRepository polities, TerritoryRepository territory, LandRepository land,
+                        LedgerRepository ledger, MarketRepository market, ShopRegistryRepository shops,
+                        ContractRegistryRepository contracts, CommunityRepository community,
+                        StockExchangeRepository exchange, PressRepository press, CivicRepository civic,
+                        JusticeRepository justice, ProductionRepository production) {
+        this(polities, territory, land, ledger, market, shops, contracts, community, exchange, press, civic, justice,
+                production, new de.etiennebader.civ.application.inmemory.InMemoryCurrencyRepository(),
+                new de.etiennebader.civ.application.inmemory.InMemoryCreditRepository());
+    }
 
     /** Ohne Firmenbetriebe (im Speicher). */
     public Repositories(PolityRepository polities, TerritoryRepository territory, LandRepository land,
@@ -73,6 +87,8 @@ public record Repositories(PolityRepository polities, TerritoryRepository territ
         Objects.requireNonNull(civic, "civic");
         Objects.requireNonNull(justice, "justice");
         Objects.requireNonNull(production, "production");
+        Objects.requireNonNull(currencies, "currencies");
+        Objects.requireNonNull(credit, "credit");
         Objects.requireNonNull(polities, "polities");
         Objects.requireNonNull(territory, "territory");
         Objects.requireNonNull(land, "land");
