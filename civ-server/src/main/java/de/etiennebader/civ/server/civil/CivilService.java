@@ -3,6 +3,7 @@ package de.etiennebader.civ.server.civil;
 import de.etiennebader.civ.application.CivApplication;
 import de.etiennebader.civ.application.civil.Address;
 import de.etiennebader.civ.application.civil.Addresses;
+import de.etiennebader.civ.application.civil.IdCards;
 import de.etiennebader.civ.application.civil.RunContracts;
 import de.etiennebader.civ.application.day.Calendar;
 import de.etiennebader.civ.application.directory.PlayerDirectory;
@@ -38,6 +39,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -154,6 +156,39 @@ public final class CivilService {
         return residence.isPresent()
                 ? Reply.success(Message.of(MessageKey.ADDRESS_OF, name, residence.get().line()))
                 : Reply.success(Message.of(MessageKey.ADDRESS_NONE, name));
+    }
+
+    /**
+     * {@code /civ ausweis}: Das Rathaus (die Gemeinde, in der der Aufrufer steht) stellt einen Personalausweis
+     * für den Aufrufer oder für einen Dorfbewohner aus. {@code handout} übergibt die Daten an das Item.
+     */
+    public Reply issueIdCard(Caller caller, Optional<ActorRef> villager, Consumer<IdCardIssue> handout) {
+        return withTown(caller, town -> {
+            ActorRef holder = villager.orElse(caller.player());
+            String name = villager.isPresent() ? texts.actor(holder) : caller.name();
+            IdCards.Data data = app.idCards().issue(holder, name, calendar.today());
+            handout.accept(new IdCardIssue(holder, data));
+            return Reply.success(villager.isPresent()
+                    ? Message.of(MessageKey.ID_CARD_ISSUED_FOR, name)
+                    : Message.of(MessageKey.ID_CARD_ISSUED));
+        });
+    }
+
+    /** {@code /civ ausweis pruefen}: Zeigt die Angaben eines Ausweises und ob sie noch stimmen. */
+    public Reply checkIdCard(ActorRef holder, IdCards.Data card) {
+        List<Message> lines = new ArrayList<>();
+        lines.add(Message.of(MessageKey.ID_CARD_HEADER, card.holderName(), card.issuedOn().value()));
+        lines.add(card.address().map(line -> Message.of(MessageKey.ID_CARD_ADDRESS, line))
+                .orElseGet(() -> Message.of(MessageKey.ID_CARD_ADDRESS_NONE)));
+        lines.add(card.citizenOf().map(town -> Message.of(MessageKey.ID_CARD_CITIZEN_OF, town))
+                .orElseGet(() -> Message.of(MessageKey.ID_CARD_CITIZEN_NONE)));
+        boolean current = app.idCards().isCurrent(holder, texts.actor(holder), card);
+        lines.add(Message.of(current ? MessageKey.ID_CARD_VALID : MessageKey.ID_CARD_OUTDATED));
+        return Reply.success(lines);
+    }
+
+    /** Ein ausgestellter Ausweis samt Inhaber. */
+    public record IdCardIssue(ActorRef holder, IdCards.Data data) {
     }
 
     /** Anschrift eines Akteurs als Text; leer ohne Wohnsitz. */

@@ -211,6 +211,9 @@ public enum GuiKeys {
     LAW_BOOK_OPEN,
     LAW_BOOK_OPEN_HINT,
     LAW_BOOK_ITEM_LORE,
+    ID_CARD_NAME,
+    ID_CARD_NAME_LINE,
+    ID_CARD_ISSUED_LINE,
     // Parteien
     PARTIES,
     PARTIES_HINT,

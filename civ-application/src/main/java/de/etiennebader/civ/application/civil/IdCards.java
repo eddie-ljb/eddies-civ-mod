@@ -52,6 +52,15 @@ public final class IdCards {
         return new Data(holderName, address, citizenOf, today);
     }
 
+    /**
+     * Ob die Angaben des Ausweises noch mit dem Register übereinstimmen: Name, Anschrift und Staatsbürgerschaft
+     * (der Ausstellungstag zählt nicht). Nach Umzug, Einbürgerung oder Umbenennung ist der Ausweis veraltet.
+     */
+    public boolean isCurrent(ActorRef holder, String currentName, Data card) {
+        Data now = issue(holder, currentName, card.issuedOn());
+        return now.equals(card);
+    }
+
     private Optional<String> citizenshipOf(ActorRef holder) {
         for (PolityView polity : queries.polities()) {
             if (polity.kind() != PolityKind.TERRITORIAL) {

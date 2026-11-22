@@ -89,6 +89,30 @@ class CivilServiceTest {
     }
 
     @Test
+    @DisplayName("Personalausweis: nur für Mitglieder einer Gemeinde ausgestellt, nach Änderung der Daten veraltet")
+    void idCardIssueAndValidity() {
+        setUpTown();
+        Caller mayor = at(alice, "Alice", 8, 8);
+        PlayerRef stranger = new PlayerRef(PlayerId.generate(ids));
+        server.playerJoined(stranger, "Stranger");
+        Caller outside = at(stranger, "Stranger", 8, 8);
+        assertFalse(server.civil().issueIdCard(outside, Optional.empty(), issue -> {
+            throw new AssertionError("ohne Gemeinde darf nichts ausgestellt werden");
+        }).success());
+
+        java.util.concurrent.atomic.AtomicReference<CivilService.IdCardIssue> issued =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        Reply reply = server.civil().issueIdCard(mayor, Optional.empty(), issued::set);
+        assertTrue(has(reply, MessageKey.ID_CARD_ISSUED), reply.toString());
+        assertEquals("Alice", issued.get().data().holderName());
+        assertTrue(has(server.civil().checkIdCard(issued.get().holder(), issued.get().data()), MessageKey.ID_CARD_VALID));
+
+        var stale = new de.etiennebader.civ.application.civil.IdCards.Data("Alice",
+                Optional.of("Altstraße 9"), issued.get().data().citizenOf(), issued.get().data().issuedOn());
+        assertTrue(has(server.civil().checkIdCard(issued.get().holder(), stale), MessageKey.ID_CARD_OUTDATED));
+    }
+
+    @Test
     @DisplayName("Ort, Land und Nation erscheinen abhängig vom Schildtyp und vom tatsächlichen Aufstellort")
     void territorialSignLines() {
         setUpTown();
