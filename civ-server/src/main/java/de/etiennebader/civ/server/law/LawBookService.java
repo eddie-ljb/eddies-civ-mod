@@ -10,6 +10,8 @@ import de.etiennebader.civ.application.query.WorldQueries;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.law.EnactedStatute;
 import de.etiennebader.civ.domain.law.LawRecognizer;
+import de.etiennebader.civ.domain.law.ParameterCatalog;
+import de.etiennebader.civ.domain.law.ParameterKey;
 import de.etiennebader.civ.domain.law.ParameterValue;
 import de.etiennebader.civ.domain.law.StandardParameters;
 import de.etiennebader.civ.domain.law.Statute;
@@ -63,6 +65,10 @@ public final class LawBookService {
      * persistierten Spielzustands – siehe {@code docs/issue-10-gesetzeseditor.md}. Ein Vorlagenentwurf bleibt also
      * nur bis zum nächsten Serverneustart erhalten.
      */
+    /** Obergrenzen gegen unbegrenztes Wachstum des Arbeitsspeichers. */
+    static final int MAX_DRAFTS_PER_AUTHOR = 30;
+    static final int MAX_RIGHTS_PER_PARAGRAPH = 50;
+
     private final Map<String, LawDraft> drafts = new LinkedHashMap<>();
 
     public LawBookService(CivApplication app, Calendar calendar, Texts texts, Announcements announcements,
@@ -169,9 +175,14 @@ public final class LawBookService {
 
     /** Erlass in einer bestimmten Gemeinde oder einem Bund, z. B. aus dem Gesetzbuch-Menü. */
     public Reply enact(Caller caller, PolityId polityId, String title, String text) {
+        return enact(caller, polityId, title, text, List.of());
+    }
+
+    private Reply enact(Caller caller, PolityId polityId, String title, String text,
+                        List<ParameterValue<?>> explicitValues) {
         return attempt(() -> {
             EnactParagraph.Result result = app.enactParagraph().execute(new EnactParagraph.Command(polityId,
-                    caller.player(), title, text, calendar.today()));
+                    caller.player(), title, text, explicitValues, calendar.today()));
             PolityView polity = queries.polity(polityId).orElseThrow();
             List<Message> lines = new ArrayList<>();
             if (result.statute().isPresent() || accepted(result.proposal())) {
@@ -186,7 +197,7 @@ public final class LawBookService {
                         caller.name(), title.strip())));
                 lines.add(opened);
             }
-            lines.addAll(effects(result.recognition().values()));
+            lines.addAll(effects(merge(result.recognition().values(), explicitValues)));
             if (!result.recognition().unrecognized().isEmpty()) {
                 lines.add(Message.of(MessageKey.PARAGRAPH_UNENFORCED,
                         String.join(" / ", result.recognition().unrecognized())));
@@ -224,6 +235,66 @@ public final class LawBookService {
         });
     }
 
+    private static List<ParameterValue<?>> merge(List<ParameterValue<?>> recognized,
+                                                  List<ParameterValue<?>> explicit) {
+        Map<ParameterKey<?>, ParameterValue<?>> byKey = new LinkedHashMap<>();
+        recognized.forEach(value -> byKey.put(value.key(), value));
+        explicit.forEach(value -> byKey.put(value.key(), value));
+        return List.copyOf(byKey.values());
+    }
+
+    // ---- Rechte-Editor und Gesetzesüberblick im Web (#10) ----
+
+    /** Ein Recht (Parameter) einer Polity mit geltendem Wert. */
+    public record RightView(ParameterKey<?> key, Object value, Object defaultValue, boolean explicit) {
+    }
+
+    /** Alle Rechte einer Polity mit geltendem Wert, in Katalogreihenfolge. */
+    public List<RightView> rightsOf(PolityView polity) {
+        List<RightView> rights = new ArrayList<>();
+        for (ParameterKey<?> key : ParameterCatalog.standard().keys()) {
+            rights.add(rightOf(polity, key));
+        }
+        return rights;
+    }
+
+    private static <T> RightView rightOf(PolityView polity, ParameterKey<T> key) {
+        Optional<T> explicit = polity.laws().explicitValueOf(key);
+        return new RightView(key, explicit.orElse(key.defaultValue()), key.defaultValue(), explicit.isPresent());
+    }
+
+    /** Darf die Person für diese Polity Gesetze erlassen oder beantragen (Ebene, die sie führt, sonst Wohngemeinde)? */
+    public boolean canLegislate(Caller caller, PolityId polityId) {
+        return legislature(caller).map(PolityView::id).filter(polityId::equals).isPresent();
+    }
+
+    /**
+     * Setzt Rechte ausdrücklich als Paragraphen, ohne Freitext: {@code values} bildet Parameter-ID auf Wert ab.
+     * Wie jeder Paragraph wird er sofort erlassen oder, bei Abstimmungspflicht, als Antrag eröffnet.
+     */
+    public Reply enactRights(Caller caller, PolityId polityId, String title, Map<String, String> values) {
+        if (!canLegislate(caller, polityId)) {
+            return Reply.failure(Message.of(MessageKey.NOT_IN_MUNICIPALITY));
+        }
+        if (values.isEmpty() || values.size() > MAX_RIGHTS_PER_PARAGRAPH) {
+            return Reply.failure(Message.of(MessageKey.INVALID_LAW_VALUE, String.valueOf(values.size()), ""));
+        }
+        ParameterCatalog catalog = ParameterCatalog.standard();
+        List<ParameterValue<?>> decoded = new ArrayList<>();
+        for (Map.Entry<String, String> entry : values.entrySet()) {
+            try {
+                ParameterValue<?> value = catalog.decode(entry.getKey(), entry.getValue());
+                if (!value.key().accepts(value.value())) {
+                    return Reply.failure(Message.of(MessageKey.INVALID_LAW_VALUE, entry.getValue(), entry.getKey()));
+                }
+                decoded.add(value);
+            } catch (IllegalArgumentException e) {
+                return Reply.failure(Message.of(MessageKey.INVALID_LAW_VALUE, entry.getValue(), entry.getKey()));
+            }
+        }
+        return enact(caller, polityId, title, "", decoded);
+    }
+
     // ---- Gesetzesvorlagen (#10) ----
 
     /**
@@ -254,6 +325,11 @@ public final class LawBookService {
         }
         if (id.isPresent() && drafts.containsKey(id.get()) && !drafts.get(id.get()).author().equals(caller.player())) {
             throw new IllegalArgumentException("Entwurf gehört einer anderen Person");
+        }
+        boolean overwrite = id.isPresent() && drafts.containsKey(id.get());
+        if (!overwrite && drafts.values().stream().filter(d -> d.author().equals(caller.player())).count()
+                >= MAX_DRAFTS_PER_AUTHOR) {
+            throw new IllegalArgumentException("Zu viele Entwürfe (höchstens %d)".formatted(MAX_DRAFTS_PER_AUTHOR));
         }
         String draftId = id.filter(drafts::containsKey).orElseGet(() -> UUID.randomUUID().toString());
         Optional<PolityId> party = queries.partyOf(caller.player()).map(PolityView::id);

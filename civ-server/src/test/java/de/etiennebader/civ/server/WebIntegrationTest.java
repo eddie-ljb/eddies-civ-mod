@@ -203,6 +203,15 @@ class WebIntegrationTest {
                     + "\",\"kind\":\"verfassung\",\"text\":\"tax_rate | zu hoch\"}", cookie);
             assertTrue(sue.body().contains("\"ok\""), sue.body());
             assertEquals(400, request(base + "/api/justice", "{\"action\":\"zaubern\"}", cookie).status());
+            Response lawsAnonymous = request(base + "/api/laws", null, null);
+            assertTrue(lawsAnonymous.status() == 200 && lawsAnonymous.body().contains("\"catalog\":[{")
+                    && lawsAnonymous.body().contains("\"drafts\":[]"), lawsAnonymous.body());
+            assertEquals(401, request(base + "/api/laws", "{\"action\":\"check\",\"text\":\"x\"}", null).status());
+            assertEquals(400, request(base + "/api/laws", "{\"action\":\"zaubern\"}", cookie).status());
+            Response draft = request(base + "/api/laws", "{\"action\":\"draft\",\"title\":\"Plan\",\"text\":\"Feuer ist verboten.\"}", cookie);
+            assertTrue(draft.status() == 200 && draft.body().contains("\"ok\":true"), draft.body());
+            assertTrue(request(base + "/api/laws", null, cookie).body().contains("\"title\":\"Plan\""));
+            assertEquals(422, request(base + "/api/laws", "{\"action\":\"draft\",\"title\":\"\",\"text\":\"x\"}", cookie).status());
             assertTrue(request(base + "/api/show", null, null).body().contains("\"running\":["));
             assertTrue(request(base + "/api/civic", null, null).body().contains("\"name\":\"Nordhain\""));
             Response press = request(base + "/api/press", null, null);

@@ -321,6 +321,10 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                         request.cookie(SESSION_COOKIE).flatMap(sessions::session))));
                 case "POST /api/justice" -> withLogin(request, login -> action(request, body -> game.call(() ->
                         justiceAction(login, body)), texts));
+                case "GET /api/laws" -> HttpResponse.json(200, game.call(() -> laws(texts,
+                        request.cookie(SESSION_COOKIE).flatMap(sessions::session))));
+                case "POST /api/laws" -> withLogin(request, login -> action(request, body -> game.call(() ->
+                        lawAction(login, body)), texts));
                 case "GET /api/show" -> HttpResponse.json(200, game.call(() -> show(texts)));
                 case "GET /api/civic" -> HttpResponse.json(200, game.call(() -> civic(texts)));
                 case "POST /api/image" -> withLogin(request, login -> imageUpload(request, login, texts));
@@ -1372,6 +1376,111 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                         .build()))
                 .put("today", civ.calendar().today().value())
                 .build();
+    }
+
+    /** Gesetzesüberblick: Verfassung, Paragraphen und Rechte jeder Gemeinde und jedes Bundes, dazu die Entwürfe. */
+    private String laws(Translator texts, Optional<WebSessions.Login> login) {
+        var books = civ.lawBooks();
+        Optional<String> legislates = login.flatMap(found -> books.legislature(caller(found)))
+                .map(polity -> polity.id().value().toString());
+        List<de.etiennebader.civ.domain.law.ParameterKey<?>> catalog =
+                de.etiennebader.civ.domain.law.ParameterCatalog.standard().keys();
+        return Json.object()
+                .put("today", civ.calendar().today().value())
+                .put("legislates", legislates.orElse(""))
+                .put("maxTitle", de.etiennebader.civ.domain.law.Statute.MAX_TITLE_LENGTH)
+                .put("maxText", de.etiennebader.civ.domain.law.Statute.MAX_TEXT_LENGTH)
+                .raw("catalog", Json.array(catalog, key -> Json.object()
+                        .put("id", key.id())
+                        .put("name", texts.translate(Message.of(
+                                de.etiennebader.civ.server.command.TranslationKeys.law(key))))
+                        .put("type", key.isChoice() ? "choice" : key.type().getSimpleName().toLowerCase(Locale.ROOT))
+                        .put("default", String.valueOf(key.defaultValue()))
+                        .raw("options", Json.array(key.options(), Json::string))
+                        .build()))
+                .raw("polities", Json.array(civ.queries().polities().stream()
+                        .filter(polity -> polity.kind() == PolityKind.TERRITORIAL || polity.kind() == PolityKind.FEDERATION)
+                        .toList(), polity -> Json.object()
+                        .put("id", polity.id().value().toString())
+                        .put("name", polity.name().value())
+                        .put("level", polity.kind() == PolityKind.FEDERATION ? levelName(polity, texts)
+                                : texts.translate(Message.of(MessageKey.WEB_MUNICIPALITY)))
+                        .put("constitution", polity.constitution().proclaimedOn().map(day -> day.value()).orElse(0L))
+                        .put("preamble", polity.constitution().preamble())
+                        .raw("paragraphs", Json.array(books.paragraphsOf(polity), paragraph -> Json.object()
+                                .put("number", paragraph.number())
+                                .put("title", paragraph.title())
+                                .put("text", paragraph.text())
+                                .put("enactedOn", paragraph.enactedOn())
+                                .raw("effects", Json.array(paragraph.effects(), effect -> Json.object()
+                                        .put("id", effect.id())
+                                        .put("name", texts.translate(effect.name()))
+                                        .put("value", String.valueOf(effect.value()))
+                                        .build()))
+                                .raw("unrecognized", Json.array(paragraph.unrecognized(), Json::string))
+                                .build()))
+                        .raw("rights", Json.array(books.rightsOf(polity).stream()
+                                .filter(de.etiennebader.civ.server.law.LawBookService.RightView::explicit).toList(),
+                                right -> Json.object()
+                                        .put("id", right.key().id())
+                                        .put("value", String.valueOf(right.value()))
+                                        .build()))
+                        .build()))
+                .raw("drafts", Json.array(login.map(found -> books.draftsVisibleTo(caller(found))).orElse(List.of()),
+                        draft -> Json.object()
+                                .put("id", draft.id())
+                                .put("author", draft.authorName())
+                                .put("mine", login.map(found -> found.player().equals(draft.author())).orElse(false))
+                                .put("target", draft.targetPolity().map(id -> id.value().toString()).orElse(""))
+                                .put("title", draft.title())
+                                .put("text", draft.text())
+                                .put("savedOn", draft.savedOn())
+                                .build()))
+                .build();
+    }
+
+    /** {@code POST /api/laws}: {@code action} = check, enact, rights, repeal, draft, draftDelete. */
+    private Reply lawAction(WebSessions.Login login, Map<String, String> body) {
+        var books = civ.lawBooks();
+        Caller caller = caller(login);
+        String action = body.getOrDefault("action", "");
+        if (action.equals("check")) {
+            return books.check(body.getOrDefault("text", ""));
+        }
+        if (action.equals("draftDelete")) {
+            return books.deleteDraft(caller, body.getOrDefault("id", ""))
+                    ? Reply.success(Message.of(MessageKey.LAW_DRAFT_DELETED))
+                    : Reply.failure(Message.of(MessageKey.LAW_DRAFT_UNKNOWN));
+        }
+        if (action.equals("draft")) {
+            try {
+                Optional<PolityId> target = Optional.ofNullable(body.get("polity")).filter(id -> !id.isBlank())
+                        .map(id -> new PolityId(UUID.fromString(id)));
+                books.saveDraft(caller, Optional.ofNullable(body.get("id")).filter(id -> !id.isBlank()), target,
+                        body.getOrDefault("title", ""), body.getOrDefault("text", ""));
+                return Reply.success(Message.of(MessageKey.LAW_DRAFT_SAVED));
+            } catch (IllegalArgumentException e) {
+                return Reply.failure(Message.of(MessageKey.LAW_DRAFT_INVALID, e.getMessage()));
+            }
+        }
+        PolityId polity = new PolityId(UUID.fromString(body.getOrDefault("polity", "")));
+        if (!books.canLegislate(caller, polity)) {
+            return Reply.failure(Message.of(MessageKey.NOT_IN_MUNICIPALITY));
+        }
+        return switch (action) {
+            case "enact" -> books.enact(caller, polity, body.getOrDefault("title", ""), body.getOrDefault("text", ""));
+            case "repeal" -> books.repeal(caller, polity, Integer.parseInt(body.getOrDefault("number", "0")));
+            case "rights" -> {
+                Map<String, String> values = new java.util.LinkedHashMap<>();
+                body.forEach((key, value) -> {
+                    if (key.startsWith("right:")) {
+                        values.put(key.substring("right:".length()), value);
+                    }
+                });
+                yield books.enactRights(caller, polity, body.getOrDefault("title", ""), values);
+            }
+            default -> throw new IllegalArgumentException("Unbekannte Aktion");
+        };
     }
 
     private String caseJson(de.etiennebader.civ.server.justice.CaseView view, Translator texts) {
