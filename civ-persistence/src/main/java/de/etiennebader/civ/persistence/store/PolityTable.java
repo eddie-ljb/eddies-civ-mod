@@ -314,6 +314,18 @@ final class PolityTable {
         return results;
     }
 
+    /**
+     * Ob der Parameter der Zeile noch bekannt ist. Parameter fremder Mods ({@code modid.name}) können fehlen,
+     * wenn die Mod entfernt wurde; solche Zeilen werden beim Laden übersprungen, statt die Welt unlesbar zu machen.
+     */
+    private boolean knowsParameter(ResultSet rows) throws SQLException {
+        return catalog.find(rows.getString("parameter")).isPresent();
+    }
+
+    private static boolean isSingleChange(String motion) {
+        return !motion.equals("ENACT") && !motion.equals("REPEAL") && !motion.equals(PARTY_PROGRAM_KIND);
+    }
+
     private Map<String, List<Promise>> loadPromises(Connection connection) throws SQLException {
         Map<String, List<ParameterValue<?>>> values = new HashMap<>();
         try (PreparedStatement select = connection.prepareStatement("""
@@ -321,6 +333,9 @@ final class PolityTable {
                 FROM promise_value ORDER BY polity_id, promise_position, position""");
              ResultSet rows = select.executeQuery()) {
             while (rows.next()) {
+                if (!knowsParameter(rows)) {
+                    continue;
+                }
                 values.computeIfAbsent(rows.getString("polity_id") + "#" + rows.getInt("promise_position"),
                         ignored -> new ArrayList<>()).add(catalog.decode(rows.getString("parameter"), rows.getString("value")));
             }
@@ -768,6 +783,9 @@ final class PolityTable {
                 "SELECT proposal_id, parameter, value FROM proposal_value ORDER BY proposal_id, position");
              ResultSet rows = select.executeQuery()) {
             while (rows.next()) {
+                if (!knowsParameter(rows)) {
+                    continue;
+                }
                 values.computeIfAbsent(rows.getString("proposal_id"), ignored -> new ArrayList<>())
                         .add(catalog.decode(rows.getString("parameter"), rows.getString("value")));
             }
@@ -780,6 +798,9 @@ final class PolityTable {
              ResultSet rows = select.executeQuery()) {
             while (rows.next()) {
                 String id = rows.getString("id");
+                if (isSingleChange(rows.getString("motion")) && !catalog.find(rows.getString("parameter")).isPresent()) {
+                    continue; // Parameter einer entfernten fremden Mod
+                }
                 Motion motion = switch (rows.getString("motion")) {
                     case "ENACT" -> new Motion.Enact(rows.getString("title"), rows.getString("text"),
                             values.getOrDefault(id, List.of()));
@@ -854,6 +875,9 @@ final class PolityTable {
                 "SELECT statute_id, parameter, value FROM statute_value ORDER BY statute_id, position");
              ResultSet rows = select.executeQuery()) {
             while (rows.next()) {
+                if (!knowsParameter(rows)) {
+                    continue;
+                }
                 values.computeIfAbsent(rows.getString("statute_id"), ignored -> new ArrayList<>())
                         .add(catalog.decode(rows.getString("parameter"), rows.getString("value")));
             }

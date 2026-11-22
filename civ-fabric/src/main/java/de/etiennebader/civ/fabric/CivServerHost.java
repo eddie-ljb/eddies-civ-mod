@@ -77,6 +77,8 @@ public final class CivServerHost {
     }
 
     private void start(MinecraftServer server) {
+        // Ab hier bauen die Dienste ihre Gesetzeskataloge; fremde Mods melden ihre Gesetze vorher an (#51).
+        de.etiennebader.civ.domain.law.ExtensionParameters.freeze();
         Path file = databaseFile(server);
         // Schlägt das Laden fehl, soll der Server nicht ohne Speicherung weiterlaufen: Fehler bricht den Start ab.
         ServerSettings settings = loadSettings(server);

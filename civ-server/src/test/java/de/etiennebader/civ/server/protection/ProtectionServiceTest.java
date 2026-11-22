@@ -1,6 +1,8 @@
 package de.etiennebader.civ.server.protection;
 
 import de.etiennebader.civ.domain.actor.PlayerRef;
+import de.etiennebader.civ.domain.law.ExtensionParameters;
+import de.etiennebader.civ.domain.law.ParameterKey;
 import de.etiennebader.civ.domain.protection.Hazard;
 import de.etiennebader.civ.domain.protection.ProtectedAction;
 import de.etiennebader.civ.domain.shared.PlayerId;
@@ -23,6 +25,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ProtectionServiceTest {
+
+    /** Wie eine fremde Mod: angemeldet vor dem Serverstart (Katalog wird beim Start gebaut). */
+    private static final ParameterKey<Boolean> ME_SYSTEMS = ExtensionParameters.register(
+            ParameterKey.of("ae2.me_systems_allowed", Boolean.class, true));
 
     private final SeededIdGenerator ids = new SeededIdGenerator(13);
     private final PlayerRef alice = new PlayerRef(PlayerId.generate(ids));
@@ -77,5 +83,25 @@ class ProtectionServiceTest {
         assertTrue(protection.check(alice, ProtectedAction.BUILD, townHall).isEmpty());
         assertFalse(protection.toggleBypass(alice));
         assertTrue(protection.check(alice, ProtectedAction.BUILD, townHall).isPresent());
+    }
+
+    @Test
+    @DisplayName("Gesetze fremder Mods gelten nach Gebiet bzw. Bürgerschaft und nicht in der Wildnis")
+    void extensionLawScopes() {
+        ParameterKey<Boolean> me = ME_SYSTEMS;
+        BlockPosition wilderness = new BlockPosition(DimensionId.OVERWORLD, 500, 64, 500);
+        Caller mayor = new Caller(alice, "Alice", inTown);
+
+        assertTrue(protection.permits(dave, me, LawScope.TERRITORY, inTown));
+        assertEquals(true, server.commands().amendLaw(mayor, "ae2.me_systems_allowed", "nein").success());
+
+        assertFalse(protection.permits(dave, me, LawScope.TERRITORY, inTown));
+        assertFalse(protection.permits(alice, me, LawScope.TERRITORY, inTown));
+        assertTrue(protection.permits(alice, me, LawScope.TERRITORY, wilderness));
+        assertFalse(protection.permits(alice, me, LawScope.CITIZENSHIP, wilderness));
+        assertTrue(protection.permits(dave, me, LawScope.CITIZENSHIP, inTown));
+
+        protection.toggleBypass(alice);
+        assertTrue(protection.permits(alice, me, LawScope.TERRITORY, inTown));
     }
 }
