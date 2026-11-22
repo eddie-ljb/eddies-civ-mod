@@ -6,6 +6,7 @@ import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.server.civic.CivicService;
+import de.etiennebader.civ.server.civic.HomePortService;
 import de.etiennebader.civ.server.justice.JusticeService;
 import de.etiennebader.civ.application.CivApplication;
 import de.etiennebader.civ.application.Repositories;
@@ -113,6 +114,7 @@ public final class CivServer {
     private final FederationService federations;
     private final LevelService levels;
     private final CivicService civic;
+    private final HomePortService homePorts;
     private final JusticeService justice;
     private volatile java.nio.file.Path mapDirectory;
     private final Optional<java.nio.file.Path> imagesDirectory;
@@ -196,6 +198,7 @@ public final class CivServer {
                 companies, federations);
         this.press = new PressService(app, calendar, players, settings.currency(), texts, announcements);
         this.civic = new CivicService(app, calendar, texts, announcements, plots);
+        this.homePorts = new HomePortService(app, calendar, texts, war::registry, settings.warPortLock());
         this.justice = new JusticeService(app, calendar, players, texts, announcements);
         this.liveCount = new LiveCountService(announcements, settings.show().liveCount(),
                 settings.show().liveCountSeconds(), settings.show().projections());
@@ -487,6 +490,10 @@ public final class CivServer {
     }
 
     /** Wahlkreise und Hoheitszeichen. */
+    public HomePortService homePorts() {
+        return homePorts;
+    }
+
     public CivicService civic() {
         return civic;
     }

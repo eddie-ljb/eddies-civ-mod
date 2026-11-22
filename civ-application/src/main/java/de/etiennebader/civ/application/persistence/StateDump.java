@@ -213,6 +213,11 @@ public final class StateDump {
         world.civic().anthems().entrySet().stream().sorted(java.util.Map.Entry.comparingByKey(
                 java.util.Comparator.comparing(id -> id.value().toString()))).forEach(entry -> lines.add(String.join("|",
                 "anthem", entry.getKey().value().toString(), entry.getValue().toString())));
+        world.civic().portSettings().entrySet().stream().sorted(java.util.Map.Entry.comparingByKey(
+                java.util.Comparator.comparing(id -> id.value().toString()))).forEach(entry -> lines.add(String.join("|",
+                "port-settings", entry.getKey().value().toString(), entry.getValue().toString())));
+        world.civic().ports().forEach(port -> lines.add(String.join("|", "port", port.polity().value().toString(),
+                Integer.toString(port.slot()), port.position().toString())));
         world.justice().cases().forEach(found -> lines.add(String.join("|", "case", Integer.toString(found.number()),
                 found.id().value().toString(), found.court().value().toString(), found.kind().name(), actor(found.plaintiff()),
                 actor(found.defendant()), found.charge(), found.target(), found.stage().name(),

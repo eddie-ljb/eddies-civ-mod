@@ -44,7 +44,7 @@ final class EnglishCommands {
             Map.entry("gemeinde-entfernen", "town-remove"),
             Map.entry("gericht", "court"), Map.entry("gesetz", "statute"), Map.entry("gesetze", "statutes"),
             Map.entry("grenzen", "borders"), Map.entry("gruenden", "found"), Map.entry("grundstueck", "plot"),
-            Map.entry("hilfe", "help"), Map.entry("handbuch", "handbook"), Map.entry("holen", "get"), Map.entry("hymne", "anthem"),
+            Map.entry("heim", "home"), Map.entry("hilfe", "help"), Map.entry("handbuch", "handbook"), Map.entry("holen", "get"), Map.entry("hymne", "anthem"),
             Map.entry("investieren", "invest"), Map.entry("ja", "yes"), Map.entry("kandidieren", "run"),
             Map.entry("karte", "map"), Map.entry("kasse", "treasury"), Map.entry("kaufen", "buy"),
             Map.entry("klage", "sue"), Map.entry("konjunktur", "conjuncture"), Map.entry("konto", "account"),
@@ -70,7 +70,7 @@ final class EnglishCommands {
             Map.entry("verkaufen", "sell"), Map.entry("veroeffentlichen", "publish"), Map.entry("versprechen", "promise"),
             Map.entry("verteidiger", "defense"), Map.entry("vertrag", "contract"), Map.entry("vertrauen", "trust"),
             Map.entry("wahl", "election"), Map.entry("wahlergebnis", "results"), Map.entry("wahlkreis", "district"),
-            Map.entry("wappen", "crest"), Map.entry("weiter", "advance"), Map.entry("zeigen", "show"),
+            Map.entry("wappen", "crest"), Map.entry("zugang", "access"), Map.entry("weiter", "advance"), Map.entry("zeigen", "show"),
             Map.entry("zeitung", "newspaper"), Map.entry("zeuge", "witness"), Map.entry("zurueckziehen", "retract"));
 
     private EnglishCommands() {

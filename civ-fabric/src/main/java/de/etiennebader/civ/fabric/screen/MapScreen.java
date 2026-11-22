@@ -152,6 +152,7 @@ public final class MapScreen extends MenuScreen {
         };
         Icon icon = Icon.of(item).name(name, color).line(GuiKeys.MAP_COORDS.text(cell.chunk().x(), cell.chunk().z()));
         cell.type().ifPresent(type -> icon.line(Message.of(TranslationKeys.claimType(type))));
+        cell.port().ifPresent(port -> icon.line(GuiKeys.MAP_PORT.text(port), Icon.TITLE));
         if (cell.here()) {
             icon.line(GuiKeys.MAP_HERE.text(), Icon.TITLE).glint();
         }

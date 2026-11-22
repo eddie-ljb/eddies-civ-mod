@@ -257,6 +257,13 @@ public final class StandardParameters {
     public static final ParameterKey<Long> NEUTRALITY_FEE_PER_DAY = ParameterKey.constrained(
             "neutrality_fee_per_day", Long.class, 100L, fee -> fee >= 0);
 
+    /**
+     * Wartezeit in Sekunden zwischen zwei Teleports eines Spielers zu den Heimat-Häfen dieser Polity
+     * (0 = keine Wartezeit).
+     */
+    public static final ParameterKey<Long> HOME_PORT_COOLDOWN_SECONDS = ParameterKey.constrained(
+            "home_port_cooldown_seconds", Long.class, 10L, seconds -> seconds >= 0 && seconds <= 86_400);
+
     /** Ab diesem Kriegswillen (0-100) darf der Bürgermeister Krieg erklären; abhängig von Persönlichkeiten, Parteien, Ansprüchen. */
     public static final ParameterKey<Long> WAR_WILL_THRESHOLD = ParameterKey.constrained(
             "war_will_threshold", Long.class, 50L, value -> value >= 0 && value <= 100);
@@ -342,6 +349,7 @@ public final class StandardParameters {
                 SOLDIER_WAGE,
                 OFFICER_WAGE,
                 NEUTRALITY_FEE_PER_DAY,
+                HOME_PORT_COOLDOWN_SECONDS,
                 WAR_WILL_THRESHOLD,
                 CONQUEST_CHUNKS_PER_WIN,
                 TRAINING_COST_PER_HEAD,

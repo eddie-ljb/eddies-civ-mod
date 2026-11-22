@@ -35,6 +35,7 @@ import java.util.Objects;
  * @param founding       Gründungskosten und Vorgänger-Pflicht für Gemeinden, Bünde und Firmen
  * @param ambitions      ob ehrgeizige Dorfbewohner Firmen, Parteien und Bünde gründen, kandidieren, Gebiet beanspruchen,
  *                       Firmen übernehmen und führen
+ * @param warPortLock    wer sich im Krieg nicht mehr zu den Heimat-Häfen einer Polity porten darf
  */
 public record ServerSettings(long ticksPerDay, int claimBase, int claimPerMember, CurrencyId currency,
                              Money priceReference, Money villagerIncome, TierThresholds tiers, WebSettings web,

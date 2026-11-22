@@ -107,6 +107,10 @@ public final class CivServerFixture {
         return server.civic();
     }
 
+    public de.etiennebader.civ.server.civic.HomePortService homePorts() {
+        return server.homePorts();
+    }
+
     public de.etiennebader.civ.server.justice.JusticeService justice() {
         return server.justice();
     }
