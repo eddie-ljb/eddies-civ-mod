@@ -17,17 +17,24 @@ import java.util.Optional;
  * dies die Gründerin bzw. der Gründer ({@link #issuer}).
  */
 public record Currency(CurrencyId id, String name, String symbol, ExchangeRate rateToEmerald,
-                       Optional<ActorRef> issuer, Optional<ActorRef> centralBankChair, int baseRatePercent) {
+                       Optional<ActorRef> issuer, Optional<ActorRef> centralBankChair, int baseRatePercent,
+                       Optional<String> itemId) {
 
     public static final int MAX_NAME = 32;
     public static final int MAX_SYMBOL = 4;
     public static final int MAX_BASE_RATE_PERCENT = 100;
+    /** Spielgegenstand, in dem die Währung ausgezahlt wird, z. B. {@code minecraft:gold_ingot}. */
+    public static final java.util.regex.Pattern ITEM_ID = java.util.regex.Pattern.compile("[a-z0-9_.-]+:[a-z0-9_./-]+");
 
     public Currency {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(rateToEmerald, "rateToEmerald");
         Objects.requireNonNull(issuer, "issuer");
         Objects.requireNonNull(centralBankChair, "centralBankChair");
+        Objects.requireNonNull(itemId, "itemId");
+        if (itemId.isPresent() && !ITEM_ID.matcher(itemId.get()).matches()) {
+            throw new IllegalArgumentException("Ungültige Item-ID: " + itemId.get());
+        }
         name = Objects.requireNonNull(name, "name").strip();
         symbol = Objects.requireNonNull(symbol, "symbol").strip();
         if (name.isEmpty() || name.length() > MAX_NAME) {
@@ -44,21 +51,26 @@ public record Currency(CurrencyId id, String name, String symbol, ExchangeRate r
     /** Die eingebaute Leitwährung, immer 1:1 zu sich selbst, ohne Zentralbank. */
     public static Currency emerald() {
         return new Currency(CurrencyId.EMERALD, "Smaragd", "E", ExchangeRate.PARITY, Optional.empty(),
-                Optional.empty(), 0);
+                Optional.empty(), 0, Optional.of("minecraft:emerald"));
     }
 
     public Currency withRate(ExchangeRate rate) {
         return new Currency(id, name, symbol, Objects.requireNonNull(rate, "rate"), issuer, centralBankChair,
-                baseRatePercent);
+                baseRatePercent, itemId);
     }
 
     public Currency withChair(ActorRef chair) {
         return new Currency(id, name, symbol, rateToEmerald, issuer, Optional.of(Objects.requireNonNull(chair, "chair")),
-                baseRatePercent);
+                baseRatePercent, itemId);
     }
 
     public Currency withBaseRatePercent(int percent) {
-        return new Currency(id, name, symbol, rateToEmerald, issuer, centralBankChair, percent);
+        return new Currency(id, name, symbol, rateToEmerald, issuer, centralBankChair, percent, itemId);
+    }
+
+    public Currency withItem(String item) {
+        return new Currency(id, name, symbol, rateToEmerald, issuer, centralBankChair, baseRatePercent,
+                Optional.of(Objects.requireNonNull(item, "item")));
     }
 
     /** Wer aktuell über Leitzins und Nachfolge entscheiden darf: der Vorsitzende, sonst die Gründerin/der Gründer. */

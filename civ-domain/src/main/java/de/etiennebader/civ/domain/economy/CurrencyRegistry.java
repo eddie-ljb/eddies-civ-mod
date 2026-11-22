@@ -20,7 +20,7 @@ import java.util.Optional;
  * Eigene Währungen haben einen eindeutigen Code und ein eindeutiges Symbol; Wechselkurs,
  * Leitzins und Vorsitz ändert nur der {@link Currency#governor() Gouverneur} der Währung.
  */
-public final class CurrencyRegistry extends AggregateRoot<CurrencyEvent> {
+public final class CurrencyRegistry extends AggregateRoot<CurrencyEvent> implements CurrencyView {
 
     private final Map<CurrencyId, Currency> currencies = new LinkedHashMap<>();
 
@@ -51,10 +51,16 @@ public final class CurrencyRegistry extends AggregateRoot<CurrencyEvent> {
      */
     public Currency create(CurrencyId id, String name, String symbol, ExchangeRate rateToEmerald,
                            ActorRef issuer, Day day) {
+        return create(id, name, symbol, rateToEmerald, issuer, null, day);
+    }
+
+    /** Wie {@link #create(CurrencyId, String, String, ExchangeRate, ActorRef, Day)}, mit eigenem Auszahlungs-Item. */
+    public Currency create(CurrencyId id, String name, String symbol, ExchangeRate rateToEmerald,
+                           ActorRef issuer, String itemId, Day day) {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(issuer, "issuer");
         Currency created = new Currency(id, name, symbol, rateToEmerald, Optional.of(issuer),
-                Optional.empty(), 0);
+                Optional.empty(), 0, Optional.ofNullable(itemId));
         if (currencies.containsKey(id)) {
             throw new CurrencyAlreadyExistsException(id.code());
         }
@@ -84,6 +90,14 @@ public final class CurrencyRegistry extends AggregateRoot<CurrencyEvent> {
         return updated;
     }
 
+    /** Legt das Item fest, in dem die Währung am Bankschalter ausgezahlt wird (Aussehen der Währung). */
+    public Currency setItem(CurrencyId id, String itemId, ActorRef actor, Day day) {
+        Currency updated = requireGoverned(id, actor).withItem(itemId);
+        currencies.put(id, updated);
+        raise(new CurrencyEvent.ItemChanged(id, day));
+        return updated;
+    }
+
     /** Setzt den Leitzins in Prozent (0 bis {@link Currency#MAX_BASE_RATE_PERCENT}). */
     public Currency setBaseRate(CurrencyId id, int percent, ActorRef actor, Day day) {
         Currency updated = requireGoverned(id, actor).withBaseRatePercent(percent);
@@ -99,6 +113,7 @@ public final class CurrencyRegistry extends AggregateRoot<CurrencyEvent> {
      * @throws DomainException          bei negativem Betrag
      * @throws ArithmeticException      bei Überlauf
      */
+    @Override
     public Money convert(Money amount, CurrencyId target) {
         Objects.requireNonNull(amount, "amount");
         if (amount.isNegative()) {
@@ -109,14 +124,17 @@ public final class CurrencyRegistry extends AggregateRoot<CurrencyEvent> {
         return Money.of(from.convertTo(amount.amount(), to), target);
     }
 
+    @Override
     public Optional<Currency> find(CurrencyId id) {
         return Optional.ofNullable(currencies.get(Objects.requireNonNull(id, "id")));
     }
 
+    @Override
     public Currency require(CurrencyId id) {
         return find(id).orElseThrow(() -> new UnknownCurrencyException(id));
     }
 
+    @Override
     public List<Currency> all() {
         return List.copyOf(currencies.values());
     }

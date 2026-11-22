@@ -242,6 +242,23 @@ public final class StateDump {
                         Boolean.toString(enterprise.autoSell()), enterprise.stock().toString(),
                         enterprise.lastDay().map(found -> day(found.value())).orElse("-"),
                         Long.toString(enterprise.lastOutput()), Long.toString(enterprise.lastRevenue()))));
+        world.currencies().all().stream()
+                .sorted(java.util.Comparator.comparing(currency -> currency.id().code()))
+                .forEach(currency -> lines.add(String.join("|", "currency", currency.id().code(), currency.name(),
+                        currency.symbol(), currency.rateToEmerald().numerator() + "/" + currency.rateToEmerald().denominator(),
+                        currency.issuer().map(StateDump::actor).orElse("-"),
+                        currency.centralBankChair().map(StateDump::actor).orElse("-"),
+                        Integer.toString(currency.baseRatePercent()), currency.itemId().orElse("-"))));
+        world.credit().banks().stream().map(StateDump::actor).sorted()
+                .forEach(bank -> lines.add("bank|" + bank));
+        world.credit().scores().entrySet().stream().map(entry -> "score|" + actor(entry.getKey()) + "|" + entry.getValue())
+                .sorted().forEach(lines::add);
+        world.credit().loans().stream().sorted(java.util.Comparator.comparing(loan -> loan.id().value().toString()))
+                .forEach(loan -> lines.add(String.join("|", "loan", loan.id().value().toString(), actor(loan.lender()),
+                        actor(loan.borrower()), loan.currency().code(), Long.toString(loan.principal()),
+                        Integer.toString(loan.rateBasisPoints()), Long.toString(loan.interest()),
+                        day(loan.issuedOn().value()), day(loan.dueOn().value()), Long.toString(loan.repaid()),
+                        loan.status().name())));
         world.market().stocks().stream()
                 .map(stock -> "stock|" + stock.commodity().id() + "|" + stock.quantity() + "|" + day(stock.asOf().value()))
                 .sorted()

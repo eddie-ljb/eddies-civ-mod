@@ -2,6 +2,10 @@ package de.etiennebader.civ.application.persistence;
 
 import de.etiennebader.civ.domain.justice.JudiciaryView;
 import de.etiennebader.civ.domain.justice.Judiciary;
+import de.etiennebader.civ.domain.credit.CreditRegistry;
+import de.etiennebader.civ.domain.credit.CreditView;
+import de.etiennebader.civ.domain.economy.CurrencyRegistry;
+import de.etiennebader.civ.domain.economy.CurrencyView;
 import de.etiennebader.civ.domain.production.ProductionRegistry;
 import de.etiennebader.civ.domain.production.ProductionView;
 import de.etiennebader.civ.domain.civic.CivicView;
@@ -61,7 +65,19 @@ public record StateDelta(List<PolityChange> polities, List<ClaimChange> claims, 
                          Optional<List<Contract>> contracts, Optional<CommunitySnapshot> community,
                          Optional<ExchangeSnapshot> exchange, Optional<List<Article>> press,
                          Optional<CivicRegistry> civic, Optional<Judiciary> justice,
-                         Optional<ProductionRegistry> production) {
+                         Optional<ProductionRegistry> production, Optional<CurrencyRegistry> currencyRegistry,
+                         Optional<CreditRegistry> credit) {
+
+    /** Ohne Währungsregister und Kredite. */
+    public StateDelta(List<PolityChange> polities, List<ClaimChange> claims, List<PlotChange> plots,
+                      List<BalanceChange> balances, List<CurrencyTotals> currencies, List<CommodityStock> commodities,
+                      List<ShopChange> shops, List<DomainEvent> events, List<KnownPlayer> players,
+                      CalendarState calendar, Optional<List<Contract>> contracts, Optional<CommunitySnapshot> community,
+                      Optional<ExchangeSnapshot> exchange, Optional<List<Article>> press, Optional<CivicRegistry> civic,
+                      Optional<Judiciary> justice, Optional<ProductionRegistry> production) {
+        this(polities, claims, plots, balances, currencies, commodities, shops, events, players, calendar, contracts,
+                community, exchange, press, civic, justice, production, Optional.empty(), Optional.empty());
+    }
 
     /** Ohne Firmenbetriebe. */
     public StateDelta(List<PolityChange> polities, List<ClaimChange> claims, List<PlotChange> plots,
@@ -159,6 +175,8 @@ public record StateDelta(List<PolityChange> polities, List<ClaimChange> claims, 
         civic = Objects.requireNonNull(civic, "civic").map(StateDelta::copyOf);
         justice = Objects.requireNonNull(justice, "justice").map(StateDelta::copyOf);
         production = Objects.requireNonNull(production, "production").map(StateDelta::copyOf);
+        currencyRegistry = Objects.requireNonNull(currencyRegistry, "currencyRegistry").map(StateDelta::copyOf);
+        credit = Objects.requireNonNull(credit, "credit").map(StateDelta::copyOf);
     }
 
     /** Aktueller Stand einer geänderten Polity; leer, wenn sie aufgelöst wurde. */
@@ -274,8 +292,19 @@ public record StateDelta(List<PolityChange> polities, List<ClaimChange> claims, 
         Optional<ProductionRegistry> production = changes.production()
                 ? Optional.of(copyOf(current.production())) : Optional.empty();
         return new StateDelta(polities, claims, plots, balances, currencies, commodities, shops, changes.events(),
-                players, calendar, contracts, community, exchange, press, civic, justice, production);
+                players, calendar, contracts, community, exchange, press, civic, justice, production,
+                changes.currencyRegistry() ? Optional.of(copyOf(current.currencies())) : Optional.empty(),
+                changes.credit() ? Optional.of(copyOf(current.credit())) : Optional.empty());
     }
+
+    private static CurrencyRegistry copyOf(CurrencyView currencies) {
+        return CurrencyRegistry.restore(currencies.all());
+    }
+
+    private static CreditRegistry copyOf(CreditView credit) {
+        return CreditRegistry.restore(credit.banks(), credit.scores(), credit.loans());
+    }
+
 
     /** Eine unabhängige Kopie, damit der Speicher-Thread keinen Arbeitsstand sieht, der sich noch ändert. */
     private static CivicRegistry copyOf(CivicView civic) {

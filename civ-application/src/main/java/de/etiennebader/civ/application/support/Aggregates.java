@@ -1,6 +1,8 @@
 package de.etiennebader.civ.application.support;
 
 import de.etiennebader.civ.domain.justice.Judiciary;
+import de.etiennebader.civ.domain.credit.CreditRegistry;
+import de.etiennebader.civ.domain.economy.CurrencyRegistry;
 import de.etiennebader.civ.domain.production.ProductionRegistry;
 import de.etiennebader.civ.domain.civic.CivicRegistry;
 import de.etiennebader.civ.application.Repositories;
@@ -108,6 +110,24 @@ public final class Aggregates {
     public void commit(CivicRegistry civic) {
         repositories.civic().save(civic);
         publisher.publish(civic.pullEvents());
+    }
+
+    public CurrencyRegistry currencies() {
+        return repositories.currencies().load();
+    }
+
+    public void commit(CurrencyRegistry currencies) {
+        repositories.currencies().save(currencies);
+        publisher.publish(currencies.pullEvents());
+    }
+
+    public CreditRegistry credit() {
+        return repositories.credit().load();
+    }
+
+    public void commit(CreditRegistry credit) {
+        repositories.credit().save(credit);
+        publisher.publish(credit.pullEvents());
     }
 
     public ProductionRegistry production() {

@@ -30,6 +30,26 @@ public enum ErrorCode {
     /** Argumente: Betrag, der nicht negativ sein darf. */
     NEGATIVE_CONVERSION_AMOUNT,
 
+    // credit
+    /** Argumente: Akteur. */
+    NOT_A_BANK,
+    /** Argumente: Akteur. */
+    ALREADY_A_BANK,
+    /** Keine Argumente. */
+    INVALID_LOAN_TERMS,
+    /** Argumente: Kredit-ID. */
+    UNKNOWN_LOAN,
+    /** Argumente: Kredit-ID. */
+    LOAN_NOT_ACTIVE,
+    /** Argumente: Kredit-ID, Akteur. */
+    NOT_LOAN_BORROWER,
+    /** Argumente: Zins in Prozent, erlaubter Höchstzins in Prozent. */
+    INTEREST_ABOVE_LIMIT,
+    /** Argumente: Kreditscore, Mindestscore. */
+    CREDIT_SCORE_TOO_LOW,
+    /** Keine Argumente. */
+    LENDING_NOT_ALLOWED,
+
     // law
     /** Argumente: Titel, Mindestlänge, Höchstlänge. */
     INVALID_STATUTE_TITLE,

@@ -72,6 +72,8 @@ import de.etiennebader.civ.application.population.PersonalityLegislator;
 import de.etiennebader.civ.application.population.PersonalityVoter;
 import de.etiennebader.civ.application.port.DomainEventPublisher;
 import de.etiennebader.civ.application.query.WorldQueries;
+import de.etiennebader.civ.application.economy.CreditUseCases;
+import de.etiennebader.civ.application.economy.CurrencyUseCases;
 import de.etiennebader.civ.application.shop.BuyFromShop;
 import de.etiennebader.civ.application.shop.CloseShop;
 import de.etiennebader.civ.application.shop.OpenShop;
@@ -148,6 +150,8 @@ public final class CivApplication {
     private final LeaveParty leaveParty;
     private final ChangePartyProgram changePartyProgram;
     private final MoveSeat moveSeat;
+    private final CurrencyUseCases currencyUseCases;
+    private final CreditUseCases creditUseCases;
     private final OpenShop openShop;
     private final CloseShop closeShop;
     private final BuyFromShop buyFromShop;
@@ -258,6 +262,8 @@ public final class CivApplication {
         this.leaveParty = new LeaveParty(aggregates, dissolvePolity);
         this.changePartyProgram = new ChangePartyProgram(aggregates, ids, proposeMotion);
         this.moveSeat = new MoveSeat(aggregates);
+        this.currencyUseCases = new CurrencyUseCases(aggregates, new WorldQueries(repositories));
+        this.creditUseCases = new CreditUseCases(aggregates, new WorldQueries(repositories), ids);
         this.openShop = new OpenShop(aggregates);
         this.closeShop = new CloseShop(aggregates);
         this.buyFromShop = new BuyFromShop(aggregates);
@@ -528,6 +534,14 @@ public final class CivApplication {
 
     public MoveSeat moveSeat() {
         return moveSeat;
+    }
+
+    public CurrencyUseCases currencies() {
+        return currencyUseCases;
+    }
+
+    public CreditUseCases credit() {
+        return creditUseCases;
     }
 
     public OpenShop openShop() {

@@ -106,9 +106,20 @@ class CurrencyRegistryTest {
     void restoreKeepsCurrenciesButNeverOverwritesEmerald() {
         registry.create(GOLD, "Gold", "G", ExchangeRate.PARITY, alice, DAY);
         Currency fakeEmerald = new Currency(CurrencyId.EMERALD, "Fake", "F", new ExchangeRate(5, 1),
-                java.util.Optional.empty(), java.util.Optional.empty(), 0);
+                java.util.Optional.empty(), java.util.Optional.empty(), 0, java.util.Optional.empty());
         CurrencyRegistry restored = CurrencyRegistry.restore(List.of(registry.require(GOLD), fakeEmerald));
         assertEquals("Smaragd", restored.require(CurrencyId.EMERALD).name());
         assertEquals("Gold", restored.require(GOLD).name());
+    }
+
+    @Test
+    void itemCanBeSetByGovernorOnlyAndIsValidated() {
+        registry.create(GOLD, "Gold", "G", ExchangeRate.PARITY, alice, "minecraft:gold_ingot", DAY);
+        assertEquals("minecraft:gold_ingot", registry.require(GOLD).itemId().orElseThrow());
+        assertEquals(ErrorCode.NOT_CURRENCY_GOVERNOR,
+                codeOf(() -> registry.setItem(GOLD, "minecraft:diamond", bob, DAY)));
+        assertThrows(IllegalArgumentException.class, () -> registry.setItem(GOLD, "kein item!", alice, DAY));
+        registry.setItem(GOLD, "minecraft:diamond", alice, DAY);
+        assertEquals("minecraft:diamond", registry.require(GOLD).itemId().orElseThrow());
     }
 }

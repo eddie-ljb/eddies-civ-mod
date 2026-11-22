@@ -24,4 +24,8 @@ public sealed interface CurrencyEvent extends DomainEvent {
     /** Der Leitzins wurde geändert. */
     record BaseRateChanged(CurrencyId currency, Day occurredOn) implements CurrencyEvent {
     }
+
+    /** Das Auszahlungs-Item wurde geändert. */
+    record ItemChanged(CurrencyId currency, Day occurredOn) implements CurrencyEvent {
+    }
 }
