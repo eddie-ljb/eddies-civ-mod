@@ -20,6 +20,8 @@ import de.etiennebader.civ.domain.land.Plot;
 import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.polity.Street;
+import de.etiennebader.civ.domain.population.Gender;
+import de.etiennebader.civ.domain.population.VillagerIdentity;
 import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.DomainException;
@@ -166,7 +168,7 @@ public final class CivilService {
         return withTown(caller, town -> {
             ActorRef holder = villager.orElse(caller.player());
             String name = villager.isPresent() ? texts.actor(holder) : caller.name();
-            IdCards.Data data = app.idCards().issue(holder, name, calendar.today());
+            IdCards.Data data = app.idCards().issue(holder, name, genderOf(holder), calendar.today());
             handout.accept(new IdCardIssue(holder, data));
             return Reply.success(villager.isPresent()
                     ? Message.of(MessageKey.ID_CARD_ISSUED_FOR, name)
@@ -178,13 +180,42 @@ public final class CivilService {
     public Reply checkIdCard(ActorRef holder, IdCards.Data card) {
         List<Message> lines = new ArrayList<>();
         lines.add(Message.of(MessageKey.ID_CARD_HEADER, card.holderName(), card.issuedOn().value()));
+        card.gender().ifPresent(gender -> lines.add(Message.of(MessageKey.ID_CARD_GENDER, genderText(gender))));
         lines.add(card.address().map(line -> Message.of(MessageKey.ID_CARD_ADDRESS, line))
                 .orElseGet(() -> Message.of(MessageKey.ID_CARD_ADDRESS_NONE)));
         lines.add(card.citizenOf().map(town -> Message.of(MessageKey.ID_CARD_CITIZEN_OF, town))
                 .orElseGet(() -> Message.of(MessageKey.ID_CARD_CITIZEN_NONE)));
-        boolean current = app.idCards().isCurrent(holder, texts.actor(holder), card);
+        boolean current = app.idCards().isCurrent(holder, texts.actor(holder), genderOf(holder), card);
         lines.add(Message.of(current ? MessageKey.ID_CARD_VALID : MessageKey.ID_CARD_OUTDATED));
         return Reply.success(lines);
+    }
+
+    /** Geschlecht eines Akteurs: bei Dorfbewohnern aus dem Namen, bei Spielern die eigene Angabe. */
+    public Optional<Gender> genderOf(ActorRef actor) {
+        return switch (actor) {
+            case PersonRef person -> Optional.of(VillagerIdentity.genderOf(person.uuid()));
+            case PlayerRef player -> players.genderOf(player);
+            default -> Optional.empty();
+        };
+    }
+
+    /** {@code /civ geschlecht [weiblich|maennlich|divers]}: ohne Angabe das eigene anzeigen, sonst setzen. */
+    public Reply gender(Caller caller, Optional<Gender> chosen) {
+        if (chosen.isEmpty()) {
+            return genderOf(caller.player())
+                    .map(gender -> Reply.success(Message.of(MessageKey.GENDER_OWN, genderText(gender))))
+                    .orElseGet(() -> Reply.success(Message.of(MessageKey.GENDER_NONE)));
+        }
+        players.setGender(caller.player(), chosen.get());
+        return Reply.success(Message.of(MessageKey.GENDER_SET, genderText(chosen.get())));
+    }
+
+    private static Message genderText(Gender gender) {
+        return Message.of(switch (gender) {
+            case FEMALE -> MessageKey.GENDER_FEMALE;
+            case MALE -> MessageKey.GENDER_MALE;
+            case DIVERSE -> MessageKey.GENDER_DIVERSE;
+        });
     }
 
     /** Ein ausgestellter Ausweis samt Inhaber. */

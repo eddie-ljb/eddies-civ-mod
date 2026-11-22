@@ -4,6 +4,7 @@ import de.etiennebader.civ.application.civil.IdCards;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.actor.PlayerRef;
+import de.etiennebader.civ.domain.population.Gender;
 import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.PersonId;
 import de.etiennebader.civ.domain.shared.PlayerId;
@@ -37,6 +38,7 @@ public final class IdCardItems {
     private static final String HOLDER_KEY = "eddies_civ_id_holder";
     private static final String VILLAGER_KEY = "eddies_civ_id_villager";
     private static final String NAME_KEY = "eddies_civ_id_name";
+    private static final String GENDER_KEY = "eddies_civ_id_gender";
     private static final String ADDRESS_KEY = "eddies_civ_id_address";
     private static final String CITIZEN_KEY = "eddies_civ_id_citizen";
     private static final String DAY_KEY = "eddies_civ_id_day";
@@ -68,6 +70,7 @@ public final class IdCardItems {
         tag.putString(HOLDER_KEY, holderId(holder).toString());
         tag.putBoolean(VILLAGER_KEY, holder instanceof PersonRef);
         tag.putString(NAME_KEY, data.holderName());
+        data.gender().ifPresent(value -> tag.putString(GENDER_KEY, value.name()));
         data.address().ifPresent(value -> tag.putString(ADDRESS_KEY, value));
         data.citizenOf().ifPresent(value -> tag.putString(CITIZEN_KEY, value));
         tag.putLong(DAY_KEY, data.issuedOn().value());
@@ -77,6 +80,12 @@ public final class IdCardItems {
 
         List<Component> lore = new ArrayList<>();
         lore.add(Components.plain(GuiKeys.ID_CARD_NAME_LINE.text(data.holderName()), ChatFormatting.GRAY));
+        data.gender().ifPresent(gender -> lore.add(Components.plain(
+                Message.of(MessageKey.ID_CARD_GENDER, Message.of(switch (gender) {
+                    case FEMALE -> MessageKey.GENDER_FEMALE;
+                    case MALE -> MessageKey.GENDER_MALE;
+                    case DIVERSE -> MessageKey.GENDER_DIVERSE;
+                })), ChatFormatting.GRAY)));
         lore.add(Components.plain(data.address().map(line -> Message.of(MessageKey.ID_CARD_ADDRESS, line))
                 .orElseGet(() -> Message.of(MessageKey.ID_CARD_ADDRESS_NONE)), ChatFormatting.GRAY));
         lore.add(Components.plain(data.citizenOf().map(town -> Message.of(MessageKey.ID_CARD_CITIZEN_OF, town))
@@ -98,6 +107,7 @@ public final class IdCardItems {
             boolean villager = tag.getBoolean(VILLAGER_KEY).orElse(false);
             ActorRef holder = villager ? new PersonRef(new PersonId(id)) : new PlayerRef(new PlayerId(id));
             IdCards.Data card = new IdCards.Data(tag.getString(NAME_KEY).orElseThrow(),
+                    tag.getString(GENDER_KEY).map(Gender::valueOf),
                     tag.getString(ADDRESS_KEY), tag.getString(CITIZEN_KEY),
                     new Day(tag.getLong(DAY_KEY).orElseThrow()));
             return Optional.of(new Card(holder, card));

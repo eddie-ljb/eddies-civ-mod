@@ -3,6 +3,7 @@ package de.etiennebader.civ.application.civil;
 import de.etiennebader.civ.application.query.WorldQueries;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.polity.MembershipType;
+import de.etiennebader.civ.domain.population.Gender;
 import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.shared.Day;
@@ -28,14 +29,16 @@ public final class IdCards {
 
     /**
      * @param holderName   Name zum Ausstellungszeitpunkt
+     * @param gender       Geschlecht, falls angegeben (Spieler wählen es, Dorfbewohner haben eines)
      * @param address      Anschrift, falls ein fester Wohnsitz bestand
      * @param citizenOf    Gemeinde, deren Bürger der Inhaber zum Ausstellungszeitpunkt war
      * @param issuedOn     Ausstellungstag
      */
-    public record Data(String holderName, Optional<String> address, Optional<String> citizenOf, Day issuedOn) {
+    public record Data(String holderName, Optional<Gender> gender, Optional<String> address, Optional<String> citizenOf, Day issuedOn) {
 
         public Data {
             Objects.requireNonNull(holderName, "holderName");
+            Objects.requireNonNull(gender, "gender");
             Objects.requireNonNull(address, "address");
             Objects.requireNonNull(citizenOf, "citizenOf");
             Objects.requireNonNull(issuedOn, "issuedOn");
@@ -43,21 +46,22 @@ public final class IdCards {
     }
 
     /** Stellt die Momentaufnahme für {@code holder} zum heutigen Tag ({@code today}) aus. */
-    public Data issue(ActorRef holder, String holderName, Day today) {
+    public Data issue(ActorRef holder, String holderName, Optional<Gender> gender, Day today) {
         Objects.requireNonNull(holder, "holder");
         Objects.requireNonNull(holderName, "holderName");
+        Objects.requireNonNull(gender, "gender");
         Objects.requireNonNull(today, "today");
         Optional<String> address = addresses.residenceOf(holder).map(Address::line);
         Optional<String> citizenOf = citizenshipOf(holder);
-        return new Data(holderName, address, citizenOf, today);
+        return new Data(holderName, gender, address, citizenOf, today);
     }
 
     /**
      * Ob die Angaben des Ausweises noch mit dem Register übereinstimmen: Name, Anschrift und Staatsbürgerschaft
      * (der Ausstellungstag zählt nicht). Nach Umzug, Einbürgerung oder Umbenennung ist der Ausweis veraltet.
      */
-    public boolean isCurrent(ActorRef holder, String currentName, Data card) {
-        Data now = issue(holder, currentName, card.issuedOn());
+    public boolean isCurrent(ActorRef holder, String currentName, Optional<Gender> currentGender, Data card) {
+        Data now = issue(holder, currentName, currentGender, card.issuedOn());
         return now.equals(card);
     }
 

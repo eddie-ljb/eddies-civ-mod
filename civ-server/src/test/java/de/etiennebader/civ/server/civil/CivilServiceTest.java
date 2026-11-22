@@ -107,8 +107,13 @@ class CivilServiceTest {
         assertEquals("Alice", issued.get().data().holderName());
         assertTrue(has(server.civil().checkIdCard(issued.get().holder(), issued.get().data()), MessageKey.ID_CARD_VALID));
 
+        assertTrue(server.civil().gender(mayor, Optional.empty()).lines().stream()
+                .anyMatch(line -> line.key().equals(MessageKey.GENDER_NONE.key())));
+        server.civil().gender(mayor, Optional.of(de.etiennebader.civ.domain.population.Gender.FEMALE));
+        assertTrue(has(server.civil().checkIdCard(issued.get().holder(), issued.get().data()), MessageKey.ID_CARD_OUTDATED),
+                "Geschlechtsänderung macht den Ausweis veraltet");
         var stale = new de.etiennebader.civ.application.civil.IdCards.Data("Alice",
-                Optional.of("Altstraße 9"), issued.get().data().citizenOf(), issued.get().data().issuedOn());
+                issued.get().data().gender(), Optional.of("Altstraße 9"), issued.get().data().citizenOf(), issued.get().data().issuedOn());
         assertTrue(has(server.civil().checkIdCard(issued.get().holder(), stale), MessageKey.ID_CARD_OUTDATED));
     }
 

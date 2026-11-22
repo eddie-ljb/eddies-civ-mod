@@ -28,6 +28,7 @@ import de.etiennebader.civ.fabric.content.LawBooks;
 import de.etiennebader.civ.fabric.screen.CaseScreen;
 import de.etiennebader.civ.fabric.screen.CourtScreen;
 import de.etiennebader.civ.domain.justice.Role;
+import de.etiennebader.civ.domain.population.Gender;
 import de.etiennebader.civ.fabric.content.IdCardItems;
 import de.etiennebader.civ.fabric.content.Newspapers;
 import de.etiennebader.civ.fabric.gui.Screens;
@@ -373,6 +374,7 @@ public final class CivCommandTree {
                 .then(streetCommands())
                 .then(addressCommands())
                 .then(idCardCommands())
+                .then(genderCommands())
                 .then(Commands.literal("adressen")
                         .executes(context -> withCiv(context, (civ, player) -> civ.civil().listStreets(
                                 Players.caller(player)))))
@@ -1793,6 +1795,19 @@ public final class CivCommandTree {
                                 IdCardItems.read(player.getMainHandItem())
                                         .map(card -> civ.civil().checkIdCard(card.holder(), card.data()))
                                         .orElseGet(() -> Reply.failure(Message.of(MessageKey.ID_CARD_NOT_HELD))))));
+    }
+
+    /** {@code /civ geschlecht [weiblich|maennlich|divers]}: Geschlecht anzeigen oder festlegen (#20). */
+    private LiteralArgumentBuilder<CommandSourceStack> genderCommands() {
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("geschlecht")
+                .executes(context -> withCiv(context, (civ, player) ->
+                        civ.civil().gender(Players.caller(player), Optional.empty())));
+        for (var entry : java.util.Map.of("weiblich", Gender.FEMALE, "maennlich", Gender.MALE,
+                "divers", Gender.DIVERSE).entrySet()) {
+            root.then(Commands.literal(entry.getKey()).executes(context -> withCiv(context, (civ, player) ->
+                    civ.civil().gender(Players.caller(player), Optional.of(entry.getValue())))));
+        }
+        return root;
     }
 
     private static Reply giveIdCard(CivServer civ, ServerPlayer player, Optional<ActorRef> villager) {
