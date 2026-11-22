@@ -367,6 +367,8 @@
   "eddies-civ-mod.command.ballot_cast": "Deine Stimme für %s: %s. Du kannst sie bis zum Ende der Wahl ändern.",
   "eddies-civ-mod.command.no_election_for": "Für das Amt %s läuft keine Wahl.",
   "eddies-civ-mod.error.candidacy_outside_party_area": "Deine Partei %1$s ist nur in %2$s und dessen Gliedern wählbar.",
+  "eddies-civ-mod.error.invalid_candidacy_district": "Wahlkreiswahl: Wähle einen Wahlkreis dieser Polity (/civ wahl kandidieren <Amt> <Programm> <Wahlkreis>), du kannst nur in einem kandidieren. Angegeben: %1$s",
+  "eddies-civ-mod.error.vote_outside_district": "Du kannst nur Kandidaten deines eigenen Wahlkreises wählen.",
   "eddies-civ-mod.command.unknown_candidate": "%s kandidiert nicht als %s.",
   "eddies-civ-mod.command.ambiguous_candidate": "Mehrere Kandidaten heißen %1$s. Verwende eine Registernummer: %2$s.",
   "eddies-civ-mod.command.unknown_office": "Unbekanntes Amt „%s“. Ämter: buergermeister, schatzmeister, bauamt.",

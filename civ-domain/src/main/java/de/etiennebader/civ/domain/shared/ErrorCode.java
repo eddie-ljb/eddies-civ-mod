@@ -60,6 +60,10 @@ public enum ErrorCode {
     EXILED,
     /** Argumente: Akteur. */
     ALREADY_CANDIDATE,
+    /** Wahlkreiswahl: Kandidatur ohne oder mit unbekanntem Wahlkreis. Argumente: Wahlkreis (oder leer). */
+    INVALID_CANDIDACY_DISTRICT,
+    /** Wahlkreiswahl: Stimme für einen Kandidaten eines anderen Wahlkreises. Argumente: Kandidat. */
+    VOTE_OUTSIDE_DISTRICT,
 
     // territory
     /** Argumente: Chunk-X, Chunk-Z. */

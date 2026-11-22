@@ -367,6 +367,8 @@
   "eddies-civ-mod.command.ballot_cast": "Your vote for %s: %s. You can change it until the election ends.",
   "eddies-civ-mod.command.no_election_for": "There is no election running for %s.",
   "eddies-civ-mod.error.candidacy_outside_party_area": "Your party %1$s is only eligible in %2$s and its member territories.",
+  "eddies-civ-mod.error.invalid_candidacy_district": "District election: pick one of this polity's constituencies (/civ wahl kandidieren <office> <platform> <constituency>); you can only run in one. Given: %1$s",
+  "eddies-civ-mod.error.vote_outside_district": "You can only vote for candidates of your own constituency.",
   "eddies-civ-mod.command.unknown_candidate": "%s is not standing for %s.",
   "eddies-civ-mod.command.ambiguous_candidate": "More than one candidate is named %1$s. Use a register number: %2$s.",
   "eddies-civ-mod.command.unknown_office": "Unknown office \"%s\". Offices: buergermeister, schatzmeister, bauamt.",

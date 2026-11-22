@@ -328,7 +328,12 @@ public final class CivCommandTree {
                                                         OfficeService.platformNames(), builder))
                                                 .executes(context -> withCiv(context, (civ, player) -> civ.offices().stand(
                                                         Players.caller(player), StringArgumentType.getString(context, OFFICE),
-                                                        StringArgumentType.getString(context, PLATFORM)))))))
+                                                        StringArgumentType.getString(context, PLATFORM))))
+                                                .then(Commands.argument("wahlkreis", StringArgumentType.string())
+                                                        .executes(context -> withCiv(context, (civ, player) -> civ.offices().stand(
+                                                                Players.caller(player), StringArgumentType.getString(context, OFFICE),
+                                                                StringArgumentType.getString(context, PLATFORM),
+                                                                StringArgumentType.getString(context, "wahlkreis"))))))))
                         .then(Commands.literal("stimmen")
                                 .then(Commands.argument(OFFICE, StringArgumentType.word())
                                         .suggests(CivCommandTree::suggestOffices)

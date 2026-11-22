@@ -514,7 +514,17 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
      * Wie oben, mit Wahlprogramm.
      */
     public void standForElection(ElectionId electionId, ActorRef candidate, Platform platform, Day day) {
+        standForElection(electionId, candidate, platform, Optional.empty(), day);
+    }
+
+    /**
+     * Wie oben, bei einer Wahlkreiswahl gebunden an genau einen Wahlkreis (#47). Der Aufrufer prüft, dass der
+     * Wahlkreis existiert; ein Kandidat kandidiert je Wahl nur einmal und damit nur in einem Wahlkreis.
+     */
+    public void standForElection(ElectionId electionId, ActorRef candidate, Platform platform,
+                                 Optional<PolityId> district, Day day) {
         Objects.requireNonNull(platform, "platform");
+        Objects.requireNonNull(district, "district");
         Objects.requireNonNull(day, "day");
         Election election = requireElection(electionId);
         if (!isMember(candidate)) {
@@ -523,7 +533,7 @@ public final class Polity extends AggregateRoot<PolityEvent> implements PolityVi
         if (election.isCandidate(candidate)) {
             throw new AlreadyCandidateException(candidate);
         }
-        elections.put(electionId, election.withCandidate(candidate, platform));
+        elections.put(electionId, election.withCandidate(candidate, platform, district));
         raise(new CandidacyDeclared(id, electionId, candidate, platform, day));
     }
 

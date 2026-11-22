@@ -209,7 +209,6 @@ public final class CivApplication {
         this.tallyProposals = new TallyProposals(aggregates, ids);
         this.callElection = new CallElection(aggregates, ids);
         this.standForElection = new StandForElection(aggregates);
-        this.castBallot = new CastBallot(aggregates);
         this.appointOfficer = new AppointOfficer(aggregates);
         Function<PolityView, LawView> effectiveLaws = polity -> new WorldQueries(repositories).effectiveLaws(polity);
         Function<ActorRef, Optional<PolityView>> partyOf = actor -> new WorldQueries(repositories).partyOf(actor);
@@ -223,6 +222,7 @@ public final class CivApplication {
                 (villager, candidate, election, polity) -> campaign.bonus(villager, candidate, election, polity)
                         + pressInfluence.bonus(villager, candidate, election, polity));
         this.runElections = new RunElections(aggregates, ids, villagerVoter, partyOf, homeOf);
+        this.castBallot = new CastBallot(aggregates, runElections::districtOf);
         this.contracts = new ContractUseCases(aggregates, ids);
         this.runContracts = new RunContracts(aggregates);
         this.streets = new StreetUseCases(aggregates);

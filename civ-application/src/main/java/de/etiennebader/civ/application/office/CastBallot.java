@@ -10,7 +10,11 @@ import de.etiennebader.civ.domain.shared.PolityId;
 
 import de.etiennebader.civ.domain.law.StandardParameters;
 
+import de.etiennebader.civ.domain.polity.Election;
+import de.etiennebader.civ.domain.polity.PolityView;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * Ein Bürger wählt einen Kandidaten oder ändert seine Stimme. Ausgezählt wird erst am Ende der Wahl.
@@ -40,8 +44,19 @@ public final class CastBallot {
 
     private final Aggregates aggregates;
 
+    private final Function<PolityView, Function<ActorRef, Optional<PolityId>>> districtOf;
+
     public CastBallot(Aggregates aggregates) {
+        this(aggregates, polity -> actor -> Optional.empty());
+    }
+
+    /**
+     * @param districtOf der Wahlbezirk eines Wählers je Polity; bei Wahlkreiswahlen darf er nur Kandidaten seines
+     *                   eigenen Wahlkreises wählen (#47)
+     */
+    public CastBallot(Aggregates aggregates, Function<PolityView, Function<ActorRef, Optional<PolityId>>> districtOf) {
         this.aggregates = Objects.requireNonNull(aggregates, "aggregates");
+        this.districtOf = Objects.requireNonNull(districtOf, "districtOf");
     }
 
     public void execute(Command command) {
@@ -50,7 +65,22 @@ public final class CastBallot {
         if (!command.atBallotBox() && polity.laws().valueOf(StandardParameters.BALLOT_BOX_REQUIRED)) {
             throw new BallotBoxRequiredException();
         }
+        requireOwnDistrict(polity, command);
         polity.castBallot(command.election(), command.citizen(), command.candidate(), command.day());
         aggregates.commit(polity);
+    }
+
+    /** Wahlkreiswahl: Der Kandidat muss im Wahlkreis des Wählers antreten. */
+    private void requireOwnDistrict(Polity polity, Command command) {
+        Election election = polity.elections().stream().filter(found -> found.id().equals(command.election()))
+                .findFirst().orElse(null);
+        if (election == null || !DistrictVoting.applies(polity, election, aggregates.civic())) {
+            return;
+        }
+        Optional<PolityId> candidateDistrict = election.districtOf(command.candidate());
+        Optional<PolityId> voterDistrict = districtOf.apply(polity).apply(command.citizen());
+        if (candidateDistrict.isPresent() && !candidateDistrict.equals(voterDistrict)) {
+            throw new VoteOutsideDistrictException(command.candidate());
+        }
     }
 }
