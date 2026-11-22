@@ -27,9 +27,11 @@ public final class ParameterCatalog {
         }
     }
 
-    /** Katalog mit allen {@link StandardParameters}. */
+    /** Katalog mit allen {@link StandardParameters} und den Parametern fremder Mods ({@link ExtensionParameters}). */
     public static ParameterCatalog standard() {
-        return new ParameterCatalog(StandardParameters.all());
+        List<ParameterKey<?>> all = new java.util.ArrayList<>(StandardParameters.all());
+        all.addAll(ExtensionParameters.all());
+        return new ParameterCatalog(all);
     }
 
     public Optional<ParameterKey<?>> find(String id) {

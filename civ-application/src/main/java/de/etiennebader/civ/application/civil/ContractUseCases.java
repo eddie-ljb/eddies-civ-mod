@@ -72,7 +72,7 @@ public final class ContractUseCases {
         boolean holder = plot.holder().equals(landlord);
         boolean townPlot = plot.holder().equals(polity.asActor())
                 && (polity.holds(landlord, Office.MAYOR) || polity.holds(landlord, Office.PLANNER));
-        if (!holder && !townPlot || queries().leaseOf(town, plotId).isPresent() || tenant.equals(plot.holder())) {
+        if (!holder && !townPlot || !queries().hasFreeUnit(queries().polity(town).orElseThrow(), plotId) || tenant.equals(plot.holder())) {
             throw new PlotNotLeasableException();
         }
         ActorRef offeror = townPlot ? polity.asActor() : landlord;
@@ -153,8 +153,8 @@ public final class ContractUseCases {
         Contract contract = registry.contract(id).orElseThrow(() -> new ContractStateException(0));
         ActorRef signer = signerFor(contract.counterparty(), actor, contract.number());
         if (contract.kind() == ContractKind.LEASE
-                && queries().leaseOf(contract.plot().orElseThrow().polity(), contract.plot().orElseThrow().plot())
-                .isPresent()) {
+                && !queries().hasFreeUnit(queries().polity(contract.plot().orElseThrow().polity()).orElseThrow(),
+                contract.plot().orElseThrow().plot())) {
             throw new PlotNotLeasableException();
         }
         Ledger ledger = aggregates.ledger();

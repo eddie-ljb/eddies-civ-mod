@@ -20,6 +20,8 @@ import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.PolityName;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.shared.CurrencyId;
+import de.etiennebader.civ.domain.shared.Money;
+import de.etiennebader.civ.server.founding.FoundingFees;
 import de.etiennebader.civ.domain.shared.DomainException;
 import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.domain.territory.ChunkCoord;
@@ -49,6 +51,7 @@ public final class CivCommands {
     /** Ticks pro Minute Echtzeit bei 20 Ticks pro Sekunde. */
     private static final long TICKS_PER_MINUTE = 1_200;
 
+    private final FoundingFees fees;
     private final CivApplication app;
     private final WorldQueries queries;
     private final Calendar calendar;
@@ -60,6 +63,12 @@ public final class CivCommands {
 
     public CivCommands(CivApplication app, Calendar calendar, CurrencyId currency, Texts texts,
                        ProtectionService protection, VotingService voting) {
+        this(app, calendar, currency, texts, protection, voting, FoundingFees.FREE);
+    }
+
+    public CivCommands(CivApplication app, Calendar calendar, CurrencyId currency, Texts texts,
+                       ProtectionService protection, VotingService voting, FoundingFees fees) {
+        this.fees = Objects.requireNonNull(fees, "fees");
         this.app = Objects.requireNonNull(app, "app");
         this.queries = app.queries();
         this.calendar = Objects.requireNonNull(calendar, "calendar");
@@ -76,7 +85,7 @@ public final class CivCommands {
      */
     public Reply foundWithTownHall(Caller caller, Optional<String> name, BlockPosition townHall) {
         return name.filter(found -> !found.isBlank())
-                .map(found -> found(caller, found, townHall))
+                .map(found -> foundPaid(caller, found, townHall))
                 .orElseGet(() -> Reply.failure(Message.of(MessageKey.TOWN_HALL_NEEDS_NAME)));
     }
 
@@ -91,6 +100,24 @@ public final class CivCommands {
             app.foundPolity().execute(new FoundPolity.Command(polityName, caller.player(), currency, seat,
                     calendar.today()));
             return Reply.success(Message.of(MessageKey.FOUNDED, polityName.value()));
+        });
+    }
+
+    /** Gründung durch einen Spieler: kostet die konfigurierte Gebühr, die erst nach gelungener Gründung abgebucht wird. */
+    private Reply foundPaid(Caller caller, String name, BlockPosition seat) {
+        FoundingFees.Billing billing = fees.billing(app, currency);
+        Money balance = billing.shortfallBalance(caller.player(), fees.municipality());
+        if (balance != null) {
+            return Reply.failure(Message.of(MessageKey.FOUNDING_NOT_ENOUGH_MONEY,
+                    texts.money(Money.of(fees.municipality(), currency)), texts.money(balance)));
+        }
+        return attempt(() -> {
+            PolityName polityName = PolityName.of(name);
+            return billing.chargeAfter(caller.player(), fees.municipality(), calendar.today(), () -> {
+                app.foundPolity().execute(new FoundPolity.Command(polityName, caller.player(), currency, seat,
+                        calendar.today()));
+                return Reply.success(Message.of(MessageKey.FOUNDED, polityName.value()));
+            });
         });
     }
 

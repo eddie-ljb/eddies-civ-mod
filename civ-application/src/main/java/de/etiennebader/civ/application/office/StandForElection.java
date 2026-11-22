@@ -4,6 +4,7 @@ import de.etiennebader.civ.application.polity.Citizens;
 import de.etiennebader.civ.application.query.WorldQueries;
 import de.etiennebader.civ.application.support.Aggregates;
 import de.etiennebader.civ.domain.actor.ActorRef;
+import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.law.StandardParameters;
 import de.etiennebader.civ.domain.polity.Election;
 import de.etiennebader.civ.domain.polity.ElectionResult;
@@ -62,7 +63,9 @@ public final class StandForElection {
 
     public void execute(Command command) {
         Polity polity = aggregates.polity(command.polity());
-        Citizens.require(polity, command.citizen());
+        if (!villagerMayStand(polity, command.citizen())) {
+            Citizens.require(polity, command.citizen());
+        }
         queries.partyOf(command.citizen())
                 .filter(party -> !queries.partyEligibleIn(party, polity.id()))
                 .ifPresent(party -> {
@@ -95,6 +98,15 @@ public final class StandForElection {
             throw new InvalidCandidacyDistrictException(district.value().toString());
         }
         return Optional.of(district);
+    }
+
+    /**
+     * Wo Dorfbewohner wählen dürfen ({@link StandardParameters#VILLAGER_VOTE_PERCENT} über 0), dürfen sie auch
+     * kandidieren, auch ohne Bürgerrecht.
+     */
+    private static boolean villagerMayStand(Polity polity, ActorRef citizen) {
+        return citizen instanceof PersonRef && polity.isMember(citizen)
+                && polity.laws().valueOf(StandardParameters.VILLAGER_VOTE_PERCENT) > 0;
     }
 
     /**

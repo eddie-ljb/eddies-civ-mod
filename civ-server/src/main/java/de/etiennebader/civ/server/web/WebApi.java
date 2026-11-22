@@ -30,6 +30,7 @@ import de.etiennebader.civ.server.campaign.ResultView;
 import de.etiennebader.civ.server.civil.ContractView;
 import de.etiennebader.civ.server.command.Caller;
 import de.etiennebader.civ.server.command.Message;
+import de.etiennebader.civ.server.ranking.RankingService;
 import de.etiennebader.civ.server.command.MessageKey;
 import de.etiennebader.civ.server.command.MoneyFormat;
 import de.etiennebader.civ.server.command.Reply;
@@ -236,6 +237,7 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                 case "GET /api/market" -> HttpResponse.json(200, game.call(this::market));
                 case "GET /api/elections" -> HttpResponse.json(200, game.call(() -> elections(texts)));
                 case "GET /api/shops" -> HttpResponse.json(200, game.call(this::shops));
+                case "GET /api/rankings" -> HttpResponse.json(200, game.call(() -> rankings(texts)));
                 case "GET /api/stats" -> HttpResponse.json(200, game.call(this::stats));
                 case "GET /api/streets" -> HttpResponse.json(200, game.call(this::streets));
                 case "GET /api/chat" -> withLogin(request, login -> HttpResponse.json(200, game.call(() ->
@@ -255,6 +257,19 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                         }
                     }));
                 });
+                case "GET /api/blueprints" -> HttpResponse.json(200, game.call(() -> Json.array(
+                        civ.construction().library().all(), plan -> Json.object()
+                                .put("name", plan.name()).put("style", plan.style()).put("units", plan.units())
+                                .put("sizeX", plan.sizeX()).put("sizeY", plan.sizeY()).put("sizeZ", plan.sizeZ())
+                                .put("blocks", plan.blockCount()).build())));
+                case "POST /api/blueprints" -> withLogin(request, login -> action(request, body -> game.call(() -> {
+                    try {
+                        byte[] bytes = java.util.Base64.getDecoder().decode(body.getOrDefault("data", ""));
+                        return civ.construction().importPlan(body.getOrDefault("name", ""), bytes);
+                    } catch (IllegalArgumentException e) {
+                        return Reply.failure(Message.of(MessageKey.BUILD_PLAN_INVALID, "Base64"));
+                    }
+                }), texts));
                 case "GET /api/friends" -> withLogin(request, login -> HttpResponse.json(200, game.call(() ->
                         friends(login))));
                 case "POST /api/friends" -> withLogin(request, login -> action(request, body -> game.call(() ->
@@ -289,6 +304,7 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                         depot(login))));
                 case "POST /api/exchange" -> withLogin(request, login -> action(request, body -> game.call(() ->
                         exchangeAction(login, body)), texts));
+                case "GET /api/war" -> HttpResponse.json(200, game.call(this::war));
                 case "GET /api/press" -> HttpResponse.json(200, game.call(this::press));
                 case "POST /api/press" -> withLogin(request, login -> action(request, body -> game.call(() ->
                         civ.press().publish(login.player(), body.getOrDefault("paper", ""),
@@ -560,6 +576,7 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                 .put("dimension", dimension.value())
                 .raw("chunks", "[" + String.join(",", chunks) + "]")
                 .raw("seats", "[" + String.join(",", seats) + "]")
+                .raw("ports", ports(dimension))
                 .build();
     }
 
@@ -612,7 +629,30 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                 .put("dimension", dimension.value())
                 .raw("chunks", "[" + String.join(",", chunks) + "]")
                 .raw("seats", "[" + String.join(",", seats) + "]")
+                .raw("ports", ports(dimension))
                 .build();
+    }
+
+    /**
+     * Die zusätzlichen Heimat-Häfen auf der Karte. Häfen, zu denen die Polity niemanden lässt, bleiben verborgen,
+     * damit die öffentliche Karte keine gesperrten Orte verrät; das Gemeindehaus (Hafen 1) zeigt der Stern ohnehin.
+     */
+    private String ports(de.etiennebader.civ.domain.territory.DimensionId dimension) {
+        List<String> ports = new ArrayList<>();
+        for (de.etiennebader.civ.domain.civic.HomePort port : civ.queries().civic().ports()) {
+            if (!port.position().dimension().equals(dimension)
+                    || civ.queries().civic().portSettingsOf(port.polity()).access()
+                    == de.etiennebader.civ.domain.civic.PortAccess.NOBODY) {
+                continue;
+            }
+            civ.queries().polity(port.polity()).ifPresent(polity -> ports.add(Json.object()
+                    .put("town", port.polity().value().toString())
+                    .put("name", polity.name().value() + " " + port.slot())
+                    .put("x", port.position().x())
+                    .put("z", port.position().z())
+                    .build()));
+        }
+        return "[" + String.join(",", ports) + "]";
     }
 
     private String market() {
@@ -772,6 +812,48 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
     }
 
     /** Zeitungen und neueste Artikel; ohne Anmeldung. */
+    private String war() {
+        var registry = civ.war().registry();
+        var queries = civ.queries();
+        java.util.function.Function<de.etiennebader.civ.domain.shared.PolityId, String> name = id -> queries.polity(id)
+                .map(polity -> polity.name().toString()).orElse("?");
+        java.util.function.Function<de.etiennebader.civ.domain.shared.PolityId, Integer> wounded = id ->
+                registry.wounded().getOrDefault(id, java.util.Map.of()).size();
+        java.util.function.Function<de.etiennebader.civ.domain.shared.PolityId, Integer> troops = id ->
+                registry.services().getOrDefault(id, java.util.Map.of()).size();
+        java.util.List<String> pairs = new java.util.ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        registry.alliances().forEach((first, set) -> set.forEach(second -> {
+            String key = first.value().compareTo(second.value()) < 0 ? first.value() + "|" + second.value()
+                    : second.value() + "|" + first.value();
+            if (seen.add(key)) {
+                pairs.add(Json.object().put("first", name.apply(first)).put("second", name.apply(second)).build());
+            }
+        }));
+        return Json.object()
+                .raw("wars", Json.array(registry.wars(), war -> Json.object()
+                        .put("aggressor", name.apply(war.aggressor()))
+                        .put("defender", name.apply(war.defender()))
+                        .put("ongoing", war.ongoing())
+                        .put("declared", war.declaredOn().value())
+                        .put("ended", war.endedOn().map(day -> day.value()).orElse(0L))
+                        .put("front", registry.frontOf(war.id()))
+                        .put("aggressorTroops", troops.apply(war.aggressor()))
+                        .put("defenderTroops", troops.apply(war.defender()))
+                        .put("aggressorWounded", wounded.apply(war.aggressor()))
+                        .put("defenderWounded", wounded.apply(war.defender()))
+                        .put("winner", war.outcome().map(terms -> name.apply(terms.winner())).orElse(""))
+                        .put("reparations", war.outcome().map(terms -> terms.reparations()).orElse(0L))
+                        .raw("campaigns", Json.array(registry.campaigns().stream()
+                                .filter(campaign -> campaign.war().equals(war.id())).toList(), campaign -> Json.object()
+                                .put("kind", campaign.kind().name())
+                                .put("initiator", name.apply(campaign.initiator()))
+                                .put("on", campaign.on().value()).build()))
+                        .build()))
+                .raw("alliances", "[" + String.join(",", pairs) + "]")
+                .build();
+    }
+
     private String press() {
         return Json.object()
                 .raw("newspapers", Json.array(civ.press().newspapers(), paper -> Json.object()
@@ -844,6 +926,34 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                 .put("articles", civ.queries().press().articles().size())
                 .put("elections", elections)
                 .put("priceLevel", civ.market().priceLevelPercent())
+                .build();
+    }
+
+    /**
+     * Ranglisten der Reichsten und Größten; ohne Anmeldung. Das Serverkonto steht getrennt und in keiner Liste.
+     * Geldwerte in Hundertsteln eines Smaragds; Bünde tragen ihre Ebene, damit die Seite nach Land, Nation usw. filtert.
+     */
+    private String rankings(Translator texts) {
+        List<String> categories = new ArrayList<>();
+        for (RankingService.Category category : RankingService.Category.values()) {
+            boolean federal = category == RankingService.Category.RICHEST_FEDERATIONS
+                    || category == RankingService.Category.LARGEST_FEDERATIONS;
+            List<RankingService.Entry> entries = civ.rankings().top(category, Optional.empty(),
+                    federal ? 100 : RankingService.DEFAULT_LIMIT);
+            categories.add(Json.object()
+                    .put("id", category.id())
+                    .put("money", category.money())
+                    .raw("entries", Json.array(entries, entry -> Json.object()
+                            .put("name", entry.name())
+                            .put("level", entry.levelId())
+                            .put("levelName", entry.levelName() instanceof Message message ? texts.translate(message)
+                                    : entry.levelName().toString())
+                            .put("value", entry.value()).build()))
+                    .build());
+        }
+        return Json.object()
+                .raw("categories", "[" + String.join(",", categories) + "]")
+                .put("serverAccount", civ.rankings().serverBalance().amount())
                 .build();
     }
 

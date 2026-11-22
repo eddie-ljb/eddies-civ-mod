@@ -178,6 +178,8 @@ public final class CivCommandTree {
     private static final String ECONOMY_AXIS = "wirtschaft";
     private static final String PROGRAM_MODE = "modus";
     private static final List<String> YES_NO = List.of("ja", "nein");
+    private static final List<String> RANKINGS = List.of("spieler", "dorfbewohner", "staedte", "firmen", "buende",
+            "groesste-staedte", "groesste-firmen", "groesste-buende");
 
     private final CivServerHost host;
 
@@ -221,6 +223,16 @@ public final class CivCommandTree {
                                         (commands, caller) -> commands.describe(caller, Optional.of(name(context)))))))
                 .then(Commands.literal("liste")
                         .executes(context -> run(context.getSource(), CivCommands::list)))
+                .then(Commands.literal("rangliste")
+                        .then(Commands.argument(NAME, StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(RANKINGS, builder))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.rankings().show(
+                                        StringArgumentType.getString(context, NAME), Optional.empty())))
+                                .then(Commands.argument(LEVEL, StringArgumentType.word())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(levelIds(), builder))
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.rankings().show(
+                                                StringArgumentType.getString(context, NAME),
+                                                Optional.of(StringArgumentType.getString(context, LEVEL))))))))
                 .then(Commands.literal("recht")
                         .executes(context -> asPlayer(context,
                                 (commands, caller) -> commands.laws(caller, Optional.empty())))
@@ -233,6 +245,8 @@ public final class CivCommandTree {
                                                         caller, StringArgumentType.getString(context, LAW),
                                                         StringArgumentType.getString(context, VALUE))))))))
                 .then(plotCommands())
+                .then(constructionCommands())
+                .then(warCommands())
                 .then(Commands.literal("laden")
                         .then(Commands.literal("eroeffnen")
                                 .then(Commands.argument(PRICE, StringArgumentType.word())
@@ -774,6 +788,13 @@ public final class CivCommandTree {
             }
         }
         dispatcher.register(Commands.literal("civ")
+                .then(Commands.literal("heim")
+                        .executes(context -> withCiv(context, (civ, player) -> HomePorts.travel(civ, player,
+                                Optional.empty())))
+                        .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                                .suggests(this::suggestPolityNames)
+                                .executes(context -> withCiv(context, (civ, player) -> HomePorts.travel(civ, player,
+                                        Optional.of(StringArgumentType.getString(context, TEXT)))))))
                 .then(Commands.literal("ebenen")
                         .executes(context -> withCiv(context, (civ, player) -> civ.levels().overview(
                                 Players.caller(player)))))
@@ -969,6 +990,38 @@ public final class CivCommandTree {
                         .then(Commands.literal("entfernen")
                                 .executes(context -> withCiv(context, (civ, player) -> civ.levels().setFlag(
                                         Players.caller(player), level.apply(context), Optional.empty())))))
+                .then(Commands.literal("heim")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(
+                                Players.caller(player), level.apply(context), civ.homePorts()::list)))
+                        .then(Commands.literal("liste")
+                                .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(
+                                        Players.caller(player), level.apply(context), civ.homePorts()::list))))
+                        .then(Commands.literal("setzen")
+                                .then(Commands.argument(COUNT, IntegerArgumentType.integer(2, 3))
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(
+                                                Players.caller(player), level.apply(context),
+                                                polity -> civ.homePorts().set(Players.caller(player), polity,
+                                                        IntegerArgumentType.getInteger(context, COUNT)))))))
+                        .then(Commands.literal("entfernen")
+                                .then(Commands.argument(COUNT, IntegerArgumentType.integer(2, 3))
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(
+                                                Players.caller(player), level.apply(context),
+                                                polity -> civ.homePorts().remove(Players.caller(player), polity,
+                                                        IntegerArgumentType.getInteger(context, COUNT)))))))
+                        .then(Commands.literal("zugang")
+                                .then(Commands.argument(TEXT, StringArgumentType.word())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                java.util.List.of("keiner", "buerger", "verbuendete", "alle"), builder))
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(
+                                                Players.caller(player), level.apply(context),
+                                                polity -> civ.homePorts().setAccess(Players.caller(player), polity,
+                                                        StringArgumentType.getString(context, TEXT)))))))
+                        .then(Commands.literal("preis")
+                                .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(
+                                                Players.caller(player), level.apply(context),
+                                                polity -> civ.homePorts().setFee(Players.caller(player), polity,
+                                                        StringArgumentType.getString(context, TEXT))))))))
                 .then(Commands.literal("hymne")
                         .executes(context -> withCiv(context, (civ, player) -> playAnthem(civ, player,
                                 level.apply(context))))
@@ -1297,6 +1350,155 @@ public final class CivCommandTree {
                                                                   SuggestionsBuilder builder) {
         return SharedSuggestionProvider.suggest(host.current().map(civ -> civ.federations().federationNames())
                 .orElse(List.of()), builder);
+    }
+
+    /** {@code /civ krieg}: Krieg erklären, dienen, kämpfen, Frieden und Neutralität (Issue #27). */
+    private LiteralArgumentBuilder<CommandSourceStack> campaignKind(String word,
+            de.etiennebader.civ.domain.war.BattleKind kind) {
+        return Commands.literal(word)
+                .then(Commands.argument(COUNT, IntegerArgumentType.integer(0, 30))
+                        .executes(context -> withCiv(context, (civ, player) -> civ.war().campaign(
+                                Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER), kind,
+                                IntegerArgumentType.getInteger(context, COUNT)))));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> warCommands() {
+        return Commands.literal("krieg")
+                .then(Commands.literal("liste")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.war().list())))
+                .then(Commands.literal("erklaeren")
+                        .then(Commands.argument(COMPANY, StringArgumentType.string())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.war().declare(
+                                        Players.caller(player), StringArgumentType.getString(context, COMPANY))))))
+                .then(Commands.literal("dienen")
+                        .then(Commands.literal("soldat")
+                                .executes(context -> withCiv(context, (civ, player) -> civ.war().enlist(
+                                        Players.caller(player), de.etiennebader.civ.domain.war.MilitaryRank.SOLDIER))))
+                        .then(Commands.literal("offizier")
+                                .executes(context -> withCiv(context, (civ, player) -> civ.war().enlist(
+                                        Players.caller(player), de.etiennebader.civ.domain.war.MilitaryRank.OFFICER))))
+                        .then(Commands.literal("ausspaeher")
+                                .executes(context -> withCiv(context, (civ, player) -> civ.war().enlist(
+                                        Players.caller(player), de.etiennebader.civ.domain.war.MilitaryRank.SCOUT)))))
+                .then(Commands.literal("entlassen")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.war().discharge(Players.caller(player)))))
+                .then(Commands.literal("wille")
+                        .then(Commands.argument(COMPANY, StringArgumentType.string())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.war().willAgainst(
+                                        Players.caller(player), StringArgumentType.getString(context, COMPANY))))))
+                .then(Commands.literal("front")
+                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.war().front(
+                                        Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))))
+                .then(Commands.literal("feldzug")
+                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                                .then(campaignKind("angriff", de.etiennebader.civ.domain.war.BattleKind.ASSAULT))
+                                .then(campaignKind("hinterhalt", de.etiennebader.civ.domain.war.BattleKind.AMBUSH))
+                                .then(campaignKind("verteidigung", de.etiennebader.civ.domain.war.BattleKind.DEFENSIVE))))
+                .then(Commands.literal("ausbilden")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.war().train(Players.caller(player)))))
+                .then(Commands.literal("ausruesten")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.war().equip(Players.caller(player)))))
+                .then(Commands.literal("lazarett")
+                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(1, 1000))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.war().hospital(
+                                        Players.caller(player), IntegerArgumentType.getInteger(context, COUNT))))))
+                .then(Commands.literal("anspruch")
+                        .then(Commands.argument(COMPANY, StringArgumentType.string())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.war().claim(
+                                        Players.caller(player), StringArgumentType.getString(context, COMPANY))))))
+                .then(Commands.literal("buendnisse")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.war().allies(Players.caller(player)))))
+                .then(Commands.literal("buendnis")
+                        .then(Commands.literal("vorschlagen")
+                                .then(Commands.argument(COMPANY, StringArgumentType.string())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.war().propose(
+                                                Players.caller(player), StringArgumentType.getString(context, COMPANY))))))
+                        .then(Commands.literal("annehmen")
+                                .then(Commands.argument(COMPANY, StringArgumentType.string())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.war().accept(
+                                                Players.caller(player), StringArgumentType.getString(context, COMPANY))))))
+                        .then(Commands.literal("kuendigen")
+                                .then(Commands.argument(COMPANY, StringArgumentType.string())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.war().breakAlliance(
+                                                Players.caller(player), StringArgumentType.getString(context, COMPANY)))))))
+                .then(Commands.literal("gefecht")
+                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.war().battle(
+                                        Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))))
+                .then(Commands.literal("frieden")
+                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.war().peace(
+                                        Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))))
+                .then(Commands.literal("neutralitaet")
+                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(1, 365))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.war().neutrality(
+                                        Players.caller(player), IntegerArgumentType.getInteger(context, COUNT))))));
+    }
+
+    /** {@code /civ bau}: Baupläne ansehen, Bauaufträge vergeben, Bauamt entscheidet (Issue #19). */
+    private LiteralArgumentBuilder<CommandSourceStack> constructionCommands() {
+        return Commands.literal("bau")
+                .then(Commands.literal("plaene")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.construction().plans())))
+                .then(Commands.literal("liste")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.construction()
+                                .list(Players.caller(player)))))
+                .then(Commands.literal("beauftragen")
+                        .then(Commands.argument(TYPE, StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                        host.current().map(civ -> civ.construction().library().all().stream()
+                                                .map(plan -> plan.name()).toList())
+                                                .orElse(java.util.List.of()), builder))
+                                .then(Commands.argument(COMPANY, StringArgumentType.string())
+                                        .executes(context -> order(context, false, 0))
+                                        .then(Commands.literal("material")
+                                                .then(Commands.literal("firma")
+                                                        .executes(context -> order(context, false, 0))
+                                                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(0, 270))
+                                                                .executes(context -> order(context, false,
+                                                                        IntegerArgumentType.getInteger(context, COUNT)))))
+                                                .then(Commands.literal("selbst")
+                                                        .executes(context -> order(context, true, 0))
+                                                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(0, 270))
+                                                                .executes(context -> order(context, true,
+                                                                        IntegerArgumentType.getInteger(context, COUNT))))))
+                                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(0, 270))
+                                                .executes(context -> order(context, false,
+                                                        IntegerArgumentType.getInteger(context, COUNT)))))))
+                .then(Commands.literal("material")
+                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                                .executes(context -> withCiv(context, (civ, player) -> {
+                                    int number = IntegerArgumentType.getInteger(context, NUMBER);
+                                    int given = ConstructionSites.deliver(player, civ, number);
+                                    Reply left = civ.construction().materials(Players.caller(player), number);
+                                    if (given == 0) {
+                                        return left;
+                                    }
+                                    java.util.List<Message> lines = new java.util.ArrayList<>();
+                                    lines.add(Message.of(MessageKey.BUILD_DELIVERED, given, number));
+                                    lines.addAll(left.lines());
+                                    return left.success() ? Reply.success(lines) : left;
+                                }))))
+                .then(Commands.literal("genehmigen")
+                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.construction()
+                                        .approve(Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))))
+                .then(Commands.literal("ablehnen")
+                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.construction()
+                                        .reject(Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))))
+                .then(Commands.literal("abbrechen")
+                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.construction()
+                                        .cancel(Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))));
+    }
+
+    private int order(CommandContext<CommandSourceStack> context, boolean selfSupplied, int degrees)
+            throws CommandSyntaxException {
+        return withCiv(context, (civ, player) -> civ.construction().order(Players.caller(player),
+                StringArgumentType.getString(context, TYPE), StringArgumentType.getString(context, COMPANY),
+                selfSupplied, degrees));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> plotCommands() {

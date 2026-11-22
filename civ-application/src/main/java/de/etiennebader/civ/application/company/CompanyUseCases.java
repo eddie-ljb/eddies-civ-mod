@@ -27,6 +27,7 @@ import de.etiennebader.civ.domain.shared.Money;
 import de.etiennebader.civ.domain.shared.PolityId;
 
 import java.util.LinkedHashMap;
+import de.etiennebader.civ.domain.economy.ServerAccount;
 import java.util.Map;
 import java.util.Objects;
 
@@ -46,12 +47,24 @@ public final class CompanyUseCases {
     private final IdGenerator ids;
     private final Trading trading;
     private final DissolvePolity dissolvePolity;
+    private long foundingFee;
 
     public CompanyUseCases(Aggregates aggregates, IdGenerator ids, Trading trading, DissolvePolity dissolvePolity) {
         this.aggregates = Objects.requireNonNull(aggregates, "aggregates");
         this.ids = Objects.requireNonNull(ids, "ids");
         this.trading = Objects.requireNonNull(trading, "trading");
         this.dissolvePolity = Objects.requireNonNull(dissolvePolity, "dissolvePolity");
+    }
+
+    /**
+     * Gebühr in Währungseinheiten, die jede Firmengründung zusätzlich zum Kapital kostet; sie geht auf das
+     * {@link ServerAccount Serverkonto}. Gilt für Spieler wie Dorfbewohner.
+     */
+    public void foundingFee(long fee) {
+        if (fee < 0) {
+            throw new IllegalArgumentException("Gebühr darf nicht negativ sein: " + fee);
+        }
+        this.foundingFee = fee;
     }
 
     /**
@@ -65,9 +78,19 @@ public final class CompanyUseCases {
         if (capital.amount() < MIN_CAPITAL) {
             throw new InvalidOrderException(MIN_CAPITAL);
         }
-        PolityId id = found(founder, name, PolityKind.COMPANY, capital.currency(), day);
         Ledger ledger = aggregates.ledger();
+        Money fee = Money.of(foundingFee, capital.currency());
+        Money required = capital.plus(fee);
+        Money available = ledger.balanceOf(founder, capital.currency());
+        if (available.amount() < required.amount()) {
+            // Gebühr und Kapital zusammen müssen gedeckt sein; vorher entsteht nichts.
+            throw new InsufficientFundsException(required, available);
+        }
+        PolityId id = found(founder, name, PolityKind.COMPANY, capital.currency(), day);
         try {
+            if (fee.amount() > 0) {
+                ledger.transfer(founder, ServerAccount.REF, fee, TransferReason.FEE, day);
+            }
             ledger.transfer(founder, new PolityRef(id), capital, TransferReason.CAPITAL, day);
         } catch (InsufficientFundsException e) {
             aggregates.repositories().polities().remove(id);

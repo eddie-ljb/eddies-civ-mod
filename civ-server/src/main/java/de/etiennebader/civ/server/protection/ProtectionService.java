@@ -51,6 +51,29 @@ public final class ProtectionService {
         return queries.allows(hazard, position);
     }
 
+    /**
+     * Ob ein Gesetz einer fremden Mod die Handlung erlaubt: liest den Wahrheitswert des Parameters aus dem
+     * geltenden Recht der Gemeinde, die {@code scope} bestimmt. Gilt kein Recht (Wildnis, ohne Gemeinde),
+     * ist die Handlung erlaubt; Admins mit Umgehung ({@code /civ admin umgehen}) unterliegen keinem Gesetz.
+     * Der Parameter sollte {@code true} als „erlaubt“ lesen, damit der Standardwert nichts verbietet.
+     *
+     * @param key      mit {@link de.etiennebader.civ.domain.law.ExtensionParameters} angemeldeter Schalter
+     * @param position der Ort der Handlung; nur für {@link LawScope#TERRITORY} nötig
+     */
+    public boolean permits(PlayerRef player, ParameterKey<Boolean> key, LawScope scope, BlockPosition position) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(key, "key");
+        Objects.requireNonNull(scope, "scope");
+        if (bypassing.contains(player)) {
+            return true;
+        }
+        Optional<PolityView> polity = switch (scope) {
+            case TERRITORY -> townAt(Objects.requireNonNull(position, "position"));
+            case CITIZENSHIP -> queries.municipalityOf(player).map(PolityView.class::cast);
+        };
+        return polity.map(found -> queries.effectiveLaws(found).valueOf(key)).orElse(true);
+    }
+
     /** Ob Spieler einander hier verletzen dürfen ({@code pvp_allowed}); in der Wildnis immer. */
     public boolean allowsPvp(BlockPosition position) {
         return lawAt(position, StandardParameters.PVP_ALLOWED).orElse(true);

@@ -4,9 +4,11 @@ import de.etiennebader.civ.application.polity.PolityNameTakenException;
 import de.etiennebader.civ.application.query.WorldQueries;
 import de.etiennebader.civ.application.support.Aggregates;
 import de.etiennebader.civ.domain.actor.ActorRef;
+import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.land.LandRegistry;
 import de.etiennebader.civ.domain.polity.Membership;
 import de.etiennebader.civ.domain.polity.NotAMemberException;
+import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.Polity;
 import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.polity.PolityName;
@@ -14,6 +16,7 @@ import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.IdGenerator;
 import de.etiennebader.civ.domain.shared.PolityId;
 
+import java.util.Optional;
 import java.util.Objects;
 
 /**
@@ -70,6 +73,10 @@ public final class FoundFederation {
             if (!federation.isMember(person.member())) {
                 federation.admit(person.member(), person.type(), command.day());
             }
+        }
+        if (command.head() instanceof PersonRef) {
+            // Ein Dorfbewohner ist ohne Amt nie Bürgermeister; der Gründer führt den Bund aber.
+            federation.fillOffice(Office.MAYOR, command.head(), Optional.empty(), command.day());
         }
         aggregates.commit(federation);
         aggregates.commit(LandRegistry.open(id));

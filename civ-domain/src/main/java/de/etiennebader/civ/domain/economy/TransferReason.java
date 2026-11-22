@@ -6,6 +6,9 @@ package de.etiennebader.civ.domain.economy;
 public enum TransferReason {
     LAND_TAX,
     SALES_TAX,
+    INCOME_TAX,
+    PERMIT_FEE,
+    CONSTRUCTION,
     FEE,
     FINE,
     WAGE,
@@ -17,5 +20,6 @@ public enum TransferReason {
     SALARY,
     DIVIDEND,
     CAPITAL,
+    WAR_REPARATIONS,
     OTHER
 }

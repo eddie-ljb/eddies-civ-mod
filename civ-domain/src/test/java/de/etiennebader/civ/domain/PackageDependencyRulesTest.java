@@ -34,6 +34,7 @@ class PackageDependencyRulesTest {
     /** Welche Pakete ein Paket verwenden darf; das eigene Paket ist immer erlaubt. */
     private static final Map<String, Set<String>> ALLOWED_DEPENDENCIES = Map.ofEntries(
             Map.entry("shared", Set.of()),
+            Map.entry("construction", Set.of()),
             Map.entry("actor", Set.of("shared")),
             Map.entry("law", Set.of("shared")),
             Map.entry("territory", Set.of("shared", "actor")),
@@ -52,7 +53,8 @@ class PackageDependencyRulesTest {
             Map.entry("civic", Set.of("shared", "actor", "territory")),
             Map.entry("justice", Set.of("shared", "actor")),
             Map.entry("production", Set.of("shared", "actor", "market")),
-            Map.entry("conjuncture", Set.of("shared")));
+            Map.entry("conjuncture", Set.of("shared")),
+            Map.entry("war", Set.of("shared", "actor")));
 
     @Test
     @DisplayName("Pakete verwenden nur erlaubte Pakete")

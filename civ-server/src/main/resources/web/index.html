@@ -349,11 +349,14 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
       <a href="#wahlen">Wahlen</a>
       <a href="#markt">Markt</a>
       <a href="#boerse">Börse</a>
+      <a href="#ranglisten">Ranglisten</a>
       <a href="#presse">Presse</a>
       <a href="#staat">Staat</a>
+      <a href="#krieg">Krieg</a>
       <a href="#justiz">Justiz</a>
       <a href="#post">Post<span class="badge" id="b-post"></span></a>
       <a href="#chat">Chat<span class="badge" id="b-chat"></span></a>
+      <a href="#bauen">Bauen</a>
       <a href="#freunde">Freunde<span class="badge" id="b-friends"></span></a>
       <a href="#ich">Mein Bereich<span class="badge" id="b-me"></span></a>
     </nav>
@@ -512,6 +515,22 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
     </div>
   </section>
 
+  <section data-page="ranglisten">
+    <div class="pagehead">
+      <div><h2>Ranglisten</h2><p id="rankhint">Die Reichsten und Größten der Welt. Das Serverkonto zählt nicht mit.</p></div>
+      <div class="row">
+        <select id="rankcat" aria-label="Rangliste"></select>
+        <select id="ranklevel" aria-label="Ebene" hidden></select>
+      </div>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th class="num">#</th><th>Name</th><th id="rankvalhead" class="num">Wert</th></tr></thead>
+        <tbody id="ranking"></tbody>
+      </table>
+    </div>
+  </section>
+
   <section data-page="presse">
     <div class="pagehead">
       <div><h2>Presse</h2><p>Jeder Artikel hat einen Gegenstand, eine Haltung und ein Thema. Dorfbewohner, die ihn lesen, ändern drei Tage lang ihre Stimmung und ihre Wahlentscheidung.</p></div>
@@ -526,6 +545,13 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
     </div>
     <h3 style="margin:32px 0 12px">Zeitungen</h3>
     <div class="register" id="papers"></div>
+  </section>
+
+  <section data-page="krieg">
+    <div class="pagehead"><div><h2>Krieg</h2><p>Live-Frontverlauf aller Kriege: –100 heißt Sieg des Verteidigers, +100 Sieg des Angreifers. Die genaue Truppenstärke kennen nur Ausspäher, hier ist nur die grobe Größe sichtbar.</p></div></div>
+    <div class="register" id="wars"></div>
+    <h3 style="margin:32px 0 12px">Bündnisse</h3>
+    <div class="register" id="alliances"></div>
   </section>
 
   <section data-page="staat">
@@ -594,6 +620,17 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
       </div>
     </div>
     <div class="msg err" id="chatmsg"></div>
+  </section>
+
+  <section data-page="bauen">
+    <div class="pagehead"><div><h2>Bauen</h2><p>Baupläne für Baufirmen. Beauftragt wird im Spiel mit <code>/civ bau beauftragen</code>. Eigene Pläne lädst du hier als Litematica (<code>.litematic</code>) oder Sponge Schematic (<code>.schem</code>, z. B. aus WorldEdit) hoch; der Dateiname ist der Planname.</p></div></div>
+    <div data-locked></div>
+    <form class="row" id="planform" data-unlocked>
+      <input type="file" id="planfile" accept=".litematic,.schem" aria-label="Bauplandatei">
+      <button class="btn primary">Plan hochladen</button>
+    </form>
+    <div class="msg" id="planmsg"></div>
+    <div id="planlist"></div>
   </section>
 
   <section data-page="freunde">
@@ -743,7 +780,7 @@ const head = name => el("img", { className: "avatar", alt: "", loading: "lazy", 
 const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
 /* Seiten */
-const pages = ["start", "welt", "karte", "wahlen", "markt", "boerse", "presse", "staat", "justiz", "post", "chat", "freunde", "ich"];
+const pages = ["start", "welt", "karte", "wahlen", "markt", "boerse", "ranglisten", "presse", "krieg", "staat", "justiz", "post", "chat", "bauen", "freunde", "ich"];
 let page = "start";
 function route() {
   const wanted = location.hash.slice(1).split("/")[0];
@@ -751,8 +788,8 @@ function route() {
   document.querySelectorAll("section[data-page]").forEach(s => s.classList.toggle("on", s.dataset.page === page));
   document.querySelectorAll(".nav a").forEach(a => { if (a.getAttribute("href") === "#" + page) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
   const loaders = { start: loadStart, welt: loadWorld, karte: openMap, wahlen: loadElections, markt: loadMarket,
-    boerse: loadExchange, presse: loadPress, staat: loadState, justiz: loadJustice, post: loadLetters,
-    chat: openChat, freunde: loadFriends, ich: loadMe };
+    boerse: loadExchange, ranglisten: loadRankings, presse: loadPress, krieg: loadWar, staat: loadState, justiz: loadJustice, post: loadLetters,
+    chat: openChat, bauen: loadPlans, freunde: loadFriends, ich: loadMe };
   loaders[page]();
   if (page !== "chat") stopChat();
   if (page !== "staat") clearTimeout(stateTimer);
@@ -927,7 +964,7 @@ $("worldsearch").addEventListener("input", renderWorld);
 
 /* Karte */
 const canvas = $("canvas"), ctx = canvas.getContext("2d");
-let view = { x: 0, z: 0, scale: 12 }, mapData = { chunks: [], seats: [] }, drag = null, centered = false;
+let view = { x: 0, z: 0, scale: 12 }, mapData = { chunks: [], seats: [], ports: [] }, drag = null, centered = false;
 let electionData = { results: [], polls: [] };
 async function openMap() {
   if (!world.towns.length) await fetchWorld();
@@ -1108,6 +1145,14 @@ function draw() {
       ctx.fillText(seat.name, px, pz - 9 * devicePixelRatio);
     }
   }
+  for (const port of mapData.ports || []) {
+    const [px, pz] = toScreen(port.x / 16, port.z / 16);
+    ctx.fillStyle = css("--ink"); ctx.fillText("◆", px, pz + 4 * devicePixelRatio);
+    if (view.scale >= 6) {
+      ctx.lineWidth = 3 * devicePixelRatio; ctx.strokeStyle = css("--surface"); ctx.strokeText(port.name, px, pz - 9 * devicePixelRatio);
+      ctx.fillText(port.name, px, pz - 9 * devicePixelRatio);
+    }
+  }
 }
 const pointers = new Map();
 canvas.addEventListener("pointerdown", e => { canvas.setPointerCapture(e.pointerId); pointers.set(e.pointerId, e); drag = { x: e.clientX, y: e.clientY, vx: view.x, vz: view.z, dist: 0 }; });
@@ -1207,6 +1252,47 @@ $("esearch").addEventListener("input", renderElections);
 
 /* Markt */
 let offers = [], shopList = [], sortKey = "name", sortDir = 1;
+/* Ranglisten */
+const rankTitles = { spieler: "Reichste Spieler", dorfbewohner: "Reichste Dorfbewohner", staedte: "Reichste Städte", firmen: "Reichste Firmen",
+  buende: "Reichste Bünde (Länder, Nationen …)", "groesste-staedte": "Größte Städte (Einwohner)",
+  "groesste-firmen": "Größte Firmen (Beschäftigte)", "groesste-buende": "Größte Bünde (Einwohner)" };
+const rankValues = { "groesste-staedte": "Einwohner", "groesste-firmen": "Beschäftigte", "groesste-buende": "Einwohner" };
+let rankData = null;
+async function loadRankings() {
+  const r = await api("/api/rankings");
+  if (!r.ok) return;
+  rankData = r.data;
+  const sel = $("rankcat"), keep = sel.value;
+  sel.replaceChildren(...rankData.categories.map(c => el("option", { value: c.id, textContent: rankTitles[c.id] || c.id })));
+  if (keep) sel.value = keep;
+  renderRanking();
+}
+function renderRanking() {
+  if (!rankData) return;
+  const cat = rankData.categories.find(c => c.id === $("rankcat").value) || rankData.categories[0];
+  if (!cat) return;
+  const federal = cat.id === "buende" || cat.id === "groesste-buende";
+  const levelSel = $("ranklevel");
+  levelSel.hidden = !federal;
+  if (federal) {
+    const seen = new Map();
+    cat.entries.forEach(e => seen.set(e.level, e.levelName));
+    const keep = levelSel.value;
+    levelSel.replaceChildren(el("option", { value: "", textContent: "Alle Ebenen" }), ...[...seen].map(([id, name]) => el("option", { value: id, textContent: name })));
+    levelSel.value = seen.has(keep) ? keep : "";
+  }
+  const level = federal ? levelSel.value : "";
+  const rows = cat.entries.filter(e => !level || e.level === level).slice(0, 10);
+  $("rankvalhead").textContent = rankValues[cat.id] || "Vermögen";
+  const fmt = v => cat.money ? (v / 100).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " Smaragde" : v;
+  $("ranking").replaceChildren(...(rows.length ? rows.map((e, i) => el("tr", {}, el("td", { className: "num", textContent: i + 1 }),
+    el("td", { textContent: e.name + (federal && e.levelName ? " (" + e.levelName + ")" : "") }), el("td", { className: "num", textContent: fmt(e.value) })))
+    : [el("tr", {}, el("td", { colSpan: 3, className: "muted", textContent: "Noch keine Einträge." }))]));
+  $("rankhint").textContent = "Die Reichsten und Größten der Welt. Das Serverkonto (" + (rankData.serverAccount / 100).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " Smaragde Gründungsgebühren) zählt nicht mit.";
+}
+$("rankcat").addEventListener("change", renderRanking);
+$("ranklevel").addEventListener("change", renderRanking);
+
 async function loadMarket() {
   const [m, s] = await Promise.all([api("/api/market"), api("/api/shops")]);
   if (m.ok) { offers = m.data.offers; $("level").textContent = "Preise in Smaragden, Preisniveau " + m.data.priceLevel + " %. Viel Lager drückt den Preis; das Lager schrumpft jeden Tag."; }
@@ -1348,6 +1434,25 @@ async function renderStock(l) {
 
 /* Presse */
 let openArticle = null, writing = false;
+async function loadWar() {
+  const r = await api("/api/war");
+  if (!r.ok) return;
+  $("wars").replaceChildren(...(r.data.wars.length ? r.data.wars.map(w => {
+    const bar = el("div", { style: "position:relative;height:14px;background:var(--line);border-radius:7px;overflow:hidden;margin:8px 0" });
+    const fill = el("div", { style: "position:absolute;top:0;bottom:0;background:" + (w.front >= 0 ? "var(--emerald)" : "var(--red)") +
+      ";left:" + (w.front >= 0 ? 50 : 50 + w.front / 2) + "%;width:" + Math.abs(w.front) / 2 + "%" });
+    bar.append(fill, el("div", { style: "position:absolute;left:50%;top:0;bottom:0;width:2px;background:var(--text)" }));
+    return el("div", { className: "card" },
+      el("h3", { textContent: w.aggressor + " gegen " + w.defender }),
+      el("p", { textContent: (w.ongoing ? "läuft seit Tag " : "beendet an Tag ") + (w.ongoing ? w.declared : w.ended) + " · Front " + w.front +
+        " · Truppen " + w.aggressorTroops + " : " + w.defenderTroops + " · Verwundete " + w.aggressorWounded + " : " + w.defenderWounded }),
+      bar,
+      w.winner ? el("p", { textContent: "Sieger: " + w.winner + (w.reparations ? " · Reparationen " + w.reparations : "") }) : el("span"),
+      ...w.campaigns.map(c => el("p", { textContent: "Geplant: " + c.kind + " von " + c.initiator + " am Tag " + c.on })));
+  }) : [el("div", { className: "empty", style: "border:none", textContent: "Es herrscht Frieden." })]));
+  $("alliances").replaceChildren(...(r.data.alliances.length ? r.data.alliances.map(a => el("div", { className: "card" }, el("p", { textContent: a.first + " ↔ " + a.second })))
+    : [el("div", { className: "empty", style: "border:none", textContent: "Keine Bündnisse." })]));
+}
 async function loadPress() {
   const [p, user] = await Promise.all([api("/api/press"), refreshMe()]);
   if (p.ok) pressData = p.data;
@@ -1751,6 +1856,30 @@ $("chatform").addEventListener("submit", async e => {
   if (!text) return;
   const r = await api("/api/chat", channel ? { text, to: channel } : { text });
   if (r.ok) { $("chatinput").value = ""; say("chatmsg", "", true); pollChat(); } else say("chatmsg", r.data.message || r.data.error, false);
+});
+
+/* Bauen */
+async function loadPlans() {
+  const user = await refreshMe();
+  locked("bauen", !user);
+  const r = await api("/api/blueprints");
+  if (!r.ok) return;
+  const table = el("table", {}, el("thead", {}, el("tr", {}, ...["Plan", "Stil", "Größe (B x H x T)", "Blöcke", "Einheiten"].map(h => el("th", { textContent: h })))),
+    el("tbody", {}, ...r.data.map(p => el("tr", {}, el("td", { textContent: p.name }), el("td", { textContent: p.style }),
+      el("td", { textContent: p.sizeX + " x " + p.sizeY + " x " + p.sizeZ }), el("td", { textContent: p.blocks }), el("td", { textContent: p.units })))));
+  $("planlist").replaceChildren(r.data.length ? table : el("div", { className: "empty", textContent: "Noch keine Pläne." }));
+}
+$("planform").addEventListener("submit", async e => {
+  e.preventDefault();
+  const file = $("planfile").files[0];
+  if (!file) return say("planmsg", "Wähle zuerst eine Datei.", false);
+  if (file.size > 4 * 1024 * 1024) return say("planmsg", "Die Datei ist größer als 4 MB.", false);
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  const r = await api("/api/blueprints", { name: file.name, data: btoa(binary) });
+  say("planmsg", r.data.message || r.data.error, r.ok);
+  if (r.ok) { $("planfile").value = ""; loadPlans(); }
 });
 
 /* Freunde */

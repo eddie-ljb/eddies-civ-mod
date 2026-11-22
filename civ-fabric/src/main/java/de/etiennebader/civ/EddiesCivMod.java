@@ -1,5 +1,6 @@
 package de.etiennebader.civ;
 
+import de.etiennebader.civ.api.CivApi;
 import de.etiennebader.civ.fabric.CivCommandTree;
 import de.etiennebader.civ.fabric.Ambience;
 import de.etiennebader.civ.fabric.CivServerHost;
@@ -29,6 +30,8 @@ public class EddiesCivMod implements ModInitializer {
     @Override
     public void onInitialize() {
         CivServerHost host = new CivServerHost();
+        CivApi.bind(host);
+        CivApi.collectRegistrations();
         host.register();
         WorldHooks.install(host);
         CivContent content = CivContent.register(new TownHallPlacement(host));

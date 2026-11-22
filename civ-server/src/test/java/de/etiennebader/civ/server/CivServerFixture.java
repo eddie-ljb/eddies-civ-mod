@@ -51,12 +51,20 @@ public final class CivServerFixture {
         return server.territory();
     }
 
+    public de.etiennebader.civ.server.construction.ConstructionService construction() {
+        return server.construction();
+    }
+
     public de.etiennebader.civ.server.plot.PlotService plots() {
         return server.plots();
     }
 
     public de.etiennebader.civ.server.villager.VillagerService villagers() {
         return server.villagers();
+    }
+
+    public de.etiennebader.civ.server.war.WarService war() {
+        return server.war();
     }
 
     public de.etiennebader.civ.server.conjuncture.ConjunctureService conjuncture() {
@@ -99,6 +107,10 @@ public final class CivServerFixture {
         return server.civic();
     }
 
+    public de.etiennebader.civ.server.civic.HomePortService homePorts() {
+        return server.homePorts();
+    }
+
     public de.etiennebader.civ.server.justice.JusticeService justice() {
         return server.justice();
     }
@@ -113,6 +125,10 @@ public final class CivServerFixture {
 
     public de.etiennebader.civ.server.level.LevelService levels() {
         return server.levels();
+    }
+
+    public de.etiennebader.civ.server.ranking.RankingService rankings() {
+        return server.rankings();
     }
 
     public de.etiennebader.civ.server.civil.CivilService civil() {
@@ -153,6 +169,18 @@ public final class CivServerFixture {
 
     public ProtectionService protection() {
         return server.protection();
+    }
+
+    public de.etiennebader.civ.application.CivApplication app() {
+        return server.app();
+    }
+
+    public de.etiennebader.civ.server.villager.VillagerFoundations villagerFoundations() {
+        return server.villagerFoundations();
+    }
+
+    public de.etiennebader.civ.server.federation.VillagerFederations villagerFederations() {
+        return server.villagerFederations();
     }
 
     public WorldQueries queries() {

@@ -31,7 +31,13 @@ public enum Branch {
     /** Ziegelei: Ziegel und Glas. */
     BRICKWORKS("ziegelei", List.of(new Yield("minecraft:bricks", 12), new Yield("minecraft:glass", 16))),
     /** Imkerei und Obstbau: Äpfel, Honig. */
-    ORCHARD("obstbau", List.of(new Yield("minecraft:apple", 12), new Yield("minecraft:honey_bottle", 2)));
+    ORCHARD("obstbau", List.of(new Yield("minecraft:apple", 12), new Yield("minecraft:honey_bottle", 2))),
+    /**
+     * Baufirma: Baumaterial (Steinziegel, Bretter, Glas). Die Beschäftigten sind die Bauarbeiter; Bauherren
+     * beauftragen die Firma und beliefern sie oder bezahlen sie (Issue #19).
+     */
+    CONSTRUCTION("bau", List.of(new Yield("minecraft:stone_bricks", 24), new Yield("minecraft:oak_planks", 24),
+            new Yield("minecraft:glass", 8)));
 
     /** Menge einer Ware je Beschäftigtem und Tag. */
     public record Yield(String commodity, int perWorker) {

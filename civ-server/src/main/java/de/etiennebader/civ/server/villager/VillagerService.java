@@ -383,6 +383,12 @@ public final class VillagerService {
             governAutonomously(day);
             autoClaimChunk(day);
         }
+        if (settings.ambitions()) {
+            app.villagerAmbitions().execute(day);
+            app.villagerBusiness().execute(day);
+            app.villagerJobSearch().execute(day, villager -> false);
+            app.villagerLandlords().execute(day);
+        }
         return changes;
     }
 

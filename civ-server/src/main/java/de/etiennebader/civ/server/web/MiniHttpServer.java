@@ -29,6 +29,9 @@ import java.util.function.Function;
 public final class MiniHttpServer implements AutoCloseable {
 
     static final int MAX_BODY = 16 * 1024;
+    /** Bauplan-Upload (Base64 einer höchstens 4 MB großen Datei); nur für diesen einen Pfad. */
+    static final int MAX_UPLOAD_BODY = 6 * 1024 * 1024;
+    private static final String UPLOAD_PATH = "/api/blueprints";
     private static final int MAX_HEADER = 16 * 1024;
     private static final int TIMEOUT_MILLIS = 10_000;
 
@@ -127,7 +130,9 @@ public final class MiniHttpServer implements AutoCloseable {
                 throw new BadRequestException(400, "Ungültige Länge");
             }
         }
-        if (length < 0 || length > MAX_BODY) {
+        boolean upload = requestLine[0].equalsIgnoreCase("POST")
+                && (requestLine[1].equals(UPLOAD_PATH) || requestLine[1].startsWith(UPLOAD_PATH + "?"));
+        if (length < 0 || length > (upload ? MAX_UPLOAD_BODY : MAX_BODY)) {
             throw new BadRequestException(413, "Anfrage zu groß");
         }
         byte[] body = in.readNBytes(length);

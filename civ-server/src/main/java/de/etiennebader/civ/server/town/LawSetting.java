@@ -34,8 +34,7 @@ public record LawSetting(String id, Message name, Object value, Optional<String>
 
     /** Die möglichen Werte einer Auswahl; leer bei allen anderen. */
     public java.util.List<String> options() {
-        return new de.etiennebader.civ.domain.law.ParameterCatalog(
-                de.etiennebader.civ.domain.law.StandardParameters.all()).find(id)
+        return de.etiennebader.civ.domain.law.ParameterCatalog.standard().find(id)
                 .map(de.etiennebader.civ.domain.law.ParameterKey::options).orElse(java.util.List.of());
     }
 

@@ -1,5 +1,7 @@
 package de.etiennebader.civ.application.civil;
 
+import de.etiennebader.civ.application.federation.Federations;
+import de.etiennebader.civ.application.law.EffectiveLaws;
 import de.etiennebader.civ.application.support.Aggregates;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.contract.Contract;
@@ -14,6 +16,7 @@ import de.etiennebader.civ.domain.law.StandardParameters;
 import de.etiennebader.civ.domain.polity.OfficeTerm;
 import de.etiennebader.civ.domain.polity.Parliament;
 import de.etiennebader.civ.domain.polity.Polity;
+import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.Money;
 import de.etiennebader.civ.domain.shared.PolityId;
@@ -78,6 +81,7 @@ public final class RunContracts {
                 continue;
             }
             if (tryTransfer(ledger, contract.payer(), contract.payee(), contract.perDay(), reasonOf(contract), day)) {
+                collectIncomeTax(ledger, contract, day);
                 outcomes.add(new Paid(contract, contract.perDay()));
             } else {
                 outcomes.add(new Ended(registry.end(contract.id(), EndReason.BREACH, day), EndReason.BREACH));
@@ -87,6 +91,33 @@ public final class RunContracts {
         aggregates.commit(ledger);
         aggregates.commit(registry);
         return outcomes;
+    }
+
+    /**
+     * Einkommensteuer (Issue #19): Vom Empfänger einer Miete oder eines Lohns gehen
+     * {@link StandardParameters#INCOME_TAX_PERCENT} Prozent an die Gemeindekasse; bei Miete die Gemeinde des
+     * Grundstücks, bei Lohn die Gemeinde des Empfängers. Fehlt dem Empfänger das Geld, entfällt die Steuer.
+     */
+    private void collectIncomeTax(Ledger ledger, Contract contract, Day day) {
+        if (contract.kind() != ContractKind.LEASE && contract.kind() != ContractKind.EMPLOYMENT) {
+            return;
+        }
+        Optional<Polity> town = contract.kind() == ContractKind.LEASE
+                ? aggregates.repositories().polities().findById(contract.plot().orElseThrow().polity())
+                : aggregates.repositories().polities().findAll().stream()
+                .filter(polity -> polity.kind() == PolityKind.TERRITORIAL && polity.isMember(contract.payee()))
+                .findFirst();
+        if (town.isEmpty() || town.get().asActor().equals(contract.payee())
+                || !town.get().currency().equals(contract.perDay().currency())) {
+            return;
+        }
+        long percent = new EffectiveLaws(town.get(), Federations.ancestorsOf(
+                aggregates.repositories().polities().findAll(), town.get().id()))
+                .valueOf(StandardParameters.INCOME_TAX_PERCENT);
+        Money tax = Money.of(contract.perDay().amount() * percent / 100, contract.perDay().currency());
+        if (tax.isPositive()) {
+            tryTransfer(ledger, contract.payee(), town.get().asActor(), tax, TransferReason.INCOME_TAX, day);
+        }
     }
 
     private Optional<EndReason> endReason(Contract contract, Day day) {
