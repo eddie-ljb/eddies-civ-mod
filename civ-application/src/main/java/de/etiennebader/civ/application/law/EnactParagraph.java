@@ -6,6 +6,8 @@ import de.etiennebader.civ.application.polity.ProposeMotion;
 import de.etiennebader.civ.application.support.Aggregates;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.law.LawRecognizer;
+import de.etiennebader.civ.domain.law.ParameterKey;
+import de.etiennebader.civ.domain.law.ParameterValue;
 import de.etiennebader.civ.domain.law.Statute;
 import de.etiennebader.civ.domain.polity.Motion;
 import de.etiennebader.civ.domain.polity.Office;
@@ -15,6 +17,9 @@ import de.etiennebader.civ.domain.shared.IdGenerator;
 import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.shared.StatuteId;
 
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -25,9 +30,20 @@ import java.util.Optional;
  */
 public final class EnactParagraph {
 
-    public record Command(PolityId polity, ActorRef author, String title, String text, Day day) {
+    /**
+     * @param explicitValues Regelungen, die zusätzlich zu den im Text erkannten gesetzt werden (Rechte-Editor im
+     *                       Web); der Text darf dann leer sein
+     */
+    public record Command(PolityId polity, ActorRef author, String title, String text,
+                          List<ParameterValue<?>> explicitValues, Day day) {
+
+        public Command(PolityId polity, ActorRef author, String title, String text, Day day) {
+            this(polity, author, title, text, List.of(), day);
+        }
 
         public Command {
+            Objects.requireNonNull(explicitValues, "explicitValues");
+            explicitValues = List.copyOf(explicitValues);
             Objects.requireNonNull(polity, "polity");
             Objects.requireNonNull(author, "author");
             Objects.requireNonNull(title, "title");
@@ -60,7 +76,10 @@ public final class EnactParagraph {
      */
     public Result execute(Command command) {
         LawRecognizer.Recognition recognition = LawRecognizer.recognize(command.text());
-        Motion.Enact motion = new Motion.Enact(command.title(), command.text(), recognition.values());
+        Map<ParameterKey<?>, ParameterValue<?>> merged = new LinkedHashMap<>();
+        recognition.values().forEach(value -> merged.put(value.key(), value));
+        command.explicitValues().forEach(value -> merged.put(value.key(), value));
+        Motion.Enact motion = new Motion.Enact(command.title(), command.text(), List.copyOf(merged.values()));
         Polity polity = aggregates.polity(command.polity());
         if (Majorities.voteRequired(polity, motion)) {
             ProposeMotion.Result proposed = proposeMotion.execute(new ProposeMotion.Command(command.polity(),

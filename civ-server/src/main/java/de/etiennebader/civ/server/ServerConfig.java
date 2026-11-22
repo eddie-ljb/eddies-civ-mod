@@ -31,6 +31,7 @@ public final class ServerConfig {
     static final String EMIGRATION = "villager_emigration";
     static final String VILLAGER_POLITICS = "villager_politics_enabled";
     static final String AMBITIONS = "villager_ambitions";
+    static final String LAW_DRAFTS = "law_drafts_persist";
     static final String WAR_PORT_LOCK = "war_port_lock";
     static final String LEVELS = "federation_levels";
     static final String VILLAGER_PARTIES = "villager_parties";
@@ -57,7 +58,7 @@ public final class ServerConfig {
     static final String PRICE_LEVEL_DAMPING = "price_level_damping";
     private static final java.util.List<String> KEYS = java.util.List.of(LIVE_COUNT, LIVE_COUNT_SECONDS, PROJECTIONS,
             DEBATE_MINUTES, ANTHEM_ON_ENTER, WORLD_MAP, MAP_RADIUS, WEB_TRUST_PROXY, VILLAGER_POLITICS,
-            AMBITIONS, WAR_PORT_LOCK,
+            AMBITIONS, LAW_DRAFTS, WAR_PORT_LOCK,
             PRICE_LEVEL_MIN, PRICE_LEVEL_MAX, PRICE_LEVEL_DAMPING, COST_MUNICIPALITY, COST_COMPANY, COST_LEVELS,
             COST_LEVEL_DEFAULT, REQUIRE_PREVIOUS);
 
@@ -73,6 +74,8 @@ public final class ServerConfig {
               Buenden beitreten/gruenden und Firmen gruenden duerfen (true/false)
             villager_ambitions: ob ehrgeizige Dorfbewohner Firmen, Parteien und Buende gruenden, kandidieren, Gebiet
               beanspruchen, Firmen uebernehmen und fuehren (true/false)
+            law_drafts_persist: Gesetzesvorlagen des Web-Editors dauerhaft speichern (true/false, Standard false:
+              sie gehen sonst beim Neustart verloren)
             war_port_lock: wer sich im Krieg nicht mehr zu den Heimat-Haefen einer kriegfuehrenden Polity porten darf:
               all-outsiders (alle Nicht-Buerger, Standard), enemies (nur Buerger der Kriegsgegner) oder none (keine Sperre)
             federation_levels: eigene Ebenen fuer Buende als id:Name:Rang, z. B. kreis:Kreis:10,bund:Bund:40
@@ -156,7 +159,7 @@ public final class ServerConfig {
                 flag(properties, AMBITIONS, defaults.ambitions()),
                 ServerSettings.WarPortLock.parse(properties.getProperty(WAR_PORT_LOCK,
                         defaults.warPortLock().key()), defaults.warPortLock()),
-                founding(properties, defaults.founding()));
+                founding(properties, defaults.founding()), flag(properties, LAW_DRAFTS, defaults.persistLawDrafts()));
     }
 
     private static de.etiennebader.civ.server.founding.FoundingFees founding(Properties properties,
@@ -237,6 +240,7 @@ public final class ServerConfig {
         properties.setProperty(EMIGRATION, Boolean.toString(settings.emigration()));
         properties.setProperty(VILLAGER_POLITICS, Boolean.toString(settings.villagerPolitics()));
         properties.setProperty(AMBITIONS, Boolean.toString(settings.ambitions()));
+        properties.setProperty(LAW_DRAFTS, Boolean.toString(settings.persistLawDrafts()));
         properties.setProperty(WAR_PORT_LOCK, settings.warPortLock().key());
         properties.setProperty(LEVELS, settings.levels().spec());
         properties.setProperty(VILLAGER_PARTIES, Boolean.toString(settings.parties().villagers()));
