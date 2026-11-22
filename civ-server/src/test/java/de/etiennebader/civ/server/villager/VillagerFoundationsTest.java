@@ -85,7 +85,9 @@ class VillagerFoundationsTest {
         assertTrue(created.mayor(true).filter(PersonRef.class::isInstance).isPresent(), "ein Dorfbewohner führt sie");
         PersonRef founder = (PersonRef) created.mayor(true).orElseThrow();
         assertEquals(created.id(), server.queries().municipalityOf(founder).orElseThrow().id());
-        assertEquals(1, created.members().size());
+        assertEquals(1 + VillagerFoundations.MAX_FOLLOWERS, created.members().size(), "Gefolge zieht mit");
+        assertEquals(7 - created.members().size(),
+                server.queries().polityNamed("Nordhain").orElseThrow().members().size(), "Rest bleibt in Nordhain");
         assertTrue(created.seat().isPresent(), "das Gemeindehaus steht am letzten Aufenthaltsort");
     }
 

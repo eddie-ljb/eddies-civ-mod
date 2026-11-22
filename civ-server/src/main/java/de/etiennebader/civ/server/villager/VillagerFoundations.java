@@ -14,6 +14,7 @@ import de.etiennebader.civ.domain.polity.PolityName;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.DomainException;
+import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.server.Announcement;
 import de.etiennebader.civ.server.Announcements;
@@ -37,6 +38,8 @@ import java.util.function.Function;
  *       mit dem Ehrgeiz), und nur solange es weniger als eine Gemeinde je {@value #VILLAGERS_PER_TOWN} Dorfbewohner gibt.</li>
  *   <li><b>Wo:</b> am letzten Aufenthaltsort. Gelten dort die Claim-Regeln nicht (zu nah an fremdem Gebiet, bereits
  *       beansprucht, Limit), bleibt der Dorfbewohner in seiner Gemeinde.</li>
+ *   <li><b>Gefolge:</b> Bis zu {@value #MAX_FOLLOWERS} Mitbürger, die zuletzt am nächsten am neuen Ort gesehen wurden,
+ *       ziehen mit; mindestens {@value #MIN_LEFT_BEHIND} Dorfbewohner bleiben zurück.</li>
  * </ul>
  *
  * <p>Der Zufall ist fest je Dorfbewohner und Tag.
@@ -46,6 +49,10 @@ public final class VillagerFoundations {
     static final double FOUND_CHANCE = 0.04;
     static final int MIN_RESIDENTS = 4;
     static final int VILLAGERS_PER_TOWN = 6;
+    /** Höchstens so viele Mitbürger ziehen mit dem Gründer. */
+    static final int MAX_FOLLOWERS = 3;
+    /** So viele Dorfbewohner bleiben mindestens in der alten Gemeinde zurück. */
+    static final int MIN_LEFT_BEHIND = 2;
 
     private final CivApplication app;
     private final Function<PersonRef, Optional<BlockPosition>> lastSeen;
@@ -116,9 +123,51 @@ public final class VillagerFoundations {
             rejoin(home, villager, day); // Claim-Regeln oder Namenskollision: der Dorfbewohner bleibt, wo er war
             return false;
         }
+        PolityId created = app.queries().polityNamed(name.value()).orElseThrow().id();
+        int followers = follow(home, created, villager, seat.get(), day);
         announcements.add(Announcement.toAll(Message.of(MessageKey.VILLAGER_TOWN_FOUNDED, name.value(),
-                home.name().value())));
+                home.name().value(), followers + 1)));
         return true;
+    }
+
+    /** Mitbürger, die dem Gründer am nächsten sind, wechseln in die neue Gemeinde; @return wie viele. */
+    private int follow(PolityView home, PolityId created, PersonRef founder, BlockPosition seat, Day day) {
+        PolityView current = app.queries().polity(home.id()).orElse(home);
+        int allowed = Math.min(MAX_FOLLOWERS, (int) villagerCount(current) - MIN_LEFT_BEHIND);
+        if (allowed <= 0) {
+            return 0;
+        }
+        List<PersonRef> near = current.members().stream().map(Membership::member)
+                .filter(PersonRef.class::isInstance).map(PersonRef.class::cast)
+                .filter(v -> !v.equals(founder) && current.mayor().filter(v::equals).isEmpty())
+                .filter(v -> lastSeen.apply(v).filter(p -> p.dimension().equals(seat.dimension())).isPresent())
+                .sorted(Comparator.comparingDouble((PersonRef v) -> distance(lastSeen.apply(v).orElseThrow(), seat))
+                        .thenComparing(PersonRef::uuid))
+                .toList();
+        int moved = 0;
+        for (PersonRef follower : near) {
+            if (moved >= allowed) {
+                break;
+            }
+            try {
+                app.leavePolity().execute(new LeavePolity.Command(home.id(), follower, day));
+            } catch (DomainException ignored) {
+                continue;
+            }
+            try {
+                app.joinPolity().execute(new JoinPolity.Command(created, follower, MembershipType.CITIZEN, day));
+                moved++;
+            } catch (DomainException ignored) {
+                rejoin(home, follower, day);
+            }
+        }
+        return moved;
+    }
+
+    private static double distance(BlockPosition a, BlockPosition b) {
+        double dx = a.x() - b.x();
+        double dz = a.z() - b.z();
+        return dx * dx + dz * dz;
     }
 
     private void rejoin(PolityView home, PersonRef villager, Day day) {

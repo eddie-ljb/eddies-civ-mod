@@ -489,7 +489,7 @@
   "eddies-civ-mod.command.not_a_head": "You lead neither a town nor a federation.",
   "eddies-civ-mod.command.not_head_of_federation": "You do not lead a federation.",
   "eddies-civ-mod.command.level_too_low": "A federation of level %1$s must rank above %2$s (%3$s).",
-  "eddies-civ-mod.command.villager_town_founded": "Villagers found the town of %1$s and leave %2$s.",
+  "eddies-civ-mod.command.villager_town_founded": "Villagers found the town of %1$s and leave %2$s (%3$s members).",
   "eddies-civ-mod.command.federation_announced": "%1$s founds the %2$s %3$s, with %4$s as first member.",
   "eddies-civ-mod.command.federation_founded": "%1$s (%2$s) founded; %3$s is its first member. Invite more: /civ bund einladen <town>",
   "eddies-civ-mod.command.federation_guest_taken": "%1$s already belongs to %2$s.",
