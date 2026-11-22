@@ -34,6 +34,7 @@ import de.etiennebader.civ.domain.polity.SettlementTier;
 import de.etiennebader.civ.domain.population.Personality;
 import de.etiennebader.civ.domain.population.Trait;
 import de.etiennebader.civ.domain.shared.Day;
+import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.DomainException;
 import de.etiennebader.civ.domain.shared.Money;
 import de.etiennebader.civ.domain.shared.PolityId;
@@ -364,7 +365,11 @@ public final class VillagerService {
             }
             Money income = dailyIncome(town, day);
             if (income.isPositive() && income.currency().equals(settings.villagerIncome().currency())) {
-                creditIncome(town, income, day);
+                // Die Dorfbewohner handeln in der Standardwährung des Gebiets (Gesetz/Verfassung, Issue #4).
+                Money local = inDefaultCurrency(town, income);
+                if (local.isPositive()) {
+                    creditIncome(town, local, day);
+                }
             }
             SettlementTier before = town.tier();
             SettlementTier tier = settings.tiers().tierFor(town.memberCount());
@@ -552,6 +557,19 @@ public final class VillagerService {
                     app.creditTownIncome().creditEmployer(villager, Money.of(savings, income.currency()), day);
                 }
             }
+        }
+    }
+
+    /** Rechnet die Einnahmen in die Standardwährung der Gemeinde um; fehlschlagende Umrechnung lässt sie unverändert. */
+    private Money inDefaultCurrency(PolityView town, Money income) {
+        CurrencyId target = app.currencies().defaultCurrencyOf(town);
+        if (target.equals(income.currency())) {
+            return income;
+        }
+        try {
+            return app.currencies().convert(income, target);
+        } catch (DomainException | ArithmeticException e) {
+            return income;
         }
     }
 
