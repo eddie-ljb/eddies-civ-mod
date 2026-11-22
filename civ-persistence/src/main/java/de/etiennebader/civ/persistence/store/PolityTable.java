@@ -652,8 +652,8 @@ final class PolityTable {
         try (PreparedStatement insertElection = connection.prepareStatement(
                 "INSERT INTO election (id, polity_id, position, office, called_on, closes_on) VALUES (?, ?, ?, ?, ?, ?)");
              PreparedStatement insertCandidate = connection.prepareStatement("""
-                     INSERT INTO election_candidate (election_id, position, candidate_kind, candidate_id, platform)
-                     VALUES (?, ?, ?, ?, ?)""");
+                     INSERT INTO election_candidate (election_id, position, candidate_kind, candidate_id, platform, district)
+                     VALUES (?, ?, ?, ?, ?, ?)""");
              PreparedStatement insertBallot = connection.prepareStatement("""
                      INSERT INTO election_ballot (election_id, position, voter_kind, voter_id, candidate_kind, candidate_id)
                      VALUES (?, ?, ?, ?, ?, ?)""")) {
@@ -674,6 +674,7 @@ final class PolityTable {
                     insertCandidate.setString(3, ActorCodec.kindOf(candidate));
                     insertCandidate.setString(4, candidate.uuid().toString());
                     insertCandidate.setString(5, election.platformOf(candidate).name());
+                    insertCandidate.setString(6, election.districtOf(candidate).map(found -> found.value().toString()).orElse(null));
                     insertCandidate.addBatch();
                 }
                 int ballotPosition = 0;
@@ -713,8 +714,9 @@ final class PolityTable {
     private static Map<String, List<Election>> loadElections(Connection connection) throws SQLException {
         Map<String, List<ActorRef>> candidates = new HashMap<>();
         Map<String, Map<ActorRef, Platform>> platforms = new HashMap<>();
+        Map<String, Map<ActorRef, PolityId>> districts = new HashMap<>();
         try (PreparedStatement select = connection.prepareStatement("""
-                SELECT election_id, candidate_kind, candidate_id, platform
+                SELECT election_id, candidate_kind, candidate_id, platform, district
                 FROM election_candidate ORDER BY election_id, position""");
              ResultSet rows = select.executeQuery()) {
             while (rows.next()) {
@@ -723,6 +725,11 @@ final class PolityTable {
                 candidates.computeIfAbsent(electionId, ignored -> new ArrayList<>()).add(candidate);
                 platforms.computeIfAbsent(electionId, ignored -> new HashMap<>())
                         .put(candidate, Platform.valueOf(rows.getString("platform")));
+                String district = rows.getString("district");
+                if (district != null) {
+                    districts.computeIfAbsent(electionId, ignored -> new HashMap<>())
+                            .put(candidate, new PolityId(UUID.fromString(district)));
+                }
             }
         }
         Map<String, List<Ballot>> ballots = new HashMap<>();
@@ -746,7 +753,7 @@ final class PolityTable {
                         new ElectionId(UUID.fromString(id)), Office.valueOf(rows.getString("office")),
                         Day.of(rows.getLong("called_on")), Day.of(rows.getLong("closes_on")),
                         candidates.getOrDefault(id, List.of()), ballots.getOrDefault(id, List.of()),
-                        platforms.getOrDefault(id, Map.of())));
+                        platforms.getOrDefault(id, Map.of()), districts.getOrDefault(id, Map.of())));
             }
         }
         return elections;
