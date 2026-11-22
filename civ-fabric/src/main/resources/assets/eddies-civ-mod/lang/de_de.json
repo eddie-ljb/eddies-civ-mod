@@ -489,6 +489,7 @@
   "eddies-civ-mod.command.not_a_head": "Du führst weder eine Gemeinde noch einen Bund.",
   "eddies-civ-mod.command.not_head_of_federation": "Du führst keinen Bund.",
   "eddies-civ-mod.command.level_too_low": "Ein Bund der Ebene %1$s muss höher stehen als %2$s (%3$s).",
+  "eddies-civ-mod.command.villager_town_founded": "Dorfbewohner gründen die Gemeinde %1$s und verlassen %2$s.",
   "eddies-civ-mod.command.federation_announced": "%1$s gründet die Ebene %2$s: %3$s, erstes Glied ist %4$s.",
   "eddies-civ-mod.command.federation_founded": "%1$s (%2$s) gegründet; %3$s ist erstes Glied. Weitere einladen: /civ bund einladen <Gemeinde>",
   "eddies-civ-mod.command.federation_guest_taken": "%1$s gehört bereits zu %2$s.",
