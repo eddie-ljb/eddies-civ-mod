@@ -7,6 +7,7 @@ import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.law.StandardParameters;
 import de.etiennebader.civ.domain.polity.Election;
 import de.etiennebader.civ.domain.polity.ElectionResult;
+import de.etiennebader.civ.domain.polity.InvalidCandidacyDistrictException;
 import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.Platform;
 import de.etiennebader.civ.domain.polity.Polity;
@@ -25,7 +26,16 @@ import java.util.Optional;
  */
 public final class StandForElection {
 
-    public record Command(PolityId polity, ElectionId election, ActorRef citizen, Platform platform, Day day) {
+    /**
+     * @param district Wahlkreis der Kandidatur; bei Wahlkreiswahlen Pflicht, sonst ohne Wirkung (#47)
+     */
+    public record Command(PolityId polity, ElectionId election, ActorRef citizen, Platform platform, Day day,
+                          Optional<PolityId> district) {
+
+        /** Ohne Wahlkreis. */
+        public Command(PolityId polity, ElectionId election, ActorRef citizen, Platform platform, Day day) {
+            this(polity, election, citizen, platform, day, Optional.empty());
+        }
 
         public Command {
             Objects.requireNonNull(polity, "polity");
@@ -33,6 +43,7 @@ public final class StandForElection {
             Objects.requireNonNull(citizen, "citizen");
             Objects.requireNonNull(platform, "platform");
             Objects.requireNonNull(day, "day");
+            Objects.requireNonNull(district, "district");
         }
 
         /** Ohne Wahlprogramm. */
@@ -59,8 +70,31 @@ public final class StandForElection {
                             party.partyProfile().orElseThrow().area().orElseThrow());
                 });
         requireTermLimit(polity, command);
-        polity.standForElection(command.election(), command.citizen(), command.platform(), command.day());
+        polity.standForElection(command.election(), command.citizen(), command.platform(),
+                districtFor(polity, command), command.day());
         aggregates.commit(polity);
+    }
+
+    /**
+     * Wahlkreis der Kandidatur (#47): Bei einer Wahlkreiswahl ({@code districts}/{@code mixed}) einer Polity mit
+     * eigenen Wahlkreisen muss genau einer gewählt sein, und er muss zur Polity gehören. Sonst gibt es keine
+     * Bezirksbindung.
+     */
+    private Optional<PolityId> districtFor(Polity polity, Command command) {
+        Optional<Election> election = polity.elections().stream()
+                .filter(found -> found.id().equals(command.election())).findFirst();
+        boolean byDistrict = election.isPresent()
+                && DistrictVoting.applies(polity, election.get(), aggregates.civic());
+        if (!byDistrict) {
+            return Optional.empty();
+        }
+        PolityId district = command.district().orElseThrow(() -> new InvalidCandidacyDistrictException(""));
+        boolean known = aggregates.civic().byDistrict(district)
+                .filter(constituency -> constituency.polity().equals(polity.id())).isPresent();
+        if (!known) {
+            throw new InvalidCandidacyDistrictException(district.value().toString());
+        }
+        return Optional.of(district);
     }
 
     /**
