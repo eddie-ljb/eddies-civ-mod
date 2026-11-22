@@ -52,6 +52,7 @@ public final class SqliteStateStore implements StateStore, AutoCloseable {
     private final MarketPressTables marketPressTables = new MarketPressTables();
     private final CivicJusticeTables civicJusticeTables = new CivicJusticeTables();
     private final ProductionTables productionTables = new ProductionTables();
+    private final CurrencyCreditTables currencyCreditTables = new CurrencyCreditTables();
 
     public SqliteStateStore(SqliteDatabase database, ParameterCatalog catalog) {
         this.database = Objects.requireNonNull(database, "database");
@@ -100,7 +101,8 @@ public final class SqliteStateStore implements StateStore, AutoCloseable {
                     calendarTable.load(connection), civilTables.loadContracts(connection),
                     civilTables.loadCommunity(connection), marketPressTables.loadExchange(connection),
                     marketPressTables.loadPress(connection), civicJusticeTables.loadCivic(connection),
-                    civicJusticeTables.loadJustice(connection), productionTables.load(connection));
+                    civicJusticeTables.loadJustice(connection), productionTables.load(connection),
+                    currencyCreditTables.loadCurrencies(connection), currencyCreditTables.loadCredit(connection));
         } catch (IllegalArgumentException e) {
             throw new PersistenceException("Gespeicherter Zustand ist ungültig: " + e.getMessage(), e);
         }
@@ -144,6 +146,12 @@ public final class SqliteStateStore implements StateStore, AutoCloseable {
             }
             if (delta.production().isPresent()) {
                 productionTables.write(connection, delta.production().get());
+            }
+            if (delta.currencyRegistry().isPresent()) {
+                currencyCreditTables.writeCurrencies(connection, delta.currencyRegistry().get());
+            }
+            if (delta.credit().isPresent()) {
+                currencyCreditTables.writeCredit(connection, delta.credit().get());
             }
             if (delta.justice().isPresent()) {
                 civicJusticeTables.writeJustice(connection, delta.justice().get());

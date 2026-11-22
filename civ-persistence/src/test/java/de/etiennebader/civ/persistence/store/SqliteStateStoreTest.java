@@ -120,6 +120,9 @@ class SqliteStateStoreTest {
         assertTrue(saved.contains("  promise|"), saved);
         assertTrue(saved.contains("  poster|"), saved);
         assertTrue(saved.contains("street|Hauptstraße"), saved);
+        assertTrue(saved.contains("currency|GOLD|Gold|G|1/10|"), saved);
+        assertTrue(saved.contains("|DEFAULTED"), saved);
+        assertTrue(saved.contains("score|"), saved);
         assertTrue(saved.contains("contract|1|"), saved);
         assertTrue(saved.contains("contract|2|"), saved);
         assertTrue(saved.contains("letter|"), saved);
@@ -471,6 +474,15 @@ class SqliteStateStoreTest {
             app.production().autoSell(alice, company, false, DAY);
             app.production().endOfDay(commodity -> java.util.OptionalLong.of(8),
                     de.etiennebader.civ.domain.market.PriceLevel.NEUTRAL, DAY);
+            var gold = new CurrencyId("GOLD");
+            app.currencies().create(gold, "Gold", "G", new de.etiennebader.civ.domain.economy.ExchangeRate(1, 10), alice,
+                    "minecraft:gold_ingot", DAY);
+            app.currencies().setBaseRate(gold, 4, alice, DAY);
+            app.depositEmeralds().execute(new de.etiennebader.civ.application.economy.DepositEmeralds.Command(alice,
+                    Money.of(5_000, CurrencyId.EMERALD), DAY));
+            app.credit().licenseBank(alice, DAY);
+            app.credit().takeLoan(alice, bertram, Money.of(1_000, CurrencyId.EMERALD), 30, DAY);
+            app.credit().endOfDay(DAY.plus(40)); // Kredit fällt aus, Kreditscore sinkt
             app.endOfDay().execute(DAY);
             app.runElections().execute(DAY.plus(1));
         }
