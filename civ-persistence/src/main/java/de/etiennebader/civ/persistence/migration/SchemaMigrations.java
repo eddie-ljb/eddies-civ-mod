@@ -29,7 +29,8 @@ public final class SchemaMigrations {
             "V021__polity_image.sql",
             "V022__party_area.sql",
             "V023__home_ports.sql",
-            "V024__candidate_district.sql");
+            "V024__candidate_district.sql",
+            "V025__player_gender.sql");
 
     private SchemaMigrations() {
     }

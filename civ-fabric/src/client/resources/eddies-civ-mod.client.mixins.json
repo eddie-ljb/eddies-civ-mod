@@ -3,7 +3,8 @@
 	"package": "de.etiennebader.civ.client.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"client": [
-
+		"VillagerRenderStateMixin",
+		"VillagerRendererMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

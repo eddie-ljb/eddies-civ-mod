@@ -28,6 +28,8 @@ import de.etiennebader.civ.fabric.content.LawBooks;
 import de.etiennebader.civ.fabric.screen.CaseScreen;
 import de.etiennebader.civ.fabric.screen.CourtScreen;
 import de.etiennebader.civ.domain.justice.Role;
+import de.etiennebader.civ.domain.population.Gender;
+import de.etiennebader.civ.fabric.content.IdCardItems;
 import de.etiennebader.civ.fabric.content.Newspapers;
 import de.etiennebader.civ.fabric.gui.Screens;
 import de.etiennebader.civ.fabric.screen.ContractsScreen;
@@ -66,6 +68,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Prediction;
 import net.minecraft.world.entity.npc.villager.Villager;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.AABB;
 
@@ -370,6 +373,8 @@ public final class CivCommandTree {
                 .then(pressCommands())
                 .then(streetCommands())
                 .then(addressCommands())
+                .then(idCardCommands())
+                .then(genderCommands())
                 .then(Commands.literal("adressen")
                         .executes(context -> withCiv(context, (civ, player) -> civ.civil().listStreets(
                                 Players.caller(player)))))
@@ -1775,6 +1780,48 @@ public final class CivCommandTree {
                                 context.getSource().getOnlinePlayerNames(), builder))
                         .executes(context -> withCiv(context, (civ, player) -> civ.civil().address(
                                 Players.caller(player), Optional.of(StringArgumentType.getString(context, PLAYER))))));
+    }
+
+    /** {@code /civ ausweis [dorfbewohner|pruefen]}: Personalausweis im Rathaus ausstellen lassen und prüfen (#20). */
+    private LiteralArgumentBuilder<CommandSourceStack> idCardCommands() {
+        return Commands.literal("ausweis")
+                .executes(context -> withCiv(context, (civ, player) -> giveIdCard(civ, player, Optional.empty())))
+                .then(Commands.literal("dorfbewohner")
+                        .executes(context -> withCiv(context, (civ, player) -> nearestVillager(player)
+                                .map(villager -> giveIdCard(civ, player, Optional.of(villager)))
+                                .orElseGet(() -> Reply.failure(Message.of(MessageKey.ID_CARD_NO_VILLAGER))))))
+                .then(Commands.literal("pruefen")
+                        .executes(context -> withCiv(context, (civ, player) ->
+                                IdCardItems.read(player.getMainHandItem())
+                                        .map(card -> civ.civil().checkIdCard(card.holder(), card.data()))
+                                        .orElseGet(() -> Reply.failure(Message.of(MessageKey.ID_CARD_NOT_HELD))))));
+    }
+
+    /** {@code /civ geschlecht [weiblich|maennlich|divers]}: Geschlecht anzeigen oder festlegen (#20). */
+    private LiteralArgumentBuilder<CommandSourceStack> genderCommands() {
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("geschlecht")
+                .executes(context -> withCiv(context, (civ, player) ->
+                        civ.civil().gender(Players.caller(player), Optional.empty())));
+        for (var entry : java.util.Map.of("weiblich", Gender.FEMALE, "maennlich", Gender.MALE,
+                "divers", Gender.DIVERSE).entrySet()) {
+            root.then(Commands.literal(entry.getKey()).executes(context -> withCiv(context, (civ, player) ->
+                    civ.civil().gender(Players.caller(player), Optional.of(entry.getValue())))));
+        }
+        return root;
+    }
+
+    private static Reply giveIdCard(CivServer civ, ServerPlayer player, Optional<ActorRef> villager) {
+        return civ.civil().issueIdCard(Players.caller(player), villager, issue -> {
+            // Ein neuer Ausweis ersetzt den alten desselben Inhabers im Inventar des Ausstellers.
+            Inventory inventory = player.getInventory();
+            for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
+                ItemStack stack = inventory.getItem(slot);
+                if (IdCardItems.read(stack).map(card -> card.holder().equals(issue.holder())).orElse(false)) {
+                    inventory.setItem(slot, ItemStack.EMPTY);
+                }
+            }
+            inventory.placeItemBackInInventory(IdCardItems.create(issue.holder(), issue.data()), Prediction.SERVER_ONLY);
+        });
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> contractCommands() {

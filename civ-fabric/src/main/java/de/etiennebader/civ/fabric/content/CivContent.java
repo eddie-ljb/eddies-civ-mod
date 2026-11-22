@@ -39,6 +39,7 @@ public final class CivContent {
     public static final Identifier NEWSSTAND_ID = EddiesCivMod.id("newsstand");
     public static final Identifier STOCK_EXCHANGE_ID = EddiesCivMod.id("stock_exchange");
     public static final Identifier COURT_BENCH_ID = EddiesCivMod.id("court_bench");
+    public static final Identifier ID_CARD_ID = EddiesCivMod.id("id_card");
     public static final Identifier LAW_BOOK_ID = EddiesCivMod.id("law_book");
     public static final Identifier STREET_SIGN_ID = EddiesCivMod.id("street_sign");
     public static final Identifier HOUSE_NUMBER_ID = EddiesCivMod.id("house_number");
@@ -133,6 +134,10 @@ public final class CivContent {
         Item lawBook = Registry.register(BuiltInRegistries.ITEM, lawBookKey,
                 new Item(new Item.Properties().setId(lawBookKey).stacksTo(1).rarity(Rarity.UNCOMMON)));
         LawBooks.init(lawBook);
+        ResourceKey<Item> idCardKey = ResourceKey.create(Registries.ITEM, ID_CARD_ID);
+        Item idCard = Registry.register(BuiltInRegistries.ITEM, idCardKey,
+                new Item(new Item.Properties().setId(idCardKey).stacksTo(1).rarity(Rarity.UNCOMMON)));
+        IdCardItems.init(idCard);
 
         Block ballotBox = simpleBlock(BALLOT_BOX_ID, MapColor.WOOD, SoundType.WOOD, 2.0F);
         Item ballotBoxItem = blockItem(BALLOT_BOX_ID, ballotBox);
@@ -197,6 +202,7 @@ public final class CivContent {
                     output.accept(market);
                     output.accept(constitution);
                     output.accept(lawBook);
+                    output.accept(IdCardItems.item());
                     output.accept(ballotBox);
                     output.accept(electionPoster);
                     output.accept(mailbox);
