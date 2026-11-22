@@ -40,6 +40,7 @@ public final class CivServerHost {
     private final TerritoryNotifier territoryNotifier = new TerritoryNotifier();
     private final BorderDisplay borders = new BorderDisplay();
     private final VillagerCensus villagers = new VillagerCensus(this);
+    private final ConstructionSites constructionSites = new ConstructionSites();
 
     public void register() {
         ServerLifecycleEvents.SERVER_STARTING.register(this::start);
@@ -76,6 +77,8 @@ public final class CivServerHost {
     }
 
     private void start(MinecraftServer server) {
+        // Ab hier bauen die Dienste ihre Gesetzeskataloge; fremde Mods melden ihre Gesetze vorher an (#51).
+        de.etiennebader.civ.domain.law.ExtensionParameters.freeze();
         Path file = databaseFile(server);
         // Schlägt das Laden fehl, soll der Server nicht ohne Speicherung weiterlaufen: Fehler bricht den Start ab.
         ServerSettings settings = loadSettings(server);
@@ -112,6 +115,7 @@ public final class CivServerHost {
             territoryNotifier.tick(server, civ);
             villagers.tick(server, civ);
             borders.tick(server, civ);
+            constructionSites.tick(server, civ);
         } catch (RuntimeException e) {
             LOGGER.error("Fehler beim Tagesabschluss", e);
         }

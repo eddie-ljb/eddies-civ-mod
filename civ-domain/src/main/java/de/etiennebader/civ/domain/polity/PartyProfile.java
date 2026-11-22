@@ -1,17 +1,22 @@
 package de.etiennebader.civ.domain.polity;
 
+import de.etiennebader.civ.domain.shared.PolityId;
+
 import java.util.Objects;
+import java.util.Optional;
 import java.util.regex.Pattern;
 
 /**
- * Das Programm einer Partei: ihre politische Richtung, ihr Wappen und wie beides geändert wird.
+ * Das Programm einer Partei: ihre politische Richtung, ihr Wappen, wie beides geändert wird und ihr Geltungsgebiet.
  *
  * @param order   -100 (Freiheit) bis +100 (Ordnung)
  * @param economy -100 (niedrige Steuern) bis +100 (Ausbau und Investitionen)
  * @param emblem  Item-ID als Logo, z. B. {@code minecraft:red_banner}
  * @param mode    ob der Vorsitz allein entscheidet oder die Partei darüber abstimmt
+ * @param area    Polity, auf deren Ebene und Gebiet (sie selbst und alle untergeordneten Glieder) die Partei
+ *                wählbar ist; leer heißt überall wählbar (Standard, unverändertes Verhalten).
  */
-public record PartyProfile(int order, int economy, String emblem, ProgramMode mode) {
+public record PartyProfile(int order, int economy, String emblem, ProgramMode mode, Optional<PolityId> area) {
 
     public static final int MAX = 100;
     public static final String DEFAULT_EMBLEM = "minecraft:white_banner";
@@ -28,24 +33,30 @@ public record PartyProfile(int order, int economy, String emblem, ProgramMode mo
             throw new IllegalArgumentException("Ungültiges Wappen: " + emblem);
         }
         Objects.requireNonNull(mode, "mode");
+        Objects.requireNonNull(area, "area");
     }
 
-    /** Ohne Angabe entscheidet der Vorsitz allein über künftige Änderungen. */
+    /** Ohne Angabe entscheidet der Vorsitz allein über künftige Änderungen; überall wählbar. */
     public PartyProfile(int order, int economy, String emblem) {
-        this(order, economy, emblem, ProgramMode.CHAIR);
+        this(order, economy, emblem, ProgramMode.CHAIR, Optional.empty());
     }
 
     public PartyProfile withDirection(int newOrder, int newEconomy) {
-        return new PartyProfile(newOrder, newEconomy, emblem, mode);
+        return new PartyProfile(newOrder, newEconomy, emblem, mode, area);
     }
 
     public PartyProfile withEmblem(String newEmblem) {
-        return new PartyProfile(order, economy, newEmblem, mode);
+        return new PartyProfile(order, economy, newEmblem, mode, area);
     }
 
-    /** Ändert nur, wie künftige Programmänderungen entschieden werden; Richtung und Wappen bleiben. */
+    /** Ändert nur, wie künftige Programmänderungen entschieden werden; Richtung, Wappen und Gebiet bleiben. */
     public PartyProfile withMode(ProgramMode newMode) {
-        return new PartyProfile(order, economy, emblem, newMode);
+        return new PartyProfile(order, economy, emblem, newMode, area);
+    }
+
+    /** Geltungsgebiet setzen oder mit {@link Optional#empty()} auf "überall" zurücksetzen. */
+    public PartyProfile withArea(Optional<PolityId> newArea) {
+        return new PartyProfile(order, economy, emblem, mode, newArea);
     }
 
     /** Das Wahlprogramm, das der stärksten Richtung entspricht; in der Mitte {@link Platform#NONE}. */

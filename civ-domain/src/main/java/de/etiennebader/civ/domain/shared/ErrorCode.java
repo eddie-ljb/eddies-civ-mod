@@ -55,6 +55,7 @@ public enum ErrorCode {
     NOT_A_CANDIDATE,
     /** Amtszeitbegrenzung erreicht. */
     TERM_LIMIT_REACHED,
+    CANDIDACY_OUTSIDE_PARTY_AREA,
     /** Verbannt: Beitritt bis zum Ende der Verbannung verboten. */
     EXILED,
     /** Argumente: Akteur. */
@@ -165,7 +166,33 @@ public enum ErrorCode {
     INVALID_COMMODITY,
     INVALID_QUANTITY,
     OUT_OF_STOCK,
-    WORTHLESS_GOODS;
+    WORTHLESS_GOODS,
+
+    // Krieg
+    /** Argumente: Angreifer, Verteidiger. */
+    WAR_ALREADY_ONGOING,
+    /** Argumente: Krieg-ID. */
+    UNKNOWN_WAR,
+    /** Der Krieg ist bereits beendet. Argumente: Krieg-ID. */
+    WAR_ALREADY_ENDED,
+    /** Die Verteidigerin hat sich Neutralität erkauft. Argumente: Polity. */
+    DEFENDER_IS_NEUTRAL,
+    /** Argumente: Polity, Akteur. */
+    ALREADY_ENLISTED,
+    /** Argumente: Polity, Akteur. */
+    NOT_ENLISTED,
+    /** Neutralität lässt sich nicht während eines laufenden Kriegs erkaufen. Argumente: Polity. */
+    AT_WAR,
+    /** Der Feldzug ist nicht möglich (Zeitpunkt, Art oder Beteiligte). Argumente: keine. */
+    INVALID_CAMPAIGN,
+    /** Das Bündnis ist nicht möglich oder gibt es nicht. Argumente: keine. */
+    INVALID_ALLIANCE,
+    /** Verbündete können einander nicht den Krieg erklären. Argumente: Polity, Polity. */
+    ALLIED_POLITIES,
+    /** Der Anspruch ist nicht möglich. Argumente: keine. */
+    INVALID_CLAIM,
+    /** Die Truppe ist schon voll ausgebildet bzw. ausgerüstet. Argumente: keine. */
+    NOTHING_TO_IMPROVE;
 
     private static final String TRANSLATION_PREFIX = "eddies-civ-mod.error.";
 

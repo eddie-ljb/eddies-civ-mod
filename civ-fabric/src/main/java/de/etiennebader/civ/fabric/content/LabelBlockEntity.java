@@ -2,7 +2,11 @@ package de.etiennebader.civ.fabric.content;
 
 import com.mojang.serialization.Codec;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
@@ -22,7 +26,7 @@ public final class LabelBlockEntity extends BlockEntity {
 
     private static final String LINES_KEY = "Lines";
     private static final String COLOR_KEY = "Color";
-    private static final int MAX_LINE_LENGTH = 32;
+    private static final int MAX_LINE_LENGTH = 96;
 
     private List<String> lines = List.of();
     private DyeColor color;
@@ -41,11 +45,12 @@ public final class LabelBlockEntity extends BlockEntity {
             if (trimmed.size() >= maxLines) {
                 break;
             }
-            String cut = line.length() > MAX_LINE_LENGTH ? line.substring(0, MAX_LINE_LENGTH) : line;
+            int length = Math.min(line.codePointCount(0, line.length()), MAX_LINE_LENGTH);
+            String cut = line.substring(0, line.offsetByCodePoints(0, length)).strip();
             trimmed.add(cut);
         }
         this.lines = List.copyOf(trimmed);
-        setChanged();
+        sync();
     }
 
     public DyeColor color() {
@@ -54,7 +59,25 @@ public final class LabelBlockEntity extends BlockEntity {
 
     public void setColor(DyeColor color) {
         this.color = color;
+        sync();
+    }
+
+    private void sync() {
         setChanged();
+        if (level != null && !level.isClientSide()) {
+            BlockState state = getBlockState();
+            level.sendBlockUpdated(getBlockPos(), state, state, Block.UPDATE_CLIENTS);
+        }
+    }
+
+    @Override
+    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
+        return saveCustomOnly(registries);
+    }
+
+    @Override
+    public ClientboundBlockEntityDataPacket getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
     }
 
     @Override
@@ -72,7 +95,7 @@ public final class LabelBlockEntity extends BlockEntity {
     @Override
     protected void loadAdditional(ValueInput input) {
         super.loadAdditional(input);
-        this.lines = List.copyOf(input.listOrEmpty(LINES_KEY, Codec.STRING).stream().toList());
+        this.lines = input.listOrEmpty(LINES_KEY, Codec.STRING).stream().limit(3).toList();
         this.color = input.getString(COLOR_KEY).map(name -> DyeColor.byName(name, null)).orElse(null);
     }
 

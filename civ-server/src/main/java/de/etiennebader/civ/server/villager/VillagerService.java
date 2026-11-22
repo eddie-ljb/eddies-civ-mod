@@ -20,6 +20,7 @@ import de.etiennebader.civ.application.support.ClaimWeighting;
 import de.etiennebader.civ.application.territory.ClaimChunk;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
+import de.etiennebader.civ.domain.population.VillagerIdentity;
 import de.etiennebader.civ.domain.actor.PlayerRef;
 import de.etiennebader.civ.domain.contract.Contract;
 import de.etiennebader.civ.domain.contract.ContractKind;
@@ -212,9 +213,10 @@ public final class VillagerService {
         Personality personality = Personality.of(villager);
         Message trait = Message.of(TranslationKeys.trait(personality.dominant()));
         Optional<PolityView> town = queries.municipalityOf(villager);
+        Message identity = identityLine(VillagerIdentity.of(villager));
         if (town.isEmpty()) {
             return Reply.success(Message.of(MessageKey.VILLAGER_HOMELESS, trait, personality.order(),
-                    personality.thrift(), personality.belonging()));
+                    personality.thrift(), personality.belonging()), identity);
         }
         Satisfaction satisfaction = Satisfaction.of(personality, town.get(), queries.effectiveLaws(town.get()))
                 .withMedia(app.pressInfluence().satisfactionPoints(villager, town.get()))
@@ -242,7 +244,40 @@ public final class VillagerService {
                         texts.actor(contract.offeror()), contract.number())));
         mailbox.latest(villager).ifPresent(mail -> lines.add(Message.of(MessageKey.VILLAGER_MAIL_LATEST,
                 texts.actor(mail.from()), mail.sent().value())));
+        lines.add(identity);
         return Reply.success(lines);
+    }
+
+    /** Einwohnerregister der eigenen Gemeinde, ohne Privatanschriften; erfasst auch ungeladene Dorfbewohner. */
+    public Reply residentRegister(Caller caller, int page) {
+        Optional<PolityView> ownTown = queries.municipalityOf(caller.player());
+        if (ownTown.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.NOT_IN_MUNICIPALITY));
+        }
+        PolityView town = ownTown.orElseThrow();
+        List<Message> entries = town.members().stream().map(Membership::member)
+                .sorted(java.util.Comparator.comparing(texts::actor, String.CASE_INSENSITIVE_ORDER)
+                        .thenComparing(ActorRef::uuid))
+                .map(actor -> actor instanceof PersonRef villager ? identityLine(VillagerIdentity.of(villager))
+                        : Message.of(MessageKey.VILLAGER_REGISTER_PLAYER, texts.actor(actor)))
+                .toList();
+        if (entries.isEmpty()) {
+            return Reply.success(Message.of(MessageKey.VILLAGER_REGISTER_EMPTY, town.name().value()));
+        }
+        int pageSize = 12;
+        int pages = 1 + (entries.size() - 1) / pageSize;
+        if (page < 1 || page > pages) {
+            return Reply.failure(Message.of(MessageKey.VILLAGER_REGISTER_PAGE, pages));
+        }
+        int start = (page - 1) * pageSize;
+        List<Message> lines = new ArrayList<>();
+        lines.add(Message.of(MessageKey.VILLAGER_REGISTER_HEADER, town.name().value(), page, pages));
+        lines.addAll(entries.subList(start, Math.min(start + pageSize, entries.size())));
+        return Reply.success(lines);
+    }
+
+    private static Message identityLine(VillagerIdentity identity) {
+        return Message.of(MessageKey.VILLAGER_IDENTITY, identity.fullName(), identity.registerNumber());
     }
 
     /** Ein Spieler redet mit einem Dorfbewohner über ein Thema (Issue #18); die Antwort richtet sich nach seiner Stimmung. */
@@ -347,6 +382,12 @@ public final class VillagerService {
         if (settings.villagerPolitics()) {
             governAutonomously(day);
             autoClaimChunk(day);
+        }
+        if (settings.ambitions()) {
+            app.villagerAmbitions().execute(day);
+            app.villagerBusiness().execute(day);
+            app.villagerJobSearch().execute(day, villager -> false);
+            app.villagerLandlords().execute(day);
         }
         return changes;
     }

@@ -1,6 +1,9 @@
 package de.etiennebader.civ.fabric.content;
 
+import de.etiennebader.civ.fabric.WorldHooks;
+import de.etiennebader.civ.server.civil.CivilService.SignType;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -11,15 +14,25 @@ import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.EntityBlock;
+import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.RenderShape;
+import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityTicker;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.Shapes;
+import net.minecraft.world.phys.shapes.VoxelShape;
 
 import java.util.Arrays;
 import java.util.List;
@@ -29,15 +42,19 @@ import java.util.function.Supplier;
 
 /**
  * Straßenschild, Hausnummer, Orts-, Länder- oder Nationenschild: trägt einen vom Spieler im
- * Amboss vergebenen Text (einzeilig, oder bei {@link #multiline} mit {@code |} getrennt
+ * Amboss vergebenen Text (einzeilig, oder bei {@link #multiline()} mit {@code |} getrennt
  * mehrzeilig) sowie wahlweise eine per Farbstoff gesetzte Farbe.
  *
- * <p>Der Text wird serverseitig in der {@link LabelBlockEntity} gespeichert. Eine echte
- * 3D-Textdarstellung im Spiel (wie bei Vanilla-Schildern) ist in dieser Ausbaustufe bewusst nicht
- * umgesetzt (siehe {@code docs/issue-11-strassenschilder-hausnummern.md}); stattdessen zeigt ein
- * Rechtsklick den aktuellen Text in der Actionbar.
+ * <p>Ohne Amboss-Namen wird die Beschriftung am Aufstellort ermittelt. Die Blockentität speichert und
+ * synchronisiert sie mit dem Client; Rechtsklick zeigt sie zusätzlich in der Actionbar.
  */
 public final class LabelBlock extends Block implements EntityBlock {
+
+    public static final EnumProperty<Direction> FACING = BlockStateProperties.HORIZONTAL_FACING;
+    private static final Map<Direction, VoxelShape> STREET_SHAPES = Shapes.rotateHorizontal(
+            Shapes.or(Block.box(1, 10, 7, 15, 15, 9), Block.box(2, 0, 7, 4, 10, 9)));
+    private static final Map<Direction, VoxelShape> POST_SHAPES = Shapes.rotateHorizontal(
+            Shapes.or(Block.box(1, 4, 7, 15, 15, 9), Block.box(7, 0, 7, 9, 4, 9)));
 
     /** 26.3 hat kein {@code DyeItem.getDyeColor()} mehr; Items.DYE ist eine ColorCollection ohne Rückweg. */
     private static final Map<Item, DyeColor> DYE_COLORS = Map.ofEntries(
@@ -60,11 +77,57 @@ public final class LabelBlock extends Block implements EntityBlock {
 
     private final Supplier<BlockEntityType<LabelBlockEntity>> entityType;
     private final int maxLines;
+    private final SignType signType;
 
-    public LabelBlock(Properties properties, Supplier<BlockEntityType<LabelBlockEntity>> entityType, int maxLines) {
+    public LabelBlock(Properties properties, Supplier<BlockEntityType<LabelBlockEntity>> entityType,
+                      int maxLines, SignType signType) {
         super(properties);
         this.entityType = Objects.requireNonNull(entityType, "entityType");
         this.maxLines = maxLines;
+        this.signType = Objects.requireNonNull(signType, "signType");
+        registerDefaultState(stateDefinition.any().setValue(FACING, Direction.SOUTH));
+    }
+
+    public SignType signType() {
+        return signType;
+    }
+
+    @Override
+    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
+        builder.add(FACING);
+    }
+
+    @Override
+    public BlockState getStateForPlacement(BlockPlaceContext context) {
+        Direction clicked = context.getClickedFace();
+        Direction facing = signType == SignType.HOUSE && clicked.getAxis().isHorizontal()
+                ? clicked : context.getHorizontalDirection().getOpposite();
+        return defaultBlockState().setValue(FACING, facing);
+    }
+
+    @Override
+    protected BlockState rotate(BlockState state, Rotation rotation) {
+        return state.setValue(FACING, rotation.rotate(state.getValue(FACING)));
+    }
+
+    @Override
+    protected BlockState mirror(BlockState state, Mirror mirror) {
+        return rotate(state, mirror.getRotation(state.getValue(FACING)));
+    }
+
+    @Override
+    protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
+        Direction facing = state.getValue(FACING);
+        return switch (signType) {
+            case HOUSE -> switch (facing) {
+                case SOUTH -> Block.box(3, 4, 0, 13, 12, 2);
+                case NORTH -> Block.box(3, 4, 14, 13, 12, 16);
+                case EAST -> Block.box(0, 4, 3, 2, 12, 13);
+                default -> Block.box(14, 4, 3, 16, 12, 13);
+            };
+            case STREET -> STREET_SHAPES.get(facing.getOpposite());
+            case TOWN, COUNTRY, NATION -> POST_SHAPES.get(facing.getOpposite());
+        };
     }
 
     public boolean multiline() {
@@ -79,6 +142,7 @@ public final class LabelBlock extends Block implements EntityBlock {
         }
         Component customName = stack.get(DataComponents.CUSTOM_NAME);
         if (customName == null) {
+            entity.setLines(WorldHooks.signLines(level, pos, signType), maxLines);
             return;
         }
         String raw = customName.getString();

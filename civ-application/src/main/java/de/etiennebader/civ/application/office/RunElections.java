@@ -3,6 +3,7 @@ package de.etiennebader.civ.application.office;
 import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.domain.civic.CivicView;
 import de.etiennebader.civ.application.support.Aggregates;
+import de.etiennebader.civ.application.query.WorldQueries;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.actor.PlayerRef;
@@ -110,6 +111,7 @@ public final class RunElections {
     }
 
     private final Aggregates aggregates;
+    private final WorldQueries queries;
     private final IdGenerator ids;
     private final VillagerVoter villagerVoter;
     private final Function<ActorRef, Optional<PolityView>> partyOf;
@@ -139,6 +141,7 @@ public final class RunElections {
                         Function<ActorRef, Optional<PolityId>> homeOf) {
         this.homeOf = Objects.requireNonNull(homeOf, "homeOf");
         this.aggregates = Objects.requireNonNull(aggregates, "aggregates");
+        this.queries = new WorldQueries(aggregates.repositories());
         this.ids = Objects.requireNonNull(ids, "ids");
         this.villagerVoter = Objects.requireNonNull(villagerVoter, "villagerVoter");
         this.partyOf = Objects.requireNonNull(partyOf, "partyOf");
@@ -268,7 +271,8 @@ public final class RunElections {
 
     private void closeParliament(Polity polity, Election election, Optional<Day> until, Day day,
                                  List<Outcome> outcomes) {
-        ParliamentCount count = ParliamentCount.of(polity, election, villagerVoter, partyOf, districtOf(polity));
+        ParliamentCount count = ParliamentCount.of(polity, election, villagerVoter,
+                actor -> eligibleParty(actor, polity.id()), districtOf(polity));
         polity.seatParliament(election.id(), count.seats(), count.reserves(), until, day);
         polity.recordResult(new ElectionResult(election.id(), Office.PARLIAMENT, day, count.count().districtResults(),
                 count.seats().stream().map(Parliament.Seat::member).toList()));
@@ -339,14 +343,14 @@ public final class RunElections {
         }
         Map<PolityId, Long> standing = new HashMap<>();
         for (ActorRef candidate : open.get().candidates()) {
-            partyOf.apply(candidate).ifPresent(party -> standing.merge(party.id(), 1L, Long::sum));
+            eligibleParty(candidate, polity.id()).ifPresent(party -> standing.merge(party.id(), 1L, Long::sum));
         }
         List<ActorRef> nominated = new ArrayList<>();
         for (Membership membership : polity.members()) {
             if (!(membership.member() instanceof PersonRef villager) || open.get().isCandidate(villager)) {
                 continue;
             }
-            Optional<PolityView> party = partyOf.apply(villager);
+            Optional<PolityView> party = eligibleParty(villager, polity.id());
             if (party.isEmpty() || standing.getOrDefault(party.get().id(), 0L) >= seats) {
                 continue;
             }
@@ -358,5 +362,9 @@ public final class RunElections {
         if (!nominated.isEmpty()) {
             outcomes.add(new Nominated(polity.id(), Office.PARLIAMENT, nominated));
         }
+    }
+
+    private Optional<PolityView> eligibleParty(ActorRef actor, PolityId polity) {
+        return partyOf.apply(actor).filter(party -> queries.partyEligibleIn(party, polity));
     }
 }

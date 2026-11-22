@@ -1,8 +1,10 @@
 package de.etiennebader.civ.application.office;
 
 import de.etiennebader.civ.application.polity.Citizens;
+import de.etiennebader.civ.application.query.WorldQueries;
 import de.etiennebader.civ.application.support.Aggregates;
 import de.etiennebader.civ.domain.actor.ActorRef;
+import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.law.StandardParameters;
 import de.etiennebader.civ.domain.polity.Election;
 import de.etiennebader.civ.domain.polity.ElectionResult;
@@ -41,17 +43,36 @@ public final class StandForElection {
     }
 
     private final Aggregates aggregates;
+    private final WorldQueries queries;
 
     public StandForElection(Aggregates aggregates) {
         this.aggregates = Objects.requireNonNull(aggregates, "aggregates");
+        this.queries = new WorldQueries(aggregates.repositories());
     }
 
     public void execute(Command command) {
         Polity polity = aggregates.polity(command.polity());
-        Citizens.require(polity, command.citizen());
+        if (!villagerMayStand(polity, command.citizen())) {
+            Citizens.require(polity, command.citizen());
+        }
+        queries.partyOf(command.citizen())
+                .filter(party -> !queries.partyEligibleIn(party, polity.id()))
+                .ifPresent(party -> {
+                    throw new OutsidePartyAreaException(party.name().value(),
+                            party.partyProfile().orElseThrow().area().orElseThrow());
+                });
         requireTermLimit(polity, command);
         polity.standForElection(command.election(), command.citizen(), command.platform(), command.day());
         aggregates.commit(polity);
+    }
+
+    /**
+     * Wo Dorfbewohner wählen dürfen ({@link StandardParameters#VILLAGER_VOTE_PERCENT} über 0), dürfen sie auch
+     * kandidieren, auch ohne Bürgerrecht.
+     */
+    private static boolean villagerMayStand(Polity polity, ActorRef citizen) {
+        return citizen instanceof PersonRef && polity.isMember(citizen)
+                && polity.laws().valueOf(StandardParameters.VILLAGER_VOTE_PERCENT) > 0;
     }
 
     /**

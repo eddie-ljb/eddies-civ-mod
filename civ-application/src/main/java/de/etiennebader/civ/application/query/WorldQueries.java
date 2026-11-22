@@ -145,6 +145,20 @@ public final class WorldQueries {
         return users.stream().anyMatch(user -> user instanceof PlayerRef owner && community.trusts(owner, friend));
     }
 
+    /** Alle geltenden Mietverträge eines Grundstücks (mehrere bei Mehrfamilienhäusern, Issue #19). */
+    public List<Contract> leasesOf(PolityId polity, PlotId plot) {
+        Contract.PlotRef ref = new Contract.PlotRef(polity, plot);
+        return contracts().active().stream()
+                .filter(contract -> contract.kind() == ContractKind.LEASE && contract.plot().filter(ref::equals).isPresent())
+                .toList();
+    }
+
+    /** Ob das Grundstück noch einen Mieter aufnehmen darf, je nach Gesetz {@code max_tenants_per_plot}. */
+    public boolean hasFreeUnit(PolityView polity, PlotId plot) {
+        return leasesOf(polity.id(), plot).size() < effectiveLaws(polity).valueOf(
+                de.etiennebader.civ.domain.law.StandardParameters.MAX_TENANTS_PER_PLOT);
+    }
+
     /** Der geltende Mietvertrag eines Grundstücks. */
     public Optional<Contract> leaseOf(PolityId polity, PlotId plot) {
         Contract.PlotRef ref = new Contract.PlotRef(polity, plot);
@@ -223,6 +237,18 @@ public final class WorldQueries {
                 .filter(polity -> polity.kind() == PolityKind.PARTY && polity.isMember(actor))
                 .map(PolityView.class::cast)
                 .findFirst();
+    }
+
+    /** Eine Partei darf im festgelegten Gebiet und allen ihm untergeordneten Gebietskörperschaften antreten. */
+    public boolean partyEligibleIn(PolityView party, PolityId electionPolity) {
+        return party.partyProfile().flatMap(profile -> profile.area())
+                .map(area -> area.equals(electionPolity)
+                        || ancestorsOf(electionPolity).stream().anyMatch(ancestor -> ancestor.id().equals(area)))
+                .orElse(true);
+    }
+
+    public Optional<PolityView> electoralPartyOf(ActorRef actor, PolityId electionPolity) {
+        return partyOf(actor).filter(party -> partyEligibleIn(party, electionPolity));
     }
 
     /** Alle Parteien, in Reihenfolge ihrer Gründung. */

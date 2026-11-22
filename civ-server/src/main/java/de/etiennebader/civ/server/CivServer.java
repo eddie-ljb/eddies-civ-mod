@@ -38,6 +38,7 @@ import de.etiennebader.civ.server.community.CommunityService;
 import de.etiennebader.civ.server.company.CompanyService;
 import de.etiennebader.civ.server.constitution.ConstitutionService;
 import de.etiennebader.civ.server.federation.FederationService;
+import de.etiennebader.civ.server.federation.VillagerFederations;
 import de.etiennebader.civ.server.law.LawBookService;
 import de.etiennebader.civ.server.level.LevelService;
 import de.etiennebader.civ.server.market.ItemTraits;
@@ -100,7 +101,11 @@ public final class CivServer {
     private final TerritoryWatcher territory;
     private final TownService towns;
     private final PlotService plots;
+    private final de.etiennebader.civ.server.construction.ConstructionService construction;
+    private final de.etiennebader.civ.server.war.WarService war;
     private final VillagerService villagers;
+    private final VillagerFederations villagerFederations;
+    private final de.etiennebader.civ.server.villager.VillagerFoundations villagerFoundations;
     private final de.etiennebader.civ.server.conjuncture.ConjunctureService conjuncture;
     private final Announcements announcements = new Announcements();
     private final VotingService voting;
@@ -133,7 +138,8 @@ public final class CivServer {
     private boolean running = true;
 
     private CivServer(StateStore store, AutoCloseable storage, ServerSettings settings, IdGenerator ids,
-                      SaveListener listener, Optional<java.nio.file.Path> imagesDirectory) {
+                      SaveListener listener, Optional<java.nio.file.Path> imagesDirectory,
+                      Optional<java.nio.file.Path> dataDirectory) {
         Repositories repositories = InMemoryRepositories.create();
         ChangeTracker tracker = new ChangeTracker();
         this.storage = storage;
@@ -164,8 +170,16 @@ public final class CivServer {
         this.territory = new TerritoryWatcher(app.queries(), texts);
         this.towns = new TownService(app.queries(), settings, texts, commands, territory);
         this.plots = new PlotService(app, calendar, players, texts);
+        this.construction = new de.etiennebader.civ.server.construction.ConstructionService(app, calendar, texts,
+                settings.ticksPerDay(), new de.etiennebader.civ.server.construction.BlueprintLibrary(
+                dataDirectory.map(dir -> dir.resolve("blueprints"))), dataDirectory.map(dir -> dir.resolve("construction.tsv")), announcements);
+        this.war = new de.etiennebader.civ.server.war.WarService(app, calendar, texts, announcements, ids,
+                settings, dataDirectory.map(dir -> dir.resolve("war.tsv")));
+        this.villagerFederations = new VillagerFederations(app, federations, announcements);
         this.conjuncture = new de.etiennebader.civ.server.conjuncture.ConjunctureService(app.queries());
         this.villagers = new VillagerService(app, settings, texts, announcements, conjuncture, calendar);
+        this.villagerFoundations = new de.etiennebader.civ.server.villager.VillagerFoundations(app, villagers::lastSeen,
+                announcements);
         this.townHalls = new TownHallService(app, calendar, texts, announcements);
         this.shops = new ShopService(app, calendar, settings.currency(), texts);
         this.civil = new CivilService(app, calendar, players, settings.currency(), texts, announcements,
@@ -198,7 +212,8 @@ public final class CivServer {
         Path parent = databaseFile.toAbsolutePath().getParent();
         Optional<Path> images = Optional.ofNullable(parent).map(dir -> dir.resolve("images"));
         try {
-            return new CivServer(store, store, settings, new RandomIdGenerator(), listener, images);
+            return new CivServer(store, store, settings, new RandomIdGenerator(), listener, images,
+                    Optional.ofNullable(parent));
         } catch (RuntimeException e) {
             store.close();
             throw e;
@@ -208,7 +223,7 @@ public final class CivServer {
     /** Für Tests: mit beliebigem Speicher und vorhersagbaren IDs. */
     static CivServer start(StateStore store, ServerSettings settings, IdGenerator ids, SaveListener listener) {
         return new CivServer(store, () -> {
-        }, settings, ids, listener, Optional.empty());
+        }, settings, ids, listener, Optional.empty(), Optional.empty());
     }
 
     /**
@@ -242,8 +257,14 @@ public final class CivServer {
         offices.endOfDay(day);
         parties.endOfDay(day);
         villagers.endOfDay(day);
+        if (settings.ambitions()) {
+            villagerFoundations.endOfDay(day);
+            villagerFederations.endOfDay(day);
+            construction.villagersOrder(day);
+        }
         federations.autoDecideInvitations(day, settings.villagerPolitics());
         campaigns.endOfDay(day);
+        war.endOfDay(day);
         civil.endOfDay(day);
         justice.endOfDay(day);
         companies.endOfDay(day);
@@ -379,6 +400,14 @@ public final class CivServer {
 
     public TownService towns() {
         return towns;
+    }
+
+    public de.etiennebader.civ.server.war.WarService war() {
+        return war;
+    }
+
+    public de.etiennebader.civ.server.construction.ConstructionService construction() {
+        return construction;
     }
 
     public PlotService plots() {
@@ -548,6 +577,14 @@ public final class CivServer {
 
     public PlayerDirectory players() {
         return players;
+    }
+
+    public de.etiennebader.civ.server.villager.VillagerFoundations villagerFoundations() {
+        return villagerFoundations;
+    }
+
+    public VillagerFederations villagerFederations() {
+        return villagerFederations;
     }
 
     /** Für Tests und spätere Etappen, die weitere Use Cases brauchen. */

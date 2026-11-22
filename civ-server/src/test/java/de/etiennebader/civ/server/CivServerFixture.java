@@ -51,12 +51,20 @@ public final class CivServerFixture {
         return server.territory();
     }
 
+    public de.etiennebader.civ.server.construction.ConstructionService construction() {
+        return server.construction();
+    }
+
     public de.etiennebader.civ.server.plot.PlotService plots() {
         return server.plots();
     }
 
     public de.etiennebader.civ.server.villager.VillagerService villagers() {
         return server.villagers();
+    }
+
+    public de.etiennebader.civ.server.war.WarService war() {
+        return server.war();
     }
 
     public de.etiennebader.civ.server.conjuncture.ConjunctureService conjuncture() {
@@ -153,6 +161,18 @@ public final class CivServerFixture {
 
     public ProtectionService protection() {
         return server.protection();
+    }
+
+    public de.etiennebader.civ.application.CivApplication app() {
+        return server.app();
+    }
+
+    public de.etiennebader.civ.server.villager.VillagerFoundations villagerFoundations() {
+        return server.villagerFoundations();
+    }
+
+    public de.etiennebader.civ.server.federation.VillagerFederations villagerFederations() {
+        return server.villagerFederations();
     }
 
     public WorldQueries queries() {

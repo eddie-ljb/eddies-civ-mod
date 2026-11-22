@@ -25,6 +25,15 @@ class ServerConfigTest {
     }
 
     @Test
+    @DisplayName("Ehrgeizige Dorfbewohner sind standardmäßig an und lassen sich abschalten")
+    void ambitionsSwitch() {
+        assertTrue(ServerConfig.of(new Properties()).ambitions());
+        Properties properties = new Properties();
+        properties.setProperty(ServerConfig.AMBITIONS, "false");
+        assertEquals(false, ServerConfig.of(properties).ambitions());
+    }
+
+    @Test
     @DisplayName("Eigene Werte werden übernommen, ungültige fallen auf den Standard zurück")
     void readsValues() {
         Properties properties = new Properties();

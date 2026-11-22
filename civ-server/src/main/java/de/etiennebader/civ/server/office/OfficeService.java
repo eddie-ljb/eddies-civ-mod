@@ -15,6 +15,7 @@ import de.etiennebader.civ.application.office.StandForElection;
 import de.etiennebader.civ.application.query.WorldQueries;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
+import de.etiennebader.civ.domain.population.VillagerIdentity;
 import de.etiennebader.civ.domain.actor.PlayerRef;
 import de.etiennebader.civ.domain.law.StandardParameters;
 import de.etiennebader.civ.domain.polity.Ballot;
@@ -23,6 +24,7 @@ import de.etiennebader.civ.domain.polity.ElectionResult;
 import de.etiennebader.civ.domain.polity.MembershipType;
 import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.OfficeTerm;
+import de.etiennebader.civ.domain.polity.PartyProfile;
 import de.etiennebader.civ.domain.polity.Platform;
 import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.polity.PolityView;
@@ -229,8 +231,9 @@ public final class OfficeService {
     }
 
     private Reply stand(Caller caller, PolityView town, Election election, Platform chosen) {
-        Platform platform = chosen != Platform.NONE ? chosen : queries.partyOf(caller.player())
-                .flatMap(PolityView::partyProfile).map(profile -> profile.platform()).orElse(Platform.NONE);
+        Optional<PolityView> party = queries.partyOf(caller.player());
+        Platform platform = chosen != Platform.NONE ? chosen : party
+                .flatMap(PolityView::partyProfile).map(PartyProfile::platform).orElse(Platform.NONE);
         return attempt(() -> {
             app.standForElection().execute(new StandForElection.Command(town.id(), election.id(), caller.player(),
                     platform, calendar.today()));
@@ -249,15 +252,24 @@ public final class OfficeService {
     }
 
     private Reply voteByName(Caller caller, PolityView town, Election election, String candidateName) {
-        Optional<ActorRef> candidate = election.candidates().stream()
-                .filter(actor -> texts.actor(actor).equalsIgnoreCase(candidateName.strip()))
-                .findFirst();
+        String input = candidateName.strip();
+        List<ActorRef> matches = election.candidates().stream()
+                .filter(actor -> texts.actor(actor).equalsIgnoreCase(input)
+                        || actor instanceof PersonRef villager
+                        && VillagerIdentity.of(villager).registerNumber().equalsIgnoreCase(input))
+                .toList();
+        if (matches.size() > 1) {
+            String numbers = matches.stream().filter(PersonRef.class::isInstance).map(PersonRef.class::cast)
+                    .map(VillagerIdentity::of).map(VillagerIdentity::registerNumber).collect(Collectors.joining(", "));
+            return Reply.failure(Message.of(MessageKey.AMBIGUOUS_CANDIDATE, input, numbers));
+        }
+        Optional<ActorRef> candidate = matches.stream().findFirst();
         if (candidate.isEmpty()) {
             // Listenwahl: Die Stimme für eine Partei geht an ihren ersten Listenplatz und zählt für die ganze Liste.
             candidate = queries.polityNamed(candidateName.strip())
                     .filter(party -> party.kind() == PolityKind.PARTY)
                     .flatMap(party -> election.candidates().stream()
-                            .filter(actor -> queries.partyOf(actor).map(PolityView::id).filter(party.id()::equals)
+                            .filter(actor -> queries.electoralPartyOf(actor, town.id()).map(PolityView::id).filter(party.id()::equals)
                                     .isPresent())
                             .findFirst());
         }
@@ -419,7 +431,8 @@ public final class OfficeService {
             Optional<ElectionView> election = town.electionFor(office).map(open -> new ElectionView(open.id(),
                     open.closesOn().value(),
                     open.candidates().stream().map(actor -> new ElectionView.Candidate(actor, texts.actor(actor),
-                                    open.platformOf(actor), queries.partyOf(actor).map(party -> party.name().value())))
+                                    open.platformOf(actor), queries.electoralPartyOf(actor, town.id())
+                                            .map(party -> party.name().value())))
                             .toList(),
                     open.ballots().stream().filter(ballot -> ballot.voter().equals(viewer)).map(Ballot::candidate)
                             .findFirst(),
@@ -481,10 +494,8 @@ public final class OfficeService {
     private Optional<Map<String, Long>> tallyOf(RunElections.Outcome outcome) {
         Map<String, Long> totals = new LinkedHashMap<>();
         switch (outcome) {
-            case RunElections.Decided decided -> decided.count().totals()
-                    .forEach((candidate, votes) -> totals.merge(texts.actor(candidate), votes, Long::sum));
-            case RunElections.Runoff runoff -> runoff.count().totals()
-                    .forEach((candidate, votes) -> totals.merge(texts.actor(candidate), votes, Long::sum));
+            case RunElections.Decided decided -> addCandidateTallies(totals, decided.count().totals());
+            case RunElections.Runoff runoff -> addCandidateTallies(totals, runoff.count().totals());
             case RunElections.Seated seated -> seated.count().lists().forEach(list -> totals.merge(listName(list),
                     list.votes(), Long::sum));
             default -> {
@@ -492,6 +503,18 @@ public final class OfficeService {
             }
         }
         return Optional.of(totals);
+    }
+
+    private void addCandidateTallies(Map<String, Long> totals, Map<ActorRef, Long> candidates) {
+        Map<String, Long> frequency = candidates.keySet().stream()
+                .collect(Collectors.groupingBy(texts::actor, Collectors.counting()));
+        candidates.forEach((candidate, votes) -> {
+            String name = texts.actor(candidate);
+            if (frequency.get(name) > 1 && candidate instanceof PersonRef villager) {
+                name += " · " + VillagerIdentity.of(villager).registerNumber();
+            }
+            totals.put(name, votes);
+        });
     }
 
     private Map<String, Integer> seatsOf(RunElections.Outcome outcome) {

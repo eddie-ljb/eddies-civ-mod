@@ -46,6 +46,9 @@ Gebiete und Gemeinden müssen dabei nicht zusammenhängen – ein Wahlkreis kann
 
 ## Parteien
 Parteien sind Zusammenschlüsse von Personen (Spieler und Dorfbewohner) über alle Gemeinden hinweg; jede Person gehört höchstens einer Partei an.
+
+- **Geltungsgebiet:** `/civ partei gebiet` zeigt die aktuelle Einstellung, `gebiet setzen <Name>` wählt eine Gemeinde oder einen Bund, `gebiet leeren` erlaubt Kandidaturen wieder überall. Damit gilt die Partei bei Wahlen in genau diesem Gebiet und allen seinen Gliedern, nicht in einem übergeordneten Bund oder in Nachbargebieten. Der Programmmodus entscheidet, ob der Vorsitz die Änderung direkt vornimmt oder Parteimitglieder abstimmen.
+- **Laufende Wahlen:** Eine Gebietsänderung löscht keine bereits eingereichten Kandidaturen oder abgegebenen Stimmen. Bei der Parlamentsauszählung werden außerhalb des Gebiets keine Stimmen mehr dieser Parteiliste zugerechnet; bereits eingereichte Einzelkandidaturen bleiben bestehen. Die Parteimitgliedschaft selbst ist nicht ans Gebiet gebunden.
 - **Richtung:** zwei Achsen -100..100 – Ordnung (− Freiheit, + Ordnung) und Wirtschaft (− niedrige Steuern, + Ausbau). Die stärkere Achse ergibt das Wahlprogramm.
 - **Befehle:** `/civ partei gruenden <ordnung|freiheit|steuern|ausbau|mitte> <Name>`, `beitreten <Name>`, `austreten`, `info [Name]`, `liste`, `menue`; nur der Vorsitz: `richtung <Ordnung> <Wirtschaft>`, `wappen`, `aufloesen`.
 - **Dorfbewohner:** treten täglich mit etwas Glück einer passenden Partei bei und verlassen sie, wenn sie sich zu weit entfernt. Finden sich genug Gleichgesinnte ohne passende Partei (`villager_party_founders`, Standard 5), gründen sie eine. Abschaltbar mit `villager_parties=false`.
@@ -80,7 +83,7 @@ Gemeinden und Bünde können ein Parlament haben; `parliament_seats` (0–99, Ve
 - **Wahlurne** (Block): Rechtsklick zeigt alle laufenden Wahlen am Ort; Klick wählt. Mit `ballot_box_required` zählen nur Stimmen an der Urne.
 - Die letzten 10 Ergebnisse jeder Gemeinde/jedes Bundes bleiben gespeichert: `/civ wahlergebnis [Name | menue]`.
 - `/civ umfrage [Name]` fragt Dorfbewohner, wen sie wählen würden; beim Parlament inklusive Sitzprognose.
-- Webseite: Reiter „Wahlen“ mit Umfragen und Ergebnissen, auf der Karte die Ansicht „Wahlkarte“ (siehe auch [Map Fix, Issue #8](Spieler-Webseite.md)).
+- Webseite: Reiter „Wahlen“ mit Umfragen, Ergebnissen (je Wahlbezirk aufklappbar zur vollen Kandidaten-Rangfolge, nicht nur zum Sieger) und einer Suche nach Gemeinde/Bund; auf der Karte die Ansicht „Wahlkarte“ mit eigenem Partei-Filter und sichtbaren Bezirksgrenzen (siehe [Karte](Karte.md)).
 
 ## Dorfbewohner-Politik (`villager_politics_enabled`, Standard an)
 Gemeinden, Bünde und Firmen brauchen keinen Spieler mehr, um am Spielgeschehen teilzunehmen:

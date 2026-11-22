@@ -18,7 +18,7 @@ final class EnglishCommands {
 
     /** Deutsches Wort → englisches Wort; mit {@code eltern.wort} für Wörter, die je nach Befehl anders heißen. */
     static final Map<String, String> WORDS = Map.ofEntries(
-            Map.entry("abheben", "withdraw"), Map.entry("abholen", "collect"), Map.entry("ablehnen", "decline"),
+            Map.entry("abheben", "withdraw"), Map.entry("abholen", "collect"), Map.entry("abbrechen", "cancel"), Map.entry("ablehnen", "decline"),
             Map.entry("abmelden", "logout"), Map.entry("abstimmen", "vote"), Map.entry("abstimmungen", "votes"),
             Map.entry("adresse", "address"), Map.entry("adressen", "addresses"), Map.entry("aemter", "offices"),
             Map.entry("akte", "file"), Map.entry("amt", "office"), Map.entry("anbieten", "offer"),
@@ -27,7 +27,7 @@ final class EnglishCommands {
             Map.entry("aufnehmen", "admit"), Map.entry("ausgeben", "issue"), Map.entry("ausrufen", "call"),
             Map.entry("aussage", "testify"), Map.entry("aussenposten", "outpost"), Map.entry("austreten", "leave"),
             Map.entry("beanspruchen", "claim"), Map.entry("beeinflussen", "influence"),
-            Map.entry("beitreten", "join"), Map.entry("berufung", "appeal"),
+            Map.entry("bau", "build"), Map.entry("beauftragen", "commission"), Map.entry("beitreten", "join"), Map.entry("berufung", "appeal"),
             Map.entry("beweis", "evidence"), Map.entry("boerse", "exchange"), Map.entry("branche", "branch"),
             Map.entry("brief", "letter"), Map.entry("buch", "book"), Map.entry("buendnis", "alliance"),
             Map.entry("bund", "federation"), Map.entry("debatte", "debate"), Map.entry("depot", "portfolio"),
@@ -36,7 +36,7 @@ final class EnglishCommands {
             Map.entry("gericht.einstellen", "dismiss"), Map.entry("einzahlen", "deposit"),
             Map.entry("entfernen", "remove"), Map.entry("entlassen", "release"), Map.entry("entnehmen", "take"),
             Map.entry("erlassen", "enact"), Map.entry("ernennen", "appoint"), Map.entry("eroeffnen", "open"),
-            Map.entry("erstellen", "make"), Map.entry("faelle", "cases"), Map.entry("fall", "case"),
+            Map.entry("erstellen", "make"), Map.entry("faelle", "cases"), Map.entry("genehmigen", "approve"), Map.entry("plaene", "plans"), Map.entry("fall", "case"),
             Map.entry("firma", "company"), Map.entry("flagge", "flag"), Map.entry("frei", "custom"),
             Map.entry("freigeben", "free"), Map.entry("freund", "friend"), Map.entry("freunde", "friends"),
             Map.entry("gebiet", "area"), Map.entry("gebiet-entfernen", "area-remove"),
@@ -51,7 +51,7 @@ final class EnglishCommands {
             Map.entry("kuendigen", "terminate"),
             Map.entry("laden", "shop"), Map.entry("lager", "stock"), Map.entry("land", "state"),
             Map.entry("leeren", "clear"), Map.entry("lesen", "read"), Map.entry("liste", "list"),
-            Map.entry("menue", "menu"), Map.entry("miete", "lease"), Map.entry("misstrauen", "distrust"),
+            Map.entry("material", "material"), Map.entry("menue", "menu"), Map.entry("miete", "lease"), Map.entry("misstrauen", "distrust"),
             Map.entry("nachricht", "message"), Map.entry("nein", "no"), Map.entry("parlament", "parliament"),
             Map.entry("partei", "party"), Map.entry("plaedoyer", "plead"), Map.entry("post", "mail"),
             Map.entry("programmodus", "programmode"),

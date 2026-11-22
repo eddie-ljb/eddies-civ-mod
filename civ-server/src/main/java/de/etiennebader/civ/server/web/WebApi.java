@@ -9,6 +9,7 @@ import de.etiennebader.civ.domain.civic.CustomImage;
 import de.etiennebader.civ.domain.civic.ImageKind;
 import de.etiennebader.civ.domain.exchange.Side;
 import de.etiennebader.civ.domain.market.Quote;
+import de.etiennebader.civ.domain.polity.ElectionResult;
 import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.Platform;
 import de.etiennebader.civ.domain.polity.PolityKind;
@@ -36,6 +37,7 @@ import de.etiennebader.civ.server.command.TranslationKeys;
 import de.etiennebader.civ.server.community.LetterView;
 import de.etiennebader.civ.server.company.HoldingView;
 import de.etiennebader.civ.server.company.OrderView;
+import de.etiennebader.civ.server.election.ElectionMapColor;
 import de.etiennebader.civ.server.level.TerritoryColor;
 import de.etiennebader.civ.server.market.ItemTraits;
 import de.etiennebader.civ.server.market.MarketOffer;
@@ -220,9 +222,17 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                 case "GET /", "GET /index.html" ->
                         new HttpResponse(200, "text/html; charset=utf-8", page, Map.of("Cache-Control", "no-cache"));
                 case "GET /api/world" -> HttpResponse.json(200, game.call(() -> world(texts)));
-                case "GET /api/map" -> HttpResponse.json(200, game.call(() ->
-                        map(new DimensionId(request.query().getOrDefault("dim", DimensionId.OVERWORLD.value())),
-                                Optional.ofNullable(request.query().get("level")).filter(v -> !v.isBlank()))));
+                case "GET /api/map" -> HttpResponse.json(200, game.call(() -> {
+                    DimensionId dimension = new DimensionId(request.query().getOrDefault("dim", DimensionId.OVERWORLD.value()));
+                    String electionParam = request.query().get("election");
+                    if (electionParam != null && !electionParam.isBlank()) {
+                        PolityId electionPolity = new PolityId(UUID.fromString(electionParam));
+                        Optional<Office> office = Optional.ofNullable(request.query().get("office"))
+                                .filter(v -> !v.isBlank()).map(Office::valueOf);
+                        return mapElection(dimension, electionPolity, office);
+                    }
+                    return map(dimension, Optional.ofNullable(request.query().get("level")).filter(v -> !v.isBlank()));
+                }));
                 case "GET /api/market" -> HttpResponse.json(200, game.call(this::market));
                 case "GET /api/elections" -> HttpResponse.json(200, game.call(() -> elections(texts)));
                 case "GET /api/shops" -> HttpResponse.json(200, game.call(this::shops));
@@ -245,6 +255,19 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                         }
                     }));
                 });
+                case "GET /api/blueprints" -> HttpResponse.json(200, game.call(() -> Json.array(
+                        civ.construction().library().all(), plan -> Json.object()
+                                .put("name", plan.name()).put("style", plan.style()).put("units", plan.units())
+                                .put("sizeX", plan.sizeX()).put("sizeY", plan.sizeY()).put("sizeZ", plan.sizeZ())
+                                .put("blocks", plan.blockCount()).build())));
+                case "POST /api/blueprints" -> withLogin(request, login -> action(request, body -> game.call(() -> {
+                    try {
+                        byte[] bytes = java.util.Base64.getDecoder().decode(body.getOrDefault("data", ""));
+                        return civ.construction().importPlan(body.getOrDefault("name", ""), bytes);
+                    } catch (IllegalArgumentException e) {
+                        return Reply.failure(Message.of(MessageKey.BUILD_PLAN_INVALID, "Base64"));
+                    }
+                }), texts));
                 case "GET /api/friends" -> withLogin(request, login -> HttpResponse.json(200, game.call(() ->
                         friends(login))));
                 case "POST /api/friends" -> withLogin(request, login -> action(request, body -> game.call(() ->
@@ -279,6 +302,7 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                         depot(login))));
                 case "POST /api/exchange" -> withLogin(request, login -> action(request, body -> game.call(() ->
                         exchangeAction(login, body)), texts));
+                case "GET /api/war" -> HttpResponse.json(200, game.call(this::war));
                 case "GET /api/press" -> HttpResponse.json(200, game.call(this::press));
                 case "POST /api/press" -> withLogin(request, login -> action(request, body -> game.call(() ->
                         civ.press().publish(login.player(), body.getOrDefault("paper", ""),
@@ -454,6 +478,12 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                                 .put("party", district.leaderParty().orElse(""))
                                 .put("key", district.leaderKey())
                                 .put("votes", CampaignService.votes(district.votes()))
+                                .raw("lines", Json.array(district.lines(), line -> Json.object()
+                                        .put("name", line.name())
+                                        .put("party", line.party().orElse(""))
+                                        .put("votes", CampaignService.votes(line.votes()))
+                                        .put("percent", line.percent())
+                                        .build()))
                                 .build()))
                         .build());
             }
@@ -527,6 +557,58 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                         .put("z", chunk.z())
                         .put("town", polity.id().value().toString())
                         .put("group", group)
+                        .put("outpost", claim.map(c -> c.type().name().equals("OUTPOST")).orElse(false))
+                        .build());
+            }
+        }
+        List<String> seats = new ArrayList<>();
+        for (PolityView polity : civ.queries().polities()) {
+            polity.seat().filter(seat -> seat.dimension().equals(dimension)).ifPresent(seat -> seats.add(Json.object()
+                    .put("town", polity.id().value().toString())
+                    .put("name", polity.name().value())
+                    .put("x", seat.x())
+                    .put("z", seat.z())
+                    .build()));
+        }
+        return Json.object()
+                .put("dimension", dimension.value())
+                .raw("chunks", "[" + String.join(",", chunks) + "]")
+                .raw("seats", "[" + String.join(",", seats) + "]")
+                .build();
+    }
+
+    /**
+     * Wie {@link #map(DimensionId, Optional)}, aber jedes Feld trägt zusätzlich seinen Wahlbezirk ({@code district})
+     * und seine Kartenfarbe richtet sich nach dem Wahlergebnis von {@code electionPolity} statt nach der
+     * Bundeshierarchie (#9). Nutzt dieselbe Bezirks- und Farbauflösung wie die Ingame-Karte, siehe
+     * {@link ElectionMapColor} und {@link de.etiennebader.civ.server.town.TownService#mapByElection}.
+     */
+    private String mapElection(DimensionId dimension, PolityId electionPolity, Optional<Office> office) {
+        Optional<PolityView> target = civ.queries().polity(electionPolity);
+        Optional<ElectionResult> result = target.flatMap(found -> office.isPresent()
+                ? ElectionMapColor.latestResult(found, office.get()) : ElectionMapColor.latestResult(found));
+        List<String> chunks = new ArrayList<>();
+        for (PolityView polity : civ.queries().polities()) {
+            Collection<ChunkCoord> territory = civ.queries().territory().territoryOf(polity.id());
+            if (territory.isEmpty()) {
+                continue;
+            }
+            for (ChunkCoord chunk : territory) {
+                if (!chunk.dimension().equals(dimension) || chunks.size() >= MAX_MAP_CHUNKS) {
+                    continue;
+                }
+                Optional<BlockPosition> representative = Optional.of(chunk.center(64));
+                Optional<Claim> claim = civ.queries().territory().claimAt(chunk);
+                PolityId district = ElectionMapColor.districtOf(civ.queries().civic(), electionPolity, representative,
+                        polity.id());
+                String group = ElectionMapColor.colorOf(civ.queries().civic(), electionPolity, representative,
+                        polity.id(), result, civ.queries()::partyOf).orElseThrow();
+                chunks.add(Json.object()
+                        .put("x", chunk.x())
+                        .put("z", chunk.z())
+                        .put("town", polity.id().value().toString())
+                        .put("group", group)
+                        .put("district", district.value().toString())
                         .put("outpost", claim.map(c -> c.type().name().equals("OUTPOST")).orElse(false))
                         .build());
             }
@@ -704,6 +786,48 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
     }
 
     /** Zeitungen und neueste Artikel; ohne Anmeldung. */
+    private String war() {
+        var registry = civ.war().registry();
+        var queries = civ.queries();
+        java.util.function.Function<de.etiennebader.civ.domain.shared.PolityId, String> name = id -> queries.polity(id)
+                .map(polity -> polity.name().toString()).orElse("?");
+        java.util.function.Function<de.etiennebader.civ.domain.shared.PolityId, Integer> wounded = id ->
+                registry.wounded().getOrDefault(id, java.util.Map.of()).size();
+        java.util.function.Function<de.etiennebader.civ.domain.shared.PolityId, Integer> troops = id ->
+                registry.services().getOrDefault(id, java.util.Map.of()).size();
+        java.util.List<String> pairs = new java.util.ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        registry.alliances().forEach((first, set) -> set.forEach(second -> {
+            String key = first.value().compareTo(second.value()) < 0 ? first.value() + "|" + second.value()
+                    : second.value() + "|" + first.value();
+            if (seen.add(key)) {
+                pairs.add(Json.object().put("first", name.apply(first)).put("second", name.apply(second)).build());
+            }
+        }));
+        return Json.object()
+                .raw("wars", Json.array(registry.wars(), war -> Json.object()
+                        .put("aggressor", name.apply(war.aggressor()))
+                        .put("defender", name.apply(war.defender()))
+                        .put("ongoing", war.ongoing())
+                        .put("declared", war.declaredOn().value())
+                        .put("ended", war.endedOn().map(day -> day.value()).orElse(0L))
+                        .put("front", registry.frontOf(war.id()))
+                        .put("aggressorTroops", troops.apply(war.aggressor()))
+                        .put("defenderTroops", troops.apply(war.defender()))
+                        .put("aggressorWounded", wounded.apply(war.aggressor()))
+                        .put("defenderWounded", wounded.apply(war.defender()))
+                        .put("winner", war.outcome().map(terms -> name.apply(terms.winner())).orElse(""))
+                        .put("reparations", war.outcome().map(terms -> terms.reparations()).orElse(0L))
+                        .raw("campaigns", Json.array(registry.campaigns().stream()
+                                .filter(campaign -> campaign.war().equals(war.id())).toList(), campaign -> Json.object()
+                                .put("kind", campaign.kind().name())
+                                .put("initiator", name.apply(campaign.initiator()))
+                                .put("on", campaign.on().value()).build()))
+                        .build()))
+                .raw("alliances", "[" + String.join(",", pairs) + "]")
+                .build();
+    }
+
     private String press() {
         return Json.object()
                 .raw("newspapers", Json.array(civ.press().newspapers(), paper -> Json.object()
