@@ -211,6 +211,55 @@ public final class MachineService implements ProductionUseCases.Rules {
         return Reply.success(lines);
     }
 
+    /** Ansicht einer Maschine für Menü und Webseite. */
+    public record MachineView(int number, MachineType type, int level, int wear, boolean placed, boolean broken,
+                              long upgradeCost, long maintainCost, long firmCost) {
+    }
+
+    public synchronized List<MachineView> views(String companyName) {
+        Optional<PolityView> firm = company(companyName);
+        if (firm.isEmpty()) {
+            return List.of();
+        }
+        List<Machine> machines = fleet.of(firm.get().id());
+        List<MachineView> views = new ArrayList<>();
+        for (int i = 0; i < machines.size(); i++) {
+            Machine m = machines.get(i);
+            long maintain = m.type().maintenanceCost(m.level(), m.wear());
+            views.add(new MachineView(i + 1, m.type(), m.level(), m.wear(), m.where().isPresent(), m.broken(),
+                    m.level() >= MachineType.MAX_LEVEL ? 0 : m.type().upgradeCost(m.level()), maintain,
+                    maintain * FIRM_SURCHARGE_PERCENT / 100));
+        }
+        return views;
+    }
+
+    /** Die Maschinentypen, die diese Firma kaufen kann. */
+    public synchronized List<MachineType> typesFor(String companyName) {
+        return company(companyName).flatMap(firm -> queries.production().enterpriseOf(firm.id()))
+                .map(found -> MachineType.of(found.branch())).orElse(List.of());
+    }
+
+    /** Ob gerade eine Wartungsfirma mit Personal einspringen kann. */
+    public synchronized boolean maintenanceFirmAvailable(String companyName) {
+        return company(companyName).flatMap(firm -> maintenanceFirm(firm.id())).isPresent();
+    }
+
+    /** Alle Arbeitsplätze auf einmal, damit das Spiel nicht je Dorfbewohner alle Verträge durchsuchen muss. */
+    public synchronized Map<PersonRef, Workplace> workplaces() {
+        Map<PersonRef, Workplace> result = new HashMap<>();
+        for (Contract contract : queries.contracts().active()) {
+            if (contract.kind() == ContractKind.EMPLOYMENT && contract.counterparty() instanceof PersonRef employee
+                    && contract.offeror() instanceof de.etiennebader.civ.domain.actor.PolityRef firm) {
+                List<MachinePos> positions = fleet.of(firm.id()).stream().filter(machine -> !machine.broken())
+                        .flatMap(machine -> machine.where().stream()).toList();
+                if (!positions.isEmpty()) {
+                    result.putIfAbsent(employee, new Workplace(firm.id(), positions));
+                }
+            }
+        }
+        return result;
+    }
+
     /** Ergebnis eines Kaufs: der Block, der dem Spieler ins Inventar gelegt werden soll. */
     public record Purchase(Reply reply, Optional<MachineType> type) {
     }
@@ -478,7 +527,7 @@ public final class MachineService implements ProductionUseCases.Rules {
         store.save(fleet);
     }
 
-    static String typeKey(MachineType type) {
+    public static String typeKey(MachineType type) {
         return "eddies-civ-mod.machine." + type.name().toLowerCase(Locale.ROOT);
     }
 

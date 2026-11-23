@@ -72,7 +72,21 @@ final class VillagerCensus {
         });
     }
 
+    /** Alle 2 Sekunden die Angestellten zu ihren Maschinen schicken. */
+    private static final int COMMUTE_INTERVAL = 40;
+    private int commuteTicks;
+
     void tick(MinecraftServer server, CivServer civ) {
+        if (++commuteTicks >= COMMUTE_INTERVAL) {
+            commuteTicks = 0;
+            MachineWork.refreshWorkplaces(civ, COMMUTE_INTERVAL);
+            if (MachineWork.hasWorkplaces()) {
+                for (ServerLevel level : server.getAllLevels()) {
+                    for (Villager villager : level.getEntities(EntityTypes.VILLAGER, found -> found.isAlive())) {
+                            }
+                }
+            }
+        }
         if (++ticks < INTERVAL) {
             return;
         }

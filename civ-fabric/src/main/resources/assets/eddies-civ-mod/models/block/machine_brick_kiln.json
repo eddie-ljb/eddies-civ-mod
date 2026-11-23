@@ -1,6 +1,8 @@
 {
-  "parent": "minecraft:block/cube_all",
+  "parent": "minecraft:block/cube_bottom_top",
   "textures": {
-    "all": "eddies-civ-mod:block/machine_brick_kiln"
+    "top": "eddies-civ-mod:block/machine_brick_kiln_top",
+    "side": "eddies-civ-mod:block/machine_brick_kiln_side",
+    "bottom": "eddies-civ-mod:block/machine_brick_kiln_bottom"
   }
 }

@@ -18,5 +18,10 @@ Angestellter von 50 % bis 100 %. Dorfbewohner-Firmen kaufen, bauen aus und warte
 **Zusatzwaren:** `/civ firma einlagern <Firma>` legt die Ware in der Hand ins Lager, wenn sie thematisch zur Branche
 passt (`Branch.extras()`, z. B. Kaktus bei `acker`); sie wird wie das übrige Lager verkauft.
 
-Gespeichert in `machines.tsv`. Nicht umgesetzt: eigenes Menü (GUI) für Maschinen, Verlagern fertig gebauter Maschinen
-zwischen Firmen.
+**Menü:** `/civ firma maschine menue <Firma>` oder im Firmenmenü der Knopf „Maschinen“: Klick baut aus, Rechtsklick wartet
+selbst, Schleichen + Klick beauftragt die Wartungsfirma; darunter kaufst du neue Typen der Branche.
+
+**Arbeitsweg:** Alle 2 Sekunden werden Angestellte tagsüber zu ihrer Maschine geschickt (Arbeitsplätze alle 10 s aus den
+Verträgen eingelesen). Kommen sie nach 5 Versuchen nicht an, werden sie neben die Maschine versetzt und gelten als anwesend.
+
+Gespeichert in `machines.tsv`. Nicht umgesetzt: Verlagern fertig gebauter Maschinen zwischen Firmen.

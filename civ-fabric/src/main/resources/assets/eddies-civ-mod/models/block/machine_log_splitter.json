@@ -1,6 +1,8 @@
 {
-  "parent": "minecraft:block/cube_all",
+  "parent": "minecraft:block/cube_bottom_top",
   "textures": {
-    "all": "eddies-civ-mod:block/machine_log_splitter"
+    "top": "eddies-civ-mod:block/machine_log_splitter_top",
+    "side": "eddies-civ-mod:block/machine_log_splitter_side",
+    "bottom": "eddies-civ-mod:block/machine_log_splitter_bottom"
   }
 }

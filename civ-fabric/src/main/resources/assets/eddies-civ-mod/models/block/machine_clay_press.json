@@ -1,6 +1,8 @@
 {
-  "parent": "minecraft:block/cube_all",
+  "parent": "minecraft:block/cube_bottom_top",
   "textures": {
-    "all": "eddies-civ-mod:block/machine_clay_press"
+    "top": "eddies-civ-mod:block/machine_clay_press_top",
+    "side": "eddies-civ-mod:block/machine_clay_press_side",
+    "bottom": "eddies-civ-mod:block/machine_clay_press_bottom"
   }
 }

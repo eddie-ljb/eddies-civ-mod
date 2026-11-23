@@ -60,18 +60,45 @@ public final class MachineWork {
         }
     }
 
-    /** Schickt einen angestellten Dorfbewohner tagsüber zu den Maschinen seiner Firma. */
+    /** Wie oft ein Dorfbewohner ohne Ankunft losgeschickt wird, bevor er zur Maschine versetzt wird. */
+    private static final int STUCK_AFTER = 5;
+    private static final int CACHE_TICKS = 200;
+
+    private static java.util.Map<PersonRef, de.etiennebader.civ.server.machine.MachineService.Workplace> workplaces =
+            java.util.Map.of();
+    private static long cacheAge = Long.MAX_VALUE;
+    private static final java.util.Map<PersonRef, Integer> attempts = new java.util.HashMap<>();
+
+    /** Aufruf alle paar Ticks: Arbeitsplätze höchstens alle {@value #CACHE_TICKS} Ticks neu einlesen. */
+    static void refreshWorkplaces(CivServer civ, int elapsedTicks) {
+        cacheAge += elapsedTicks;
+        if (cacheAge >= CACHE_TICKS) {
+            workplaces = civ.machines().workplaces();
+            attempts.keySet().retainAll(workplaces.keySet());
+            cacheAge = 0;
+        }
+    }
+
+    static boolean hasWorkplaces() {
+        return !workplaces.isEmpty();
+    }
+
+    /**
+     * Schickt einen angestellten Dorfbewohner tagsüber zu den Maschinen seiner Firma. Kommt er nach mehreren
+     * Versuchen nicht an (Hindernisse, eigene Tagesroutine), wird er neben die Maschine versetzt; angekommen
+     * zählt er als anwesend.
+     */
     static void commute(CivServer civ, ServerLevel level, Villager villager, PersonRef ref) {
         if (villager.isBaby() || !level.isBrightOutside()) {
+            attempts.remove(ref);
             return;
         }
-        Optional<de.etiennebader.civ.server.machine.MachineService.Workplace> workplace =
-                civ.machines().workplaceOf(ref);
-        if (workplace.isEmpty()) {
+        var workplace = workplaces.get(ref);
+        if (workplace == null) {
             return;
         }
         String dimension = level.dimension().identifier().toString();
-        Optional<BlockPos> target = workplace.get().machines().stream()
+        Optional<BlockPos> target = workplace.machines().stream()
                 .filter(position -> position.dimension().equals(dimension))
                 .map(position -> new BlockPos(position.x(), position.y(), position.z()))
                 .min(Comparator.comparingDouble(pos -> villager.blockPosition().distSqr(pos)));
@@ -79,7 +106,17 @@ public final class MachineWork {
             return;
         }
         if (villager.blockPosition().distSqr(target.get()) <= ARRIVED_DISTANCE_SQ) {
-            civ.machines().worked(workplace.get().company(), ref);
+            attempts.remove(ref);
+            civ.machines().worked(workplace.company(), ref);
+            return;
+        }
+        int tries = attempts.merge(ref, 1, Integer::sum);
+        if (tries > STUCK_AFTER) {
+            BlockPos beside = target.get().relative(villager.getDirection());
+            villager.getNavigation().stop();
+            villager.teleportTo(beside.getX() + 0.5, beside.getY(), beside.getZ() + 0.5);
+            attempts.remove(ref);
+            civ.machines().worked(workplace.company(), ref);
         } else {
             villager.getNavigation().moveTo(target.get().getX() + 0.5, target.get().getY(),
                     target.get().getZ() + 0.5, WALK_SPEED);

@@ -1310,6 +1310,13 @@ public final class CivCommandTree {
                         .suggests(this::suggestOwnCompanies)
                         .executes(context -> withCiv(context, (civ, player) -> civ.machines().list(
                                 StringArgumentType.getString(context, COMPANY))))))
+                .then(Commands.literal("menue").then(Commands.argument(COMPANY, StringArgumentType.string())
+                        .suggests(this::suggestOwnCompanies)
+                        .executes(context -> withCiv(context, (civ, player) -> {
+                            Screens.open(player, new de.etiennebader.civ.fabric.screen.MachinesScreen(civ, player,
+                                    StringArgumentType.getString(context, COMPANY), Optional.empty()));
+                            return null;
+                        }))))
                 .then(Commands.literal("kaufen").then(Commands.argument(COMPANY, StringArgumentType.string())
                         .suggests(this::suggestOwnCompanies)
                         .then(Commands.argument(ITEM, StringArgumentType.word())
