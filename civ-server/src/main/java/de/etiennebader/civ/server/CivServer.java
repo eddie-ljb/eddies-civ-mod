@@ -109,6 +109,7 @@ public final class CivServer {
     private final de.etiennebader.civ.server.construction.ConstructionService construction;
     private final de.etiennebader.civ.server.war.WarService war;
     private final de.etiennebader.civ.server.family.FamilyService family;
+    private final de.etiennebader.civ.server.machine.MachineService machines;
     private final de.etiennebader.civ.server.religion.ReligionService religion;
     private final VillagerService villagers;
     private final de.etiennebader.civ.server.villager.EducationStore educationStore;
@@ -215,6 +216,9 @@ public final class CivServer {
         this.community = new CommunityService(app, calendar, players, texts, announcements, Clock.systemUTC());
         this.companies = new CompanyService(app, calendar, players, settings.currency(), texts, announcements,
                 conjuncture, settings.founding());
+        this.machines = new de.etiennebader.civ.server.machine.MachineService(app, settings, texts, announcements, ids,
+                calendar::today, dataDirectory.map(dir -> dir.resolve("machines.tsv")));
+        app.production().rules(machines);
         app.companies().foundingFee(settings.founding().company());
         this.companies.pricing(market::priceLevel);
         this.rankings = new de.etiennebader.civ.server.ranking.RankingService(app, texts, settings.currency(),
@@ -304,6 +308,7 @@ public final class CivServer {
         civil.endOfDay(day);
         justice.endOfDay(day);
         companies.endOfDay(day);
+        machines.endOfDay(day, settings.ambitions());
         companies.produce(day);
         press.endOfDay(day.plus(1));
         community.endOfDay(day.plus(1));
@@ -453,6 +458,11 @@ public final class CivServer {
     /** Religionen, Klerus, Gläubigkeit der Dorfbewohner (Issue #13). */
     public de.etiennebader.civ.server.religion.ReligionService religion() {
         return religion;
+    }
+
+    /** Maschinen, Wartung und Zusatzwaren der Firmen. */
+    public de.etiennebader.civ.server.machine.MachineService machines() {
+        return machines;
     }
 
     /** Heirat, Scheidung und Kinder der Dorfbewohner. */

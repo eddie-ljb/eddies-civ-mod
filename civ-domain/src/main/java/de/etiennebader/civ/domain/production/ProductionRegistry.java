@@ -78,6 +78,26 @@ public final class ProductionRegistry extends AggregateRoot<ProductionEvent> imp
         return put(current.withStock(stock).produced(stock, day, total, 0), day);
     }
 
+    /**
+     * Legt zugekaufte oder abgegebene Zusatzwaren ins Lager, bis zur Lagergrenze.
+     *
+     * @return wie viel tatsächlich eingelagert wurde
+     * @throws IllegalArgumentException wenn die Ware nicht zur Branche passt
+     */
+    public long deposit(PolityId company, Commodity commodity, long quantity, Day day) {
+        Enterprise current = require(company);
+        if (!current.branch().accepts(commodity)) {
+            throw new IllegalArgumentException("Passt nicht zur Branche: " + commodity.id());
+        }
+        Map<Commodity, Long> stock = new TreeMap<>(current.stock());
+        long added = Math.max(0, Math.min(Enterprise.STOCK_LIMIT - stock.getOrDefault(commodity, 0L), quantity));
+        if (added > 0) {
+            stock.merge(commodity, added, Long::sum);
+            put(current.withStock(stock), day);
+        }
+        return added;
+    }
+
     /** Nimmt Waren aus dem Lager, z. B. zum Verkauf oder zum Abholen. */
     public Enterprise take(PolityId company, Commodity commodity, long quantity, Day day) {
         Enterprise current = require(company);

@@ -1,6 +1,26 @@
 {
   "replace": false,
   "values": [
-    "eddies-civ-mod:bank"
+    "eddies-civ-mod:bank",
+    "eddies-civ-mod:machine_sawmill",
+    "eddies-civ-mod:machine_log_splitter",
+    "eddies-civ-mod:machine_shearing_station",
+    "eddies-civ-mod:machine_wool_loom",
+    "eddies-civ-mod:machine_seed_drill",
+    "eddies-civ-mod:machine_harvester",
+    "eddies-civ-mod:machine_ore_crusher",
+    "eddies-civ-mod:machine_mine_drill",
+    "eddies-civ-mod:machine_net_winch",
+    "eddies-civ-mod:machine_fish_smoker",
+    "eddies-civ-mod:machine_milking_machine",
+    "eddies-civ-mod:machine_feed_mixer",
+    "eddies-civ-mod:machine_clay_press",
+    "eddies-civ-mod:machine_brick_kiln",
+    "eddies-civ-mod:machine_fruit_press",
+    "eddies-civ-mod:machine_honey_extractor",
+    "eddies-civ-mod:machine_concrete_mixer",
+    "eddies-civ-mod:machine_crane",
+    "eddies-civ-mod:machine_workbench_rig",
+    "eddies-civ-mod:machine_diagnostic_stand"
   ]
 }

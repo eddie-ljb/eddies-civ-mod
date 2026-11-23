@@ -77,6 +77,7 @@ final class VillagerCensus {
             return;
         }
         ticks = 0;
+        MachineWork.verify(server, civ);
         List<FamilyRegistry.Child> births = civ.family().pendingBirths();
         for (ServerLevel level : server.getAllLevels()) {
             List<Villager> loaded = new java.util.ArrayList<>(level.getEntities(EntityTypes.VILLAGER, villager -> villager.isAlive()));
@@ -92,6 +93,7 @@ final class VillagerCensus {
                     continue;
                 }
                 seen(civ, villager);
+                MachineWork.commute(civ, level, villager, ref(villager));
                 showMood(civ, level, villager);
             }
         }

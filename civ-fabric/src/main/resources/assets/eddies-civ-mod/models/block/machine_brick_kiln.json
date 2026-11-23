@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "eddies-civ-mod:block/machine_brick_kiln"
+  }
+}

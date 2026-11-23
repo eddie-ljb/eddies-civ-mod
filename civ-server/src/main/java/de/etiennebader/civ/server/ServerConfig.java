@@ -53,12 +53,13 @@ public final class ServerConfig {
     static final String ANTHEM_ON_ENTER = "anthem_on_enter";
     static final String WORLD_MAP = "world_map";
     static final String MAP_RADIUS = "world_map_radius_chunks";
+    static final String COMPANY_PLOT_REQUIRED = "company_plot_required";
     static final String PRICE_LEVEL_MIN = "price_level_min";
     static final String PRICE_LEVEL_MAX = "price_level_max";
     static final String PRICE_LEVEL_DAMPING = "price_level_damping";
     private static final java.util.List<String> KEYS = java.util.List.of(LIVE_COUNT, LIVE_COUNT_SECONDS, PROJECTIONS,
             DEBATE_MINUTES, ANTHEM_ON_ENTER, WORLD_MAP, MAP_RADIUS, WEB_TRUST_PROXY, VILLAGER_POLITICS,
-            AMBITIONS, LAW_DRAFTS, WAR_PORT_LOCK,
+            AMBITIONS, LAW_DRAFTS, WAR_PORT_LOCK, COMPANY_PLOT_REQUIRED,
             PRICE_LEVEL_MIN, PRICE_LEVEL_MAX, PRICE_LEVEL_DAMPING, COST_MUNICIPALITY, COST_COMPANY, COST_LEVELS,
             COST_LEVEL_DEFAULT, REQUIRE_PREVIOUS);
 
@@ -201,7 +202,8 @@ public final class ServerConfig {
             return new ServerSettings.EconomySettings(
                     decimal(properties, PRICE_LEVEL_MIN, defaults.priceLevelMin()),
                     decimal(properties, PRICE_LEVEL_MAX, defaults.priceLevelMax()),
-                    decimal(properties, PRICE_LEVEL_DAMPING, defaults.priceLevelDamping()));
+                    decimal(properties, PRICE_LEVEL_DAMPING, defaults.priceLevelDamping()),
+                    flag(properties, COMPANY_PLOT_REQUIRED, defaults.companyPlotRequired()));
         } catch (IllegalArgumentException e) {
             return defaults;
         }
@@ -264,6 +266,7 @@ public final class ServerConfig {
         properties.setProperty(ANTHEM_ON_ENTER, Boolean.toString(settings.show().anthemOnEnter()));
         properties.setProperty(WORLD_MAP, Boolean.toString(settings.show().worldMap()));
         properties.setProperty(MAP_RADIUS, Integer.toString(settings.show().mapRadius()));
+        properties.setProperty(COMPANY_PLOT_REQUIRED, Boolean.toString(settings.economy().companyPlotRequired()));
         properties.setProperty(PRICE_LEVEL_MIN, Double.toString(settings.economy().priceLevelMin()));
         properties.setProperty(PRICE_LEVEL_MAX, Double.toString(settings.economy().priceLevelMax()));
         properties.setProperty(PRICE_LEVEL_DAMPING, Double.toString(settings.economy().priceLevelDamping()));

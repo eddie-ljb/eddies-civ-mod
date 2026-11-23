@@ -142,11 +142,18 @@ public record ServerSettings(long ticksPerDay, int claimBase, int claimPerMember
      *                          {@value de.etiennebader.civ.domain.market.PriceLevel#MIN}
      * @param priceLevelMax     größter Preisfaktor bei sehr hoher Geldmenge je Kopf (Inflation), höchstens
      *                          {@value de.etiennebader.civ.domain.market.PriceLevel#MAX}
+     * @param companyPlotRequired ob jede Firma ein Grundstück halten muss, um zu produzieren (Standard aus)
      * @param priceLevelDamping Dämpfung der Preisreaktion auf die Geldmenge je Kopf; 0,5 entspricht der
      *                          bisherigen festen Formel (Quadratwurzel), höhere Werte lassen die Preise
      *                          stärker auf Inflation/Deflation reagieren
      */
-    public record EconomySettings(double priceLevelMin, double priceLevelMax, double priceLevelDamping) {
+    public record EconomySettings(double priceLevelMin, double priceLevelMax, double priceLevelDamping,
+                                  boolean companyPlotRequired) {
+
+        /** Ohne Grundstückspflicht für Firmen (Standard). */
+        public EconomySettings(double priceLevelMin, double priceLevelMax, double priceLevelDamping) {
+            this(priceLevelMin, priceLevelMax, priceLevelDamping, false);
+        }
 
         public static final EconomySettings DEFAULT =
                 new EconomySettings(PriceLevel.MIN, PriceLevel.MAX, PriceLevel.DEFAULT_DAMPING);

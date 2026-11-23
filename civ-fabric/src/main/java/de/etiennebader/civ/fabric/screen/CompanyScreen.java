@@ -238,6 +238,7 @@ public final class CompanyScreen extends MenuScreen {
             case BRICKWORKS -> Items.BRICK;
             case ORCHARD -> Items.APPLE;
             case CONSTRUCTION -> Items.STONE_BRICKS;
+            case MAINTENANCE -> Items.IRON_INGOT;
         };
     }
 }
