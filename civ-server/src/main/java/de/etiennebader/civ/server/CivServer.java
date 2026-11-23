@@ -109,6 +109,7 @@ public final class CivServer {
     private final de.etiennebader.civ.server.construction.ConstructionService construction;
     private final de.etiennebader.civ.server.war.WarService war;
     private final de.etiennebader.civ.server.family.FamilyService family;
+    private final de.etiennebader.civ.server.religion.ReligionService religion;
     private final VillagerService villagers;
     private final de.etiennebader.civ.server.villager.EducationStore educationStore;
     private final VillagerFederations villagerFederations;
@@ -197,7 +198,14 @@ public final class CivServer {
         educationStore.load(app.villagerEducation());
         this.family = new de.etiennebader.civ.server.family.FamilyService(app.queries(), announcements,
                 dataDirectory.map(dir -> dir.resolve("family.tsv")));
-        villagers.familyLines(family::describe);
+        this.religion = new de.etiennebader.civ.server.religion.ReligionService(app.queries(), players, announcements,
+                ids, dataDirectory.map(dir -> dir.resolve("religion.tsv")));
+        villagers.faithPoints(religion::faithPoints);
+        villagers.familyLines(villager -> {
+            List<de.etiennebader.civ.server.command.Message> lines = new java.util.ArrayList<>(family.describe(villager));
+            lines.addAll(religion.describe(villager));
+            return lines;
+        });
         this.villagerFoundations = new de.etiennebader.civ.server.villager.VillagerFoundations(app, villagers::lastSeen,
                 announcements, settings.founding());
         this.townHalls = new TownHallService(app, calendar, texts, announcements);
@@ -289,6 +297,7 @@ public final class CivServer {
             construction.villagersOrder(day);
             family.endOfDay(day);
         }
+        religion.endOfDay(day);
         federations.autoDecideInvitations(day, settings.villagerPolitics());
         campaigns.endOfDay(day);
         war.endOfDay(day);
@@ -439,6 +448,11 @@ public final class CivServer {
 
     public de.etiennebader.civ.server.war.WarService war() {
         return war;
+    }
+
+    /** Religionen, Klerus, Gläubigkeit der Dorfbewohner (Issue #13). */
+    public de.etiennebader.civ.server.religion.ReligionService religion() {
+        return religion;
     }
 
     /** Heirat, Scheidung und Kinder der Dorfbewohner. */

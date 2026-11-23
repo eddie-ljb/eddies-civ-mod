@@ -93,6 +93,8 @@ public final class VillagerService {
     /** Kinder, die seit dem letzten Tagesabschluss überhaupt gesehen wurden. */
     private final java.util.Set<PersonRef> childrenToday = new java.util.HashSet<>();
     /** Familienangaben für die Auskunft über einen Dorfbewohner; vom Server gesetzt. */
+    /** Zufriedenheitspunkte durch Glauben (Issue #13); vom Server gesetzt. */
+    private java.util.function.ToIntFunction<PersonRef> faithPoints = villager -> 0;
     private java.util.function.Function<PersonRef, List<Message>> familyLines = villager -> List.of();
     /** Post zwischen Spielern und Dorfbewohnern bzw. unter Dorfbewohnern (Issue #18); wie {@link #social} nur im Speicher. */
     private final VillagerMailbox mailbox = new VillagerMailbox();
@@ -242,7 +244,11 @@ public final class VillagerService {
         return queries.municipalityOf(villager)
                 .map(town -> Satisfaction.of(Personality.of(villager), town, queries.effectiveLaws(town))
                         .withMedia(app.pressInfluence().satisfactionPoints(villager, town))
-                        .withSocial(social.pointsOf(villager)));
+                        .withSocial(social.pointsOf(villager) + faithPoints.applyAsInt(villager)));
+    }
+
+    public void faithPoints(java.util.function.ToIntFunction<PersonRef> points) {
+        this.faithPoints = Objects.requireNonNull(points, "points");
     }
 
     public void familyLines(java.util.function.Function<PersonRef, List<Message>> lines) {
@@ -261,7 +267,7 @@ public final class VillagerService {
         }
         Satisfaction satisfaction = Satisfaction.of(personality, town.get(), queries.effectiveLaws(town.get()))
                 .withMedia(app.pressInfluence().satisfactionPoints(villager, town.get()))
-                .withSocial(social.pointsOf(villager));
+                .withSocial(social.pointsOf(villager) + faithPoints.applyAsInt(villager));
         List<Message> lines = new ArrayList<>(List.of(
                 Message.of(MessageKey.VILLAGER_INFO, town.get().name().value(), trait, personality.order(),
                         personality.thrift(), personality.belonging()),

@@ -64,7 +64,10 @@ final class VillagerCensus {
         });
         ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
             if (entity instanceof Villager villager) {
-                host.current().ifPresent(civ -> civ.villagers().gone(ref(villager), civ.calendar().today()));
+                host.current().ifPresent(civ -> {
+                    civ.villagers().gone(ref(villager), civ.calendar().today());
+                    civ.religion().gone(ref(villager));
+                });
             }
         });
     }

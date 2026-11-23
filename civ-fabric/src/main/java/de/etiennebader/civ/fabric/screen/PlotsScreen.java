@@ -111,6 +111,7 @@ final class PlotsScreen extends MenuScreen {
             case PUBLIC -> Items.BELL;
             case EMBASSY -> Items.BANNER.white();
             case EDUCATION -> Items.BOOKSHELF;
+            case RELIGIOUS -> Items.LECTERN;
         };
     }
 }

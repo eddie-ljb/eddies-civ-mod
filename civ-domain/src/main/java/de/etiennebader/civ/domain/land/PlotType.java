@@ -12,5 +12,7 @@ public enum PlotType {
     /** Botschaft: gehört immer einer fremden Polity. */
     EMBASSY,
     /** Schule: junge Dorfbewohner, die sich hier aufhalten, gewinnen Bildung (Issue #21). */
-    EDUCATION
+    EDUCATION,
+    /** Gotteshaus: Gebete hier stärken die Inbrunst der Religion doppelt (Issue #13). */
+    RELIGIOUS
 }

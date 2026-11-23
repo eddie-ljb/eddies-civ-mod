@@ -60,4 +60,32 @@ class PersonalityTest {
         assertEquals(0.9, new Personality(0, 0, 100).loyalty(), 0.001);
         assertTrue(new Personality(0, 0, 50).loyalty() > new Personality(0, 0, -50).loyalty());
     }
+
+    @Test
+    @DisplayName("Gläubigkeit (Issue #13) bleibt deterministisch zwischen -100 und 100, beide Richtungen kommen vor")
+    void religiosity() {
+        PersonRef villager = actors.villager();
+        int value = Personality.of(villager).religiosity();
+        assertTrue(value >= -100 && value <= 100);
+        assertEquals(value, Personality.of(new PersonRef(villager.id())).religiosity(),
+                "dieselbe Identität ergibt immer dieselbe Gläubigkeit");
+
+        boolean sawBeliever = false;
+        boolean sawAtheist = false;
+        for (int i = 0; i < 500; i++) {
+            int religiosity = Personality.of(actors.villager()).religiosity();
+            sawBeliever |= Personality.believer(religiosity);
+            sawAtheist |= !Personality.believer(religiosity);
+        }
+        assertTrue(sawBeliever && sawAtheist, "unter vielen Dorfbewohnern sollten beide Richtungen vorkommen");
+    }
+
+    @Test
+    @DisplayName("believer() grenzt an 0: positiv gläubig, 0 und negativ nicht")
+    void believerThreshold() {
+        assertTrue(Personality.believer(1));
+        assertTrue(Personality.believer(100));
+        assertEquals(false, Personality.believer(0));
+        assertEquals(false, Personality.believer(-1));
+    }
 }
