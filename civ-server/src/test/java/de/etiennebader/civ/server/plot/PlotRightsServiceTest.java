@@ -93,4 +93,16 @@ class PlotRightsServiceTest {
         assertTrue(server.protection().check(bob, ProtectedAction.BUILD, SPOT).isPresent(),
                 "die alten Einstellungen gelten für den neuen Inhaber nicht");
     }
+
+    @Test
+    @DisplayName("Auch Dorfbewohner der Gemeinde lassen sich als Gast eintragen")
+    void villagerGuest() {
+        setUp();
+        var villager = new de.etiennebader.civ.domain.actor.PersonRef(de.etiennebader.civ.domain.shared.PersonId.generate(ids));
+        server.villagers().seen(villager, HERE, de.etiennebader.civ.domain.shared.Day.of(1));
+        String name = de.etiennebader.civ.domain.population.VillagerIdentity.of(villager).fullName();
+        assertTrue(server.plotRights().setGuest(bobCaller, name, "bauen", "ja").success());
+        assertTrue(server.protection().check(cleo, ProtectedAction.BUILD, SPOT).isPresent());
+        assertTrue(server.plotRights().viewAt(bob, HERE).orElseThrow().rights().guests().containsKey(villager));
+    }
 }

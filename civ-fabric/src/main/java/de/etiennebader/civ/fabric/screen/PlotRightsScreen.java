@@ -34,6 +34,7 @@ final class PlotRightsScreen extends MenuScreen {
     private static final int[] MEMBER_SLOTS = {10, 11, 12};
     private static final int[] OUTSIDER_SLOTS = {14, 15, 16};
     private static final int[] RULE_SLOTS = {28, 29, 30, 31, 32};
+    private static final int[] GUEST_SLOTS = {18, 19, 20, 21, 22, 23, 24, 25};
     private static final ProtectedAction[] ACTIONS = {ProtectedAction.BUILD, ProtectedAction.INTERACT,
             ProtectedAction.OPEN_CONTAINER};
 
@@ -103,6 +104,38 @@ final class PlotRightsScreen extends MenuScreen {
             }
             canvas.set(RULE_SLOTS[i], icon.build(), click -> change(click.player(), view,
                     r -> r.withStance(flag, next(r.stance(flag)))));
+        }
+        int index = 0;
+        for (var entry : rights.guests().entrySet()) {
+            if (index >= GUEST_SLOTS.length) {
+                break;
+            }
+            var guest = entry.getKey();
+            var actions = entry.getValue();
+            String name = civ.texts().actor(guest);
+            Icon icon = Icon.of(Items.PLAYER_HEAD).name(GuiKeys.PLOT_RIGHTS_GUEST_ENTRY.text(name), Icon.TITLE)
+                    .line(Message.of(MessageKey.PLOT_RIGHTS_ACTIONS,
+                            Message.of(actions.contains(ProtectedAction.BUILD) ? MessageKey.PLOT_RIGHTS_ALLOWED
+                                    : MessageKey.PLOT_RIGHTS_FORBIDDEN),
+                            Message.of(actions.contains(ProtectedAction.INTERACT) ? MessageKey.PLOT_RIGHTS_ALLOWED
+                                    : MessageKey.PLOT_RIGHTS_FORBIDDEN),
+                            Message.of(actions.contains(ProtectedAction.OPEN_CONTAINER) ? MessageKey.PLOT_RIGHTS_ALLOWED
+                                    : MessageKey.PLOT_RIGHTS_FORBIDDEN)));
+            if (view.canManage()) {
+                icon.hint(GuiKeys.PLOT_RIGHTS_GUEST_HINT.text());
+            }
+            canvas.set(GUEST_SLOTS[index++], icon.build(), click -> change(click.player(), view, r -> {
+                if (click.shift()) {
+                    return r.withoutGuest(guest);
+                }
+                ProtectedAction action = click.right() ? ProtectedAction.INTERACT : ProtectedAction.BUILD;
+                return r.withGuest(guest, action, !actions.contains(action));
+            }));
+        }
+        if (view.canManage() && rights.guests().size() < PlotRights.MAX_GUESTS) {
+            canvas.set(26, Icon.of(Items.WRITABLE_BOOK).name(GuiKeys.PLOT_RIGHTS_GUEST_ADD.text(), Icon.GOOD).build(),
+                    click -> prompt(click, GuiKeys.PLOT_RIGHTS_GUEST_ADD.text(),
+                            "/civ grundstueck rechte gast "));
         }
         canvas.set(34, Icon.of(Items.BARRIER).name(GuiKeys.PLOT_RIGHTS_RESET.text(), Icon.BAD).build(),
                 click -> change(click.player(), view, r -> PlotRights.DEFAULT));

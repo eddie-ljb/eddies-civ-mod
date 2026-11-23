@@ -1738,5 +1738,9 @@
   "eddies-civ-mod.command.plot_rights_action_container": "Open containers",
   "eddies-civ-mod.command.municipal_build_ordered": "%3$s is having a building built: %1$s, commissioned from the construction firm %2$s.",
   "eddies-civ-mod.command.town_plot_planned": "The planning office of %4$s plans a plot (%1$s, %2$s × %3$s) for the town.",
-  "eddies-civ-mod.command.town_plot_offered": "New plot advertised in %5$s: %1$s, %2$s × %3$s, price %4$s."
+  "eddies-civ-mod.command.town_plot_offered": "New plot advertised in %5$s: %1$s, %2$s × %3$s, price %4$s.",
+  "eddies-civ-mod.command.build_site_abandoned": "Build order %1$s cancelled: the building site was not clear for %2$s days.",
+  "eddies-civ-mod.gui.plot_rights_guest_entry": "Guest: %1$s",
+  "eddies-civ-mod.gui.plot_rights_guest_hint": "Click: build, right-click: doors, shift: remove",
+  "eddies-civ-mod.gui.plot_rights_guest_add": "Add guest"
 }

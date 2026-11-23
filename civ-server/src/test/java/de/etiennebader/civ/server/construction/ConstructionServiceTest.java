@@ -243,4 +243,17 @@ class ConstructionServiceTest {
         }
         return raw.toByteArray();
     }
+
+    @Test
+    @DisplayName("Ein Baufeld, das tagelang blockiert bleibt, beendet den Auftrag")
+    void blockedSiteIsAbandoned() {
+        setUp();
+        assertTrue(server.construction().order(aliceAt, "holz-huette", "Bau AG").success());
+        Flat blocked = new Flat(true, false, 70);
+        long perDay = de.etiennebader.civ.server.CivServerFixture.SETTINGS.ticksPerDay();
+        for (int i = 0; i < 5; i++) {
+            server.construction().advance(perDay, blocked);
+        }
+        assertEquals(ConstructionProject.Status.CANCELLED, server.construction().projects().getFirst().status());
+    }
 }

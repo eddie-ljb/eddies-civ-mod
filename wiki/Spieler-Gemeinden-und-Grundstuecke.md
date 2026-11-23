@@ -46,14 +46,14 @@ Grundstücke teilen das Gemeindeland auf. Nur ihre Inhaber dürfen dort bauen, u
 Der Inhaber stellt ein, was auf seinem Grundstück erlaubt ist (Rechtsklick auf das Grundstück im Grundstücksmenü oder per Befehl):
 - `/civ grundstueck rechte` zeigt die Einstellungen.
 - `/civ grundstueck rechte mitglieder|fremde <bauen|benutzen|behaelter> <ja|nein>` erlaubt oder verbietet Mitgliedern der Gemeinde bzw. allen anderen das Bauen, das Benutzen von Türen, Knöpfen und Hebeln oder das Öffnen von Behältern. Standard: Mitglieder benutzen Türen, Fremde nichts.
-- `/civ grundstueck rechte gast <Spieler> <Handlung> <ja|nein>` und `gastentfernen <Spieler>` geben einzelnen Spielern Rechte (bis zu 32 Gäste).
+- `/civ grundstueck rechte gast <Spieler> <Handlung> <ja|nein>` und `gastentfernen <Spieler>` geben einzelnen Spielern Rechte (bis zu 32 Gäste, auch Dorfbewohner der Gemeinde mit vollem Namen; im Menü per Klick umschalten).
 - `/civ grundstueck rechte regel <pvp|monster|explosionen|feuer|tiere> <gesetz|erlauben|verbieten>` stellt Regeln abweichend vom Gesetz ein: Kämpfe, feindliche Monster, Explosionen, Feuerausbreitung und ob Fremde Tiere verletzen dürfen.
 - `/civ grundstueck rechte zuruecksetzen` stellt den Standard wieder her.
 
 Ob der Inhaber Gemeinde-, Länder- und Nationenrecht überschreiben darf, regelt das Gesetz `plot_rights_override` (Standard ja). Steht es auf nein, gilt das Recht auch auf Grundstücken: Was es Fremden erlaubt, ist überall erlaubt, und die Regeln des Grundstücks werden ignoriert. Wechselt das Grundstück den Inhaber, gilt wieder der Standard. Gemeindeland ist davon nicht betroffen; dafür entscheidet das Recht der Gemeinde.
 
 ### Dorfbewohner als Bauamt und Bauherren
-Ist das Bauamt (Planer, sonst Bürgermeister) ein Dorfbewohner, schneidet er neue Grundstücke zu und schreibt sie zum Verkauf aus, plant Schule, Gotteshaus und öffentliche Plätze und lässt darauf kommunale Bauten von einer Baufirma errichten, bezahlt aus der Gemeindekasse. Dorfbewohner kaufen angebotenes Wohnland und bauen darauf; Firmenchefs und Zeitungsleiter lassen auf den Grundstücken ihrer Organisation bauen. Über 50 eingebaute Bauvorlagen (`/civ bau plaene`) decken Wohnen, Gewerbe, Industrie, Landwirtschaft und kommunale Bauten ab.
+Ist das Bauamt (Planer, sonst Bürgermeister) ein Dorfbewohner, schneidet er neue Grundstücke zu und schreibt sie zum Verkauf aus, plant Schule, Gotteshaus und öffentliche Plätze und lässt darauf kommunale Bauten von einer Baufirma errichten, bezahlt aus der Gemeindekasse. Dorfbewohner kaufen angebotenes Wohnland und bauen darauf; Firmenchefs und Zeitungsleiter lassen auf den Grundstücken ihrer Organisation bauen. Bleibt das Baufeld drei Tage lang blockiert, endet der Auftrag. Auf Grundstücken einer Gemeinde, Firma, Zeitung, Partei oder eines Bundes baut deren Leitung (Spieler oder Dorfbewohner) auf Kosten der Kasse. Über 50 eingebaute Bauvorlagen (`/civ bau plaene`) decken Wohnen, Gewerbe, Industrie, Landwirtschaft und kommunale Bauten ab.
 
 ## Straßen und Adressen
 - Bürgermeister oder Bauamt markieren eine Straße mit dem Grundstücksstab und legen sie mit `/civ strasse anlegen <Name>` an; `aufheben <Name>` und `liste` gibt es auch.

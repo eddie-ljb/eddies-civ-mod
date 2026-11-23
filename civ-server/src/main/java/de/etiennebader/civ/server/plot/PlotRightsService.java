@@ -189,7 +189,7 @@ public final class PlotRightsService implements PlotRightsSource {
 
     /** Einem Spieler als Gast eine Handlung erlauben oder verbieten. */
     public synchronized Reply setGuest(Caller caller, String playerName, String actionInput, String allowInput) {
-        Optional<PlayerRef> guest = players.findByName(playerName.strip());
+        Optional<? extends ActorRef> guest = resolveGuest(caller, playerName);
         if (guest.isEmpty()) {
             return Reply.failure(Message.of(MessageKey.UNKNOWN_RECIPIENT, playerName.strip()));
         }
@@ -206,8 +206,25 @@ public final class PlotRightsService implements PlotRightsSource {
                 : rights.withGuest(guest.get(), action.get(), allowed.get()));
     }
 
+    /** Ein Gast ist ein Spieler mit diesem Namen oder ein Dorfbewohner der Gemeinde, dessen vollen Namen man nennt. */
+    private Optional<? extends ActorRef> resolveGuest(Caller caller, String name) {
+        Optional<PlayerRef> player = players.findByName(name.strip());
+        if (player.isPresent()) {
+            return player;
+        }
+        return plotAt(caller.position()).flatMap(found -> found.polity().members().stream()
+                .map(de.etiennebader.civ.domain.polity.Membership::member)
+                .filter(de.etiennebader.civ.domain.actor.PersonRef.class::isInstance)
+                .filter(member -> texts.actor(member).equalsIgnoreCase(name.strip())).findFirst());
+    }
+
+    /** Gäste, die man einladen kann: Dorfbewohner der Gemeinde, für Menüs. */
+    public synchronized Optional<? extends ActorRef> guestNamed(Caller caller, String name) {
+        return resolveGuest(caller, name);
+    }
+
     public synchronized Reply removeGuest(Caller caller, String playerName) {
-        Optional<PlayerRef> guest = players.findByName(playerName.strip());
+        Optional<? extends ActorRef> guest = resolveGuest(caller, playerName);
         if (guest.isEmpty()) {
             return Reply.failure(Message.of(MessageKey.UNKNOWN_RECIPIENT, playerName.strip()));
         }

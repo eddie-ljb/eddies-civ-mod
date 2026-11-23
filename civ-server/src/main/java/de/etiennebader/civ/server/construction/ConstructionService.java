@@ -110,6 +110,11 @@ public final class ConstructionService {
     private final Map<UUID, ConstructionProject> projects = new java.util.LinkedHashMap<>();
     private final Map<UUID, Double> carry = new HashMap<>();
     private final Map<UUID, Long> blockedUntil = new HashMap<>();
+    private final Map<UUID, Long> blockedSince = new HashMap<>();
+    /** Grundstücke, deren Baufeld so lange blockiert war, dass der Auftrag aufgegeben wurde; bis zum Neustart. */
+    private final java.util.Set<PlotId> abandoned = new java.util.HashSet<>();
+    /** Nach so vielen Tagen blockiertem Baufeld wird ein Auftrag ohne Baubeginn aufgegeben. */
+    static final int ABANDON_DAYS = 3;
     private final de.etiennebader.civ.server.Announcements announcements;
     private final TownPlanning planning;
     private boolean interimGovernment = true;
@@ -269,12 +274,17 @@ public final class ConstructionService {
     private ConstructionProject place(ActorRef client, PolityId townId, Plot plot, Blueprint plan, PolityView firm,
                                       Day day, boolean selfSupplied, int rotation) {
         PolityView town = queries.polity(townId).orElseThrow();
-        boolean holder = plot.holder().equals(client);
-        boolean townPlot = plot.holder().equals(town.asActor()) && mayDecide(client, townId);
-        boolean organisationPlot = plot.holder() instanceof PolityRef org && client instanceof PersonRef person
-                && queries.polity(org.id()).map(found -> found.holds(person, Office.MAYOR)).orElse(false);
+        final ActorRef asked = client;
+        boolean holder = plot.holder().equals(asked);
+        boolean townPlot = plot.holder().equals(town.asActor()) && mayDecide(asked, townId);
+        boolean organisationPlot = plot.holder() instanceof PolityRef org
+                && queries.polity(org.id()).map(found -> found.holds(asked, Office.MAYOR)).orElse(false);
         if (!holder && !townPlot && !organisationPlot) {
             throw new BuildRefused(Message.of(MessageKey.BUILD_NOT_HOLDER));
+        }
+        // Auf Grundstücken einer Gemeinde, Firma oder anderen Organisation baut die Organisation: Ihre Kasse zahlt.
+        if (!holder) {
+            client = plot.holder();
         }
         if (queries.production().enterpriseOf(firm.id()).map(e -> e.branch() != Branch.CONSTRUCTION).orElse(true)) {
             throw new BuildRefused(Message.of(MessageKey.BUILD_NOT_CONSTRUCTION, firm.name().value()));
@@ -380,6 +390,11 @@ public final class ConstructionService {
                 int y = terrain.groundLevel(corner, fx, fz);
                 BlockPosition min = new BlockPosition(project.dimension(), project.originX(), y, project.originZ());
                 if (!terrain.isClear(min, fx, plan.get().sizeY(), fz)) {
+                    long since = blockedSince.computeIfAbsent(current.id(), id -> clock);
+                    if (clock - since >= ABANDON_DAYS * perDay) {
+                        abandon(current);
+                        continue;
+                    }
                     blockedUntil.put(current.id(), clock + RECHECK_TICKS);
                     if (current.client() instanceof PlayerRef player) {
                         announcements.add(de.etiennebader.civ.server.Announcement.toPlayer(player,
@@ -388,6 +403,7 @@ public final class ConstructionService {
                     continue;
                 }
                 blockedUntil.remove(current.id());
+                blockedSince.remove(current.id());
                 current = current.withOriginY(y);
                 put(current);
             }
@@ -424,6 +440,20 @@ public final class ConstructionService {
                     workers(firm.get()).stream().map(ActorRef::uuid).toList()));
         }
         return builds;
+    }
+
+    /** Das Baufeld blieb zu lange blockiert: Der Auftrag endet, der Bauherr (bei Organisationen deren Leitung) erfährt es. */
+    private void abandon(ConstructionProject project) {
+        put(project.withStatus(ConstructionProject.Status.CANCELLED));
+        blockedSince.remove(project.id());
+        blockedUntil.remove(project.id());
+        abandoned.add(project.plot());
+        ActorRef who = project.client() instanceof PolityRef org
+                ? queries.polity(org.id()).flatMap(PolityView::mayor).orElse(null) : project.client();
+        if (who instanceof PlayerRef player) {
+            announcements.add(de.etiennebader.civ.server.Announcement.toPlayer(player,
+                    Message.of(MessageKey.BUILD_SITE_ABANDONED, project.number(), ABANDON_DAYS)));
+        }
     }
 
     /** Wie viele der nächsten Blöcke aus dem Lager gedeckt sind; verbraucht die Baustoffe im {@code depot}. */
@@ -540,7 +570,8 @@ public final class ConstructionService {
             return true;
         }
         return project.client() instanceof PolityRef org
-                && queries.polity(org.id()).map(found -> found.holds(player, Office.MAYOR)).orElse(false);
+                && (queries.polity(org.id()).map(found -> found.holds(player, Office.MAYOR)).orElse(false)
+                || mayDecide(player, project.town()) && org.id().equals(project.town()));
     }
 
     /**
@@ -579,7 +610,8 @@ public final class ConstructionService {
             }
         }
         for (PolityView owner : queries.polities().stream().filter(p -> p.kind() == PolityKind.TERRITORIAL
-                        || p.kind() == PolityKind.COMPANY || p.kind() == PolityKind.NEWSPAPER)
+                        || p.kind() == PolityKind.COMPANY || p.kind() == PolityKind.NEWSPAPER
+                        || p.kind() == PolityKind.PARTY || p.kind() == PolityKind.FEDERATION)
                 .sorted(Comparator.comparing(p -> p.id().value())).toList()) {
             if (head(owner).filter(h -> VillagerAmbitions.roll(h, day, 0x94) < ORGANISATION_ORDERS).isPresent()
                     && orderForOrganisation(owner, towns, day)) {
@@ -632,7 +664,7 @@ public final class ConstructionService {
         Personality personality = Personality.of(villager);
         List<Plot> empty = queries.land(town.id()).plotsHeldBy(villager).stream()
                 .filter(plot -> plot.type() != PlotType.EMBASSY)
-                .filter(plot -> projects.values().stream().noneMatch(p -> p.plot().equals(plot.id())))
+                .filter(plot -> projects.values().stream().noneMatch(p -> p.plot().equals(plot.id())) && !abandoned.contains(plot.id()))
                 .sorted(Comparator.<Plot, Boolean>comparing(plot -> plot.type() != PlotType.RESIDENTIAL)
                         .thenComparing(plot -> plot.id().value())).toList();
         if (empty.isEmpty()) {
@@ -678,7 +710,7 @@ public final class ConstructionService {
                     .filter(plot -> plot.type() != PlotType.EMBASSY)
                     .filter(plot -> owner.kind() != PolityKind.TERRITORIAL || isCivic(plot.type()))
                     .filter(plot -> !plot.isForSale())
-                    .filter(plot -> projects.values().stream().noneMatch(p -> p.plot().equals(plot.id())))
+                    .filter(plot -> projects.values().stream().noneMatch(p -> p.plot().equals(plot.id())) && !abandoned.contains(plot.id()))
                     .sorted(Comparator.comparing(plot -> plot.id().value())).toList();
             if (candidates.isEmpty()) {
                 continue;

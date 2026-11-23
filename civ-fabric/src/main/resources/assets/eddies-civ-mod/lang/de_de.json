@@ -1738,5 +1738,9 @@
   "eddies-civ-mod.command.plot_rights_action_container": "Behälter öffnen",
   "eddies-civ-mod.command.municipal_build_ordered": "%3$s lässt bauen: %1$s, Auftrag an die Baufirma %2$s.",
   "eddies-civ-mod.command.town_plot_planned": "Das Bauamt von %4$s plant ein Grundstück (%1$s, %2$s × %3$s) für die Gemeinde.",
-  "eddies-civ-mod.command.town_plot_offered": "Neues Grundstück in %5$s ausgeschrieben: %1$s, %2$s × %3$s, Preis %4$s."
+  "eddies-civ-mod.command.town_plot_offered": "Neues Grundstück in %5$s ausgeschrieben: %1$s, %2$s × %3$s, Preis %4$s.",
+  "eddies-civ-mod.command.build_site_abandoned": "Bauauftrag %1$s abgebrochen: Das Baufeld war %2$s Tage lang nicht frei.",
+  "eddies-civ-mod.gui.plot_rights_guest_entry": "Gast: %1$s",
+  "eddies-civ-mod.gui.plot_rights_guest_hint": "Klick: Bauen, Rechtsklick: Türen, Umschalt: entfernen",
+  "eddies-civ-mod.gui.plot_rights_guest_add": "Gast hinzufügen"
 }
