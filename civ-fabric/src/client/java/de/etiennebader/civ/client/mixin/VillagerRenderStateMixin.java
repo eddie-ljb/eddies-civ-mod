@@ -1,5 +1,6 @@
 package de.etiennebader.civ.client.mixin;
 
+import de.etiennebader.civ.client.CivVillagerState;
 import net.minecraft.client.renderer.entity.state.VillagerRenderState;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;

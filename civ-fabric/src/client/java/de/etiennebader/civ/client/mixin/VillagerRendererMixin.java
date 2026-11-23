@@ -1,5 +1,6 @@
 package de.etiennebader.civ.client.mixin;
 
+import de.etiennebader.civ.client.CivVillagerState;
 import de.etiennebader.civ.client.VillagerSkins;
 import net.minecraft.client.renderer.entity.VillagerRenderer;
 import net.minecraft.client.renderer.entity.state.VillagerRenderState;
