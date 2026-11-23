@@ -83,6 +83,11 @@ public final class CompanyScreen extends MenuScreen {
         renderEmployees(canvas, firm, quoted);
         canvas.fillRow(5, Icon.of(Items.STAINED_GLASS_PANE.gray()).hidden().build());
         backButton(canvas);
+        canvas.set(47, Icon.of(Items.PISTON).name(GuiKeys.MACHINES_BUTTON.text(), Icon.TITLE)
+                .line(GuiKeys.MACHINES_BUTTON_LINE.text(), Icon.INFO).build(), click -> {
+                    Feedback.click(click.player());
+                    Screens.open(click.player(), new MachinesScreen(civ, click.player(), companyName, Optional.of(this)));
+                });
         if (enterprise.isPresent()) {
             canvas.set(49, Icon.of(Items.EMERALD).name(GuiKeys.COMPANY_SELL_NOW.text(), Icon.TITLE).build(),
                     click -> act(click, civ.companies().sell(Players.caller(click.player()), quoted, "jetzt")));
@@ -238,6 +243,7 @@ public final class CompanyScreen extends MenuScreen {
             case BRICKWORKS -> Items.BRICK;
             case ORCHARD -> Items.APPLE;
             case CONSTRUCTION -> Items.STONE_BRICKS;
+            case MAINTENANCE -> Items.IRON_INGOT;
         };
     }
 }

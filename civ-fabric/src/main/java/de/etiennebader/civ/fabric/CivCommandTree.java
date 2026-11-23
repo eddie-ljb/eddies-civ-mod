@@ -1289,6 +1289,73 @@ public final class CivCommandTree {
     }
 
     /** Holt Waren aus dem Firmenlager ins Inventar; was nicht passt, fällt vor die Füße. */
+    /** {@code /civ firma einlagern <Firma>}: die Ware in der Hand als Zusatzware ins Firmenlager. */
+    private static Reply deposit(CivServer civ, ServerPlayer player, String company) {
+        ItemStack hand = player.getMainHandItem();
+        if (hand.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.DEPOSIT_EMPTY_HAND));
+        }
+        String id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(hand.getItem()).toString();
+        var result = civ.machines().deposit(Players.caller(player), company, id, hand.getCount());
+        if (result.quantity() > 0) {
+            hand.shrink((int) result.quantity());
+        }
+        return result.reply();
+    }
+
+    /** {@code /civ firma maschine ...}: Maschinen ansehen, kaufen, ausbauen und warten. */
+    private LiteralArgumentBuilder<CommandSourceStack> machineCommands() {
+        return Commands.literal("maschine")
+                .then(Commands.literal("liste").then(Commands.argument(COMPANY, StringArgumentType.string())
+                        .suggests(this::suggestOwnCompanies)
+                        .executes(context -> withCiv(context, (civ, player) -> civ.machines().list(
+                                StringArgumentType.getString(context, COMPANY))))))
+                .then(Commands.literal("menue").then(Commands.argument(COMPANY, StringArgumentType.string())
+                        .suggests(this::suggestOwnCompanies)
+                        .executes(context -> withCiv(context, (civ, player) -> {
+                            Screens.open(player, new de.etiennebader.civ.fabric.screen.MachinesScreen(civ, player,
+                                    StringArgumentType.getString(context, COMPANY), Optional.empty()));
+                            return null;
+                        }))))
+                .then(Commands.literal("kaufen").then(Commands.argument(COMPANY, StringArgumentType.string())
+                        .suggests(this::suggestOwnCompanies)
+                        .then(Commands.argument(ITEM, StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                        java.util.Arrays.stream(de.etiennebader.civ.domain.production.MachineType.values())
+                                                .map(de.etiennebader.civ.domain.production.MachineType::id).toList(), builder))
+                                .executes(context -> withCiv(context, (civ, player) -> {
+                                    var purchase = civ.machines().buy(Players.caller(player),
+                                            StringArgumentType.getString(context, COMPANY),
+                                            StringArgumentType.getString(context, ITEM));
+                                    purchase.type().flatMap(type -> net.minecraft.core.registries.BuiltInRegistries.ITEM
+                                                    .getOptional(net.minecraft.resources.Identifier.fromNamespaceAndPath(
+                                                            "eddies-civ-mod", type.blockId())))
+                                            .ifPresent(item -> player.getInventory().placeItemBackInInventory(
+                                                    new ItemStack(item), net.minecraft.util.Prediction.SERVER_ONLY));
+                                    return purchase.reply();
+                                })))))
+                .then(Commands.literal("ausbauen").then(Commands.argument(COMPANY, StringArgumentType.string())
+                        .suggests(this::suggestOwnCompanies)
+                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1, 64))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.machines().upgrade(
+                                        Players.caller(player), StringArgumentType.getString(context, COMPANY),
+                                        IntegerArgumentType.getInteger(context, NUMBER)))))))
+                .then(Commands.literal("warten").then(Commands.argument(COMPANY, StringArgumentType.string())
+                        .suggests(this::suggestOwnCompanies)
+                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1, 64))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.machines().maintain(
+                                        Players.caller(player), StringArgumentType.getString(context, COMPANY),
+                                        IntegerArgumentType.getInteger(context, NUMBER), false)))
+                                .then(Commands.literal("selbst")
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.machines().maintain(
+                                                Players.caller(player), StringArgumentType.getString(context, COMPANY),
+                                                IntegerArgumentType.getInteger(context, NUMBER), false))))
+                                .then(Commands.literal("firma")
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.machines().maintain(
+                                                Players.caller(player), StringArgumentType.getString(context, COMPANY),
+                                                IntegerArgumentType.getInteger(context, NUMBER), true)))))));
+    }
+
     private static Reply pickup(CivServer civ, ServerPlayer player, String company, String item, int quantity) {
         String id = item.contains(":") ? item : "minecraft:" + item;
         Optional<net.minecraft.world.item.Item> type = Optional.ofNullable(net.minecraft.resources.Identifier.tryParse(id))
@@ -2377,6 +2444,12 @@ public final class CivCommandTree {
                                                         StringArgumentType.getString(context, COMPANY),
                                                         StringArgumentType.getString(context, ITEM),
                                                         IntegerArgumentType.getInteger(context, COUNT))))))))
+                .then(machineCommands())
+                .then(Commands.literal("einlagern")
+                        .then(Commands.argument(COMPANY, StringArgumentType.string())
+                                .suggests(this::suggestOwnCompanies)
+                                .executes(context -> withCiv(context, (civ, player) -> deposit(civ, player,
+                                        StringArgumentType.getString(context, COMPANY))))))
                 .then(Commands.literal("kuendigen")
                         .then(Commands.argument(COMPANY, StringArgumentType.string())
                                 .suggests(this::suggestOwnCompanies)

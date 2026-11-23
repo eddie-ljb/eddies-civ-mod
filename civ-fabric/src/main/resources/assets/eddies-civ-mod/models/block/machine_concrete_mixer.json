@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/cube_bottom_top",
+  "textures": {
+    "top": "eddies-civ-mod:block/machine_concrete_mixer_top",
+    "side": "eddies-civ-mod:block/machine_concrete_mixer_side",
+    "bottom": "eddies-civ-mod:block/machine_concrete_mixer_bottom"
+  }
+}

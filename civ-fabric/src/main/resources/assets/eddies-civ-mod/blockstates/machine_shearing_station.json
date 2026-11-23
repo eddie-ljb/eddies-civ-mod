@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "eddies-civ-mod:block/machine_shearing_station"
+    }
+  }
+}

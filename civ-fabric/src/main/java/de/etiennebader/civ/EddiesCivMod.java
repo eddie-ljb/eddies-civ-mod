@@ -34,7 +34,9 @@ public class EddiesCivMod implements ModInitializer {
         CivApi.collectRegistrations();
         host.register();
         WorldHooks.install(host);
-        CivContent content = CivContent.register(new TownHallPlacement(host));
+        CivContent content = CivContent.register(new TownHallPlacement(host),
+                new de.etiennebader.civ.fabric.MachinePlacement(host));
+        new de.etiennebader.civ.fabric.MachineWork(host).register();
         new PlotWand(host, content).register();
         new ProtectionListener(host, content).register();
         new TerritoryRules(host).register();

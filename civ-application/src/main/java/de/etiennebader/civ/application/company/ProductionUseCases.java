@@ -58,12 +58,65 @@ public final class ProductionUseCases {
     public record Sale(Map<Commodity, Long> sold, Money revenue) {
     }
 
+    /**
+     * Regeln von außen für die Produktion: ob eine Firma heute überhaupt produzieren darf (z. B. nur mit
+     * Grundstück), um welchen Faktor Maschinen den Ertrag steigern, und was nach einem Produktionstag geschieht
+     * (z. B. Verschleiß).
+     */
+    public interface Rules {
+        Rules NONE = new Rules() {
+        };
+
+        default boolean mayProduce(PolityId company) {
+            return true;
+        }
+
+        default double outputFactor(PolityId company) {
+            return 1.0;
+        }
+
+        default void produced(PolityId company, Day day) {
+        }
+    }
+
     private final Aggregates aggregates;
     private final CompanyUseCases companies;
+    private Rules rules = Rules.NONE;
 
     public ProductionUseCases(Aggregates aggregates, CompanyUseCases companies) {
         this.aggregates = Objects.requireNonNull(aggregates, "aggregates");
         this.companies = Objects.requireNonNull(companies, "companies");
+    }
+
+    public void rules(Rules rules) {
+        this.rules = Objects.requireNonNull(rules, "rules");
+    }
+
+    /** Legt Waren aus dem Besitz der Leitung ins Lager; nur Waren, die thematisch zur Branche passen. */
+    public long deposit(ActorRef head, PolityId company, Commodity commodity, long quantity, Day day) {
+        companies.requireHead(head, company, PolityKind.COMPANY);
+        ProductionRegistry registry = aggregates.production();
+        long added = registry.deposit(company, commodity, quantity, day);
+        aggregates.commit(registry);
+        return added;
+    }
+
+    /** Zahlt aus der Firmenkasse; das Geld verlässt den Umlauf (Kauf, Ausbau, eigene Wartung von Maschinen). */
+    public void spend(ActorRef head, PolityId company, Money amount, Day day) {
+        Polity polity = companies.requireHead(head, company, PolityKind.COMPANY);
+        Ledger ledger = aggregates.ledger();
+        ledger.burn(polity.asActor(), amount, SupplyChange.INVESTMENT, day);
+        aggregates.commit(ledger);
+    }
+
+    /** Zahlt aus der Firmenkasse an eine andere Firma, z. B. eine Wartungsfirma. */
+    public void payFirm(ActorRef head, PolityId company, PolityId recipient, Money amount, Day day) {
+        Polity polity = companies.requireHead(head, company, PolityKind.COMPANY);
+        Polity other = aggregates.polity(recipient);
+        Ledger ledger = aggregates.ledger();
+        ledger.transfer(polity.asActor(), other.asActor(), amount,
+                de.etiennebader.civ.domain.economy.TransferReason.FEE, day);
+        aggregates.commit(ledger);
     }
 
     public Enterprise chooseBranch(ActorRef head, PolityId company, Branch branch, Day day) {
@@ -158,7 +211,14 @@ public final class ProductionUseCases {
             if (enterprise.lastDay().filter(day::equals).isPresent()) {
                 continue;
             }
-            Map<Commodity, Long> output = enterprise.dailyOutput(workforce(enterprise.company()));
+            if (!rules.mayProduce(enterprise.company())) {
+                continue;
+            }
+            double factor = rules.outputFactor(enterprise.company());
+            Map<Commodity, Long> output = new LinkedHashMap<>();
+            enterprise.dailyOutput(workforce(enterprise.company()))
+                    .forEach((commodity, quantity) -> output.put(commodity, Math.round(quantity * factor)));
+            rules.produced(enterprise.company(), day);
             Enterprise produced = registry.produce(enterprise.company(), output, day);
             aggregates.commit(registry);
             Money revenue = Money.of(0, polity.get().currency());

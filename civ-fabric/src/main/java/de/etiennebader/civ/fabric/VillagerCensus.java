@@ -72,11 +72,26 @@ final class VillagerCensus {
         });
     }
 
+    /** Alle 2 Sekunden die Angestellten zu ihren Maschinen schicken. */
+    private static final int COMMUTE_INTERVAL = 40;
+    private int commuteTicks;
+
     void tick(MinecraftServer server, CivServer civ) {
+        if (++commuteTicks >= COMMUTE_INTERVAL) {
+            commuteTicks = 0;
+            MachineWork.refreshWorkplaces(civ, COMMUTE_INTERVAL);
+            if (MachineWork.hasWorkplaces()) {
+                for (ServerLevel level : server.getAllLevels()) {
+                    for (Villager villager : level.getEntities(EntityTypes.VILLAGER, found -> found.isAlive())) {
+                            }
+                }
+            }
+        }
         if (++ticks < INTERVAL) {
             return;
         }
         ticks = 0;
+        MachineWork.verify(server, civ);
         List<FamilyRegistry.Child> births = civ.family().pendingBirths();
         for (ServerLevel level : server.getAllLevels()) {
             List<Villager> loaded = new java.util.ArrayList<>(level.getEntities(EntityTypes.VILLAGER, villager -> villager.isAlive()));
@@ -92,6 +107,7 @@ final class VillagerCensus {
                     continue;
                 }
                 seen(civ, villager);
+                MachineWork.commute(civ, level, villager, ref(villager));
                 showMood(civ, level, villager);
             }
         }

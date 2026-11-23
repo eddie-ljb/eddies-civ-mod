@@ -100,7 +100,9 @@ public final class CivContent {
         this.nationSign = nationSign;
     }
 
-    public static CivContent register(TownHallBlock.PlacementHandler townHallPlacement) {
+    public static CivContent register(TownHallBlock.PlacementHandler townHallPlacement,
+                                      MachineBlock.PlacementHandler machinePlacement) {
+        MachineContent machines = MachineContent.register(machinePlacement);
         ResourceKey<Block> blockKey = ResourceKey.create(Registries.BLOCK, TOWN_HALL_ID);
         Block townHall = Registry.register(BuiltInRegistries.BLOCK, blockKey, new TownHallBlock(
                 BlockBehaviour.Properties.of()
@@ -176,7 +178,7 @@ public final class CivContent {
                 new BlockEntityType<>((pos, state) -> new LabelBlockEntity(labelTypeHolder[0], pos, state),
                         java.util.Set.of(streetSign, houseNumber, townSign, countrySign, nationSign)));
 
-        registerTab(townHallItem, bankItem, marketItem, constitutionItem, lawBook, plotWand, ballotBoxItem,
+        registerTab(machines.items(), townHallItem, bankItem, marketItem, constitutionItem, lawBook, plotWand, ballotBoxItem,
                 electionPosterItem, mailboxItem, newsstandItem, stockExchangeItem, courtBenchItem, streetSignItem,
                 houseNumberItem, townSignItem, countrySignItem, nationSignItem);
         return new CivContent(townHall, townHallItem, bank, market, plotWand, constitution, constitutionCopy, ballotBox,
@@ -188,7 +190,7 @@ public final class CivContent {
      * Eigener Reiter im Kreativinventar: zuerst die Blöcke und Werkzeuge des Mods, danach Vanilla-Items,
      * die man zum Ausprobieren braucht (Geld, Ladentruhe, Dorfbewohner, Dinge für den Gebietsschutz).
      */
-    private static void registerTab(Item townHall, Item bank, Item market, Item constitution, Item lawBook,
+    private static void registerTab(java.util.List<Item> machineItems, Item townHall, Item bank, Item market, Item constitution, Item lawBook,
                                     Item plotWand, Item ballotBox, Item electionPoster, Item mailbox,
                                     Item newsstand, Item stockExchange, Item courtBench, Item streetSign,
                                     Item houseNumber, Item townSign, Item countrySign, Item nationSign) {
@@ -214,6 +216,7 @@ public final class CivContent {
                     output.accept(townSign);
                     output.accept(countrySign);
                     output.accept(nationSign);
+                    machineItems.forEach(output::accept);
                     output.accept(Items.WRITABLE_BOOK);
                     output.accept(plotWand);
                     output.accept(Items.EMERALD);
