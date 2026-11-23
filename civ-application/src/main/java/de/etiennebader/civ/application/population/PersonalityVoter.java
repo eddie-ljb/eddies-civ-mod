@@ -37,9 +37,13 @@ public final class PersonalityVoter implements VillagerVoter {
     /** Bonus für Kandidaten der eigenen Partei. */
     static final double OWN_PARTY = 0.6;
 
+    /** Bildung/Intelligenz-Bonus (0-100, Issue #21) eines Dorfbewohners, der keine Wirkung hat (neutral). */
+    static final int NEUTRAL_EDUCATION = 50;
+
     private final Function<PolityView, LawView> lawsOf;
     private final Function<ActorRef, Optional<PolityView>> partyOf;
     private final CampaignInfluence campaign;
+    private final Function<PersonRef, Integer> educationOf;
 
     /** Ohne Bundesrecht und Parteien, z. B. für Tests. */
     public PersonalityVoter() {
@@ -57,9 +61,21 @@ public final class PersonalityVoter implements VillagerVoter {
      */
     public PersonalityVoter(Function<PolityView, LawView> lawsOf, Function<ActorRef, Optional<PolityView>> partyOf,
                             CampaignInfluence campaign) {
+        this(lawsOf, partyOf, campaign, villager -> NEUTRAL_EDUCATION);
+    }
+
+    /**
+     * @param lawsOf      das tatsächlich geltende Recht einer Polity
+     * @param partyOf     die Partei eines Akteurs
+     * @param educationOf Bildungs-/Intelligenz-Bonus (0-100, Issue #21) eines Dorfbewohners; je höher, desto stärker
+     *                    richtet er sich nach dem Programm der Kandidaten statt nach Amtsbonus und Bauchgefühl
+     */
+    public PersonalityVoter(Function<PolityView, LawView> lawsOf, Function<ActorRef, Optional<PolityView>> partyOf,
+                            CampaignInfluence campaign, Function<PersonRef, Integer> educationOf) {
         this.campaign = Objects.requireNonNull(campaign, "campaign");
         this.lawsOf = Objects.requireNonNull(lawsOf, "lawsOf");
         this.partyOf = Objects.requireNonNull(partyOf, "partyOf");
+        this.educationOf = Objects.requireNonNull(educationOf, "educationOf");
     }
 
     @Override
@@ -76,11 +92,12 @@ public final class PersonalityVoter implements VillagerVoter {
         boolean parliament = election.office() == Office.PARLIAMENT;
         ActorRef best = null;
         double bestUtility = Double.NEGATIVE_INFINITY;
+        int educationBonus = Math.max(0, Math.min(100, educationOf.apply(villager)));
         for (ActorRef candidate : election.candidates()) {
             Optional<PolityView> party = partyOf.apply(candidate);
             double utility = utility(personality, satisfaction, election.platformOf(candidate),
                     parliament ? polity.parliament().holdsSeat(candidate) : incumbent.filter(candidate::equals).isPresent(),
-                    villager, candidate)
+                    villager, candidate, educationBonus)
                     + partyAffinity(personality, ownParty, party, ownPartyLoyalty)
                     + campaign.bonus(villager, candidate, election, polity);
             if (utility > bestUtility) {
@@ -93,6 +110,17 @@ public final class PersonalityVoter implements VillagerVoter {
 
     static double utility(Personality personality, Satisfaction satisfaction, Platform platform, boolean incumbent,
                           PersonRef villager, ActorRef candidate) {
+        return utility(personality, satisfaction, platform, incumbent, villager, candidate, NEUTRAL_EDUCATION);
+    }
+
+    /**
+     * Gebildete Dorfbewohner (Issue #21) richten sich stärker nach dem Programm und weniger nach Amtsbonus und
+     * Stimmung; ungebildete umgekehrt. Bei {@link #NEUTRAL_EDUCATION} ändert sich nichts (Faktor 1,0).
+     */
+    static double utility(Personality personality, Satisfaction satisfaction, Platform platform, boolean incumbent,
+                          PersonRef villager, ActorRef candidate, int educationBonus) {
+        double programmeWeight = 0.5 + educationBonus / 100.0;
+        double incumbencyWeight = 1.5 - educationBonus / 100.0;
         double taxBurden = -satisfaction.points(Satisfaction.Factor.TAXES) / 40.0;
         double programme = switch (platform) {
             case NONE -> 0;
@@ -102,7 +130,7 @@ public final class PersonalityVoter implements VillagerVoter {
         };
         double mood = satisfaction.score() / 100.0;
         double incumbency = incumbent ? mood * personality.loyalty() : Math.max(0, -mood) * 0.4;
-        return programme + incumbency + noise(villager, candidate);
+        return programme * programmeWeight + incumbency * incumbencyWeight + noise(villager, candidate);
     }
 
     /**

@@ -778,6 +778,7 @@ public enum MessageKey {
     RELIGION_NONE,
     RELIGION_LOGO_USAGE,
     RELIGION_LOGO_FORBIDDEN,
+    VILLAGER_EDUCATION,
     HELP_CIVIL,
     // Ankündigungen und Fehler ohne Domänenbezug
     NEW_DAY,

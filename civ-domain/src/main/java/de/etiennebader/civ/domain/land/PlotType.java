@@ -10,5 +10,7 @@ public enum PlotType {
     AGRICULTURAL,
     PUBLIC,
     /** Botschaft: gehört immer einer fremden Polity. */
-    EMBASSY
+    EMBASSY,
+    /** Schule: junge Dorfbewohner, die sich hier aufhalten, gewinnen Bildung (Issue #21). */
+    EDUCATION
 }

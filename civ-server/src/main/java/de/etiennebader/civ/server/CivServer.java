@@ -111,6 +111,7 @@ public final class CivServer {
     private final de.etiennebader.civ.server.family.FamilyService family;
     private final de.etiennebader.civ.server.religion.ReligionService religion;
     private final VillagerService villagers;
+    private final de.etiennebader.civ.server.villager.EducationStore educationStore;
     private final VillagerFederations villagerFederations;
     private final de.etiennebader.civ.server.villager.VillagerFoundations villagerFoundations;
     private final de.etiennebader.civ.server.conjuncture.ConjunctureService conjuncture;
@@ -192,6 +193,9 @@ public final class CivServer {
         this.villagerFederations = new VillagerFederations(app, federations, announcements);
         this.conjuncture = new de.etiennebader.civ.server.conjuncture.ConjunctureService(app.queries());
         this.villagers = new VillagerService(app, settings, texts, announcements, conjuncture, calendar);
+        this.educationStore = new de.etiennebader.civ.server.villager.EducationStore(
+                dataDirectory.map(dir -> dir.resolve("education.tsv")));
+        educationStore.load(app.villagerEducation());
         this.family = new de.etiennebader.civ.server.family.FamilyService(app.queries(), announcements,
                 dataDirectory.map(dir -> dir.resolve("family.tsv")));
         this.religion = new de.etiennebader.civ.server.religion.ReligionService(app.queries(), players, announcements,
@@ -285,6 +289,7 @@ public final class CivServer {
         offices.endOfDay(day);
         parties.endOfDay(day);
         villagers.endOfDay(day);
+        educationStore.save(app.villagerEducation());
         app.credit().endOfDay(day); // überfällige Kredite fallen aus
         if (settings.ambitions()) {
             villagerFoundations.endOfDay(day);
