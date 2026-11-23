@@ -92,7 +92,7 @@ public final class PersonalityVoter implements VillagerVoter {
         boolean parliament = election.office() == Office.PARLIAMENT;
         ActorRef best = null;
         double bestUtility = Double.NEGATIVE_INFINITY;
-        int educationBonus = educationOf.apply(villager);
+        int educationBonus = Math.max(0, Math.min(100, educationOf.apply(villager)));
         for (ActorRef candidate : election.candidates()) {
             Optional<PolityView> party = partyOf.apply(candidate);
             double utility = utility(personality, satisfaction, election.platformOf(candidate),
@@ -110,6 +110,17 @@ public final class PersonalityVoter implements VillagerVoter {
 
     static double utility(Personality personality, Satisfaction satisfaction, Platform platform, boolean incumbent,
                           PersonRef villager, ActorRef candidate) {
+        return utility(personality, satisfaction, platform, incumbent, villager, candidate, NEUTRAL_EDUCATION);
+    }
+
+    /**
+     * Gebildete Dorfbewohner (Issue #21) richten sich stärker nach dem Programm und weniger nach Amtsbonus und
+     * Stimmung; ungebildete umgekehrt. Bei {@link #NEUTRAL_EDUCATION} ändert sich nichts (Faktor 1,0).
+     */
+    static double utility(Personality personality, Satisfaction satisfaction, Platform platform, boolean incumbent,
+                          PersonRef villager, ActorRef candidate, int educationBonus) {
+        double programmeWeight = 0.5 + educationBonus / 100.0;
+        double incumbencyWeight = 1.5 - educationBonus / 100.0;
         double taxBurden = -satisfaction.points(Satisfaction.Factor.TAXES) / 40.0;
         double programme = switch (platform) {
             case NONE -> 0;
@@ -119,7 +130,7 @@ public final class PersonalityVoter implements VillagerVoter {
         };
         double mood = satisfaction.score() / 100.0;
         double incumbency = incumbent ? mood * personality.loyalty() : Math.max(0, -mood) * 0.4;
-        return programme + incumbency + noise(villager, candidate);
+        return programme * programmeWeight + incumbency * incumbencyWeight + noise(villager, candidate);
     }
 
     /**

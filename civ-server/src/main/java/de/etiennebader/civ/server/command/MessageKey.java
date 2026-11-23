@@ -638,6 +638,7 @@ public enum MessageKey {
     VILLAGER_CRIME_SUSPECTED,
     VILLAGER_LOYALTY,
     VILLAGER_PARTY_LOYALTY,
+    VILLAGER_EDUCATION,
     HELP_CIVIL,
     // Ankündigungen und Fehler ohne Domänenbezug
     NEW_DAY,

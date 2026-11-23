@@ -87,6 +87,10 @@ public final class VillagerService {
     private final Map<PersonRef, BlockPosition> lastSeen = new HashMap<>();
     /** Politische Beeinflussung und Dorfbewohner-Kontakte (Issue #18); wie {@link #departures} nur im Speicher. */
     private final SocialEffects social = new SocialEffects();
+    /** Kinder, die heute (seit dem letzten Tagesabschluss) in einer Schule gesehen wurden (Issue #21). */
+    private final java.util.Set<PersonRef> attendedToday = new java.util.HashSet<>();
+    /** Kinder, die seit dem letzten Tagesabschluss überhaupt gesehen wurden. */
+    private final java.util.Set<PersonRef> childrenToday = new java.util.HashSet<>();
     /** Post zwischen Spielern und Dorfbewohnern bzw. unter Dorfbewohnern (Issue #18); wie {@link #social} nur im Speicher. */
     private final VillagerMailbox mailbox = new VillagerMailbox();
     /** Wie oft je 100 Chancen pro Tag ein sehr unzufriedener, freiheitsliebender Dorfbewohner auffällt. */
@@ -151,10 +155,40 @@ public final class VillagerService {
         }
     }
 
+    /**
+     * Ein junger Dorfbewohner wurde an dieser Stelle gesehen (Issue #21): hält er sich auf einem Schulgrundstück
+     * auf, gilt er heute als zur Schule gegangen. Die Werte ändern sich erst im Tagesabschluss, genau einmal je Tag.
+     */
+    public void childSeen(PersonRef child, BlockPosition position) {
+        Objects.requireNonNull(child, "child");
+        childrenToday.add(child);
+        boolean inSchool = queries.territory().sovereignOf(position.chunk())
+                .flatMap(id -> queries.land(id).plotAt(position.dimension(), position.x(), position.z()))
+                .filter(plot -> plot.type() == de.etiennebader.civ.domain.land.PlotType.EDUCATION).isPresent();
+        if (inSchool) {
+            attendedToday.add(child);
+        }
+    }
+
+    /** Ein Dorfbewohner ist erwachsen: Bildung und Intelligenz frieren ein. */
+    public void grownUp(PersonRef villager) {
+        app.villagerEducation().grownUp(villager);
+    }
+
+    private void educationDay() {
+        for (PersonRef child : childrenToday) {
+            app.villagerEducation().recordChildDay(child, attendedToday.contains(child));
+        }
+        childrenToday.clear();
+        attendedToday.clear();
+    }
+
     /** Ein Dorfbewohner ist gestorben oder verschwunden. */
     public void gone(PersonRef villager, Day day) {
         departures.remove(villager);
         lastSeen.remove(villager);
+        childrenToday.remove(villager);
+        attendedToday.remove(villager);
         queries.municipalityOf(villager).ifPresent(town -> {
             try {
                 app.leavePolity().execute(new LeavePolity.Command(town.id(), villager, day));
@@ -232,6 +266,8 @@ public final class VillagerService {
                         satisfaction.productivityPercent()),
                 Message.of(MessageKey.VILLAGER_LOYALTY, signed(VillagerLoyalty.toPolity(personality, town.get(),
                         villager, calendar.today(), queries.effectiveLaws(town.get()))))));
+        app.villagerEducation().find(villager).ifPresent(education -> lines.add(Message.of(
+                MessageKey.VILLAGER_EDUCATION, education.points(), education.intelligence())));
         queries.partyOf(villager).ifPresent(party -> lines.add(Message.of(MessageKey.VILLAGER_PARTY_LOYALTY,
                 signed(VillagerLoyalty.toParty(personality, party, villager, calendar.today())),
                 signed(VillagerLoyalty.toChairperson(personality, party, calendar.today())))));
@@ -379,6 +415,7 @@ public final class VillagerService {
             emigrate(day);
         }
         socialAndCrime(day);
+        educationDay();
         if (settings.villagerPolitics()) {
             governAutonomously(day);
             autoClaimChunk(day);

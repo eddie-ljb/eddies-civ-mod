@@ -24,6 +24,11 @@ public final class VillagerEducationLedger {
         return state.computeIfAbsent(villager, VillagerEducation::initial);
     }
 
+    /** Der verfolgte Bildungsstand, falls vorhanden; legt keinen neuen an. */
+    public java.util.Optional<VillagerEducation> find(PersonRef villager) {
+        return java.util.Optional.ofNullable(state.get(villager));
+    }
+
     /** Ein Tag im Kindesalter: {@code attendedSchool}, ob der Dorfbewohner an diesem Tag zur Schule gegangen ist. */
     public void recordChildDay(PersonRef villager, boolean attendedSchool) {
         state.put(villager, of(villager).afterChildDay(attendedSchool));
@@ -31,6 +36,7 @@ public final class VillagerEducationLedger {
 
     /** Der Dorfbewohner ist erwachsen geworden: sein Bildungsstand friert ein. */
     public void grownUp(PersonRef villager) {
+        Objects.requireNonNull(villager, "villager");
         state.computeIfPresent(villager, (ignored, education) -> education.grownUp());
     }
 

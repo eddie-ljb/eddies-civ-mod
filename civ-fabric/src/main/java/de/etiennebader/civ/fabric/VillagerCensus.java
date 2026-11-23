@@ -87,9 +87,14 @@ final class VillagerCensus {
     }
 
     private static void seen(CivServer civ, Villager villager) {
-        if (villager.isBaby() || !villager.isAlive()) {
+        if (!villager.isAlive()) {
             return;
         }
+        if (villager.isBaby()) {
+            civ.villagers().childSeen(ref(villager), Players.position(villager.level(), villager.blockPosition()));
+            return;
+        }
+        civ.villagers().grownUp(ref(villager));
         civ.villagers().seen(ref(villager), Players.position(villager.level(), villager.blockPosition()),
                 civ.calendar().today());
     }

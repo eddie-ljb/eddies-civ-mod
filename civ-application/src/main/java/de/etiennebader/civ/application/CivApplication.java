@@ -126,6 +126,8 @@ public final class CivApplication {
     private final StreetUseCases streets;
     private final CommunityUseCases community;
     private final VillagerVoter villagerVoter;
+    private final de.etiennebader.civ.application.population.VillagerEducationLedger villagerEducation =
+            new de.etiennebader.civ.application.population.VillagerEducationLedger();
     private final MakePromise makePromise;
     private final PutUpPoster putUpPoster;
     private final DissolvePolity dissolvePolity;
@@ -221,7 +223,8 @@ public final class CivApplication {
                 actor -> new WorldQueries(repositories).municipalityOf(actor), partyOf);
         this.villagerVoter = new PersonalityVoter(effectiveLaws, partyOf,
                 (villager, candidate, election, polity) -> campaign.bonus(villager, candidate, election, polity)
-                        + pressInfluence.bonus(villager, candidate, election, polity));
+                        + pressInfluence.bonus(villager, candidate, election, polity),
+                villagerEducation::bonusOf);
         this.runElections = new RunElections(aggregates, ids, villagerVoter, partyOf, homeOf);
         this.contracts = new ContractUseCases(aggregates, ids);
         this.runContracts = new RunContracts(aggregates);
@@ -506,6 +509,11 @@ public final class CivApplication {
 
     public VillagerLandlords villagerLandlords() {
         return villagerLandlords;
+    }
+
+    /** Bildung und Intelligenz der Dorfbewohner (Issue #21). */
+    public de.etiennebader.civ.application.population.VillagerEducationLedger villagerEducation() {
+        return villagerEducation;
     }
 
     public VillagerAmbitions villagerAmbitions() {
