@@ -31,6 +31,11 @@ public interface ProtectionContext {
         return false;
     }
 
+    /** Die Rechte, die der Inhaber auf einem Grundstück eingestellt hat; leer heißt: {@link PlotRights#DEFAULT}. */
+    default Optional<PlotRights> plotRights(PolityId polity, PlotId plot) {
+        return Optional.empty();
+    }
+
     /** Das Recht, das in dieser Polity gilt; übergeordnetes Bundesrecht kann es ergänzen. */
     default LawView laws(PolityView polity) {
         return polity.laws();

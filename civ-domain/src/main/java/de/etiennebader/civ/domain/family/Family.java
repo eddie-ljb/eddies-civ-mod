@@ -18,7 +18,9 @@ public final class Family {
     /** Beziehungswert (0–100), ab dem ein unverheiratetes Paar heiratet. */
     public static final int MARRY_BOND = 20;
     /** Beziehungswert, ab dem ein Ehepaar Kinder bekommt. */
-    public static final int CHILD_BOND = 40;
+    public static final int CHILD_BOND = 35;
+    /** Beziehungsgewinn durch die Hochzeitsfeier. */
+    public static final int WEDDING_BONUS = 20;
     /** Mindestabstand zwischen zwei Geburten in Tagen. */
     public static final int BIRTH_GAP_DAYS = 10;
     /** Höchstzahl gemeinsamer Kinder eines Paares. */
@@ -78,13 +80,14 @@ public final class Family {
         Personality b = Personality.of(second);
         int warmth = (a.community() + b.community() + a.belonging() + b.belonging()) / 4;
         int educated = (educationA + educationB) / 2;
-        int wish = 2 + warmth / 40 - educated / 50;
-        return Math.max(0, Math.min(MAX_CHILDREN, wish));
+        int wish = 2 + warmth / 40 - educated / 80;
+        // Eine Ehe bleibt nicht aus Prinzip kinderlos: mindestens ein Kind wünscht sich jedes Paar.
+        return Math.max(1, Math.min(MAX_CHILDREN, wish));
     }
 
     /** Wahrscheinlichkeit in Promille für eine Geburt an einem Tag, wenn das Paar noch Kinder möchte. */
     public static int birthChancePerMille(int bond) {
-        return bond < CHILD_BOND ? 0 : 30 + (bond - CHILD_BOND) / 2;
+        return bond < CHILD_BOND ? 0 : Math.min(400, 100 + (bond - CHILD_BOND) * 3);
     }
 
     /** Stabile Kennung eines Kindes aus den Eltern und seiner Nummer, damit Neustarts nichts verschieben. */

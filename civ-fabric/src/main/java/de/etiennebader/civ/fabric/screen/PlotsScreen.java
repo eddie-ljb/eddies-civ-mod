@@ -61,6 +61,12 @@ final class PlotsScreen extends MenuScreen {
         for (int index = 0; index < PER_PAGE && page * PER_PAGE + index < plots.size(); index++) {
             PlotView plot = plots.get(page * PER_PAGE + index);
             canvas.set(index, icon(plot), click -> {
+                if (plot.heldByViewer() && !plot.townLand() && click.right()) {
+                    Feedback.click(click.player());
+                    de.etiennebader.civ.fabric.gui.Screens.open(click.player(),
+                            new PlotRightsScreen(civ, click.player(), plot.town(), plot.id(), plot.townName(), this));
+                    return;
+                }
                 if (!click.shift() || plot.askingPrice().isEmpty() || plot.heldByViewer()) {
                     return;
                 }
@@ -98,6 +104,9 @@ final class PlotsScreen extends MenuScreen {
             }
         } else {
             icon.hint(GuiKeys.PLOT_ENTRY_NOT_OFFERED.text());
+        }
+        if (plot.heldByViewer() && !plot.townLand()) {
+            icon.hint(GuiKeys.PLOT_RIGHTS_EDIT_HINT.text());
         }
         return icon.build();
     }

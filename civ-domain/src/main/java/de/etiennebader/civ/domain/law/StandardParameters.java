@@ -115,6 +115,14 @@ public final class StandardParameters {
     public static final ParameterKey<Boolean> HOSTILE_MOBS_ALLOWED =
             ParameterKey.of("hostile_mobs_allowed", Boolean.class, true);
 
+    /**
+     * Ob Grundstücksinhaber auf ihrem Grundstück eigene Rechte einstellen dürfen, die vom Recht der Gemeinde, des
+     * Landes und der Nation abweichen (PvP, Monster, Explosionen, Feuer, Tierschutz und wer dort bauen oder Türen
+     * benutzen darf). Sonst gilt das Recht auch auf Grundstücken: Was es Fremden erlaubt, ist überall erlaubt.
+     */
+    public static final ParameterKey<Boolean> PLOT_RIGHTS_OVERRIDE =
+            ParameterKey.of("plot_rights_override", Boolean.class, true);
+
     /** Ob Nicht-Mitglieder Tiere im Gebiet verletzen dürfen. */
     public static final ParameterKey<Boolean> OUTSIDERS_MAY_HURT_ANIMALS =
             ParameterKey.of("outsiders_may_hurt_animals", Boolean.class, false);
@@ -344,6 +352,7 @@ public final class StandardParameters {
                 PVP_ALLOWED,
                 HOSTILE_MOBS_ALLOWED,
                 OUTSIDERS_MAY_HURT_ANIMALS,
+                PLOT_RIGHTS_OVERRIDE,
                 FEDERAL_LEVY_PERCENT,
                 PARLIAMENT_SEATS,
                 SESSION_DAYS,

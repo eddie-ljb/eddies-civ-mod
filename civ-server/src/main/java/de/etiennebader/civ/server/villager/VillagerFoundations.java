@@ -16,6 +16,8 @@ import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.DomainException;
 import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.territory.BlockPosition;
+import de.etiennebader.civ.domain.territory.ChunkCoord;
+import de.etiennebader.civ.domain.territory.TerritoryView;
 import de.etiennebader.civ.server.Announcement;
 import de.etiennebader.civ.server.founding.FoundingFees;
 import de.etiennebader.civ.server.Announcements;
@@ -26,6 +28,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 /**
@@ -37,8 +40,14 @@ import java.util.function.Function;
  *       Gemeinde mit mindestens {@value #MIN_RESIDENTS} Dorfbewohnern leben, damit keine Gemeinde ausblutet.</li>
  *   <li><b>Wie oft:</b> höchstens eine Gründung je Tag, mit {@value #FOUND_CHANCE} Tageswahrscheinlichkeit (gewichtet
  *       mit dem Ehrgeiz), und nur solange es weniger als eine Gemeinde je {@value #VILLAGERS_PER_TOWN} Dorfbewohner gibt.</li>
- *   <li><b>Wo:</b> am letzten Aufenthaltsort. Gelten dort die Claim-Regeln nicht (zu nah an fremdem Gebiet, bereits
- *       beansprucht, Limit), bleibt der Dorfbewohner in seiner Gemeinde.</li>
+ *   <li><b>Wo:</b> am letzten Aufenthaltsort, sofern der Chunk dort samt Umgebung frei ist. Wohnt der Dorfbewohner
+ *       (wie fast immer) mitten in einer fremden Gemeinde, sucht er den nächstgelegenen freien Ort im Umkreis von
+ *       {@value #SITE_RADIUS} Chunks. Gibt es keinen, oder gelten die Claim-Regeln nicht, bleibt er in seiner
+ *       Gemeinde.</li>
+ *   <li><b>Umzug:</b> Gründer und Gefolge werden zum neuen Gemeindehaus gebracht ({@code relocate}); sonst würde sie
+ *       die Gemeindezuordnung beim nächsten Rundgang zurück in die alte Gemeinde ziehen.</li>
+ *   <li><b>Gebühr:</b> Siedler zahlen nur {@value #SETTLER_FEE_PERCENT} % der Gründungsgebühr; ihre Ersparnisse
+ *       reichen sonst nie für die volle Gebühr.</li>
  *   <li><b>Gefolge:</b> Bis zu {@value #MAX_FOLLOWERS} Mitbürger, die zuletzt am nächsten am neuen Ort gesehen wurden,
  *       ziehen mit; mindestens {@value #MIN_LEFT_BEHIND} Dorfbewohner bleiben zurück.</li>
  * </ul>
@@ -54,11 +63,18 @@ public final class VillagerFoundations {
     static final int MAX_FOLLOWERS = 3;
     /** So viele Dorfbewohner bleiben mindestens in der alten Gemeinde zurück. */
     static final int MIN_LEFT_BEHIND = 2;
+    /** Umkreis in Chunks, in dem ein freier Ort für die neue Gemeinde gesucht wird. */
+    static final int SITE_RADIUS = 16;
+    /** Freier Rand in Chunks rund um das neue Gemeindegebiet, damit Gemeinden nicht sofort zusammenwachsen. */
+    static final int SITE_GAP = 2;
+    /** Anteil der Gründungsgebühr, den ein Dorfbewohner als Siedler zahlt. */
+    static final int SETTLER_FEE_PERCENT = 20;
 
     private final FoundingFees fees;
     private final CivApplication app;
     private final Function<PersonRef, Optional<BlockPosition>> lastSeen;
     private final Announcements announcements;
+    private final BiConsumer<PersonRef, BlockPosition> relocate;
 
     public VillagerFoundations(CivApplication app, Function<PersonRef, Optional<BlockPosition>> lastSeen,
                                Announcements announcements) {
@@ -68,6 +84,14 @@ public final class VillagerFoundations {
     /** Mit Gründungskosten: der Dorfbewohner zahlt aus seinem eigenen Konto. */
     public VillagerFoundations(CivApplication app, Function<PersonRef, Optional<BlockPosition>> lastSeen,
                                Announcements announcements, FoundingFees fees) {
+        this(app, lastSeen, announcements, fees, (villager, seat) -> { });
+    }
+
+    /** @param relocate bringt einen Dorfbewohner zum Gemeindehaus der neuen Gemeinde */
+    public VillagerFoundations(CivApplication app, Function<PersonRef, Optional<BlockPosition>> lastSeen,
+                               Announcements announcements, FoundingFees fees,
+                               BiConsumer<PersonRef, BlockPosition> relocate) {
+        this.relocate = Objects.requireNonNull(relocate, "relocate");
         this.fees = Objects.requireNonNull(fees, "fees");
         this.app = Objects.requireNonNull(app, "app");
         this.lastSeen = Objects.requireNonNull(lastSeen, "lastSeen");
@@ -111,9 +135,13 @@ public final class VillagerFoundations {
     }
 
     private boolean found(PolityView home, PersonRef villager, Day day) {
-        Optional<BlockPosition> seat = lastSeen.apply(villager);
-        if (seat.isEmpty()) {
+        Optional<BlockPosition> seen = lastSeen.apply(villager);
+        if (seen.isEmpty()) {
             return false;
+        }
+        Optional<BlockPosition> seat = site(seen.get());
+        if (seat.isEmpty()) {
+            return false; // weit und breit kein freier Ort
         }
         PolityName name;
         try {
@@ -122,7 +150,8 @@ public final class VillagerFoundations {
             return false;
         }
         FoundingFees.Billing billing = fees.billing(app, home.currency());
-        if (billing.shortfallBalance(villager, fees.municipality()) != null) {
+        long fee = fees.municipality() * SETTLER_FEE_PERCENT / 100;
+        if (billing.shortfallBalance(villager, fee) != null) {
             return false; // zu arm für die Gründungsgebühr: bleibt, wo er ist
         }
         try {
@@ -131,7 +160,7 @@ public final class VillagerFoundations {
             return false; // z. B. Amtsinhaber, die nicht gehen dürfen
         }
         try {
-            billing.chargeAfter(villager, fees.municipality(), day, () -> {
+            billing.chargeAfter(villager, fee, day, () -> {
                 app.foundPolity().execute(new FoundPolity.Command(name, villager, home.currency(), seat.get(), day));
                 return null;
             });
@@ -140,6 +169,7 @@ public final class VillagerFoundations {
             return false;
         }
         PolityId created = app.queries().polityNamed(name.value()).orElseThrow().id();
+        relocate.accept(villager, seat.get());
         int followers = follow(home, created, villager, seat.get(), day);
         announcements.add(Announcement.toAll(Message.of(MessageKey.VILLAGER_TOWN_FOUNDED, name.value(),
                 home.name().value(), followers + 1)));
@@ -172,12 +202,52 @@ public final class VillagerFoundations {
             }
             try {
                 app.joinPolity().execute(new JoinPolity.Command(created, follower, MembershipType.CITIZEN, day));
+                relocate.accept(follower, seat);
                 moved++;
             } catch (DomainException ignored) {
                 rejoin(home, follower, day);
             }
         }
         return moved;
+    }
+
+    /**
+     * Der Ort für das neue Gemeindehaus: der Aufenthaltsort selbst, wenn dort alles frei ist, sonst der nächstgelegene
+     * Chunk im Umkreis, um den herum {@value #SITE_GAP} Chunks unbeansprucht sind.
+     */
+    Optional<BlockPosition> site(BlockPosition seen) {
+        TerritoryView territory = app.queries().territory();
+        ChunkCoord origin = seen.chunk();
+        if (isFree(territory, origin)) {
+            return Optional.of(seen);
+        }
+        ChunkCoord best = null;
+        long bestDistance = Long.MAX_VALUE;
+        for (int dx = -SITE_RADIUS; dx <= SITE_RADIUS; dx++) {
+            for (int dz = -SITE_RADIUS; dz <= SITE_RADIUS; dz++) {
+                long distance = (long) dx * dx + (long) dz * dz;
+                if (distance >= bestDistance) {
+                    continue;
+                }
+                ChunkCoord candidate = new ChunkCoord(origin.dimension(), origin.x() + dx, origin.z() + dz);
+                if (isFree(territory, candidate)) {
+                    best = candidate;
+                    bestDistance = distance;
+                }
+            }
+        }
+        return Optional.ofNullable(best).map(chunk -> chunk.center(seen.y()));
+    }
+
+    private static boolean isFree(TerritoryView territory, ChunkCoord chunk) {
+        for (int dx = -SITE_GAP; dx <= SITE_GAP; dx++) {
+            for (int dz = -SITE_GAP; dz <= SITE_GAP; dz++) {
+                if (territory.claimAt(new ChunkCoord(chunk.dimension(), chunk.x() + dx, chunk.z() + dz)).isPresent()) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     private static double distance(BlockPosition a, BlockPosition b) {

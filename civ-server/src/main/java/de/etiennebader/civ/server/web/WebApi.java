@@ -306,6 +306,10 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                         exchangeAction(login, body)), texts));
                 case "GET /api/war" -> HttpResponse.json(200, game.call(this::war));
                 case "GET /api/families" -> HttpResponse.json(200, game.call(this::families));
+                case "GET /api/religions" -> HttpResponse.json(200, game.call(() -> religions(
+                        request.cookie(SESSION_COOKIE).flatMap(sessions::session))));
+                case "POST /api/religions" -> withLogin(request, login -> action(request, body -> game.call(() ->
+                        religionAction(login, body)), texts));
                 case "GET /api/press" -> HttpResponse.json(200, game.call(this::press));
                 case "POST /api/press" -> withLogin(request, login -> action(request, body -> game.call(() ->
                         civ.press().publish(login.player(), body.getOrDefault("paper", ""),
@@ -878,6 +882,60 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                         .put("divorced", divorce.divorced().value()).build()))
                 .put("children", registry.children().size())
                 .build();
+    }
+
+    private String religions(Optional<WebSessions.Login> login) {
+        var census = civ.religion().census();
+        return Json.object()
+                .raw("religions", Json.array(civ.religion().summaries(login.map(WebSessions.Login::player)),
+                        r -> Json.object()
+                                .put("id", r.id())
+                                .put("name", r.name())
+                                .put("logo", r.logo())
+                                .put("monotheistic", r.monotheistic())
+                                .put("scripture", r.scripture())
+                                .put("temple", r.temple())
+                                .put("language", r.language())
+                                .put("head", r.head())
+                                .put("power", r.power())
+                                .put("members", r.members())
+                                .put("villagers", r.villagers())
+                                .put("fervor", r.fervor())
+                                .raw("denominations", Json.array(r.denominations(), Json::string))
+                                .put("founder", r.founder())
+                                .put("founded", r.founded())
+                                .put("electionOpen", r.electionOpen())
+                                .put("electionCloses", r.electionCloses())
+                                .raw("candidates", Json.array(r.candidates(), Json::string))
+                                .put("mine", r.mine())
+                                .put("denomination", r.denomination())
+                                .build()))
+                .raw("census", Json.object()
+                        .put("believers", census.believers())
+                        .put("undecided", census.undecided())
+                        .put("atheists", census.atheists())
+                        .put("organised", census.organised()).build())
+                .raw("rites", Json.array(civ.religion().recentRites(20), Json::string))
+                .put("loggedIn", login.isPresent())
+                .build();
+    }
+
+    private Reply religionAction(WebSessions.Login login, Map<String, String> body) {
+        Caller caller = caller(login);
+        var religion = civ.religion();
+        var today = civ.calendar().today();
+        return switch (body.getOrDefault("action", "")) {
+            case "join" -> religion.join(caller, body.getOrDefault("name", ""));
+            case "leave" -> religion.leave(caller);
+            case "found" -> religion.found(caller, body.getOrDefault("name", ""),
+                    Boolean.parseBoolean(body.getOrDefault("monotheistic", "false")),
+                    body.getOrDefault("scripture", ""), body.getOrDefault("temple", ""),
+                    body.getOrDefault("language", ""), today);
+            case "candidate" -> religion.candidate(caller, today);
+            case "vote" -> religion.vote(caller, body.getOrDefault("candidate", ""), today);
+            case "denomination" -> religion.denomination(caller, body.getOrDefault("name", ""), today);
+            default -> Reply.failure(Message.of(MessageKey.RELIGION_ERROR, "Unbekannte Aktion"));
+        };
     }
 
     private String press() {

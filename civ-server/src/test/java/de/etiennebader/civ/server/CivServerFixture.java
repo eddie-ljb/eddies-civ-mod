@@ -63,6 +63,14 @@ public final class CivServerFixture {
         return server.villagers();
     }
 
+    public de.etiennebader.civ.server.plot.PlotRightsService plotRights() {
+        return server.plotRights();
+    }
+
+    public de.etiennebader.civ.server.religion.ReligionService religion() {
+        return server.religion();
+    }
+
     public de.etiennebader.civ.server.family.FamilyService family() {
         return server.family();
     }

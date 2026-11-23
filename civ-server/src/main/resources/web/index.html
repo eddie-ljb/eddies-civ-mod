@@ -354,6 +354,7 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
       <a href="#staat">Staat</a>
       <a href="#krieg">Krieg</a>
       <a href="#familien">Familien</a>
+      <a href="#religion">Religion</a>
       <a href="#recht">Recht</a>
       <a href="#justiz">Justiz</a>
       <a href="#post">Post<span class="badge" id="b-post"></span></a>
@@ -561,6 +562,18 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
     <div class="register" id="marriages"></div>
     <h3 style="margin:32px 0 12px">Scheidungen</h3>
     <div class="register" id="divorces"></div>
+  </section>
+
+  <section data-page="religion">
+    <div class="pagehead"><div><h2>Religion</h2><p>Glaubensgemeinschaften der Welt: gegründet von Spielern und von besonders gläubigen Dorfbewohnern. Gläubige Dorfbewohner schließen sich der größten Religion an, wählen ihr Oberhaupt und gewinnen durch Gebete und Gottesdienste an Halt. Der Klerus gewichtet, wie stark ein Gottesdienst wirkt.</p></div>
+      <div class="row"><button class="btn primary" id="newreligion" hidden>Religion gründen</button></div></div>
+    <div class="msg" id="religionmsg"></div>
+    <div class="register" id="religioncensus"></div>
+    <div id="religionform"></div>
+    <h3 style="margin:32px 0 12px">Religionen</h3>
+    <div class="register" id="religions"></div>
+    <h3 style="margin:32px 0 12px">Zuletzt gefeiert</h3>
+    <div class="register" id="religionrites"></div>
   </section>
 
   <section data-page="staat">
@@ -803,7 +816,7 @@ const head = name => el("img", { className: "avatar", alt: "", loading: "lazy", 
 const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
 /* Seiten */
-const pages = ["start", "welt", "karte", "wahlen", "markt", "boerse", "ranglisten", "presse", "krieg", "familien", "staat", "recht", "justiz", "post", "chat", "bauen", "freunde", "ich"];
+const pages = ["start", "welt", "karte", "wahlen", "markt", "boerse", "ranglisten", "presse", "krieg", "familien", "religion", "staat", "recht", "justiz", "post", "chat", "bauen", "freunde", "ich"];
 let page = "start";
 function route() {
   const wanted = location.hash.slice(1).split("/")[0];
@@ -811,7 +824,7 @@ function route() {
   document.querySelectorAll("section[data-page]").forEach(s => s.classList.toggle("on", s.dataset.page === page));
   document.querySelectorAll(".nav a").forEach(a => { if (a.getAttribute("href") === "#" + page) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
   const loaders = { start: loadStart, welt: loadWorld, karte: openMap, wahlen: loadElections, markt: loadMarket,
-    boerse: loadExchange, ranglisten: loadRankings, presse: loadPress, krieg: loadWar, familien: loadFamilies, staat: loadState, recht: loadLaws, justiz: loadJustice, post: loadLetters,
+    boerse: loadExchange, ranglisten: loadRankings, presse: loadPress, krieg: loadWar, familien: loadFamilies, religion: loadReligion, staat: loadState, recht: loadLaws, justiz: loadJustice, post: loadLetters,
     chat: openChat, bauen: loadPlans, freunde: loadFriends, ich: loadMe };
   loaders[page]();
   if (page !== "chat") stopChat();
@@ -1487,6 +1500,65 @@ async function loadFamilies() {
     el("p", { textContent: d.first + " & " + d.second + " · verheiratet an Tag " + d.married + ", geschieden an Tag " + d.divorced })))
     : [el("div", { className: "empty", style: "border:none", textContent: "Keine Scheidungen." })]));
 }
+let religionData = { religions: [], census: {}, rites: [], loggedIn: false };
+async function religionAct(body) {
+  const r = await api("/api/religions", body);
+  say("religionmsg", r.ok ? r.data.message : (r.data.message || r.data.error), r.ok);
+  await loadReligion(true);
+}
+async function loadReligion(keepMessage) {
+  const r = await api("/api/religions");
+  if (!r.ok) return;
+  religionData = r.data;
+  if (!keepMessage) say("religionmsg", "", true);
+  const c = religionData.census || {};
+  const total = (c.believers || 0) + (c.undecided || 0) + (c.atheists || 0);
+  $("religioncensus").replaceChildren(el("div", { className: "card" }, el("h3", { textContent: "Glaube unter den Dorfbewohnern" }),
+    facts([["Gläubige", c.believers || 0], ["Unentschlossene", c.undecided || 0], ["Atheisten", c.atheists || 0],
+      ["Einer Religion angeschlossen", (c.organised || 0) + (total ? " von " + total : "")]])));
+  $("newreligion").hidden = !religionData.loggedIn || religionData.religions.some(x => x.mine);
+  $("religions").replaceChildren(...(religionData.religions.length ? religionData.religions.map(rel => {
+    const actions = el("div", { className: "row", style: "margin-top:10px" });
+    if (religionData.loggedIn) {
+      if (rel.mine) {
+        actions.append(el("button", { className: "btn small", textContent: "Austreten", onclick: () => religionAct({ action: "leave" }) }));
+        if (rel.electionOpen) {
+          actions.append(el("button", { className: "btn small", textContent: "Für das Klerusamt kandidieren", onclick: () => religionAct({ action: "candidate" }) }));
+          for (const name of rel.candidates) actions.append(el("button", { className: "btn small", textContent: "Wählen: " + name, onclick: () => religionAct({ action: "vote", candidate: name }) }));
+        }
+      } else if (!religionData.religions.some(x => x.mine)) {
+        actions.append(el("button", { className: "btn small primary", textContent: "Beitreten", onclick: () => religionAct({ action: "join", name: rel.name }) }));
+      }
+    }
+    return el("div", { className: "entry" }, crest(rel.id, rel.name, "religion"),
+      el("div", {}, el("h3", { textContent: (rel.logo ? "[" + rel.logo + "] " : "") + rel.name + (rel.mine ? " (deine)" : "") }),
+        el("div", { className: "sub", textContent: (rel.monotheistic ? "Ein Gott" : "Viele Götter") + " · gegründet von " + rel.founder + " an Tag " + rel.founded })),
+      facts([["Oberhaupt", rel.head || "vakant"], ["Macht des Klerus", rel.power + " / 100"], ["Mitglieder", rel.members + " (davon Dorfbewohner " + rel.villagers + ")"],
+        ["Inbrunst", rel.fervor + " / 6"], ["Heilige Schrift", rel.scripture], ["Gotteshaus", rel.temple], ["Sprache", rel.language],
+        ["Konfessionen", rel.denominations.join(", ")], ["Klerus-Wahl", rel.electionOpen ? "läuft bis Tag " + rel.electionCloses + (rel.candidates.length ? ", Kandidaten: " + rel.candidates.join(", ") : "") : ""],
+        ["Deine Konfession", rel.mine ? rel.denomination : ""]]), actions);
+  }) : [el("div", { className: "empty", textContent: "Noch keine Religion. Gründe eine mit /civ religion gruenden oder hier auf der Seite; sehr gläubige Dorfbewohner gründen auch von selbst welche." })]));
+  $("religionrites").replaceChildren(...(religionData.rites.length ? religionData.rites.map(t => el("div", { className: "card" }, el("p", { textContent: t })))
+    : [el("div", { className: "empty", style: "border:none", textContent: "Noch keine Zeremonien." })]));
+}
+$("newreligion").addEventListener("click", () => {
+  const name = el("input", { maxLength: 48, required: true, ariaLabel: "Name" });
+  const scripture = el("input", { maxLength: 48, ariaLabel: "Heilige Schrift", placeholder: "Heilige Schrift" });
+  const temple = el("input", { maxLength: 48, ariaLabel: "Gotteshaus", placeholder: "Gotteshaus" });
+  const language = el("input", { maxLength: 48, ariaLabel: "Sprache", placeholder: "Sprache" });
+  const mono = el("input", { type: "checkbox", id: "religionmono" });
+  const form = el("form", { className: "card", style: "display:grid;gap:10px;max-width:420px" },
+    el("h3", { textContent: "Religion gründen" }), name, scripture, temple, language,
+    el("label", {}, mono, " Nur ein Gott"),
+    el("button", { className: "btn primary", textContent: "Gründen" }));
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    await religionAct({ action: "found", name: name.value, monotheistic: String(mono.checked), scripture: scripture.value || "Heilige Schrift",
+      temple: temple.value || "Tempel", language: language.value || "Deutsch" });
+    $("religionform").replaceChildren();
+  });
+  $("religionform").replaceChildren(form);
+});
 async function loadPress() {
   const [p, user] = await Promise.all([api("/api/press"), refreshMe()]);
   if (p.ok) pressData = p.data;

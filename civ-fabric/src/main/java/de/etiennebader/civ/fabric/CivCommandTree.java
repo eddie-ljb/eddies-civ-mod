@@ -55,6 +55,7 @@ import de.etiennebader.civ.server.federation.Levels;
 import de.etiennebader.civ.server.office.OfficeService;
 import de.etiennebader.civ.server.office.OfficeView;
 import de.etiennebader.civ.server.party.PartyService;
+import de.etiennebader.civ.server.plot.PlotRightsService;
 import de.etiennebader.civ.server.plot.PlotService;
 import de.etiennebader.civ.server.town.TownHallService;
 import net.minecraft.commands.CommandSourceStack;
@@ -130,6 +131,11 @@ import java.util.function.Function;
  * /civ grundstueck kaufen           angebotenes Grundstück kaufen
  * /civ grundstueck vergeben &lt;Spieler&gt;  Gemeindeland verschenken (Bürger)
  * /civ grundstueck aufloesen        Gemeindeland-Grundstück auflösen (Bürger)
+ * /civ grundstueck rechte            Rechte des Grundstücks zeigen (Inhaber)
+ * /civ grundstueck rechte mitglieder|fremde &lt;bauen|benutzen|behaelter&gt; &lt;ja|nein&gt;
+ * /civ grundstueck rechte gast &lt;Spieler&gt; &lt;Handlung&gt; &lt;ja|nein&gt;, gastentfernen &lt;Spieler&gt;
+ * /civ grundstueck rechte regel &lt;pvp|monster|explosionen|feuer|tiere&gt; &lt;gesetz|erlauben|verbieten&gt;
+ * /civ grundstueck rechte zuruecksetzen
  * /civ firma gruenden &lt;Kapital&gt; &lt;Name&gt;  Firma mit Aktien an der Börse; info, liste, aufnehmen, entlassen,
  *                                   einstellen, dividende, ausgeben, aufloesen
  * /civ boerse [kaufen|verkaufen &lt;Firma&gt; &lt;Anzahl&gt; [Limit] | depot | buch | streichen | menue]
@@ -1771,7 +1777,63 @@ public final class CivCommandTree {
                                 .executes(context -> withCiv(context, (civ, player) -> civ.plots().assign(
                                         Players.caller(player), StringArgumentType.getString(context, PLAYER))))))
                 .then(Commands.literal("aufloesen")
-                        .executes(context -> withCiv(context, (civ, player) -> civ.plots().dissolve(Players.caller(player)))));
+                        .executes(context -> withCiv(context, (civ, player) -> civ.plots().dissolve(Players.caller(player)))))
+                .then(plotRightsCommands());
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> plotRightsCommands() {
+        java.util.function.Function<String, com.mojang.brigadier.builder.RequiredArgumentBuilder<CommandSourceStack, String>>
+                answer = name -> Commands.argument(name, StringArgumentType.word())
+                .suggests((context, builder) -> SharedSuggestionProvider.suggest(List.of("ja", "nein"), builder));
+        return Commands.literal("rechte")
+                .executes(context -> withCiv(context, (civ, player) -> civ.plotRights().show(Players.caller(player))))
+                .then(plotAudience("mitglieder", true, answer))
+                .then(plotAudience("fremde", false, answer))
+                .then(Commands.literal("gast")
+                        .then(Commands.argument(PLAYER, StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                        context.getSource().getOnlinePlayerNames(), builder))
+                                .then(Commands.argument(TYPE, StringArgumentType.word())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                PlotRightsService.actionNames(), builder))
+                                        .then(answer.apply(PRICE)
+                                                .executes(context -> withCiv(context, (civ, player) ->
+                                                        civ.plotRights().setGuest(Players.caller(player),
+                                                                StringArgumentType.getString(context, PLAYER),
+                                                                StringArgumentType.getString(context, TYPE),
+                                                                StringArgumentType.getString(context, PRICE))))))))
+                .then(Commands.literal("gastentfernen")
+                        .then(Commands.argument(PLAYER, StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                        context.getSource().getOnlinePlayerNames(), builder))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.plotRights().removeGuest(
+                                        Players.caller(player), StringArgumentType.getString(context, PLAYER))))))
+                .then(Commands.literal("regel")
+                        .then(Commands.argument(TYPE, StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                        PlotRightsService.ruleNames(), builder))
+                                .then(Commands.argument(PRICE, StringArgumentType.word())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                PlotRightsService.stanceNames(), builder))
+                                        .executes(context -> withCiv(context, (civ, player) ->
+                                                civ.plotRights().setRule(Players.caller(player),
+                                                        StringArgumentType.getString(context, TYPE),
+                                                        StringArgumentType.getString(context, PRICE)))))))
+                .then(Commands.literal("zuruecksetzen")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.plotRights().reset(
+                                Players.caller(player)))));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> plotAudience(String name, boolean members,
+            java.util.function.Function<String, com.mojang.brigadier.builder.RequiredArgumentBuilder<CommandSourceStack, String>> answer) {
+        return Commands.literal(name)
+                .then(Commands.argument(TYPE, StringArgumentType.word())
+                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                PlotRightsService.actionNames(), builder))
+                        .then(answer.apply(PRICE)
+                                .executes(context -> withCiv(context, (civ, player) -> civ.plotRights().setAudience(
+                                        Players.caller(player), members, StringArgumentType.getString(context, TYPE),
+                                        StringArgumentType.getString(context, PRICE))))));
     }
 
     private Reply plotInfo(CivServer civ, ServerPlayer player) {

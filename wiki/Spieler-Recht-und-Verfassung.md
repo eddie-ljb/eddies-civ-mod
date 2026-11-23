@@ -37,6 +37,7 @@ Zusätzliche Spielregeln aus dem Gesetzes-Baukasten:
 | `pvp_allowed` (Standard ja) | Spieler können einander im Gebiet nicht verletzen, wenn nein |
 | `hostile_mobs_allowed` (Standard ja) | Feindliche Monster verschwinden im Gebiet alle 5 Sekunden, wenn nein; benannte bleiben |
 | `outsiders_may_hurt_animals` (Standard nein) | Fremde können Tiere nicht verletzen |
+| `plot_rights_override` (Standard ja) | Grundstücksinhaber dürfen auf ihrem Grundstück abweichend von Gemeinde-, Länder- und Nationenrecht einstellen, wer bauen/benutzen darf und ob PvP, Monster, Explosionen, Feuer und Tierschutz gelten (`/civ grundstueck rechte`). Bei nein gilt das Recht auch auf Grundstücken: Was es Fremden erlaubt, ist überall erlaubt |
 | `federal_levy_percent` (0–10, nur im Bund) | Bundesumlage: jedes Glied zahlt täglich diesen Anteil seiner Kasse an den Bund |
 
 ## Gesetzbuch (Item)

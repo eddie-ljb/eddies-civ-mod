@@ -203,6 +203,7 @@ Alle Regelungen stehen im Rechtsmenü (Gemeindehaus → Recht) als Schalter oder
 | `pvp_allowed` (Standard ja) | Spieler können einander im Gebiet nicht verletzen, wenn nein („PvP ist verboten.“) |
 | `hostile_mobs_allowed` (Standard ja) | Feindliche Monster verschwinden im Gebiet alle 5 Sekunden, wenn nein; benannte bleiben („Keine Monster in der Stadt.“) |
 | `outsiders_may_hurt_animals` (Standard nein) | Fremde können Tiere nicht verletzen („Tiere sind geschützt.“) |
+| `plot_rights_override` (Standard ja) | Grundstücksinhaber dürfen auf ihrem Grundstück abweichend von Gemeinde-, Länder- und Nationenrecht einstellen, wer bauen/benutzen darf und ob PvP, Monster, Explosionen, Feuer und Tierschutz gelten (`/civ grundstueck rechte`). Bei nein gilt das Recht auch auf Grundstücken: Was es Fremden erlaubt, ist überall erlaubt |
 | `federal_levy_percent` (0–10, nur im Bund) | Bundesumlage: jedes Glied zahlt täglich diesen Anteil seiner Kasse an den Bund („Die Bundesumlage beträgt 5 %.“) |
 
 ### Schutz
@@ -335,6 +336,7 @@ Anmelden: Mit `/civ web` holst du dir im Spiel einen Code und gibst ihn auf der 
 | `/civ grundstueck ecke1` / `ecke2` | Ecken einer Auswahl setzen |
 | `/civ grundstueck erstellen <Art>` | Auswahl zum Grundstück machen (Bürgermeister, Bauamt) |
 | `/civ grundstueck chunk <Art>` | ganzen Chunk zum Grundstück machen (Bürgermeister, Bauamt) |
+| `/civ grundstueck rechte [mitglieder\|fremde <bauen\|benutzen\|behaelter> <ja\|nein>] [gast <Spieler> <Handlung> <ja\|nein>] [gastentfernen <Spieler>] [regel <pvp\|monster\|explosionen\|feuer\|tiere> <gesetz\|erlauben\|verbieten>] [zuruecksetzen]` | Rechte auf dem eigenen Grundstück einstellen (Inhaber) |
 | `/civ grundstueck anbieten <Preis>` | Grundstück zum Verkauf anbieten |
 | `/civ grundstueck zurueckziehen` | Verkaufsangebot zurückziehen |
 | `/civ grundstueck kaufen` | angebotenes Grundstück kaufen |

@@ -101,6 +101,16 @@ public final class BlueprintLibrary {
         return plan;
     }
 
+    /**
+     * Eingebaute Pläne, die zur Grundstücksart gehören und in die Fläche passen, nach Größe sortiert. Importierte
+     * Pläne zählen nicht: Wer sie nutzen will, bestellt sie selbst.
+     */
+    public synchronized List<Blueprint> fittingFor(de.etiennebader.civ.domain.land.PlotType type, long width,
+                                                   long depth) {
+        return fitting(width, depth).stream().filter(plan -> BuiltInBlueprints.plotTypesOf(plan).contains(type))
+                .toList();
+    }
+
     /** Pläne, die in die Fläche passen, nach Größe sortiert. */
     public synchronized List<Blueprint> fitting(long width, long depth) {
         return plans.values().stream().filter(plan -> plan.sizeX() <= width && plan.sizeZ() <= depth)
