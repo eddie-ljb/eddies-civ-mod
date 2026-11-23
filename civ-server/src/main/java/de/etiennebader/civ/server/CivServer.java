@@ -196,6 +196,7 @@ public final class CivServer {
                 dataDirectory.map(dir -> dir.resolve("family.tsv")));
         this.religion = new de.etiennebader.civ.server.religion.ReligionService(app.queries(), players, announcements,
                 ids, dataDirectory.map(dir -> dir.resolve("religion.tsv")));
+        villagers.faithPoints(religion::faithPoints);
         villagers.familyLines(villager -> {
             List<de.etiennebader.civ.server.command.Message> lines = new java.util.ArrayList<>(family.describe(villager));
             lines.addAll(religion.describe(villager));

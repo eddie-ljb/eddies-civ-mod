@@ -43,7 +43,7 @@ class ReligionStoreTest {
 
         ReligionStore store = new ReligionStore(Optional.of(dir.resolve("religion.tsv")));
         store.save(new ReligionStore.State(registry.religions(), members, Map.of(villager, "Morgen"),
-                List.of("Taufe: Eddie")));
+                List.of("Taufe: Eddie"), Map.of(id, 4), Map.of(id, "Sonne")));
         ReligionStore.State loaded = store.load();
 
         assertEquals(1, loaded.religions().size());
@@ -56,5 +56,7 @@ class ReligionStoreTest {
         assertEquals(members, loaded.members());
         assertEquals("Morgen", loaded.denominations().get(villager));
         assertEquals(List.of("Taufe: Eddie"), loaded.rites());
+        assertEquals(4, loaded.fervor().get(id));
+        assertEquals("Sonne", loaded.logos().get(id));
     }
 }

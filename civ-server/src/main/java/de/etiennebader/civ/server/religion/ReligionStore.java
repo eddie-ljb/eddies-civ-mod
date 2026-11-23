@@ -28,9 +28,10 @@ final class ReligionStore {
 
     /** Alles, was gespeichert wird. */
     record State(List<Religion> religions, Map<ActorRef, ReligionId> members, Map<ActorRef, String> denominations,
-                 List<String> rites) {
+                 List<String> rites, Map<ReligionId, Integer> fervor, Map<ReligionId, String> logos) {
         static State empty() {
-            return new State(List.of(), new LinkedHashMap<>(), new LinkedHashMap<>(), new ArrayList<>());
+            return new State(List.of(), new LinkedHashMap<>(), new LinkedHashMap<>(), new ArrayList<>(),
+                    new LinkedHashMap<>(), new LinkedHashMap<>());
         }
     }
 
@@ -48,6 +49,8 @@ final class ReligionStore {
         Map<ActorRef, ReligionId> members = new LinkedHashMap<>();
         Map<ActorRef, String> denominations = new LinkedHashMap<>();
         List<String> rites = new ArrayList<>();
+        Map<ReligionId, Integer> fervor = new LinkedHashMap<>();
+        Map<ReligionId, String> logos = new LinkedHashMap<>();
         try {
             for (String line : Files.readAllLines(file.get(), StandardCharsets.UTF_8)) {
                 String[] f = line.split("\t", -1);
@@ -88,6 +91,8 @@ final class ReligionStore {
                         }
                     }
                     case "RITE" -> rites.add(f[1]);
+                    case "FER" -> fervor.put(new ReligionId(UUID.fromString(f[1])), Integer.parseInt(f[2]));
+                    case "LOGO" -> logos.put(new ReligionId(UUID.fromString(f[1])), f[2]);
                     default -> {
                     }
                 }
@@ -95,7 +100,7 @@ final class ReligionStore {
         } catch (IOException | RuntimeException e) {
             return State.empty();
         }
-        return new State(religions, members, denominations, rites);
+        return new State(religions, members, denominations, rites, fervor, logos);
     }
 
     void save(State state) {
@@ -124,6 +129,8 @@ final class ReligionStore {
         state.members().forEach((actor, religion) -> lines.add(String.join("\t", "MEM", text(actor),
                 religion.value().toString(), clean(state.denominations().getOrDefault(actor, "")))));
         state.rites().forEach(rite -> lines.add("RITE\t" + clean(rite)));
+        state.fervor().forEach((id, value) -> lines.add("FER\t" + id.value() + "\t" + value));
+        state.logos().forEach((id, logo) -> lines.add("LOGO\t" + id.value() + "\t" + clean(logo)));
         try {
             Path target = file.get().toAbsolutePath();
             Files.createDirectories(target.getParent());

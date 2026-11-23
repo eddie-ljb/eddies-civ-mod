@@ -1487,6 +1487,14 @@ public final class CivCommandTree {
                         .executes(context -> withCiv(context, (civ, player) -> civ.religion().power(
                                 Players.caller(player), IntegerArgumentType.getInteger(context, COUNT),
                                 civ.calendar().today())))))
+                .then(Commands.literal("logo").then(Commands.argument(NAME, StringArgumentType.string())
+                        .executes(context -> withCiv(context, (civ, player) -> civ.religion().logo(
+                                Players.caller(player), StringArgumentType.getString(context, NAME))))))
+                .then(Commands.literal("menue").executes(context -> withCiv(context, (civ, player) -> {
+                    Screens.open(player, new de.etiennebader.civ.fabric.screen.ReligionScreen(civ, player,
+                            Optional.empty()));
+                    return null;
+                })))
                 .then(Commands.literal("beten")
                         .executes(context -> withCiv(context, (civ, player) -> civ.religion().pray(Players.caller(player)))))
                 .then(Commands.literal("gottesdienst")

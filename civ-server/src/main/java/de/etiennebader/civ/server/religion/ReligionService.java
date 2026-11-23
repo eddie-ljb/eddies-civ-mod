@@ -61,7 +61,15 @@ public final class ReligionService {
     private final Map<ActorRef, ReligionId> members;
     private final Map<ActorRef, String> denominations;
     private final List<String> rites;
+    private final Map<ReligionId, Integer> fervor;
+    private final Map<ReligionId, String> logos;
+    private final java.util.Set<PlayerRef> prayedToday = new java.util.HashSet<>();
     private final Random random = new Random();
+
+    /** Obergrenze der Inbrunst: wie sehr Gebete und Gottesdienste die Gläubigen gerade stärken. */
+    static final int MAX_FERVOR = 6;
+    /** Ab diesem Machtgrad des Klerus fühlen sich Atheisten bedrängt. */
+    static final int PRESSURE_POWER = 70;
 
     public ReligionService(WorldQueries queries, PlayerDirectory players, Announcements announcements,
                            IdGenerator ids, Optional<Path> file) {
@@ -75,18 +83,39 @@ public final class ReligionService {
         this.members = new LinkedHashMap<>(state.members());
         this.denominations = new LinkedHashMap<>(state.denominations());
         this.rites = new ArrayList<>(state.rites());
+        this.fervor = new LinkedHashMap<>(state.fervor());
+        this.logos = new LinkedHashMap<>(state.logos());
     }
 
     private void save() {
-        store.save(new ReligionStore.State(registry.religions(), members, denominations, rites));
+        store.save(new ReligionStore.State(registry.religions(), members, denominations, rites, fervor, logos));
     }
 
-    private static Reply done(String text) {
-        return Reply.success(Message.of(MessageKey.RELIGION_DONE, text));
+    private static Reply ok(MessageKey key, Object... args) {
+        return Reply.success(Message.of(key, args));
     }
 
-    private static Reply fail(String text) {
-        return Reply.failure(Message.of(MessageKey.RELIGION_ERROR, text));
+    private static Reply no(MessageKey key, Object... args) {
+        return Reply.failure(Message.of(key, args));
+    }
+
+    /** Fehlertext aus der Domäne (deutsch), unverändert durchgereicht. */
+    private static Reply fail(String domainText) {
+        return Reply.failure(Message.of(MessageKey.RELIGION_ERROR, domainText));
+    }
+
+    private static Message kind(Religion religion) {
+        return Message.of(religion.monotheistic() ? MessageKey.RELIGION_MONO : MessageKey.RELIGION_POLY);
+    }
+
+    private Message head(Religion religion) {
+        return religion.clergyHead().map(head -> Message.of(MessageKey.RELIGION_DONE, nameOf(head)))
+                .orElseGet(() -> Message.of(MessageKey.RELIGION_VACANT));
+    }
+
+    private String logoPrefix(Religion religion) {
+        String logo = logos.get(religion.id());
+        return logo == null ? "" : "[" + logo + "] ";
     }
 
     private int memberCount(Religion religion) {
@@ -115,9 +144,9 @@ public final class ReligionService {
                     temple, language, day);
             members.put(caller.player(), religion.id());
             save();
-            announcements.add(Announcement.toAll(Message.of(MessageKey.RELIGION_DONE,
-                    caller.name() + " gründet die Religion " + religion.name() + "."))); 
-            return done("Religion gegründet: " + religion.name() + (monotheistic ? " (monotheistisch)" : " (polytheistisch)"));
+            announcements.add(Announcement.toAll(Message.of(MessageKey.RELIGION_FOUNDED_ANNOUNCE, caller.name(),
+                    religion.name())));
+            return ok(MessageKey.RELIGION_FOUNDED, religion.name(), kind(religion));
         } catch (IllegalArgumentException | IllegalStateException e) {
             return fail(e.getMessage());
         }
@@ -125,13 +154,12 @@ public final class ReligionService {
 
     public synchronized Reply list() {
         if (registry.religions().isEmpty()) {
-            return done("Es gibt noch keine Religionen.");
+            return ok(MessageKey.RELIGION_NONE_YET);
         }
         List<Message> lines = new ArrayList<>();
         for (Religion religion : registry.religions()) {
-            lines.add(Message.of(MessageKey.RELIGION_LIST_ENTRY, religion.name(),
-                    religion.monotheistic() ? "monotheistisch" : "polytheistisch", memberCount(religion),
-                    religion.clergyHead().map(this::nameOf).orElse("vakant")));
+            lines.add(Message.of(MessageKey.RELIGION_LIST_ENTRY, religion.name(), kind(religion),
+                    memberCount(religion), head(religion), logoPrefix(religion)));
         }
         return Reply.success(lines);
     }
@@ -139,46 +167,46 @@ public final class ReligionService {
     public synchronized Reply info(String name) {
         Optional<Religion> found = registry.religionNamed(name);
         if (found.isEmpty()) {
-            return fail("Unbekannte Religion: " + name);
+            return no(MessageKey.RELIGION_UNKNOWN, name);
         }
         Religion r = found.get();
         List<Message> lines = new ArrayList<>();
-        lines.add(Message.of(MessageKey.RELIGION_INFO, r.name(), r.monotheistic() ? "monotheistisch" : "polytheistisch",
-                r.scriptureName(), r.templeName(), r.language(), memberCount(r), nameOf(r.founder())));
-        lines.add(Message.of(MessageKey.RELIGION_INFO_CLERGY, r.clergyHead().map(this::nameOf).orElse("vakant"),
+        lines.add(Message.of(MessageKey.RELIGION_INFO, r.name(), kind(r), r.scriptureName(), r.templeName(),
+                r.language(), memberCount(r), nameOf(r.founder()), logoPrefix(r)));
+        lines.add(Message.of(MessageKey.RELIGION_INFO_CLERGY, head(r),
                 r.clergyPower(), r.denominations().isEmpty() ? "-"
-                        : String.join(", ", r.denominations().stream().map(Denomination::name).toList())));
-        r.election().ifPresent(e -> lines.add(Message.of(MessageKey.RELIGION_DONE, "Klerus-Wahl läuft bis Tag "
-                + e.closesOn().value() + ", Kandidaten: " + (e.candidates().isEmpty() ? "-"
-                : String.join(", ", e.candidates().stream().map(this::nameOf).toList())))));
+                        : String.join(", ", r.denominations().stream().map(Denomination::name).toList()),
+                fervor.getOrDefault(r.id(), 0)));
+        r.election().ifPresent(e -> lines.add(Message.of(MessageKey.RELIGION_ELECTION_INFO, e.closesOn().value(),
+                e.candidates().isEmpty() ? "-" : String.join(", ", e.candidates().stream().map(this::nameOf).toList()))));
         return Reply.success(lines);
     }
 
     public synchronized Reply join(Caller caller, String name) {
         Optional<Religion> found = registry.religionNamed(name);
         if (found.isEmpty()) {
-            return fail("Unbekannte Religion: " + name);
+            return no(MessageKey.RELIGION_UNKNOWN, name);
         }
         members.put(caller.player(), found.get().id());
         denominations.remove(caller.player());
         save();
-        return done("Du gehörst nun zu " + found.get().name() + ".");
+        return ok(MessageKey.RELIGION_JOINED, found.get().name());
     }
 
     public synchronized Reply leave(Caller caller) {
         if (members.remove(caller.player()) == null) {
-            return fail("Du gehörst keiner Religion an.");
+            return no(MessageKey.RELIGION_NOT_MEMBER);
         }
         denominations.remove(caller.player());
         save();
-        return done("Du bist aus deiner Religion ausgetreten.");
+        return ok(MessageKey.RELIGION_LEFT);
     }
 
     /** Fügt der eigenen Religion eine Konfession hinzu (Gründer/Klerus) und wählt sie, oder wählt eine bestehende. */
     public synchronized Reply denomination(Caller caller, String name, Day day) {
         Optional<Religion> religion = religionOf(caller.player());
         if (religion.isEmpty()) {
-            return fail("Du gehörst keiner Religion an.");
+            return no(MessageKey.RELIGION_NOT_MEMBER);
         }
         try {
             Religion r = religion.get();
@@ -187,13 +215,13 @@ public final class ReligionService {
                 boolean allowed = r.founder().equals(caller.player())
                         || r.clergyHead().filter(caller.player()::equals).isPresent();
                 if (!allowed) {
-                    return fail("Nur Gründer oder Klerus-Oberhaupt dürfen neue Konfessionen anlegen.");
+                    return no(MessageKey.RELIGION_DENOMINATION_FORBIDDEN);
                 }
                 registry.addDenomination(r.id(), new Denomination(name), day);
             }
             denominations.put(caller.player(), name.strip());
             save();
-            return done("Konfession: " + name.strip());
+            return ok(MessageKey.RELIGION_DENOMINATION_SET, name.strip());
         } catch (IllegalArgumentException | IllegalStateException e) {
             return fail(e.getMessage());
         }
@@ -203,16 +231,16 @@ public final class ReligionService {
     public synchronized Reply power(Caller caller, int power, Day day) {
         Optional<Religion> religion = religionOf(caller.player());
         if (religion.isEmpty()) {
-            return fail("Du gehörst keiner Religion an.");
+            return no(MessageKey.RELIGION_NOT_MEMBER);
         }
         Religion r = religion.get();
         if (r.clergyHead().isEmpty()) {
-            return fail("Das Klerusamt ist vakant.");
+            return no(MessageKey.RELIGION_OFFICE_VACANT);
         }
         try {
             registry.appointClergy(r.id(), caller.player(), r.clergyHead().get(), power, day);
             save();
-            return done("Machtgrad des Klerus: " + power);
+            return ok(MessageKey.RELIGION_POWER_SET, power);
         } catch (IllegalArgumentException e) {
             return fail(e.getMessage());
         }
@@ -222,63 +250,68 @@ public final class ReligionService {
     public synchronized Reply pray(Caller caller) {
         Optional<Religion> religion = religionOf(caller.player());
         if (religion.isEmpty()) {
-            return fail("Du gehörst keiner Religion an.");
+            return no(MessageKey.RELIGION_NOT_MEMBER);
         }
         Religion r = religion.get();
-        long believers = members.entrySet().stream().filter(e -> e.getValue().equals(r.id())).count();
-        return done("Du betest in " + r.templeName() + " (" + r.scriptureName() + "). " + believers
-                + " Gläubige teilen deinen Glauben.");
+        if (!prayedToday.add(caller.player())) {
+            return no(MessageKey.RELIGION_PRAYED_ALREADY);
+        }
+        fervor.merge(r.id(), 1, (a, b) -> Math.min(MAX_FERVOR, a + b));
+        save();
+        return ok(MessageKey.RELIGION_PRAYED, r.templeName(), r.scriptureName(), memberCount(r));
     }
 
     /** Gottesdienst, nur durch das Klerus-Oberhaupt; alle Gläubigen erfahren davon. */
     public synchronized Reply service(Caller caller) {
         Optional<Religion> religion = religionOf(caller.player());
         if (religion.isEmpty() || religion.get().clergyHead().filter(caller.player()::equals).isEmpty()) {
-            return fail("Nur das Klerus-Oberhaupt hält Gottesdienste.");
+            return no(MessageKey.RELIGION_ONLY_HEAD_SERVICE);
         }
         Religion r = religion.get();
-        int attendees = (int) members.entrySet().stream().filter(e -> e.getValue().equals(r.id())).count();
-        announcements.add(Announcement.toAll(Message.of(MessageKey.RELIGION_DONE, caller.name() + " hält einen "
-                + "Gottesdienst in " + r.templeName() + " (" + r.name() + ") mit " + attendees + " Gläubigen.")));
-        return done("Gottesdienst gehalten, " + attendees + " Gläubige.");
+        int attendees = memberCount(r);
+        fervor.merge(r.id(), 3, (a, b) -> Math.min(MAX_FERVOR, a + b));
+        save();
+        announcements.add(Announcement.toAll(Message.of(MessageKey.RELIGION_SERVICE_ANNOUNCE, caller.name(),
+                r.templeName(), r.name(), attendees)));
+        return ok(MessageKey.RELIGION_SERVICE_DONE, attendees);
     }
 
     /** Taufe oder Segnung (z. B. einer Hochzeit): nur durch das Klerus-Oberhaupt, wird als Ritus festgehalten. */
     public synchronized Reply rite(Caller caller, String kind, String targetName, Day day) {
         Optional<Religion> religion = religionOf(caller.player());
         if (religion.isEmpty() || religion.get().clergyHead().filter(caller.player()::equals).isEmpty()) {
-            return fail("Nur das Klerus-Oberhaupt vollzieht Riten.");
+            return no(MessageKey.RELIGION_ONLY_HEAD_RITE);
         }
         Optional<PlayerRef> target = players.findByName(targetName);
         if (target.isEmpty()) {
-            return fail("Unbekannter Spieler: " + targetName);
+            return no(MessageKey.RELIGION_UNKNOWN_PLAYER, targetName);
         }
         Religion r = religion.get();
         if (kind.equals("taufe")) {
             members.put(target.get(), r.id());
             denominations.remove(target.get());
         }
-        String text = (kind.equals("taufe") ? "Taufe" : "Segnung") + ": " + targetName + " (" + r.name() + ", Tag "
-                + day.value() + ")";
-        rites.add(text);
+        Message text = Message.of(kind.equals("taufe") ? MessageKey.RELIGION_RITE_BAPTISM
+                : MessageKey.RELIGION_RITE_BLESSING, targetName, r.name(), day.value());
+        rites.add((kind.equals("taufe") ? "Taufe: " : "Segnung: ") + targetName + " (" + r.name() + ", " + day.value() + ")");
         while (rites.size() > MAX_RITES) {
             rites.removeFirst();
         }
         save();
-        announcements.add(Announcement.toAll(Message.of(MessageKey.RELIGION_DONE, text)));
-        return done(text);
+        announcements.add(Announcement.toAll(text));
+        return Reply.success(text);
     }
 
     /** Klerus-Wahl ausrufen (Mitglied). */
     public synchronized Reply callElection(Caller caller, Day day) {
         Optional<Religion> religion = religionOf(caller.player());
         if (religion.isEmpty()) {
-            return fail("Du gehörst keiner Religion an.");
+            return no(MessageKey.RELIGION_NOT_MEMBER);
         }
         try {
             registry.callClergyElection(religion.get().id(), day.plus(ELECTION_DAYS), day);
             save();
-            return done("Klerus-Wahl ausgerufen, sie endet in " + ELECTION_DAYS + " Tagen.");
+            return ok(MessageKey.RELIGION_ELECTION_CALLED, ELECTION_DAYS);
         } catch (IllegalStateException e) {
             return fail(e.getMessage());
         }
@@ -287,12 +320,12 @@ public final class ReligionService {
     public synchronized Reply candidate(Caller caller, Day day) {
         Optional<Religion> religion = religionOf(caller.player());
         if (religion.isEmpty()) {
-            return fail("Du gehörst keiner Religion an.");
+            return no(MessageKey.RELIGION_NOT_MEMBER);
         }
         try {
             registry.nominateClergy(religion.get().id(), caller.player(), day);
             save();
-            return done("Du kandidierst für das Klerusamt.");
+            return ok(MessageKey.RELIGION_CANDIDATE);
         } catch (IllegalStateException | IllegalArgumentException e) {
             return fail(e.getMessage());
         }
@@ -301,26 +334,74 @@ public final class ReligionService {
     public synchronized Reply vote(Caller caller, String candidateName, Day day) {
         Optional<Religion> religion = religionOf(caller.player());
         if (religion.isEmpty()) {
-            return fail("Du gehörst keiner Religion an.");
+            return no(MessageKey.RELIGION_NOT_MEMBER);
         }
         Optional<PlayerRef> candidate = players.findByName(candidateName);
         if (candidate.isEmpty()) {
-            return fail("Unbekannter Spieler: " + candidateName);
+            return no(MessageKey.RELIGION_UNKNOWN_PLAYER, candidateName);
         }
         try {
             registry.castClergyVote(religion.get().id(), caller.player(), candidate.get(), day);
             save();
-            return done("Stimme abgegeben für " + candidateName + ".");
+            return ok(MessageKey.RELIGION_VOTED, candidateName);
         } catch (IllegalStateException | IllegalArgumentException e) {
             return fail(e.getMessage());
         }
     }
 
+    /** Logo der Religion setzen (1-24 Zeichen, z. B. ein Symbol); nur Gründer oder Klerus-Oberhaupt. */
+    public synchronized Reply logo(Caller caller, String logo) {
+        Optional<Religion> religion = religionOf(caller.player());
+        if (religion.isEmpty()) {
+            return no(MessageKey.RELIGION_NOT_MEMBER);
+        }
+        Religion r = religion.get();
+        if (!r.founder().equals(caller.player()) && r.clergyHead().filter(caller.player()::equals).isEmpty()) {
+            return no(MessageKey.RELIGION_LOGO_FORBIDDEN);
+        }
+        String stripped = logo.strip();
+        if (stripped.isEmpty() || stripped.length() > 24) {
+            return no(MessageKey.RELIGION_LOGO_USAGE);
+        }
+        logos.put(r.id(), stripped.replace('\t', ' ').replace('\n', ' '));
+        save();
+        return ok(MessageKey.RELIGION_LOGO_SET, stripped);
+    }
+
+    /** Eintrag der Religionsliste für die Oberfläche. */
+    public record ReligionEntry(Religion religion, String logo, int members, Message head, boolean mine) {
+    }
+
+    public synchronized List<ReligionEntry> entries(ActorRef viewer) {
+        Optional<Religion> mine = religionOf(viewer);
+        return registry.religions().stream().map(r -> new ReligionEntry(r, logos.getOrDefault(r.id(), ""),
+                memberCount(r), head(r), mine.filter(r::equals).isPresent())).toList();
+    }
+
+    /**
+     * Zufriedenheitspunkte durch Glauben (politische Rolle der Religion): Gläubige Mitglieder gewinnen Halt, mehr bei
+     * Inbrunst durch Gebete/Gottesdienste und bei starkem Klerus; Atheisten spüren den Druck eines sehr mächtigen
+     * Klerus.
+     */
+    public synchronized int faithPoints(PersonRef villager) {
+        int faith = Personality.of(villager).religiosity();
+        Optional<Religion> own = religionOf(villager);
+        if (own.isPresent() && faith > 0) {
+            return 1 + fervor.getOrDefault(own.get().id(), 0) / 2 + Math.round(own.get().clergyPower() / 50f);
+        }
+        if (faith <= -JOIN_THRESHOLD && registry.religions().stream().anyMatch(r -> r.clergyPower() >= PRESSURE_POWER
+                && r.clergyHead().isPresent() && memberCount(r) > 0)) {
+            return -1;
+        }
+        return 0;
+    }
+
     /** Kurzzeile zur Religion eines Dorfbewohners für die Auskunft beim Anschauen. */
     public synchronized List<Message> describe(PersonRef villager) {
         int faith = Personality.of(villager).religiosity();
-        String attitude = faith >= JOIN_THRESHOLD ? "gläubig" : faith <= -JOIN_THRESHOLD ? "atheistisch" : "unentschieden";
-        String religion = religionOf(villager).map(Religion::name).orElse("keine");
+        Message attitude = Message.of(faith >= JOIN_THRESHOLD ? MessageKey.RELIGION_ATTITUDE_BELIEVER
+                : faith <= -JOIN_THRESHOLD ? MessageKey.RELIGION_ATTITUDE_ATHEIST : MessageKey.RELIGION_ATTITUDE_UNDECIDED);
+        Object religion = religionOf(villager).<Object>map(Religion::name).orElse(Message.of(MessageKey.RELIGION_NONE));
         return List.of(Message.of(MessageKey.RELIGION_VILLAGER, religion, attitude, faith));
     }
 
@@ -338,6 +419,10 @@ public final class ReligionService {
      * ausgeschrieben.
      */
     public synchronized void endOfDay(Day day) {
+        prayedToday.clear();
+        fervor.replaceAll((id, value) -> Math.max(0, value - 1));
+        fervor.values().removeIf(value -> value == 0);
+        logos.keySet().removeIf(id -> registry.religion(id).isEmpty());
         if (registry.religions().isEmpty()) {
             return;
         }
@@ -379,8 +464,8 @@ public final class ReligionService {
         Optional<ActorRef> before = religion.clergyHead();
         Religion after = registry.closeClergyElection(religion.id(), day);
         if (after.clergyHead().isPresent() && !after.clergyHead().equals(before)) {
-            announcements.add(Announcement.toAll(Message.of(MessageKey.RELIGION_DONE, nameOf(after.clergyHead().get())
-                    + " ist neues Klerus-Oberhaupt von " + after.name() + ".")));
+            announcements.add(Announcement.toAll(Message.of(MessageKey.RELIGION_NEW_HEAD,
+                    nameOf(after.clergyHead().get()), after.name())));
         }
     }
 }
