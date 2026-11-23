@@ -7,10 +7,16 @@ import de.etiennebader.civ.application.law.RepealParagraph;
 import de.etiennebader.civ.application.polity.ProposeMotion;
 import de.etiennebader.civ.application.polity.VoteOutcome;
 import de.etiennebader.civ.application.query.WorldQueries;
+import de.etiennebader.civ.domain.actor.ActorRef;
+import de.etiennebader.civ.domain.actor.PlayerRef;
+import de.etiennebader.civ.domain.shared.PlayerId;
 import de.etiennebader.civ.domain.law.EnactedStatute;
 import de.etiennebader.civ.domain.law.LawRecognizer;
+import de.etiennebader.civ.domain.law.ParameterCatalog;
+import de.etiennebader.civ.domain.law.ParameterKey;
 import de.etiennebader.civ.domain.law.ParameterValue;
 import de.etiennebader.civ.domain.law.StandardParameters;
+import de.etiennebader.civ.domain.law.Statute;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.shared.DomainException;
 import de.etiennebader.civ.domain.shared.PolityId;
@@ -25,10 +31,18 @@ import de.etiennebader.civ.server.command.TranslationKeys;
 import de.etiennebader.civ.server.federation.FederationService;
 import de.etiennebader.civ.server.town.LawSetting;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.Supplier;
 
 /**
@@ -52,8 +66,29 @@ public final class LawBookService {
     private final Announcements announcements;
     private final FederationService federations;
 
+    /**
+     * Gesetzesvorlagen für den Gesetzes-Editor im Web (#10): bewusst standardmäßig nur im Arbeitsspeicher (bis zum
+     * Serverneustart); mit {@code law_drafts_persist=true} zusätzlich in einer Datei im Datenordner – siehe
+     * {@code docs/issue-10-gesetzeseditor.md}.
+     */
+    /** Obergrenzen gegen unbegrenztes Wachstum des Arbeitsspeichers. */
+    static final int MAX_DRAFTS_PER_AUTHOR = 30;
+    static final int MAX_RIGHTS_PER_PARAGRAPH = 50;
+
+    private final Map<String, LawDraft> drafts = new LinkedHashMap<>();
+
+    /** Wohin Entwürfe geschrieben werden, wenn {@code law_drafts_persist} an ist; sonst leer. */
+    private final Optional<Path> draftFile;
+
     public LawBookService(CivApplication app, Calendar calendar, Texts texts, Announcements announcements,
                           FederationService federations) {
+        this(app, calendar, texts, announcements, federations, Optional.empty());
+    }
+
+    public LawBookService(CivApplication app, Calendar calendar, Texts texts, Announcements announcements,
+                          FederationService federations, Optional<Path> draftFile) {
+        this.draftFile = Objects.requireNonNull(draftFile, "draftFile");
+        loadDrafts();
         this.app = Objects.requireNonNull(app, "app");
         this.queries = app.queries();
         this.calendar = Objects.requireNonNull(calendar, "calendar");
@@ -156,9 +191,14 @@ public final class LawBookService {
 
     /** Erlass in einer bestimmten Gemeinde oder einem Bund, z. B. aus dem Gesetzbuch-Menü. */
     public Reply enact(Caller caller, PolityId polityId, String title, String text) {
+        return enact(caller, polityId, title, text, List.of());
+    }
+
+    private Reply enact(Caller caller, PolityId polityId, String title, String text,
+                        List<ParameterValue<?>> explicitValues) {
         return attempt(() -> {
             EnactParagraph.Result result = app.enactParagraph().execute(new EnactParagraph.Command(polityId,
-                    caller.player(), title, text, calendar.today()));
+                    caller.player(), title, text, explicitValues, calendar.today()));
             PolityView polity = queries.polity(polityId).orElseThrow();
             List<Message> lines = new ArrayList<>();
             if (result.statute().isPresent() || accepted(result.proposal())) {
@@ -173,7 +213,7 @@ public final class LawBookService {
                         caller.name(), title.strip())));
                 lines.add(opened);
             }
-            lines.addAll(effects(result.recognition().values()));
+            lines.addAll(effects(merge(result.recognition().values(), explicitValues)));
             if (!result.recognition().unrecognized().isEmpty()) {
                 lines.add(Message.of(MessageKey.PARAGRAPH_UNENFORCED,
                         String.join(" / ", result.recognition().unrecognized())));
@@ -209,6 +249,198 @@ public final class LawBookService {
             }
             return Reply.success(Message.of(MessageKey.PARAGRAPH_REPEAL_PROPOSED, name, paragraph.get().title()));
         });
+    }
+
+    private static List<ParameterValue<?>> merge(List<ParameterValue<?>> recognized,
+                                                  List<ParameterValue<?>> explicit) {
+        Map<ParameterKey<?>, ParameterValue<?>> byKey = new LinkedHashMap<>();
+        recognized.forEach(value -> byKey.put(value.key(), value));
+        explicit.forEach(value -> byKey.put(value.key(), value));
+        return List.copyOf(byKey.values());
+    }
+
+    // ---- Rechte-Editor und Gesetzesüberblick im Web (#10) ----
+
+    /** Ein Recht (Parameter) einer Polity mit geltendem Wert. */
+    public record RightView(ParameterKey<?> key, Object value, Object defaultValue, boolean explicit) {
+    }
+
+    /** Alle Rechte einer Polity mit geltendem Wert, in Katalogreihenfolge. */
+    public List<RightView> rightsOf(PolityView polity) {
+        List<RightView> rights = new ArrayList<>();
+        for (ParameterKey<?> key : ParameterCatalog.standard().keys()) {
+            rights.add(rightOf(polity, key));
+        }
+        return rights;
+    }
+
+    private static <T> RightView rightOf(PolityView polity, ParameterKey<T> key) {
+        Optional<T> explicit = polity.laws().explicitValueOf(key);
+        return new RightView(key, explicit.orElse(key.defaultValue()), key.defaultValue(), explicit.isPresent());
+    }
+
+    /** Darf die Person für diese Polity Gesetze erlassen oder beantragen (Ebene, die sie führt, sonst Wohngemeinde)? */
+    public boolean canLegislate(Caller caller, PolityId polityId) {
+        return legislature(caller).map(PolityView::id).filter(polityId::equals).isPresent();
+    }
+
+    /**
+     * Setzt Rechte ausdrücklich als Paragraphen, ohne Freitext: {@code values} bildet Parameter-ID auf Wert ab.
+     * Wie jeder Paragraph wird er sofort erlassen oder, bei Abstimmungspflicht, als Antrag eröffnet.
+     */
+    public Reply enactRights(Caller caller, PolityId polityId, String title, Map<String, String> values) {
+        if (!canLegislate(caller, polityId)) {
+            return Reply.failure(Message.of(MessageKey.NOT_IN_MUNICIPALITY));
+        }
+        if (values.isEmpty() || values.size() > MAX_RIGHTS_PER_PARAGRAPH) {
+            return Reply.failure(Message.of(MessageKey.INVALID_LAW_VALUE, String.valueOf(values.size()), ""));
+        }
+        ParameterCatalog catalog = ParameterCatalog.standard();
+        List<ParameterValue<?>> decoded = new ArrayList<>();
+        for (Map.Entry<String, String> entry : values.entrySet()) {
+            try {
+                ParameterValue<?> value = catalog.decode(entry.getKey(), entry.getValue());
+                if (!value.key().accepts(value.value())) {
+                    return Reply.failure(Message.of(MessageKey.INVALID_LAW_VALUE, entry.getValue(), entry.getKey()));
+                }
+                decoded.add(value);
+            } catch (IllegalArgumentException e) {
+                return Reply.failure(Message.of(MessageKey.INVALID_LAW_VALUE, entry.getValue(), entry.getKey()));
+            }
+        }
+        return enact(caller, polityId, title, "", decoded);
+    }
+
+    // ---- Gesetzesvorlagen (#10) ----
+
+    /**
+     * Ein gespeicherter Entwurf für einen Paragraphen: sichtbar für die Autorin/den Autor und, sofern vorhanden,
+     * für die eigene Partei zum Zeitpunkt des Speicherns. Ob die Partei später wechselt, ändert die Sichtbarkeit
+     * eines schon gespeicherten Entwurfs nicht mehr.
+     */
+    public record LawDraft(String id, ActorRef author, String authorName, Optional<PolityId> party,
+                           Optional<PolityId> targetPolity, String title, String text, long savedOn) {
+    }
+
+    /**
+     * Speichert einen Entwurf neu oder, mit {@code id} eines eigenen vorhandenen Entwurfs, überschreibt ihn.
+     *
+     * @throws IllegalArgumentException bei leerem/zu langem Titel oder Text, oder wenn {@code id} den Entwurf
+     *                                  einer anderen Person meint
+     */
+    public LawDraft saveDraft(Caller caller, Optional<String> id, Optional<PolityId> targetPolity, String title,
+                              String text) {
+        String draftTitle = title.strip();
+        String draftText = text.strip();
+        if (draftTitle.isEmpty() || draftTitle.length() > Statute.MAX_TITLE_LENGTH) {
+            throw new IllegalArgumentException("Titel leer oder zu lang (höchstens %d Zeichen)"
+                    .formatted(Statute.MAX_TITLE_LENGTH));
+        }
+        if (draftText.length() > Statute.MAX_TEXT_LENGTH) {
+            throw new IllegalArgumentException("Text zu lang (höchstens %d Zeichen)".formatted(Statute.MAX_TEXT_LENGTH));
+        }
+        if (id.isPresent() && drafts.containsKey(id.get()) && !drafts.get(id.get()).author().equals(caller.player())) {
+            throw new IllegalArgumentException("Entwurf gehört einer anderen Person");
+        }
+        boolean overwrite = id.isPresent() && drafts.containsKey(id.get());
+        if (!overwrite && drafts.values().stream().filter(d -> d.author().equals(caller.player())).count()
+                >= MAX_DRAFTS_PER_AUTHOR) {
+            throw new IllegalArgumentException("Zu viele Entwürfe (höchstens %d)".formatted(MAX_DRAFTS_PER_AUTHOR));
+        }
+        String draftId = id.filter(drafts::containsKey).orElseGet(() -> UUID.randomUUID().toString());
+        Optional<PolityId> party = queries.partyOf(caller.player()).map(PolityView::id);
+        LawDraft draft = new LawDraft(draftId, caller.player(), caller.name(), party, targetPolity, draftTitle,
+                draftText, calendar.today().value());
+        drafts.put(draftId, draft);
+        storeDrafts();
+        return draft;
+    }
+
+    /** Eigene Entwürfe und die der eigenen Partei, neueste zuerst. */
+    public List<LawDraft> draftsVisibleTo(Caller caller) {
+        Optional<PolityId> party = queries.partyOf(caller.player()).map(PolityView::id);
+        return drafts.values().stream()
+                .filter(draft -> draft.author().equals(caller.player())
+                        || (party.isPresent() && draft.party().equals(party)))
+                .sorted(Comparator.comparingLong(LawDraft::savedOn).reversed())
+                .toList();
+    }
+
+    /** @return ob gelöscht wurde; {@code false} ohne diesen Entwurf oder wenn er einer anderen Person gehört */
+    public boolean deleteDraft(Caller caller, String id) {
+        LawDraft draft = drafts.get(id);
+        if (draft == null || !draft.author().equals(caller.player())) {
+            return false;
+        }
+        drafts.remove(id);
+        storeDrafts();
+        return true;
+    }
+
+    // Dateiformat: eine Zeile je Entwurf, Felder durch Tab getrennt, \\ \t \n maskiert.
+    private static String escape(String value) {
+        return value.replace("\\", "\\\\").replace("\t", "\\t").replace("\n", "\\n").replace("\r", "");
+    }
+
+    private static String unescape(String value) {
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c == '\\' && i + 1 < value.length()) {
+                char next = value.charAt(++i);
+                out.append(next == 't' ? '\t' : next == 'n' ? '\n' : next);
+            } else {
+                out.append(c);
+            }
+        }
+        return out.toString();
+    }
+
+    private void storeDrafts() {
+        if (draftFile.isEmpty()) {
+            return;
+        }
+        List<String> lines = new ArrayList<>();
+        for (LawDraft d : drafts.values()) {
+            lines.add(String.join("\t", d.id(), d.author().uuid().toString(), escape(d.authorName()),
+                    d.party().map(id -> id.value().toString()).orElse(""),
+                    d.targetPolity().map(id -> id.value().toString()).orElse(""), escape(d.title()),
+                    escape(d.text()), Long.toString(d.savedOn())));
+        }
+        try {
+            Path target = draftFile.get();
+            Path temp = target.resolveSibling(target.getFileName() + ".tmp");
+            Files.write(temp, lines);
+            Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (IOException | RuntimeException e) {
+            // Der Entwurf bleibt im Speicher gültig; nur das Schreiben ist gescheitert.
+            System.err.println("Gesetzesvorlagen konnten nicht gespeichert werden: " + e);
+        }
+    }
+
+    private void loadDrafts() {
+        if (draftFile.isEmpty() || !Files.isRegularFile(draftFile.get())) {
+            return;
+        }
+        try {
+            for (String line : Files.readAllLines(draftFile.get())) {
+                String[] f = line.split("\t", -1);
+                if (f.length != 8) {
+                    continue;
+                }
+                try {
+                    ActorRef author = new PlayerRef(new PlayerId(UUID.fromString(f[1])));
+                    drafts.put(f[0], new LawDraft(f[0], author, unescape(f[2]),
+                            f[3].isEmpty() ? Optional.empty() : Optional.of(new PolityId(UUID.fromString(f[3]))),
+                            f[4].isEmpty() ? Optional.empty() : Optional.of(new PolityId(UUID.fromString(f[4]))),
+                            unescape(f[5]), unescape(f[6]), Long.parseLong(f[7])));
+                } catch (IllegalArgumentException e) {
+                    // kaputte Zeile überspringen
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("Gesetzesvorlagen konnten nicht gelesen werden: " + e);
+        }
     }
 
     private Optional<ParagraphView> paragraph(PolityView polity, int number) {

@@ -56,6 +56,7 @@ public enum GuiKeys {
     MAP_FOREIGN,
     MAP_COORDS,
     MAP_HERE,
+    MAP_PORT,
     MAP_CLAIM_HINT,
     MAP_OUTPOST_HINT,
     MAP_LEVEL_HIGHEST,
@@ -70,6 +71,8 @@ public enum GuiKeys {
     BANK_DEPOSIT_ALL,
     BANK_WITHDRAW,
     BANK_WITHDRAW_HINT,
+    BANK_PAYOUT_CURRENCY,
+    BANK_PAYOUT_HINT,
     BANK_TRANSFER_HINT,
     // Markt
     MARKET_HELP,
@@ -210,6 +213,9 @@ public enum GuiKeys {
     LAW_BOOK_OPEN,
     LAW_BOOK_OPEN_HINT,
     LAW_BOOK_ITEM_LORE,
+    ID_CARD_NAME,
+    ID_CARD_NAME_LINE,
+    ID_CARD_ISSUED_LINE,
     // Parteien
     PARTIES,
     PARTIES_HINT,

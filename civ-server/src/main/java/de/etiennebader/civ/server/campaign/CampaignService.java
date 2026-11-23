@@ -17,6 +17,7 @@ import de.etiennebader.civ.domain.polity.ElectionResult;
 import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.PartyProfile;
 import de.etiennebader.civ.domain.polity.Platform;
+import de.etiennebader.civ.domain.law.VotingMethod;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.polity.Poster;
 import de.etiennebader.civ.domain.polity.Promise;
@@ -379,36 +380,72 @@ public final class CampaignService {
         List<ElectionResult> results = new ArrayList<>(polity.results());
         Collections.reverse(results);
         for (ElectionResult result : results) {
+            boolean byList = listBallot(polity, result.office());
             Map<ActorRef, Long> totals = result.totals();
             long sum = totals.values().stream().mapToLong(Long::longValue).sum();
             List<ResultView.District> districts = result.districts().stream()
-                    .map(district -> district(district))
+                    .map(district -> district(district, byList))
                     .toList();
             views.add(new ResultView(polity.id(), polity.name().value(), result.office(),
-                    offices.officeName(polity, result.office()), result.closedOn().value(), lines(totals, sum),
+                    offices.officeName(polity, result.office()), result.closedOn().value(), lines(totals, sum, byList),
                     districts, result.winners().stream().map(texts::actor).toList()));
         }
         return views;
     }
 
-    private ResultView.District district(ElectionResult.District district) {
+    /** Listenwahl (#47): Parlamentswahl nach Listen; Auswertung und Karte zeigen dann nur die Parteien. */
+    private static boolean listBallot(PolityView polity, Office office) {
+        return office == Office.PARLIAMENT && VotingMethod.Ballot.of(polity.laws().valueOf(StandardParameters.BALLOT_TYPE))
+                == VotingMethod.Ballot.LIST;
+    }
+
+    private ResultView.District district(ElectionResult.District district, boolean byList) {
         long sum = district.total();
         Optional<ActorRef> leader = district.leader();
         Optional<PolityView> party = leader.flatMap(queries::partyOf);
         return new ResultView.District(district.district(),
                 district.district().map(texts::polityName).orElseGet(() -> "-"),
-                leader.map(texts::actor).orElse("-"), party.map(found -> found.name().value()),
+                byList && party.isPresent() ? party.get().name().value() : leader.map(texts::actor).orElse("-"),
+                party.map(found -> found.name().value()),
                 party.map(found -> found.id().value().toString())
                         .orElseGet(() -> leader.map(actor -> actor.uuid().toString()).orElse("")),
-                sum, lines(district.votes(), sum));
+                sum, lines(district.votes(), sum, byList));
     }
 
-    private List<ResultView.Line> lines(Map<ActorRef, Long> votes, long sum) {
+    private List<ResultView.Line> lines(Map<ActorRef, Long> votes, long sum, boolean byList) {
+        if (byList) {
+            return listLines(votes, sum);
+        }
         return votes.entrySet().stream()
                 .sorted(Map.Entry.<ActorRef, Long>comparingByValue().reversed())
                 .map(entry -> {
                     Optional<PolityView> party = queries.partyOf(entry.getKey());
                     return new ResultView.Line(texts.actor(entry.getKey()), party.map(found -> found.name().value()),
+                            party.map(PolityView::id), entry.getValue(),
+                            sum == 0 ? 0 : Math.round(entry.getValue() * 100.0 / sum));
+                })
+                .toList();
+    }
+
+    /** Listenwahl: die Stimmen der Kandidaten einer Partei zu einer Zeile der Partei, Parteilose einzeln. */
+    private List<ResultView.Line> listLines(Map<ActorRef, Long> votes, long sum) {
+        Map<Object, Long> byKey = new java.util.LinkedHashMap<>();
+        Map<Object, Optional<PolityView>> parties = new java.util.HashMap<>();
+        Map<Object, ActorRef> single = new java.util.HashMap<>();
+        votes.forEach((candidate, count) -> {
+            Optional<PolityView> party = queries.partyOf(candidate);
+            Object key = party.<Object>map(PolityView::id).orElse(candidate);
+            byKey.merge(key, count, Long::sum);
+            parties.put(key, party);
+            single.put(key, candidate);
+        });
+        return byKey.entrySet().stream()
+                .sorted(Map.Entry.<Object, Long>comparingByValue().reversed())
+                .map(entry -> {
+                    Optional<PolityView> party = parties.get(entry.getKey());
+                    String name = party.map(found -> found.name().value())
+                            .orElseGet(() -> texts.actor(single.get(entry.getKey())));
+                    return new ResultView.Line(name, party.map(found -> found.name().value()),
                             party.map(PolityView::id), entry.getValue(),
                             sum == 0 ? 0 : Math.round(entry.getValue() * 100.0 / sum));
                 })

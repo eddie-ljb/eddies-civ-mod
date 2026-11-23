@@ -18,6 +18,8 @@ public enum SupplyChange {
     INVESTMENT,
     /** Gebühr für das Beanspruchen eines Chunks; das Geld verlässt den Umlauf. */
     TERRITORY_CLAIM,
+    /** Ausbildung, Ausrüstung und Lazarett einer Garnison; das Geld verlässt den Umlauf. */
+    MILITARY_SPENDING,
     /** Eingriff eines Administrators. */
     ADMIN
 }

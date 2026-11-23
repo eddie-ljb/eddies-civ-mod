@@ -27,6 +27,7 @@ import de.etiennebader.civ.domain.polity.PartyProfile;
 import de.etiennebader.civ.domain.polity.Platform;
 import de.etiennebader.civ.domain.polity.ProgramMode;
 import de.etiennebader.civ.domain.polity.PolityName;
+import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.Day;
@@ -236,7 +237,40 @@ public final class PartyService {
                 Message.of(MessageKey.PARTY_INFO_DIRECTION, view.order(), view.economy(),
                         Message.of(TranslationKeys.platform(view.platform()))),
                 Message.of(MessageKey.PARTY_INFO_CHAIR, view.chair()),
+                areaMessage(party.get().partyProfile().orElseThrow()),
                 Message.of(MessageKey.PARTY_INFO_MEMBERS, view.players(), view.villagers()));
+    }
+
+    public Reply area(Caller caller) {
+        return withOwnParty(caller, party -> Reply.success(areaMessage(party.partyProfile().orElseThrow())));
+    }
+
+    /** Das bestehende Parteiprogramm bestimmt, ob der Vorsitz entscheidet oder die Mitglieder abstimmen. */
+    public Reply setArea(Caller caller, Optional<String> name) {
+        return withOwnParty(caller, party -> {
+            Optional<PolityId> area = name.flatMap(queries::polityNamed)
+                    .filter(polity -> isPartyArea(polity.kind())).map(PolityView::id);
+            if (name.isPresent() && area.isEmpty()) {
+                return Reply.failure(Message.of(MessageKey.PARTY_AREA_UNKNOWN, name.orElseThrow().strip()));
+            }
+            PartyProfile profile = party.partyProfile().orElseThrow().withArea(area);
+            return change(caller, party, profile, areaMessage(profile));
+        });
+    }
+
+    public List<String> areaNames() {
+        return queries.polities().stream().filter(polity -> isPartyArea(polity.kind()))
+                .map(polity -> polity.name().value()).toList();
+    }
+
+    private static boolean isPartyArea(PolityKind kind) {
+        return kind == PolityKind.TERRITORIAL || kind == PolityKind.FEDERATION;
+    }
+
+    private Message areaMessage(PartyProfile profile) {
+        Object label = profile.area().<Object>map(texts::polityName)
+                .orElseGet(() -> Message.of(MessageKey.PARTY_AREA_UNRESTRICTED));
+        return Message.of(MessageKey.PARTY_AREA_INFO, label);
     }
 
     /** {@code /civ partei liste} */

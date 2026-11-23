@@ -244,7 +244,7 @@ class CivCommandsTest {
             assertTrue(reply.lines().contains(Message.of(MessageKey.LAW_ENTRY,
                     Message.of(TranslationKeys.law(StandardParameters.OUTSIDERS_MAY_BUILD)), "outsiders_may_build",
                     Message.of(TranslationKeys.yesNo(false)))));
-            assertEquals(StandardParameters.all().size() + 1, reply.lines().size());
+            assertEquals(de.etiennebader.civ.domain.law.ParameterCatalog.standard().keys().size() + 1, reply.lines().size());
         }
 
         @Test

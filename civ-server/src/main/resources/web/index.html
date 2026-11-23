@@ -152,6 +152,8 @@ code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-si
 .legend { position: absolute; bottom: 12px; left: 12px; background: color-mix(in srgb, var(--surface) 92%, transparent); border: 1px solid var(--line);
   border-radius: var(--r-m); padding: 8px 12px; font-size: .85rem; max-height: 40%; max-width: calc(100% - 24px); overflow: auto; }
 .legend div { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
+.legend details { margin: 0 0 6px 20px; }
+.legend details summary { cursor: pointer; color: var(--emerald); font-size: .8rem; }
 .swatch { width: 12px; height: 12px; border-radius: 3px; background: var(--c); flex: none; }
 .tooltip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-s);
   padding: 6px 10px; font-size: .85rem; display: none; white-space: nowrap; box-shadow: 0 4px 14px rgba(0,0,0,.15); }
@@ -160,6 +162,12 @@ code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-si
 .polls { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 36px; }
 .poll { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-l); padding: 18px; border-left: 4px solid var(--c); }
 .poll .sub { color: var(--muted); font-size: .88rem; margin: 2px 0 12px; }
+.districts { margin-top: 10px; }
+.districts > summary { cursor: pointer; color: var(--emerald); font-size: .88rem; font-weight: 600; }
+.districts .line { margin: 8px 0 0; }
+.districts details { margin: 0 0 8px 16px; }
+.districts details summary { cursor: pointer; color: var(--muted); font-size: .82rem; }
+.districts details .line { font-size: .85rem; margin: 4px 0 0; }
 .bar { height: 8px; background: var(--sunk); border-radius: 4px; overflow: hidden; margin: 3px 0 10px; }
 .bar > span { display: block; height: 100%; background: var(--c); border-radius: 4px; }
 .line { display: flex; justify-content: space-between; gap: 10px; font-size: .93rem; }
@@ -341,11 +349,16 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
       <a href="#wahlen">Wahlen</a>
       <a href="#markt">Markt</a>
       <a href="#boerse">Börse</a>
+      <a href="#ranglisten">Ranglisten</a>
       <a href="#presse">Presse</a>
       <a href="#staat">Staat</a>
+      <a href="#krieg">Krieg</a>
+      <a href="#familien">Familien</a>
+      <a href="#recht">Recht</a>
       <a href="#justiz">Justiz</a>
       <a href="#post">Post<span class="badge" id="b-post"></span></a>
       <a href="#chat">Chat<span class="badge" id="b-chat"></span></a>
+      <a href="#bauen">Bauen</a>
       <a href="#freunde">Freunde<span class="badge" id="b-friends"></span></a>
       <a href="#ich">Mein Bereich<span class="badge" id="b-me"></span></a>
     </nav>
@@ -443,6 +456,8 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
         </select>
         <select id="mapmode" aria-label="Ansicht"><option value="">Gebiete</option></select>
         <select id="maplevel" aria-label="Ebene" title="Nach welcher Ebene Gebiete eingefärbt werden"><option value="">Höchste Ebene</option></select>
+        <select id="mapparty" aria-label="Partei" title="Wahlkarte auf eine Partei eingrenzen" hidden><option value="">Alle Parteien</option></select>
+        <label class="btn small" style="background:var(--surface)" id="borderbox" hidden><input type="checkbox" id="showborders" checked style="padding:0"> Bezirksgrenzen</label>
         <label class="btn small" style="background:var(--surface)"><input type="checkbox" id="showstreets" checked style="padding:0"> Straßen</label>
         <label class="btn small" style="background:var(--surface)" id="terrainbox" hidden><input type="checkbox" id="showterrain" checked style="padding:0"> Gelände</label>
         <button class="btn small" id="recenter">Zentrieren</button>
@@ -450,7 +465,7 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
       <div class="legend" id="legend"></div>
       <div class="tooltip" id="tooltip"></div>
     </div>
-    <p class="muted small" style="margin-top:10px">Außenposten sind schraffiert, ein Stern markiert das Gemeindehaus. Gemeinden desselben Bundes teilen sich eine Farbe, standardmäßig nach dessen höchster Ebene (Nation &gt; Land &gt; Gemeinde); „Ebene" grenzt das auf eine bestimmte Stufe ein. In der Wahlkarte färbt sich jede Gemeinde nach dem Führenden ihres Wahlbezirks.</p>
+    <p class="muted small" style="margin-top:10px">Außenposten sind schraffiert, ein Stern markiert das Gemeindehaus. Gemeinden desselben Bundes teilen sich eine Farbe, standardmäßig nach dessen höchster Ebene (Nation &gt; Land &gt; Gemeinde); „Ebene" grenzt das auf eine bestimmte Stufe ein. In der Wahlkarte („Ansicht") färbt sich jeder Chunk nach dem Führenden seines eigenen Wahlbezirks, auch wenn eine Gemeinde in mehrere Bezirke geteilt ist; „Bezirksgrenzen" zeichnet die Grenze zwischen Bezirken nach, „Partei" grenzt die Farbe auf eine Partei ein.</p>
   </section>
 
   <section data-page="wahlen">
@@ -459,6 +474,7 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
       <div class="toolbar" style="margin:0">
         <select id="elevel" aria-label="Ebene"><option value="">Alle Ebenen</option></select>
         <select id="eparty" aria-label="Partei"><option value="">Alle Parteien</option></select>
+        <input id="esearch" type="search" placeholder="Gemeinde/Bund suchen" aria-label="Gemeinde/Bund suchen">
       </div>
     </div>
     <h3 id="pollhead" style="margin-bottom:12px">Laufende Wahlen</h3>
@@ -501,6 +517,22 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
     </div>
   </section>
 
+  <section data-page="ranglisten">
+    <div class="pagehead">
+      <div><h2>Ranglisten</h2><p id="rankhint">Die Reichsten und Größten der Welt. Das Serverkonto zählt nicht mit.</p></div>
+      <div class="row">
+        <select id="rankcat" aria-label="Rangliste"></select>
+        <select id="ranklevel" aria-label="Ebene" hidden></select>
+      </div>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th class="num">#</th><th>Name</th><th id="rankvalhead" class="num">Wert</th></tr></thead>
+        <tbody id="ranking"></tbody>
+      </table>
+    </div>
+  </section>
+
   <section data-page="presse">
     <div class="pagehead">
       <div><h2>Presse</h2><p>Jeder Artikel hat einen Gegenstand, eine Haltung und ein Thema. Dorfbewohner, die ihn lesen, ändern drei Tage lang ihre Stimmung und ihre Wahlentscheidung.</p></div>
@@ -515,6 +547,20 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
     </div>
     <h3 style="margin:32px 0 12px">Zeitungen</h3>
     <div class="register" id="papers"></div>
+  </section>
+
+  <section data-page="krieg">
+    <div class="pagehead"><div><h2>Krieg</h2><p>Live-Frontverlauf aller Kriege: –100 heißt Sieg des Verteidigers, +100 Sieg des Angreifers. Die genaue Truppenstärke kennen nur Ausspäher, hier ist nur die grobe Größe sichtbar.</p></div></div>
+    <div class="register" id="wars"></div>
+    <h3 style="margin:32px 0 12px">Bündnisse</h3>
+    <div class="register" id="alliances"></div>
+  </section>
+
+  <section data-page="familien">
+    <div class="pagehead"><div><h2>Familien</h2><p>Ehen, Scheidungen und Kinder der Dorfbewohner. Wer zueinander passt, kommt sich näher und heiratet; wer sich auseinanderlebt, trennt sich. Bildung, Gemeinsinn und Heimatverbundenheit bestimmen mit, wie viele Kinder es werden.</p></div></div>
+    <div class="register" id="marriages"></div>
+    <h3 style="margin:32px 0 12px">Scheidungen</h3>
+    <div class="register" id="divorces"></div>
   </section>
 
   <section data-page="staat">
@@ -538,6 +584,20 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
       <button class="btn" onclick="uploadImage()">Hochladen</button>
       <div class="msg" id="imgMsg"></div>
     </div>
+  </section>
+
+  <section data-page="recht">
+    <div class="pagehead">
+      <div><h2>Recht</h2><p>Verfassung, Gesetze und Rechte jeder Gemeinde und jedes Bundes mit allen Paragraphen. Wer eine Ebene führt (sonst: in der eigenen Gemeinde), kann hier Gesetze und Rechte verfassen. Im Spiel gelten sie wie mit <code>/civ gesetz</code>.</p></div>
+      <div class="row">
+        <div class="seg" id="lawtabs"><button class="on" data-tab="overview">Überblick</button><button data-tab="editor" id="lawedittab" hidden>Editor</button></div>
+      </div>
+    </div>
+    <div id="lawoverview">
+      <div class="row"><select id="lawpolity" aria-label="Gemeinde oder Bund"></select></div>
+      <div id="lawbook"></div>
+    </div>
+    <div id="laweditor" hidden></div>
   </section>
 
   <section data-page="justiz">
@@ -583,6 +643,17 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
       </div>
     </div>
     <div class="msg err" id="chatmsg"></div>
+  </section>
+
+  <section data-page="bauen">
+    <div class="pagehead"><div><h2>Bauen</h2><p>Baupläne für Baufirmen. Beauftragt wird im Spiel mit <code>/civ bau beauftragen</code>. Eigene Pläne lädst du hier als Litematica (<code>.litematic</code>) oder Sponge Schematic (<code>.schem</code>, z. B. aus WorldEdit) hoch; der Dateiname ist der Planname.</p></div></div>
+    <div data-locked></div>
+    <form class="row" id="planform" data-unlocked>
+      <input type="file" id="planfile" accept=".litematic,.schem" aria-label="Bauplandatei">
+      <button class="btn primary">Plan hochladen</button>
+    </form>
+    <div class="msg" id="planmsg"></div>
+    <div id="planlist"></div>
   </section>
 
   <section data-page="freunde">
@@ -732,7 +803,7 @@ const head = name => el("img", { className: "avatar", alt: "", loading: "lazy", 
 const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
 /* Seiten */
-const pages = ["start", "welt", "karte", "wahlen", "markt", "boerse", "presse", "staat", "justiz", "post", "chat", "freunde", "ich"];
+const pages = ["start", "welt", "karte", "wahlen", "markt", "boerse", "ranglisten", "presse", "krieg", "familien", "staat", "recht", "justiz", "post", "chat", "bauen", "freunde", "ich"];
 let page = "start";
 function route() {
   const wanted = location.hash.slice(1).split("/")[0];
@@ -740,8 +811,8 @@ function route() {
   document.querySelectorAll("section[data-page]").forEach(s => s.classList.toggle("on", s.dataset.page === page));
   document.querySelectorAll(".nav a").forEach(a => { if (a.getAttribute("href") === "#" + page) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
   const loaders = { start: loadStart, welt: loadWorld, karte: openMap, wahlen: loadElections, markt: loadMarket,
-    boerse: loadExchange, presse: loadPress, staat: loadState, justiz: loadJustice, post: loadLetters,
-    chat: openChat, freunde: loadFriends, ich: loadMe };
+    boerse: loadExchange, ranglisten: loadRankings, presse: loadPress, krieg: loadWar, familien: loadFamilies, staat: loadState, recht: loadLaws, justiz: loadJustice, post: loadLetters,
+    chat: openChat, bauen: loadPlans, freunde: loadFriends, ich: loadMe };
   loaders[page]();
   if (page !== "chat") stopChat();
   if (page !== "staat") clearTimeout(stateTimer);
@@ -916,7 +987,7 @@ $("worldsearch").addEventListener("input", renderWorld);
 
 /* Karte */
 const canvas = $("canvas"), ctx = canvas.getContext("2d");
-let view = { x: 0, z: 0, scale: 12 }, mapData = { chunks: [], seats: [] }, drag = null, centered = false;
+let view = { x: 0, z: 0, scale: 12 }, mapData = { chunks: [], seats: [], ports: [] }, drag = null, centered = false;
 let electionData = { results: [], polls: [] };
 async function openMap() {
   if (!world.towns.length) await fetchWorld();
@@ -941,20 +1012,24 @@ function resize() {
 window.addEventListener("resize", () => { if (page === "karte") resize(); });
 async function loadMap() {
   if (!electionData.results.length) { const r = await api("/api/elections"); if (r.ok) { electionData = r.data; fillModes(); } }
+  const result = electionResult();
+  fillMapParty();
   const level = $("maplevel").value;
-  const [{ ok, data }, tiles] = await Promise.all([api("/api/map?dim=" + encodeURIComponent($("dim").value)
-      + (level ? "&level=" + encodeURIComponent(level) : "")),
+  $("maplevel").hidden = !!result; $("mapparty").hidden = !result; $("borderbox").hidden = !result;
+  const query = "dim=" + encodeURIComponent($("dim").value) + (result
+    ? "&election=" + encodeURIComponent(result.polity) + "&office=" + encodeURIComponent(result.office)
+    : (level ? "&level=" + encodeURIComponent(level) : ""));
+  const [{ ok, data }, tiles] = await Promise.all([api("/api/map?" + query),
     api("/api/map/tiles?dim=" + encodeURIComponent($("dim").value))]);
   if (!ok) return;
   mapData = data;
   terrain = tiles.ok ? tiles.data : { enabled: false, tiles: [] };
   $("terrainbox").hidden = !terrain.enabled;
-  const result = electionResult();
   if (result) {
-    const leaders = result.districts.filter(d => d.town);
-    $("legend").replaceChildren(...(leaders.length ? [...new Map(leaders.map(d => [d.key, d])).values()].map(d => {
+    const districts = result.districts.filter(d => d.town);
+    $("legend").replaceChildren(...(districts.length ? districts.map(d => {
       const sw = el("span", { className: "swatch" }); sw.style.setProperty("--c", colorOf(d.key));
-      return el("div", {}, sw, (d.party || d.leader) + ": " + leaders.filter(x => x.key === d.key).map(x => x.name).join(", "));
+      return el("div", {}, sw, districtRanking(d));
     }) : [el("div", { textContent: "Keine Bezirke." })]));
   } else {
     const names = Object.fromEntries([...world.towns, ...(world.federations || [])].map(t => [t.id, t.name]));
@@ -971,6 +1046,27 @@ function fillModes() {
   mode.replaceChildren(el("option", { value: "", textContent: "Gebiete" }),
     ...electionData.results.map((r, i) => el("option", { value: String(i), textContent: "Wahlkarte: " + r.polityName + ", " + r.officeName + " (Tag " + r.day + ")" })));
   mode.value = current && electionData.results[+current] ? current : "";
+  fillMapParty();
+}
+function fillMapParty() {
+  const result = electionResult(), select = $("mapparty"), current = select.value;
+  const parties = result ? [...new Set(result.districts.flatMap(d => d.lines.map(l => l.party)).filter(Boolean))].sort() : [];
+  select.replaceChildren(el("option", { value: "", textContent: "Alle Parteien" }),
+    ...parties.map(p => el("option", { value: p, textContent: p })));
+  select.value = parties.includes(current) ? current : "";
+}
+/** Eine Bezirkszeile mit Führendem, aufklappbar zur vollen Kandidaten-Rangfolge (nicht nur der/die Erste). */
+function districtRanking(d) {
+  const row = el("div", {}, el("span", { textContent: d.name + ": " + d.leader + (d.party ? " (" + d.party + ")" : "") }));
+  if (d.lines && d.lines.length > 1) {
+    const details = el("details", {});
+    details.append(el("summary", { textContent: "Rangfolge (" + d.lines.length + ")" }),
+      ...d.lines.map((l, i) => el("div", { className: "line" },
+        el("span", { textContent: (i + 1) + ". " + l.name + (l.party ? " (" + l.party + ")" : "") }),
+        el("span", { textContent: l.percent + " %" }))));
+    row.append(details);
+  }
+  return row;
 }
 function recenter() {
   const rect = canvas.getBoundingClientRect();
@@ -987,12 +1083,13 @@ function toScreen(cx, cz) {
 }
 function electionResult() { const m = $("mapmode").value; return m === "" ? null : electionData.results[+m] || null; }
 function chunkColor(c) {
-  const result = electionResult();
-  if (!result) return colorOf(c.group || c.town);
-  const d = result.districts.find(x => x.town === c.town);
-  const party = $("eparty").value;
-  if (!d || (party && d.party !== party)) return css("--line");
-  return colorOf(d.key);
+  if (!electionResult()) return colorOf(c.group || c.town);
+  const party = $("mapparty").value;
+  if (party) {
+    const d = electionResult().districts.find(x => x.town === c.district);
+    if (!d || d.party !== party) return css("--line");
+  }
+  return colorOf(c.group);
 }
 let terrain = { enabled: false, tiles: [], chunks: 32 };
 const tileImages = new Map();
@@ -1035,6 +1132,20 @@ function draw() {
     if (c.outpost && s > 8) { ctx.globalAlpha = .9; ctx.strokeStyle = chunkColor(c); ctx.beginPath(); ctx.moveTo(px, pz + s); ctx.lineTo(px + s, pz); ctx.stroke(); }
   }
   ctx.globalAlpha = 1;
+  if (electionResult() && $("showborders").checked) {
+    const byPos = new Map(mapData.chunks.map(c => [c.x + "," + c.z, c]));
+    ctx.strokeStyle = css("--ink"); ctx.lineWidth = Math.max(1.5, s * .08); ctx.beginPath();
+    for (const c of mapData.chunks) {
+      if (!c.district) continue;
+      const [px, pz] = toScreen(c.x, c.z);
+      for (const [dx, dz, x1, y1, x2, y2] of [[1, 0, px + s, pz, px + s, pz + s], [-1, 0, px, pz, px, pz + s],
+          [0, 1, px, pz + s, px + s, pz + s], [0, -1, px, pz, px + s, pz]]) {
+        const neighbor = byPos.get((c.x + dx) + "," + (c.z + dz));
+        if (!neighbor || neighbor.district !== c.district) { ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); }
+      }
+    }
+    ctx.stroke();
+  }
   if ($("showstreets").checked && $("dim").value === "minecraft:overworld" && view.scale >= 8) {
     ctx.font = "600 " + (11 * devicePixelRatio) + "px " + css("--font"); ctx.textAlign = "center";
     for (const t of streetsData.towns) for (const st of t.streets) {
@@ -1055,6 +1166,14 @@ function draw() {
     if (view.scale >= 4) {
       ctx.lineWidth = 3 * devicePixelRatio; ctx.strokeStyle = css("--surface"); ctx.strokeText(seat.name, px, pz - 9 * devicePixelRatio);
       ctx.fillText(seat.name, px, pz - 9 * devicePixelRatio);
+    }
+  }
+  for (const port of mapData.ports || []) {
+    const [px, pz] = toScreen(port.x / 16, port.z / 16);
+    ctx.fillStyle = css("--ink"); ctx.fillText("◆", px, pz + 4 * devicePixelRatio);
+    if (view.scale >= 6) {
+      ctx.lineWidth = 3 * devicePixelRatio; ctx.strokeStyle = css("--surface"); ctx.strokeText(port.name, px, pz - 9 * devicePixelRatio);
+      ctx.fillText(port.name, px, pz - 9 * devicePixelRatio);
     }
   }
 }
@@ -1079,7 +1198,7 @@ canvas.addEventListener("pointermove", e => {
   let text = hit ? (world.towns.find(t => t.id === hit.town) || {}).name || "?" : "Wildnis";
   if (hit && hit.outpost) text += " (Außenposten)";
   const result = electionResult();
-  if (hit && result) { const d = result.districts.find(x => x.town === hit.town); if (d) text += ", vorn: " + d.leader + (d.party ? " (" + d.party + ")" : ""); }
+  if (hit && result) { const d = result.districts.find(x => x.town === hit.district); if (d) text += ", " + d.name + ", vorn: " + d.leader + (d.party ? " (" + d.party + ")" : ""); }
   const street = streetsData.towns.flatMap(t => t.streets).find(st => bx * 16 >= st.minX && bx * 16 <= st.maxX + 1 && bz * 16 >= st.minZ && bz * 16 <= st.maxZ + 1);
   if (street) text += ", " + street.name;
   const tip = $("tooltip");
@@ -1092,6 +1211,8 @@ canvas.addEventListener("wheel", e => { e.preventDefault(); view.scale = Math.mi
 $("dim").addEventListener("change", () => loadMap().then(recenter));
 $("mapmode").addEventListener("change", loadMap);
 $("maplevel").addEventListener("change", loadMap);
+$("mapparty").addEventListener("change", draw);
+$("showborders").addEventListener("change", draw);
 $("showstreets").addEventListener("change", draw);
 $("showterrain").addEventListener("change", draw);
 $("recenter").addEventListener("click", recenter);
@@ -1114,8 +1235,9 @@ async function loadElections() {
   renderElections();
 }
 function renderElections() {
-  const level = $("elevel").value, party = $("eparty").value;
-  const polls = electionData.polls.filter(p => (!level || p.level === level) && (!party || p.entries.some(e => e.party === party)));
+  const level = $("elevel").value, party = $("eparty").value, search = $("esearch").value.trim().toLowerCase();
+  const matches = name => !search || name.toLowerCase().includes(search);
+  const polls = electionData.polls.filter(p => (!level || p.level === level) && (!party || p.entries.some(e => e.party === party)) && matches(p.polityName));
   $("polls").replaceChildren(...(polls.length ? polls.map(p => {
     const card = el("div", { className: "poll" }); card.style.setProperty("--c", colorOf(p.polity));
     card.append(el("h3", { textContent: p.polityName + ": " + p.officeName }),
@@ -1129,7 +1251,7 @@ function renderElections() {
     if (p.lists.length) card.append(el("div", { className: "muted small", textContent: "Sitzprognose: " + p.lists.map(l => l.name + " " + l.seats).join(", ") }));
     return card;
   }) : [el("div", { className: "empty", textContent: "Gerade läuft keine Wahl. Ausrufen kann sie der Bürgermeister im Rathaus." })]));
-  const results = electionData.results.filter(r => (!level || r.level === level) && (!party || r.totals.some(t => t.party === party)));
+  const results = electionData.results.filter(r => (!level || r.level === level) && (!party || r.totals.some(t => t.party === party)) && matches(r.polityName));
   $("results").replaceChildren(...(results.length ? [...results].reverse().map(r => {
     const card = el("div", { className: "poll" }); card.style.setProperty("--c", colorOf(r.polity));
     card.append(el("h3", { textContent: r.polityName + ": " + r.officeName }), el("div", { className: "sub", textContent: r.level + ", ausgezählt an Tag " + r.day }));
@@ -1139,15 +1261,61 @@ function renderElections() {
       card.append(el("div", { className: "line" }, el("span", { textContent: t.name + (t.party ? " (" + t.party + ")" : "") + (r.winners.includes(t.name) ? " ✓" : "") }),
         el("span", { textContent: t.votes + " Stimmen, " + t.percent + " %" })), bar);
     }
-    if (r.districts.length > 1) card.append(el("div", { className: "muted small", textContent: "Bezirke: " + r.districts.map(d => d.name + " " + d.leader).join(", ") }));
+    if (r.districts.length > 1) {
+      const box = el("details", { className: "districts" });
+      box.append(el("summary", { textContent: r.districts.length + " Wahlbezirke" }), ...r.districts.map(districtRanking));
+      card.append(box);
+    }
     return card;
   }) : [el("div", { className: "empty", textContent: "Noch keine Wahl ausgezählt." })]));
 }
 $("elevel").addEventListener("change", renderElections);
 $("eparty").addEventListener("change", () => { renderElections(); draw(); });
+$("esearch").addEventListener("input", renderElections);
 
 /* Markt */
 let offers = [], shopList = [], sortKey = "name", sortDir = 1;
+/* Ranglisten */
+const rankTitles = { spieler: "Reichste Spieler", dorfbewohner: "Reichste Dorfbewohner", staedte: "Reichste Städte", firmen: "Reichste Firmen",
+  buende: "Reichste Bünde (Länder, Nationen …)", "groesste-staedte": "Größte Städte (Einwohner)",
+  "groesste-firmen": "Größte Firmen (Beschäftigte)", "groesste-buende": "Größte Bünde (Einwohner)" };
+const rankValues = { "groesste-staedte": "Einwohner", "groesste-firmen": "Beschäftigte", "groesste-buende": "Einwohner" };
+let rankData = null;
+async function loadRankings() {
+  const r = await api("/api/rankings");
+  if (!r.ok) return;
+  rankData = r.data;
+  const sel = $("rankcat"), keep = sel.value;
+  sel.replaceChildren(...rankData.categories.map(c => el("option", { value: c.id, textContent: rankTitles[c.id] || c.id })));
+  if (keep) sel.value = keep;
+  renderRanking();
+}
+function renderRanking() {
+  if (!rankData) return;
+  const cat = rankData.categories.find(c => c.id === $("rankcat").value) || rankData.categories[0];
+  if (!cat) return;
+  const federal = cat.id === "buende" || cat.id === "groesste-buende";
+  const levelSel = $("ranklevel");
+  levelSel.hidden = !federal;
+  if (federal) {
+    const seen = new Map();
+    cat.entries.forEach(e => seen.set(e.level, e.levelName));
+    const keep = levelSel.value;
+    levelSel.replaceChildren(el("option", { value: "", textContent: "Alle Ebenen" }), ...[...seen].map(([id, name]) => el("option", { value: id, textContent: name })));
+    levelSel.value = seen.has(keep) ? keep : "";
+  }
+  const level = federal ? levelSel.value : "";
+  const rows = cat.entries.filter(e => !level || e.level === level).slice(0, 10);
+  $("rankvalhead").textContent = rankValues[cat.id] || "Vermögen";
+  const fmt = v => cat.money ? (v / 100).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " Smaragde" : v;
+  $("ranking").replaceChildren(...(rows.length ? rows.map((e, i) => el("tr", {}, el("td", { className: "num", textContent: i + 1 }),
+    el("td", { textContent: e.name + (federal && e.levelName ? " (" + e.levelName + ")" : "") }), el("td", { className: "num", textContent: fmt(e.value) })))
+    : [el("tr", {}, el("td", { colSpan: 3, className: "muted", textContent: "Noch keine Einträge." }))]));
+  $("rankhint").textContent = "Die Reichsten und Größten der Welt. Das Serverkonto (" + (rankData.serverAccount / 100).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " Smaragde Gründungsgebühren) zählt nicht mit.";
+}
+$("rankcat").addEventListener("change", renderRanking);
+$("ranklevel").addEventListener("change", renderRanking);
+
 async function loadMarket() {
   const [m, s] = await Promise.all([api("/api/market"), api("/api/shops")]);
   if (m.ok) { offers = m.data.offers; $("level").textContent = "Preise in Smaragden, Preisniveau " + m.data.priceLevel + " %. Viel Lager drückt den Preis; das Lager schrumpft jeden Tag."; }
@@ -1289,6 +1457,36 @@ async function renderStock(l) {
 
 /* Presse */
 let openArticle = null, writing = false;
+async function loadWar() {
+  const r = await api("/api/war");
+  if (!r.ok) return;
+  $("wars").replaceChildren(...(r.data.wars.length ? r.data.wars.map(w => {
+    const bar = el("div", { style: "position:relative;height:14px;background:var(--line);border-radius:7px;overflow:hidden;margin:8px 0" });
+    const fill = el("div", { style: "position:absolute;top:0;bottom:0;background:" + (w.front >= 0 ? "var(--emerald)" : "var(--red)") +
+      ";left:" + (w.front >= 0 ? 50 : 50 + w.front / 2) + "%;width:" + Math.abs(w.front) / 2 + "%" });
+    bar.append(fill, el("div", { style: "position:absolute;left:50%;top:0;bottom:0;width:2px;background:var(--text)" }));
+    return el("div", { className: "card" },
+      el("h3", { textContent: w.aggressor + " gegen " + w.defender }),
+      el("p", { textContent: (w.ongoing ? "läuft seit Tag " : "beendet an Tag ") + (w.ongoing ? w.declared : w.ended) + " · Front " + w.front +
+        " · Truppen " + w.aggressorTroops + " : " + w.defenderTroops + " · Verwundete " + w.aggressorWounded + " : " + w.defenderWounded }),
+      bar,
+      w.winner ? el("p", { textContent: "Sieger: " + w.winner + (w.reparations ? " · Reparationen " + w.reparations : "") }) : el("span"),
+      ...w.campaigns.map(c => el("p", { textContent: "Geplant: " + c.kind + " von " + c.initiator + " am Tag " + c.on })));
+  }) : [el("div", { className: "empty", style: "border:none", textContent: "Es herrscht Frieden." })]));
+  $("alliances").replaceChildren(...(r.data.alliances.length ? r.data.alliances.map(a => el("div", { className: "card" }, el("p", { textContent: a.first + " ↔ " + a.second })))
+    : [el("div", { className: "empty", style: "border:none", textContent: "Keine Bündnisse." })]));
+}
+async function loadFamilies() {
+  const r = await api("/api/families");
+  if (!r.ok) return;
+  $("marriages").replaceChildren(...(r.data.marriages.length ? r.data.marriages.map(m => el("div", { className: "card" },
+    el("h3", { textContent: m.first + " & " + m.second }),
+    el("p", { textContent: "verheiratet seit Tag " + m.since + " · Kinder " + m.children + " · Beziehung " + m.bond + "/100" })))
+    : [el("div", { className: "empty", style: "border:none", textContent: "Noch keine Ehepaare." })]));
+  $("divorces").replaceChildren(...(r.data.divorces.length ? r.data.divorces.map(d => el("div", { className: "card" },
+    el("p", { textContent: d.first + " & " + d.second + " · verheiratet an Tag " + d.married + ", geschieden an Tag " + d.divorced })))
+    : [el("div", { className: "empty", style: "border:none", textContent: "Keine Scheidungen." })]));
+}
 async function loadPress() {
   const [p, user] = await Promise.all([api("/api/press"), refreshMe()]);
   if (p.ok) pressData = p.data;
@@ -1461,6 +1659,116 @@ function renderSymbols(d) {
       ["Wahlkreise", p.constituencies.length ? p.constituencies.map(c => c.name + (c.towns.length ? " (" + c.towns.join(", ") + ")" : "") + (c.areas.length ? " – " + c.areas.length + " Gebiet(e)" : "")).join("; ") : "keine eigenen, es gelten Gemeinden"]])))
     : [el("div", { className: "empty", textContent: "Noch keine Gemeinde." })]));
 }
+
+/* Recht: Überblick und Editor */
+let lawData = null, lawTab = "overview", lawDraftId = "";
+async function loadLaws() {
+  const [r] = await Promise.all([api("/api/laws"), refreshMe()]);
+  if (!r.ok) return;
+  lawData = r.data;
+  $("lawedittab").hidden = !(me && lawData.legislates);
+  if ($("lawedittab").hidden) lawTab = "overview";
+  const select = $("lawpolity"), keep = select.value;
+  select.replaceChildren(...lawData.polities.map(p => el("option", { value: p.id, textContent: p.name + " (" + p.level + ")" })));
+  select.value = keep && lawData.polities.some(p => p.id === keep) ? keep : (lawData.legislates || (lawData.polities[0] || {}).id || "");
+  renderLaws();
+}
+function lawName(id) { const p = lawData.polities.find(x => x.id === id); return p ? p.name : ""; }
+function renderLaws() {
+  for (const b of $("lawtabs").children) b.classList.toggle("on", b.dataset.tab === lawTab);
+  $("lawoverview").hidden = lawTab !== "overview";
+  $("laweditor").hidden = lawTab !== "editor";
+  if (lawTab === "overview") renderLawBook(); else renderLawEditor();
+}
+function lawEffects(effects) {
+  return effects.length ? el("ul", { className: "muted small" }, ...effects.map(e => el("li", { textContent: e.name + ": " + e.value }))) : null;
+}
+function renderLawBook() {
+  const p = lawData.polities.find(x => x.id === $("lawpolity").value);
+  if (!p) { $("lawbook").replaceChildren(el("div", { className: "empty", textContent: "Noch keine Gemeinde." })); return; }
+  const canEdit = me && lawData.legislates === p.id;
+  const msg = el("div", { className: "msg" });
+  const rights = p.rights.map(r => { const k = lawData.catalog.find(c => c.id === r.id); return [k ? k.name : r.id, r.value]; });
+  $("lawbook").replaceChildren(
+    el("h3", { style: "margin:20px 0 8px", textContent: "Verfassung" }),
+    el("p", { className: "muted", textContent: p.constitution ? (p.preamble || "Ohne Präambel.") + " (ausgerufen an Tag " + p.constitution + ")" : "Noch keine Verfassung ausgerufen." }),
+    el("h3", { style: "margin:20px 0 8px", textContent: "Gesetze und Paragraphen (" + p.paragraphs.length + ")" }),
+    ...(p.paragraphs.length ? p.paragraphs.map(g => el("details", { className: "article" },
+      el("summary", { textContent: "§" + g.number + " " + g.title + " (Tag " + g.enactedOn + ")" }),
+      g.text ? el("p", { textContent: g.text }) : null,
+      lawEffects(g.effects),
+      g.unrecognized.length ? el("p", { className: "muted small", textContent: "Nicht automatisch durchgesetzt: " + g.unrecognized.join(" / ") }) : null,
+      canEdit ? el("button", { className: "btn small", textContent: "Aufheben", onclick: async () => {
+        if (!confirm("§" + g.number + " " + g.title + " aufheben?")) return;
+        const r = await api("/api/laws", { action: "repeal", polity: p.id, number: String(g.number) });
+        msg.textContent = r.data.message || r.data.error; msg.className = "msg " + (r.ok ? "ok" : "err");
+        if (r.ok) loadLaws();
+      } }) : null)) : [el("div", { className: "empty", style: "border:none", textContent: "Noch keine Paragraphen." })]),
+    el("h3", { style: "margin:20px 0 8px", textContent: "Rechte (ausdrücklich gesetzt)" }),
+    rights.length ? facts(rights) : el("p", { className: "muted", textContent: "Es gelten die Standardwerte." }),
+    msg);
+}
+function lawField(k, current) {
+  const aria = k.name;
+  if (k.type === "boolean") return el("select", { ariaLabel: aria }, ...["true", "false"].map(v => el("option", { value: v, textContent: v === "true" ? "ja" : "nein", selected: v === current })));
+  if (k.type === "choice") return el("select", { ariaLabel: aria }, ...k.options.map(v => el("option", { value: v, textContent: v, selected: v === current })));
+  return el("input", { ariaLabel: aria, value: current, inputMode: "numeric" });
+}
+function renderLawEditor() {
+  const polity = lawData.polities.find(x => x.id === lawData.legislates);
+  if (!polity) { $("laweditor").replaceChildren(el("div", { className: "empty", textContent: "Du führst keine Ebene und gehörst zu keiner Gemeinde." })); return; }
+  const draft = lawData.drafts.find(d => d.id === lawDraftId);
+  const msg = el("div", { className: "msg" });
+  const show = r => { msg.textContent = r.data.message || r.data.error; msg.className = "msg " + (r.ok ? "ok" : "err"); };
+  const title = el("input", { required: true, maxLength: lawData.maxTitle, ariaLabel: "Titel", value: draft ? draft.title : "" });
+  const text = el("textarea", { rows: 6, maxLength: lawData.maxText, ariaLabel: "Text", value: draft ? draft.text : "" });
+  const counter = el("div", { className: "muted small" });
+  const count = () => { counter.textContent = text.value.length + " / " + lawData.maxText + " Zeichen"; };
+  text.addEventListener("input", count); count();
+  const check = el("div", { className: "muted small" });
+  const law = el("form", { className: "article compose" }, el("h3", { textContent: "Gesetz verfassen für " + polity.name }),
+    el("label", { className: "field" }, "Titel", title), el("label", { className: "field" }, "Text", text), counter,
+    el("div", { className: "row" },
+      el("button", { className: "btn primary", textContent: "Erlassen oder beantragen" }),
+      el("button", { type: "button", className: "btn", textContent: "Prüfen", onclick: async () => { const r = await api("/api/laws", { action: "check", text: text.value }); show(r); } }),
+      el("button", { type: "button", className: "btn", textContent: "Als Entwurf speichern", onclick: async () => {
+        const r = await api("/api/laws", { action: "draft", id: lawDraftId, polity: polity.id, title: title.value, text: text.value });
+        show(r); if (r.ok) { lawDraftId = ""; loadLaws(); }
+      } })), check, msg);
+  law.addEventListener("submit", async e => {
+    e.preventDefault();
+    const r = await api("/api/laws", { action: "enact", polity: polity.id, title: title.value, text: text.value });
+    show(r); if (r.ok) { lawDraftId = ""; title.value = text.value = ""; count(); loadLaws(); }
+  });
+  const rtitle = el("input", { required: true, maxLength: lawData.maxTitle, ariaLabel: "Titel", placeholder: "z. B. Steuerreform" });
+  const current = Object.fromEntries(polity.rights.map(r => [r.id, r.value]));
+  const inputs = lawData.catalog.map(k => ({ k, original: current[k.id] ?? k.default, field: lawField(k, current[k.id] ?? k.default) }));
+  const rmsg = el("div", { className: "msg" });
+  const rights = el("form", { className: "article compose" }, el("h3", { textContent: "Rechte ändern für " + polity.name }),
+    el("p", { className: "muted small", textContent: "Nur geänderte Werte werden als Paragraph beschlossen." }),
+    el("label", { className: "field" }, "Titel", rtitle),
+    el("div", { className: "compose" }, ...inputs.map(i => el("label", { className: "field" }, i.k.name + " (Standard: " + i.k.default + ")", i.field))),
+    el("div", { className: "row" }, el("button", { className: "btn primary", textContent: "Rechte beschließen" })), rmsg);
+  rights.addEventListener("submit", async e => {
+    e.preventDefault();
+    const body = { action: "rights", polity: polity.id, title: rtitle.value };
+    for (const i of inputs) if (i.field.value !== i.original) body["right:" + i.k.id] = i.field.value;
+    if (Object.keys(body).length === 3) { rmsg.textContent = "Nichts geändert."; rmsg.className = "msg err"; return; }
+    const r = await api("/api/laws", body);
+    rmsg.textContent = r.data.message || r.data.error; rmsg.className = "msg " + (r.ok ? "ok" : "err");
+    if (r.ok) loadLaws();
+  });
+  const drafts = el("div", { className: "article" }, el("h3", { textContent: "Gesetzesvorlagen" }),
+    el("p", { className: "muted small", textContent: "Eigene Entwürfe und die deiner Partei. Ob sie einen Serverneustart überstehen, entscheidet der Server-Admin." }),
+    ...(lawData.drafts.length ? lawData.drafts.map(d => el("div", { className: "row" },
+      el("span", { textContent: d.title + " – " + d.author + (d.target ? " (für " + lawName(d.target) + ")" : "") + ", Tag " + d.savedOn }),
+      el("button", { className: "btn small", textContent: "Laden", onclick: () => { lawDraftId = d.mine ? d.id : ""; renderLawEditor(); const f = $("laweditor").querySelector("input"); f.value = d.title; $("laweditor").querySelector("textarea").value = d.text; $("laweditor").querySelector("textarea").dispatchEvent(new Event("input")); } }),
+      d.mine ? el("button", { className: "btn small", textContent: "Löschen", onclick: async () => { const r = await api("/api/laws", { action: "draftDelete", id: d.id }); if (r.ok) { if (lawDraftId === d.id) lawDraftId = ""; loadLaws(); } } }) : null))
+      : [el("div", { className: "muted", textContent: "Keine Entwürfe." })]));
+  $("laweditor").replaceChildren(law, rights, drafts);
+}
+$("lawpolity").addEventListener("change", renderLaws);
+$("lawtabs").addEventListener("click", e => { const t = e.target.dataset && e.target.dataset.tab; if (t) { lawTab = t; renderLaws(); } });
 
 /* Justiz */
 let justiceData = null, openCase = null, filingCase = false;
@@ -1692,6 +2000,30 @@ $("chatform").addEventListener("submit", async e => {
   if (!text) return;
   const r = await api("/api/chat", channel ? { text, to: channel } : { text });
   if (r.ok) { $("chatinput").value = ""; say("chatmsg", "", true); pollChat(); } else say("chatmsg", r.data.message || r.data.error, false);
+});
+
+/* Bauen */
+async function loadPlans() {
+  const user = await refreshMe();
+  locked("bauen", !user);
+  const r = await api("/api/blueprints");
+  if (!r.ok) return;
+  const table = el("table", {}, el("thead", {}, el("tr", {}, ...["Plan", "Stil", "Größe (B x H x T)", "Blöcke", "Einheiten"].map(h => el("th", { textContent: h })))),
+    el("tbody", {}, ...r.data.map(p => el("tr", {}, el("td", { textContent: p.name }), el("td", { textContent: p.style }),
+      el("td", { textContent: p.sizeX + " x " + p.sizeY + " x " + p.sizeZ }), el("td", { textContent: p.blocks }), el("td", { textContent: p.units })))));
+  $("planlist").replaceChildren(r.data.length ? table : el("div", { className: "empty", textContent: "Noch keine Pläne." }));
+}
+$("planform").addEventListener("submit", async e => {
+  e.preventDefault();
+  const file = $("planfile").files[0];
+  if (!file) return say("planmsg", "Wähle zuerst eine Datei.", false);
+  if (file.size > 4 * 1024 * 1024) return say("planmsg", "Die Datei ist größer als 4 MB.", false);
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  const r = await api("/api/blueprints", { name: file.name, data: btoa(binary) });
+  say("planmsg", r.data.message || r.data.error, r.ok);
+  if (r.ok) { $("planfile").value = ""; loadPlans(); }
 });
 
 /* Freunde */

@@ -74,4 +74,23 @@ public interface CivicView {
     default List<CustomImage> imagesOf(PolityId polity, ImageKind kind) {
         return imagesOf(polity).stream().filter(image -> image.kind() == kind).toList();
     }
+
+    /** Zugangsregeln der Heimat-Häfen; Polities ohne Eintrag haben {@link PortSettings#DEFAULT}. */
+    Map<PolityId, PortSettings> portSettings();
+
+    /** Alle zusätzlichen Heimat-Häfen (Slot 2 und 3) aller Polities. */
+    List<HomePort> ports();
+
+    default PortSettings portSettingsOf(PolityId polity) {
+        return portSettings().getOrDefault(polity, PortSettings.DEFAULT);
+    }
+
+    default List<HomePort> portsOf(PolityId polity) {
+        return ports().stream().filter(port -> port.polity().equals(polity))
+                .sorted(java.util.Comparator.comparingInt(HomePort::slot)).toList();
+    }
+
+    default Optional<HomePort> port(PolityId polity, int slot) {
+        return ports().stream().filter(port -> port.polity().equals(polity) && port.slot() == slot).findFirst();
+    }
 }

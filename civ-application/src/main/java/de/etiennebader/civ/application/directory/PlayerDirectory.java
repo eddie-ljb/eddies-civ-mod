@@ -1,6 +1,7 @@
 package de.etiennebader.civ.application.directory;
 
 import de.etiennebader.civ.domain.actor.PlayerRef;
+import de.etiennebader.civ.domain.population.Gender;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -32,9 +33,28 @@ public final class PlayerDirectory {
 
     /** Merkt sich den aktuellen Namen, z. B. beim Betreten des Servers. */
     public void record(PlayerRef player, String name) {
-        KnownPlayer known = new KnownPlayer(player, name);
+        KnownPlayer known = new KnownPlayer(player, name, genderOf(player));
         if (!known.equals(players.get(player))) {
             players.put(player, known);
+            changed.add(player);
+        }
+    }
+
+    /** Das vom Spieler gewählte Geschlecht; leer, solange er keines angegeben hat. */
+    public Optional<Gender> genderOf(PlayerRef player) {
+        return Optional.ofNullable(players.get(player)).flatMap(KnownPlayer::gender);
+    }
+
+    /** Speichert das gewählte Geschlecht eines bereits bekannten Spielers. */
+    public void setGender(PlayerRef player, Gender gender) {
+        Objects.requireNonNull(gender, "gender");
+        KnownPlayer known = players.get(player);
+        if (known == null) {
+            throw new IllegalArgumentException("Unbekannter Spieler: " + player);
+        }
+        KnownPlayer updated = new KnownPlayer(player, known.name(), Optional.of(gender));
+        if (!updated.equals(known)) {
+            players.put(player, updated);
             changed.add(player);
         }
     }

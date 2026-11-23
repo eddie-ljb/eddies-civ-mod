@@ -27,6 +27,10 @@ import de.etiennebader.civ.server.command.Message;
 import de.etiennebader.civ.server.command.MessageKey;
 import de.etiennebader.civ.server.command.Reply;
 import de.etiennebader.civ.server.command.Texts;
+import de.etiennebader.civ.server.founding.FoundingFees;
+import de.etiennebader.civ.domain.actor.PolityRef;
+import de.etiennebader.civ.domain.shared.CurrencyId;
+import de.etiennebader.civ.domain.shared.Money;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -57,6 +61,8 @@ public final class FederationService {
     private final Levels levels;
     private final Texts texts;
     private final Announcements announcements;
+    private FoundingFees fees = FoundingFees.FREE;
+    private CurrencyId currency = CurrencyId.EMERALD;
     private final Map<PolityId, Set<PolityId>> invitations = new HashMap<>();
 
     public FederationService(CivApplication app, Calendar calendar, Levels levels, Texts texts,
@@ -67,6 +73,24 @@ public final class FederationService {
         this.levels = Objects.requireNonNull(levels, "levels");
         this.texts = Objects.requireNonNull(texts, "texts");
         this.announcements = Objects.requireNonNull(announcements, "announcements");
+    }
+
+    /** Mit Gründungskosten; die Gebühr zahlt die Kasse der Gliedkörperschaft, aus der gegründet wird. */
+    public FederationService(CivApplication app, Calendar calendar, Levels levels, Texts texts,
+                             Announcements announcements, FoundingFees fees, CurrencyId currency) {
+        this(app, calendar, levels, texts, announcements);
+        this.fees = Objects.requireNonNull(fees, "fees");
+        this.currency = Objects.requireNonNull(currency, "currency");
+    }
+
+    /** Gründungskosten einer Bundebene in Währungseinheiten. */
+    public long foundingCost(Level level) {
+        return fees.federation(level.id());
+    }
+
+    /** Abrechnung der Gründungsgebühr (Prüfung vorab, Abbuchung nach der Gründung). */
+    public FoundingFees.Billing billing() {
+        return fees.billing(app, currency);
     }
 
     public Levels levels() {
@@ -136,7 +160,22 @@ public final class FederationService {
         if (level.get().rank() <= levelOf(constituent).rank()) {
             return Reply.failure(tooLow(level.get(), constituent));
         }
-        return attempt(() -> {
+        if (fees.requirePreviousLevel()) {
+            Level previous = previousLevel(level.get());
+            if (levelOf(constituent).rank() != previous.rank()) {
+                return Reply.failure(Message.of(MessageKey.FEDERATION_NEEDS_PREVIOUS_LEVEL,
+                        level.get().displayName(), previous.displayName()));
+            }
+        }
+        long cost = fees.federation(level.get().id());
+        PolityRef payer = new PolityRef(constituent.id());
+        FoundingFees.Billing billing = fees.billing(app, currency);
+        Money balance = billing.shortfallBalance(payer, cost);
+        if (balance != null) {
+            return Reply.failure(Message.of(MessageKey.FOUNDING_NOT_ENOUGH_MONEY,
+                    texts.money(Money.of(cost, currency)), texts.money(balance)));
+        }
+        return attempt(() -> billing.chargeAfter(payer, cost, calendar.today(), () -> {
             PolityName federationName = PolityName.of(name);
             app.foundFederation().execute(new FoundFederation.Command(federationName, level.get().id(),
                     constituent.id(), caller.player(), calendar.today()));
@@ -144,7 +183,18 @@ public final class FederationService {
                     level.get().displayName(), federationName.value(), constituent.name().value())));
             return Reply.success(Message.of(MessageKey.FEDERATION_FOUNDED, federationName.value(),
                     level.get().displayName(), constituent.name().value()));
-        });
+        }));
+    }
+
+    /** Die Ebene direkt unter der gewünschten (die Gemeinde, wenn keine andere dazwischen liegt). */
+    private Level previousLevel(Level target) {
+        Level previous = Levels.MUNICIPALITY;
+        for (Level candidate : levels.all()) {
+            if (candidate.rank() < target.rank()) {
+                previous = candidate;
+            }
+        }
+        return previous;
     }
 
     /** {@code /civ bund einladen <Gemeinde oder Bund>} */
@@ -167,10 +217,28 @@ public final class FederationService {
             return Reply.failure(Message.of(MessageKey.FEDERATION_GUEST_TAKEN, guest.name().value(),
                     parent.get().name().value()));
         }
+        sendInvitation(host, guest);
+        return Reply.success(Message.of(MessageKey.FEDERATION_INVITED, guest.name().value(), host.name().value()));
+    }
+
+    /** Lädt eine Gemeinde oder einen Bund ein und benachrichtigt sie; die Prüfungen macht der Aufrufer. */
+    public void sendInvitation(PolityView host, PolityView guest) {
         invitations.computeIfAbsent(guest.id(), id -> new LinkedHashSet<>()).add(host.id());
         announcements.add(Announcement.toTown(guest.id(), Message.of(MessageKey.FEDERATION_INVITATION,
                 host.name().value(), guest.name().value())));
-        return Reply.success(Message.of(MessageKey.FEDERATION_INVITED, guest.name().value(), host.name().value()));
+    }
+
+    /** Die Bünde, die diese Gemeinde oder diesen Bund eingeladen haben. */
+    public Set<PolityId> invitationsFor(PolityId guest) {
+        return Set.copyOf(invitations.getOrDefault(guest, Set.of()));
+    }
+
+    /** Nimmt eine Einladung für die Gemeinde an, etwa durch einen Dorfbewohner als Bürgermeister. */
+    public void accept(PolityView host, PolityView guest) {
+        app.joinFederation().execute(new JoinFederation.Command(host.id(), guest.id(), calendar.today()));
+        invitations.remove(guest.id());
+        announcements.add(Announcement.toTown(host.id(), Message.of(MessageKey.FEDERATION_JOINED,
+                guest.name().value(), host.name().value())));
     }
 
     /** {@code /civ bund beitreten <Bund>}: nimmt eine Einladung an. */

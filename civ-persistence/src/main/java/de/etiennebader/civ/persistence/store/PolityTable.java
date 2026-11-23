@@ -64,12 +64,12 @@ final class PolityTable {
     private static final String UPSERT_POLITY = """
             INSERT INTO polity (id, seq, name, kind, tier, currency, founded_on, seat_dimension, seat_x, seat_y, seat_z,
                                 level, constitution_proclaimed_on, preamble, party_order, party_economy, party_emblem,
-                                party_mode, parliament_elected_on, parliament_until)
-            VALUES (?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM polity), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                party_mode, party_area, parliament_elected_on, parliament_until)
+            VALUES (?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM polity), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (id) DO UPDATE SET name = excluded.name, kind = excluded.kind, level = excluded.level,
                 constitution_proclaimed_on = excluded.constitution_proclaimed_on, preamble = excluded.preamble,
                 party_order = excluded.party_order, party_economy = excluded.party_economy,
-                party_emblem = excluded.party_emblem, party_mode = excluded.party_mode,
+                party_emblem = excluded.party_emblem, party_mode = excluded.party_mode, party_area = excluded.party_area,
                 parliament_elected_on = excluded.parliament_elected_on, parliament_until = excluded.parliament_until,
                 tier = excluded.tier,
                 currency = excluded.currency, founded_on = excluded.founded_on,
@@ -104,14 +104,20 @@ final class PolityTable {
                 upsert.setInt(15, polity.party().get().economy());
                 upsert.setString(16, polity.party().get().emblem());
                 upsert.setString(17, polity.party().get().mode().name());
+                if (polity.party().get().area().isPresent()) {
+                    upsert.setString(18, polity.party().get().area().get().value().toString());
+                } else {
+                    upsert.setNull(18, Types.VARCHAR);
+                }
             } else {
                 upsert.setNull(14, Types.INTEGER);
                 upsert.setNull(15, Types.INTEGER);
                 upsert.setNull(16, Types.VARCHAR);
                 upsert.setNull(17, Types.VARCHAR);
+                upsert.setNull(18, Types.VARCHAR);
             }
-            bindDay(upsert, 18, polity.parliament().electedOn());
-            bindDay(upsert, 19, polity.parliament().until());
+            bindDay(upsert, 19, polity.parliament().electedOn());
+            bindDay(upsert, 20, polity.parliament().until());
             upsert.executeUpdate();
         }
         deleteChildren(connection, id);
@@ -308,6 +314,18 @@ final class PolityTable {
         return results;
     }
 
+    /**
+     * Ob der Parameter der Zeile noch bekannt ist. Parameter fremder Mods ({@code modid.name}) können fehlen,
+     * wenn die Mod entfernt wurde; solche Zeilen werden beim Laden übersprungen, statt die Welt unlesbar zu machen.
+     */
+    private boolean knowsParameter(ResultSet rows) throws SQLException {
+        return catalog.find(rows.getString("parameter")).isPresent();
+    }
+
+    private static boolean isSingleChange(String motion) {
+        return !motion.equals("ENACT") && !motion.equals("REPEAL") && !motion.equals(PARTY_PROGRAM_KIND);
+    }
+
     private Map<String, List<Promise>> loadPromises(Connection connection) throws SQLException {
         Map<String, List<ParameterValue<?>>> values = new HashMap<>();
         try (PreparedStatement select = connection.prepareStatement("""
@@ -315,6 +333,9 @@ final class PolityTable {
                 FROM promise_value ORDER BY polity_id, promise_position, position""");
              ResultSet rows = select.executeQuery()) {
             while (rows.next()) {
+                if (!knowsParameter(rows)) {
+                    continue;
+                }
                 values.computeIfAbsent(rows.getString("polity_id") + "#" + rows.getInt("promise_position"),
                         ignored -> new ArrayList<>()).add(catalog.decode(rows.getString("parameter"), rows.getString("value")));
             }
@@ -443,7 +464,9 @@ final class PolityTable {
         }
         String modeName = row.getString("party_mode");
         ProgramMode mode = modeName == null ? ProgramMode.CHAIR : ProgramMode.valueOf(modeName);
-        return Optional.of(new PartyProfile(row.getInt("party_order"), row.getInt("party_economy"), emblem, mode));
+        String area = row.getString("party_area");
+        Optional<PolityId> areaId = area == null ? Optional.empty() : Optional.of(new PolityId(UUID.fromString(area)));
+        return Optional.of(new PartyProfile(row.getInt("party_order"), row.getInt("party_economy"), emblem, mode, areaId));
     }
 
     private static Constitution constitutionOf(ResultSet row) throws SQLException {
@@ -526,15 +549,18 @@ final class PolityTable {
 
     private static final String PARTY_PROGRAM_KIND = "PARTY_PROGRAM";
 
-    /** Kodiert ein Parteiprogramm für die Antrags-Textspalte: {@code order|economy|emblem|mode}. */
+    /** Kodiert ein Parteiprogramm für die Antrags-Textspalte: {@code order|economy|emblem|mode|area}. */
     private static String encodeProfile(PartyProfile profile) {
-        return profile.order() + "|" + profile.economy() + "|" + profile.emblem() + "|" + profile.mode().name();
+        return profile.order() + "|" + profile.economy() + "|" + profile.emblem() + "|" + profile.mode().name()
+                + "|" + profile.area().map(id -> id.value().toString()).orElse("");
     }
 
     private static PartyProfile decodeProfile(String encoded) {
-        String[] parts = encoded.split("\\|", 4);
+        String[] parts = encoded.split("\\|", 5);
+        Optional<PolityId> area = parts.length > 4 && !parts[4].isBlank()
+                ? Optional.of(new PolityId(UUID.fromString(parts[4]))) : Optional.empty();
         return new PartyProfile(Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), parts[2],
-                ProgramMode.valueOf(parts[3]));
+                ProgramMode.valueOf(parts[3]), area);
     }
 
     private static void insertProposals(Connection connection, String polityId, List<Proposal> proposals)
@@ -641,8 +667,8 @@ final class PolityTable {
         try (PreparedStatement insertElection = connection.prepareStatement(
                 "INSERT INTO election (id, polity_id, position, office, called_on, closes_on) VALUES (?, ?, ?, ?, ?, ?)");
              PreparedStatement insertCandidate = connection.prepareStatement("""
-                     INSERT INTO election_candidate (election_id, position, candidate_kind, candidate_id, platform)
-                     VALUES (?, ?, ?, ?, ?)""");
+                     INSERT INTO election_candidate (election_id, position, candidate_kind, candidate_id, platform, district)
+                     VALUES (?, ?, ?, ?, ?, ?)""");
              PreparedStatement insertBallot = connection.prepareStatement("""
                      INSERT INTO election_ballot (election_id, position, voter_kind, voter_id, candidate_kind, candidate_id)
                      VALUES (?, ?, ?, ?, ?, ?)""")) {
@@ -663,6 +689,7 @@ final class PolityTable {
                     insertCandidate.setString(3, ActorCodec.kindOf(candidate));
                     insertCandidate.setString(4, candidate.uuid().toString());
                     insertCandidate.setString(5, election.platformOf(candidate).name());
+                    insertCandidate.setString(6, election.districtOf(candidate).map(found -> found.value().toString()).orElse(null));
                     insertCandidate.addBatch();
                 }
                 int ballotPosition = 0;
@@ -702,8 +729,9 @@ final class PolityTable {
     private static Map<String, List<Election>> loadElections(Connection connection) throws SQLException {
         Map<String, List<ActorRef>> candidates = new HashMap<>();
         Map<String, Map<ActorRef, Platform>> platforms = new HashMap<>();
+        Map<String, Map<ActorRef, PolityId>> districts = new HashMap<>();
         try (PreparedStatement select = connection.prepareStatement("""
-                SELECT election_id, candidate_kind, candidate_id, platform
+                SELECT election_id, candidate_kind, candidate_id, platform, district
                 FROM election_candidate ORDER BY election_id, position""");
              ResultSet rows = select.executeQuery()) {
             while (rows.next()) {
@@ -712,6 +740,11 @@ final class PolityTable {
                 candidates.computeIfAbsent(electionId, ignored -> new ArrayList<>()).add(candidate);
                 platforms.computeIfAbsent(electionId, ignored -> new HashMap<>())
                         .put(candidate, Platform.valueOf(rows.getString("platform")));
+                String district = rows.getString("district");
+                if (district != null) {
+                    districts.computeIfAbsent(electionId, ignored -> new HashMap<>())
+                            .put(candidate, new PolityId(UUID.fromString(district)));
+                }
             }
         }
         Map<String, List<Ballot>> ballots = new HashMap<>();
@@ -735,7 +768,7 @@ final class PolityTable {
                         new ElectionId(UUID.fromString(id)), Office.valueOf(rows.getString("office")),
                         Day.of(rows.getLong("called_on")), Day.of(rows.getLong("closes_on")),
                         candidates.getOrDefault(id, List.of()), ballots.getOrDefault(id, List.of()),
-                        platforms.getOrDefault(id, Map.of())));
+                        platforms.getOrDefault(id, Map.of()), districts.getOrDefault(id, Map.of())));
             }
         }
         return elections;
@@ -757,6 +790,9 @@ final class PolityTable {
                 "SELECT proposal_id, parameter, value FROM proposal_value ORDER BY proposal_id, position");
              ResultSet rows = select.executeQuery()) {
             while (rows.next()) {
+                if (!knowsParameter(rows)) {
+                    continue;
+                }
                 values.computeIfAbsent(rows.getString("proposal_id"), ignored -> new ArrayList<>())
                         .add(catalog.decode(rows.getString("parameter"), rows.getString("value")));
             }
@@ -769,6 +805,9 @@ final class PolityTable {
              ResultSet rows = select.executeQuery()) {
             while (rows.next()) {
                 String id = rows.getString("id");
+                if (isSingleChange(rows.getString("motion")) && !catalog.find(rows.getString("parameter")).isPresent()) {
+                    continue; // Parameter einer entfernten fremden Mod
+                }
                 Motion motion = switch (rows.getString("motion")) {
                     case "ENACT" -> new Motion.Enact(rows.getString("title"), rows.getString("text"),
                             values.getOrDefault(id, List.of()));
@@ -802,7 +841,7 @@ final class PolityTable {
         try (PreparedStatement select = connection.prepareStatement(
                 """
                 SELECT id, name, kind, level, tier, currency, founded_on, seat_dimension, seat_x, seat_y, seat_z,
-                       constitution_proclaimed_on, preamble, party_order, party_economy, party_emblem, party_mode,
+                       constitution_proclaimed_on, preamble, party_order, party_economy, party_emblem, party_mode, party_area,
                        parliament_elected_on, parliament_until
                 FROM polity ORDER BY seq""");
              ResultSet rows = select.executeQuery()) {
@@ -843,6 +882,9 @@ final class PolityTable {
                 "SELECT statute_id, parameter, value FROM statute_value ORDER BY statute_id, position");
              ResultSet rows = select.executeQuery()) {
             while (rows.next()) {
+                if (!knowsParameter(rows)) {
+                    continue;
+                }
                 values.computeIfAbsent(rows.getString("statute_id"), ignored -> new ArrayList<>())
                         .add(catalog.decode(rows.getString("parameter"), rows.getString("value")));
             }

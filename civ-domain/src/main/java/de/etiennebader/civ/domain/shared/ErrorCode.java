@@ -18,6 +18,44 @@ public enum ErrorCode {
     /** Argumente: ungültiger Code. */
     INVALID_CURRENCY_CODE,
 
+    // economy / currencies
+    /** Argumente: Währungscode. */
+    UNKNOWN_CURRENCY,
+    /** Argumente: Währungscode oder Symbol, das schon vergeben ist. */
+    CURRENCY_ALREADY_EXISTS,
+    /** Argumente: Währungscode der eingebauten, unveränderlichen Währung. */
+    CURRENCY_PROTECTED,
+    /** Argumente: Währungscode, Akteur. */
+    NOT_CURRENCY_GOVERNOR,
+    /** Argumente: Betrag, der nicht negativ sein darf. */
+    NEGATIVE_CONVERSION_AMOUNT,
+
+    // credit
+    /** Argumente: Akteur. */
+    NOT_A_BANK,
+    /** Argumente: Akteur. */
+    ALREADY_A_BANK,
+    /** Keine Argumente. */
+    INVALID_LOAN_TERMS,
+    /** Argumente: Kredit-ID. */
+    UNKNOWN_LOAN,
+    /** Argumente: Kredit-ID. */
+    LOAN_NOT_ACTIVE,
+    /** Argumente: Kredit-ID, Akteur. */
+    NOT_LOAN_BORROWER,
+    /** Argumente: Zins in Prozent, erlaubter Höchstzins in Prozent. */
+    INTEREST_ABOVE_LIMIT,
+    /** Argumente: Kreditscore, Mindestscore. */
+    CREDIT_SCORE_TOO_LOW,
+    /** Keine Argumente. */
+    LENDING_NOT_ALLOWED,
+    /** Argumente: Angebots-ID. */
+    UNKNOWN_LOAN_OFFER,
+    /** Argumente: Angebots-ID, Akteur. */
+    NOT_OFFER_PARTY,
+    /** Argumente: Bank. */
+    BANK_NOT_SELF_SERVICE,
+
     // law
     /** Argumente: Titel, Mindestlänge, Höchstlänge. */
     INVALID_STATUTE_TITLE,
@@ -55,10 +93,15 @@ public enum ErrorCode {
     NOT_A_CANDIDATE,
     /** Amtszeitbegrenzung erreicht. */
     TERM_LIMIT_REACHED,
+    CANDIDACY_OUTSIDE_PARTY_AREA,
     /** Verbannt: Beitritt bis zum Ende der Verbannung verboten. */
     EXILED,
     /** Argumente: Akteur. */
     ALREADY_CANDIDATE,
+    /** Wahlkreiswahl: Kandidatur ohne oder mit unbekanntem Wahlkreis. Argumente: Wahlkreis (oder leer). */
+    INVALID_CANDIDACY_DISTRICT,
+    /** Wahlkreiswahl: Stimme für einen Kandidaten eines anderen Wahlkreises. Argumente: Kandidat. */
+    VOTE_OUTSIDE_DISTRICT,
 
     // territory
     /** Argumente: Chunk-X, Chunk-Z. */
@@ -165,7 +208,33 @@ public enum ErrorCode {
     INVALID_COMMODITY,
     INVALID_QUANTITY,
     OUT_OF_STOCK,
-    WORTHLESS_GOODS;
+    WORTHLESS_GOODS,
+
+    // Krieg
+    /** Argumente: Angreifer, Verteidiger. */
+    WAR_ALREADY_ONGOING,
+    /** Argumente: Krieg-ID. */
+    UNKNOWN_WAR,
+    /** Der Krieg ist bereits beendet. Argumente: Krieg-ID. */
+    WAR_ALREADY_ENDED,
+    /** Die Verteidigerin hat sich Neutralität erkauft. Argumente: Polity. */
+    DEFENDER_IS_NEUTRAL,
+    /** Argumente: Polity, Akteur. */
+    ALREADY_ENLISTED,
+    /** Argumente: Polity, Akteur. */
+    NOT_ENLISTED,
+    /** Neutralität lässt sich nicht während eines laufenden Kriegs erkaufen. Argumente: Polity. */
+    AT_WAR,
+    /** Der Feldzug ist nicht möglich (Zeitpunkt, Art oder Beteiligte). Argumente: keine. */
+    INVALID_CAMPAIGN,
+    /** Das Bündnis ist nicht möglich oder gibt es nicht. Argumente: keine. */
+    INVALID_ALLIANCE,
+    /** Verbündete können einander nicht den Krieg erklären. Argumente: Polity, Polity. */
+    ALLIED_POLITIES,
+    /** Der Anspruch ist nicht möglich. Argumente: keine. */
+    INVALID_CLAIM,
+    /** Die Truppe ist schon voll ausgebildet bzw. ausgerüstet. Argumente: keine. */
+    NOTHING_TO_IMPROVE;
 
     private static final String TRANSLATION_PREFIX = "eddies-civ-mod.error.";
 

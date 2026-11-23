@@ -9,12 +9,16 @@ import de.etiennebader.civ.domain.actor.PolityRef;
 import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.polity.SettlementTier;
+import de.etiennebader.civ.domain.population.VillagerIdentity;
+import de.etiennebader.civ.domain.economy.Currency;
+import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.DomainException;
 import de.etiennebader.civ.domain.shared.Money;
 import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.territory.ClaimType;
 
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -39,13 +43,12 @@ public final class Texts {
     }
 
     /**
-     * Ein lesbarer Name: Spielername, Gemeindename oder für Unbekannte und Bewohner die ersten
-     * Zeichen der UUID mit vorangestelltem {@code #}.
+     * Ein lesbarer Name: Spieler-, Gemeinde- oder Dorfbewohnername, für unbekannte Spieler die Kurz-ID.
      */
     public String actor(ActorRef actor) {
         return switch (actor) {
             case PlayerRef player -> players.nameOf(player).orElseGet(() -> shortId(player.uuid()));
-            case PersonRef person -> shortId(person.uuid());
+            case PersonRef person -> VillagerIdentity.nameOf(person.uuid());
             case PolityRef polity -> polityName(polity.id());
         };
     }
@@ -60,6 +63,12 @@ public final class Texts {
     public Message money(Money money) {
         long units = money.amount();
         Message amount = Message.of(TranslationKeys.MONEY_AMOUNT, MoneyFormat.whole(units), MoneyFormat.cents(units));
+        if (!money.currency().equals(CurrencyId.EMERALD)) {
+            Optional<Currency> custom = queries.currencies().find(money.currency());
+            if (custom.isPresent()) {
+                return Message.of(TranslationKeys.MONEY, amount, custom.get().symbol());
+            }
+        }
         return Message.of(TranslationKeys.MONEY, amount, Message.of(TranslationKeys.currency(money.currency())));
     }
 

@@ -20,6 +20,7 @@ import de.etiennebader.civ.application.support.ClaimWeighting;
 import de.etiennebader.civ.application.territory.ClaimChunk;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
+import de.etiennebader.civ.domain.population.VillagerIdentity;
 import de.etiennebader.civ.domain.actor.PlayerRef;
 import de.etiennebader.civ.domain.contract.Contract;
 import de.etiennebader.civ.domain.contract.ContractKind;
@@ -33,6 +34,7 @@ import de.etiennebader.civ.domain.polity.SettlementTier;
 import de.etiennebader.civ.domain.population.Personality;
 import de.etiennebader.civ.domain.population.Trait;
 import de.etiennebader.civ.domain.shared.Day;
+import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.DomainException;
 import de.etiennebader.civ.domain.shared.Money;
 import de.etiennebader.civ.domain.shared.PolityId;
@@ -86,6 +88,8 @@ public final class VillagerService {
     private final Map<PersonRef, BlockPosition> lastSeen = new HashMap<>();
     /** Politische Beeinflussung und Dorfbewohner-Kontakte (Issue #18); wie {@link #departures} nur im Speicher. */
     private final SocialEffects social = new SocialEffects();
+    /** Familienangaben für die Auskunft über einen Dorfbewohner; vom Server gesetzt. */
+    private java.util.function.Function<PersonRef, List<Message>> familyLines = villager -> List.of();
     /** Post zwischen Spielern und Dorfbewohnern bzw. unter Dorfbewohnern (Issue #18); wie {@link #social} nur im Speicher. */
     private final VillagerMailbox mailbox = new VillagerMailbox();
     /** Wie oft je 100 Chancen pro Tag ein sehr unzufriedener, freiheitsliebender Dorfbewohner auffällt. */
@@ -207,14 +211,19 @@ public final class VillagerService {
                         .withSocial(social.pointsOf(villager)));
     }
 
+    public void familyLines(java.util.function.Function<PersonRef, List<Message>> lines) {
+        this.familyLines = Objects.requireNonNull(lines, "lines");
+    }
+
     /** Auskunft über einen Dorfbewohner, z. B. beim Anschauen mit Schleichen und Rechtsklick. */
     public Reply describe(PersonRef villager) {
         Personality personality = Personality.of(villager);
         Message trait = Message.of(TranslationKeys.trait(personality.dominant()));
         Optional<PolityView> town = queries.municipalityOf(villager);
+        Message identity = identityLine(VillagerIdentity.of(villager));
         if (town.isEmpty()) {
             return Reply.success(Message.of(MessageKey.VILLAGER_HOMELESS, trait, personality.order(),
-                    personality.thrift(), personality.belonging()));
+                    personality.thrift(), personality.belonging()), identity);
         }
         Satisfaction satisfaction = Satisfaction.of(personality, town.get(), queries.effectiveLaws(town.get()))
                 .withMedia(app.pressInfluence().satisfactionPoints(villager, town.get()))
@@ -242,7 +251,41 @@ public final class VillagerService {
                         texts.actor(contract.offeror()), contract.number())));
         mailbox.latest(villager).ifPresent(mail -> lines.add(Message.of(MessageKey.VILLAGER_MAIL_LATEST,
                 texts.actor(mail.from()), mail.sent().value())));
+        lines.addAll(familyLines.apply(villager));
+        lines.add(identity);
         return Reply.success(lines);
+    }
+
+    /** Einwohnerregister der eigenen Gemeinde, ohne Privatanschriften; erfasst auch ungeladene Dorfbewohner. */
+    public Reply residentRegister(Caller caller, int page) {
+        Optional<PolityView> ownTown = queries.municipalityOf(caller.player());
+        if (ownTown.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.NOT_IN_MUNICIPALITY));
+        }
+        PolityView town = ownTown.orElseThrow();
+        List<Message> entries = town.members().stream().map(Membership::member)
+                .sorted(java.util.Comparator.comparing(texts::actor, String.CASE_INSENSITIVE_ORDER)
+                        .thenComparing(ActorRef::uuid))
+                .map(actor -> actor instanceof PersonRef villager ? identityLine(VillagerIdentity.of(villager))
+                        : Message.of(MessageKey.VILLAGER_REGISTER_PLAYER, texts.actor(actor)))
+                .toList();
+        if (entries.isEmpty()) {
+            return Reply.success(Message.of(MessageKey.VILLAGER_REGISTER_EMPTY, town.name().value()));
+        }
+        int pageSize = 12;
+        int pages = 1 + (entries.size() - 1) / pageSize;
+        if (page < 1 || page > pages) {
+            return Reply.failure(Message.of(MessageKey.VILLAGER_REGISTER_PAGE, pages));
+        }
+        int start = (page - 1) * pageSize;
+        List<Message> lines = new ArrayList<>();
+        lines.add(Message.of(MessageKey.VILLAGER_REGISTER_HEADER, town.name().value(), page, pages));
+        lines.addAll(entries.subList(start, Math.min(start + pageSize, entries.size())));
+        return Reply.success(lines);
+    }
+
+    private static Message identityLine(VillagerIdentity identity) {
+        return Message.of(MessageKey.VILLAGER_IDENTITY, identity.fullName(), identity.registerNumber());
     }
 
     /** Ein Spieler redet mit einem Dorfbewohner über ein Thema (Issue #18); die Antwort richtet sich nach seiner Stimmung. */
@@ -329,7 +372,11 @@ public final class VillagerService {
             }
             Money income = dailyIncome(town, day);
             if (income.isPositive() && income.currency().equals(settings.villagerIncome().currency())) {
-                creditIncome(town, income, day);
+                // Die Dorfbewohner handeln in der Standardwährung des Gebiets (Gesetz/Verfassung, Issue #4).
+                Money local = inDefaultCurrency(town, income);
+                if (local.isPositive()) {
+                    creditIncome(town, local, day);
+                }
             }
             SettlementTier before = town.tier();
             SettlementTier tier = settings.tiers().tierFor(town.memberCount());
@@ -347,6 +394,13 @@ public final class VillagerService {
         if (settings.villagerPolitics()) {
             governAutonomously(day);
             autoClaimChunk(day);
+        }
+        if (settings.ambitions()) {
+            app.villagerAmbitions().execute(day);
+            app.villagerBusiness().execute(day);
+            app.villagerJobSearch().execute(day, villager -> false);
+            app.villagerLandlords().execute(day);
+            app.villagerBorrowing().execute(day);
         }
         return changes;
     }
@@ -511,6 +565,19 @@ public final class VillagerService {
                     app.creditTownIncome().creditEmployer(villager, Money.of(savings, income.currency()), day);
                 }
             }
+        }
+    }
+
+    /** Rechnet die Einnahmen in die Standardwährung der Gemeinde um; fehlschlagende Umrechnung lässt sie unverändert. */
+    private Money inDefaultCurrency(PolityView town, Money income) {
+        CurrencyId target = app.currencies().defaultCurrencyOf(town);
+        if (target.equals(income.currency())) {
+            return income;
+        }
+        try {
+            return app.currencies().convert(income, target);
+        } catch (DomainException | ArithmeticException e) {
+            return income;
         }
     }
 

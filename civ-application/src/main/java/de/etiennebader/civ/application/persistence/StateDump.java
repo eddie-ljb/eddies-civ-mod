@@ -54,7 +54,8 @@ public final class StateDump {
                     day(polity.foundedOn().value()),
                     polity.seat().map(BlockPosition::toString).orElse("-")));
             polity.partyProfile().ifPresent(profile -> lines.add(String.join("|", "  party",
-                    Integer.toString(profile.order()), Integer.toString(profile.economy()), profile.emblem())));
+                    Integer.toString(profile.order()), Integer.toString(profile.economy()), profile.emblem())
+                    + profile.area().map(area -> "|area=" + area.value()).orElse("")));
             if (polity.constitution().proclaimed() || !polity.constitution().preamble().isEmpty()) {
                 lines.add(String.join("|", "  constitution",
                         polity.constitution().proclaimedOn().map(day -> day(day.value())).orElse("draft"),
@@ -212,6 +213,11 @@ public final class StateDump {
         world.civic().anthems().entrySet().stream().sorted(java.util.Map.Entry.comparingByKey(
                 java.util.Comparator.comparing(id -> id.value().toString()))).forEach(entry -> lines.add(String.join("|",
                 "anthem", entry.getKey().value().toString(), entry.getValue().toString())));
+        world.civic().portSettings().entrySet().stream().sorted(java.util.Map.Entry.comparingByKey(
+                java.util.Comparator.comparing(id -> id.value().toString()))).forEach(entry -> lines.add(String.join("|",
+                "port-settings", entry.getKey().value().toString(), entry.getValue().toString())));
+        world.civic().ports().forEach(port -> lines.add(String.join("|", "port", port.polity().value().toString(),
+                Integer.toString(port.slot()), port.position().toString())));
         world.justice().cases().forEach(found -> lines.add(String.join("|", "case", Integer.toString(found.number()),
                 found.id().value().toString(), found.court().value().toString(), found.kind().name(), actor(found.plaintiff()),
                 actor(found.defendant()), found.charge(), found.target(), found.stage().name(),
@@ -236,6 +242,29 @@ public final class StateDump {
                         Boolean.toString(enterprise.autoSell()), enterprise.stock().toString(),
                         enterprise.lastDay().map(found -> day(found.value())).orElse("-"),
                         Long.toString(enterprise.lastOutput()), Long.toString(enterprise.lastRevenue()))));
+        world.currencies().all().stream()
+                .sorted(java.util.Comparator.comparing(currency -> currency.id().code()))
+                .forEach(currency -> lines.add(String.join("|", "currency", currency.id().code(), currency.name(),
+                        currency.symbol(), currency.rateToEmerald().numerator() + "/" + currency.rateToEmerald().denominator(),
+                        currency.issuer().map(StateDump::actor).orElse("-"),
+                        currency.centralBankChair().map(StateDump::actor).orElse("-"),
+                        Integer.toString(currency.baseRatePercent()), currency.itemId().orElse("-"))));
+        world.credit().banks().stream().map(StateDump::actor).sorted()
+                .forEach(bank -> lines.add("bank|" + bank));
+        world.credit().selfServiceBanks().stream().map(StateDump::actor).sorted()
+                .forEach(bank -> lines.add("selfservice|" + bank));
+        world.credit().offers().stream().sorted(java.util.Comparator.comparing(offer -> offer.id().value().toString()))
+                .forEach(offer -> lines.add(String.join("|", "offer", offer.id().value().toString(), actor(offer.lender()),
+                        actor(offer.borrower()), offer.currency().code(), Long.toString(offer.principal()),
+                        Long.toString(offer.termDays()), day(offer.offeredOn().value()), day(offer.expiresOn().value()))));
+        world.credit().scores().entrySet().stream().map(entry -> "score|" + actor(entry.getKey()) + "|" + entry.getValue())
+                .sorted().forEach(lines::add);
+        world.credit().loans().stream().sorted(java.util.Comparator.comparing(loan -> loan.id().value().toString()))
+                .forEach(loan -> lines.add(String.join("|", "loan", loan.id().value().toString(), actor(loan.lender()),
+                        actor(loan.borrower()), loan.currency().code(), Long.toString(loan.principal()),
+                        Integer.toString(loan.rateBasisPoints()), Long.toString(loan.interest()),
+                        day(loan.issuedOn().value()), day(loan.dueOn().value()), Long.toString(loan.repaid()),
+                        loan.status().name())));
         world.market().stocks().stream()
                 .map(stock -> "stock|" + stock.commodity().id() + "|" + stock.quantity() + "|" + day(stock.asOf().value()))
                 .sorted()
@@ -264,7 +293,8 @@ public final class StateDump {
                     .collect(Collectors.joining(","));
             case Motion.Repeal repeal -> "repeal:" + repeal.statute().value() + ":" + repeal.title();
             case Motion.PartyProgram program -> "partyprogram:" + program.profile().order() + ":"
-                    + program.profile().economy() + ":" + program.profile().emblem() + ":" + program.profile().mode();
+                    + program.profile().economy() + ":" + program.profile().emblem() + ":" + program.profile().mode()
+                    + program.profile().area().map(area -> ":" + area.value()).orElse("");
         };
     }
 

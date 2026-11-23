@@ -5,6 +5,18 @@
 ## Bank (Block)
 Rezept: Gold, Eisen, Smaragd, Steinziegel (`GIG / IEI / SSS`). Per Rechtsklick zahlt man Smaragde ein oder hebt sie ab. Das Konto rechnet in Hundertsteln: 1 Smaragd = 100 Einheiten, Beträge wie `0,25` sind möglich.
 
+## Währungen, Zentralbank und Kredite
+
+- **Eigene Währung:** `/civ waehrung erstellen <Code> <Symbol> <Kurs> <Name>` (Kurs = Wert *einer* Einheit in Smaragden, z. B. `2,5`). `/civ waehrung liste` zeigt alle, `/civ waehrung umrechnen <Betrag> <von> <nach>` rechnet über Smaragd um. Smaragd ist eingebaut und unveränderlich.
+- **Zentralbank:** Zunächst entscheidet die Gründerin bzw. der Gründer, dann der ernannte Vorsitzende (`/civ waehrung vorsitz <Code> <Spieler>`) über Kurs (`kurs`), Leitzins (`leitzins <Code> <Prozent>`) und das Aussehen (`item <Code> <Item-ID>`, z. B. `minecraft:gold_ingot`).
+- **Standardwährung:** Per Gesetz oder Verfassung (`/civ recht setzen default_currency <Code>`). Die Dorfbewohner des Gebiets wirtschaften in ihr; leer = Gründungswährung.
+- **Bank:** Im Bank-Bildschirm wechselt der Knopf oben links die Auszahlungswährung. `/civ abheben <Anzahl> <Währung>` und `/civ einzahlen <Anzahl> <Währung>` tun dasselbe per Befehl. Bargeld einer eigenen Währung ist ein gekennzeichnetes Item; gewöhnliche Items gleicher Art nimmt die Bank nicht an.
+- **Kredite:** `/civ bank gruenden` macht dich zur Bank. Kreditnehmer: `/civ kredit zins <Bank> <Währung>` (Zinsangebot), `/civ kredit nehmen <Bank> <Betrag> <Tage> [Währung]`, `/civ kredit zurueckzahlen <Kennung> <Betrag>`, `/civ kredit liste`. Jahreszins = Leitzins + Aufschlag nach **Kreditscore** (300–850, Start 600). Rückzahlung erhöht den Score, Zahlungsausfall senkt ihn. Der Zentralbank-Vorsitzende leiht Banken zum reinen Leitzins.
+- **Angebote und Selbstbedienung:** Banken können Kredite anbieten (`/civ kredit anbieten <Kreditnehmer> <Betrag> <Tage> [Währung]`); der Kreditnehmer nimmt mit `/civ kredit annehmen <Kennung>` an oder lehnt mit `ablehnen` ab (sieben Tage gültig). Mit `/civ bank selbstbedienung an` darf man ohne Angebot direkt leihen (`/civ kredit nehmen …`); Standard ist aus.
+- **Firmen und Gemeinden:** `als <Name>` vor dem Unterbefehl, z. B. `/civ bank als Nordbank gruenden`, `/civ kredit als Nordbank anbieten …`. Berechtigt sind Firmenleitung bzw. Bürgermeister/Schatzmeister.
+- **Dorfbewohner** leihen sich bei knapper Kasse kleine Beträge bei Banken mit Selbstbedienung und zahlen zurück, sobald es geht.
+- **Gesetze:** `bank_lending_allowed`, `bank_max_interest_percent`, `bank_min_credit_score`, `central_bank_max_base_rate_percent`.
+
 ## Markt (Block)
 Rezept: weiße und rote Wolle, Bretter, Smaragd, Truhe (`WRW / PEP / PCP`).
 - **Verkaufen:** Klick auf einen Stapel im Inventar verkauft den ganzen Stapel, Rechtsklick nur ein Stück.
@@ -19,7 +31,7 @@ Preisbildung: Grundpreis je Item, je mehr Lagerbestand desto billiger, das Lager
 - Einnahmequellen: eigene Läden, Aufträge (freie Verträge), angestellte Dorfbewohner (`/civ firma einstellen <Firma> dorfbewohner <Lohn>`).
 - `dividende <Firma> <Betrag>` schüttet gleichmäßig an alle Aktionäre aus. `ausgeben <Firma> <Anzahl> <Preis>` gibt neue Aktien aus. `aufloesen <Firma>` verteilt die Kasse anteilig.
 - **Börse:** `/civ boerse` zeigt Kurse, `kaufen|verkaufen <Firma> <Anzahl> [Limit]` gibt eine Limit-Order auf (ohne Limit ±10 % vom letzten Kurs). Sofortige Ausführung gegen das Orderbuch, Rest wartet bis zu 7 Tage. `depot`, `buch <Firma>`, `streichen <Nr>`. Menü im Gemeindehaus oder am Block **Börsenterminal** (`GRG / IEI / III`).
-- **Produktion:** `/civ firma branche <Firma> forst|schaeferei|acker|bergwerk|fischerei|viehzucht|ziegelei|obstbau`. Jeden Abend erzeugt die Firma Waren.
+- **Produktion:** `/civ firma branche <Firma> forst|schaeferei|acker|bergwerk|fischerei|viehzucht|ziegelei|obstbau|bau`. Jeden Abend erzeugt die Firma Waren.
   - **Arbeitskräfte:** Leitung/Mitglieder je ½, Angestellte (Vertrag) je 1, mit abnehmendem Grenzertrag.
   - **Investieren:** `/civ firma investieren <Firma> <Betrag>` – Stufe 1 kostet 20 Smaragde, jede weitere doppelt so viel wie die vorige, +25 % Ertrag je Stufe, höchstens Stufe 8. Branchenwechsel halbiert die Ausstattung.
   - **Verkauf:** `automatisch` (Standard, abends an den Servermarkt) oder `hand` (Lager); `/civ firma lager`, `abholen`, `verkauf jetzt`.

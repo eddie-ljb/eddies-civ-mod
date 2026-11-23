@@ -1,6 +1,8 @@
 package de.etiennebader.civ.application.query;
 
 import de.etiennebader.civ.domain.justice.JudiciaryView;
+import de.etiennebader.civ.domain.credit.CreditView;
+import de.etiennebader.civ.domain.economy.CurrencyView;
 import de.etiennebader.civ.domain.production.ProductionView;
 import de.etiennebader.civ.domain.civic.CivicView;
 import de.etiennebader.civ.application.Repositories;
@@ -94,6 +96,14 @@ public final class WorldQueries {
         return repositories.civic().load();
     }
 
+    public CurrencyView currencies() {
+        return repositories.currencies().load();
+    }
+
+    public CreditView credit() {
+        return repositories.credit().load();
+    }
+
     public ProductionView production() {
         return repositories.production().load();
     }
@@ -143,6 +153,20 @@ public final class WorldQueries {
                 users.add(found.holder()));
         leaseOf(polity, plot).ifPresent(lease -> users.add(lease.payer()));
         return users.stream().anyMatch(user -> user instanceof PlayerRef owner && community.trusts(owner, friend));
+    }
+
+    /** Alle geltenden Mietverträge eines Grundstücks (mehrere bei Mehrfamilienhäusern, Issue #19). */
+    public List<Contract> leasesOf(PolityId polity, PlotId plot) {
+        Contract.PlotRef ref = new Contract.PlotRef(polity, plot);
+        return contracts().active().stream()
+                .filter(contract -> contract.kind() == ContractKind.LEASE && contract.plot().filter(ref::equals).isPresent())
+                .toList();
+    }
+
+    /** Ob das Grundstück noch einen Mieter aufnehmen darf, je nach Gesetz {@code max_tenants_per_plot}. */
+    public boolean hasFreeUnit(PolityView polity, PlotId plot) {
+        return leasesOf(polity.id(), plot).size() < effectiveLaws(polity).valueOf(
+                de.etiennebader.civ.domain.law.StandardParameters.MAX_TENANTS_PER_PLOT);
     }
 
     /** Der geltende Mietvertrag eines Grundstücks. */
@@ -225,6 +249,18 @@ public final class WorldQueries {
                 .findFirst();
     }
 
+    /** Eine Partei darf im festgelegten Gebiet und allen ihm untergeordneten Gebietskörperschaften antreten. */
+    public boolean partyEligibleIn(PolityView party, PolityId electionPolity) {
+        return party.partyProfile().flatMap(profile -> profile.area())
+                .map(area -> area.equals(electionPolity)
+                        || ancestorsOf(electionPolity).stream().anyMatch(ancestor -> ancestor.id().equals(area)))
+                .orElse(true);
+    }
+
+    public Optional<PolityView> electoralPartyOf(ActorRef actor, PolityId electionPolity) {
+        return partyOf(actor).filter(party -> partyEligibleIn(party, electionPolity));
+    }
+
     /** Alle Parteien, in Reihenfolge ihrer Gründung. */
     public List<PolityView> parties() {
         return repositories.polities().findAll().stream()
@@ -296,13 +332,23 @@ public final class WorldQueries {
     }
 
     /**
+     * Die Geldmenge, die am Markt wirkt: Gesamtmenge ohne das Guthaben des
+     * {@link de.etiennebader.civ.domain.economy.ServerAccount Serverkontos}, das in Gründungsgebühren gebunden ist.
+     */
+    public Money marketSupply(de.etiennebader.civ.domain.shared.CurrencyId currency) {
+        Money total = ledger().totalSupply(currency);
+        Money server = ledger().balanceOf(de.etiennebader.civ.domain.economy.ServerAccount.REF, currency);
+        return server.amount() >= total.amount() ? Money.of(0, currency) : total.minus(server);
+    }
+
+    /**
      * Das Preisniveau aus Geldmenge und Bevölkerung.
      *
      * @param population Zahl der Wirtschaftsteilnehmer, z. B. bekannte Spieler
      * @param reference  Geldmenge je Kopf, bei der Preise ihrem Grundpreis entsprechen
      */
     public PriceLevel priceLevel(int population, Money reference) {
-        return PriceLevel.of(ledger().totalSupply(reference.currency()), population, reference);
+        return PriceLevel.of(marketSupply(reference.currency()), population, reference);
     }
 
     /**
@@ -310,7 +356,7 @@ public final class WorldQueries {
      * aus der Server-Konfiguration.
      */
     public PriceLevel priceLevel(int population, Money reference, double minFactor, double maxFactor, double damping) {
-        return PriceLevel.of(ledger().totalSupply(reference.currency()), population, reference, minFactor, maxFactor,
+        return PriceLevel.of(marketSupply(reference.currency()), population, reference, minFactor, maxFactor,
                 damping);
     }
 

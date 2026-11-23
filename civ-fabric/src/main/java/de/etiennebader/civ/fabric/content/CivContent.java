@@ -1,5 +1,7 @@
 package de.etiennebader.civ.fabric.content;
 
+import de.etiennebader.civ.server.civil.CivilService.SignType;
+
 import de.etiennebader.civ.EddiesCivMod;
 import net.fabricmc.fabric.api.creativetab.v1.FabricCreativeModeTab;
 import net.minecraft.core.Registry;
@@ -37,6 +39,7 @@ public final class CivContent {
     public static final Identifier NEWSSTAND_ID = EddiesCivMod.id("newsstand");
     public static final Identifier STOCK_EXCHANGE_ID = EddiesCivMod.id("stock_exchange");
     public static final Identifier COURT_BENCH_ID = EddiesCivMod.id("court_bench");
+    public static final Identifier ID_CARD_ID = EddiesCivMod.id("id_card");
     public static final Identifier LAW_BOOK_ID = EddiesCivMod.id("law_book");
     public static final Identifier STREET_SIGN_ID = EddiesCivMod.id("street_sign");
     public static final Identifier HOUSE_NUMBER_ID = EddiesCivMod.id("house_number");
@@ -131,6 +134,10 @@ public final class CivContent {
         Item lawBook = Registry.register(BuiltInRegistries.ITEM, lawBookKey,
                 new Item(new Item.Properties().setId(lawBookKey).stacksTo(1).rarity(Rarity.UNCOMMON)));
         LawBooks.init(lawBook);
+        ResourceKey<Item> idCardKey = ResourceKey.create(Registries.ITEM, ID_CARD_ID);
+        Item idCard = Registry.register(BuiltInRegistries.ITEM, idCardKey,
+                new Item(new Item.Properties().setId(idCardKey).stacksTo(1).rarity(Rarity.UNCOMMON)));
+        IdCardItems.init(idCard);
 
         Block ballotBox = simpleBlock(BALLOT_BOX_ID, MapColor.WOOD, SoundType.WOOD, 2.0F);
         Item ballotBoxItem = blockItem(BALLOT_BOX_ID, ballotBox);
@@ -153,15 +160,15 @@ public final class CivContent {
         BlockEntityType<LabelBlockEntity>[] labelTypeHolder = new BlockEntityType[1];
         java.util.function.Supplier<BlockEntityType<LabelBlockEntity>> labelType = () -> labelTypeHolder[0];
 
-        Block streetSign = labelBlock(STREET_SIGN_ID, MapColor.WOOD, SoundType.WOOD, 1.0F, labelType, SINGLE_LINE);
+        Block streetSign = labelBlock(STREET_SIGN_ID, MapColor.WOOD, SoundType.WOOD, 1.0F, labelType, SINGLE_LINE, SignType.STREET);
         Item streetSignItem = blockItem(STREET_SIGN_ID, streetSign);
-        Block houseNumber = labelBlock(HOUSE_NUMBER_ID, MapColor.METAL, SoundType.METAL, 1.0F, labelType, SINGLE_LINE);
+        Block houseNumber = labelBlock(HOUSE_NUMBER_ID, MapColor.METAL, SoundType.METAL, 1.0F, labelType, SINGLE_LINE, SignType.HOUSE);
         Item houseNumberItem = blockItem(HOUSE_NUMBER_ID, houseNumber);
-        Block townSign = labelBlock(TOWN_SIGN_ID, MapColor.WOOD, SoundType.WOOD, 1.5F, labelType, MULTI_LINE);
+        Block townSign = labelBlock(TOWN_SIGN_ID, MapColor.WOOD, SoundType.WOOD, 1.5F, labelType, MULTI_LINE, SignType.TOWN);
         Item townSignItem = blockItem(TOWN_SIGN_ID, townSign);
-        Block countrySign = labelBlock(COUNTRY_SIGN_ID, MapColor.WOOD, SoundType.WOOD, 1.5F, labelType, MULTI_LINE);
+        Block countrySign = labelBlock(COUNTRY_SIGN_ID, MapColor.WOOD, SoundType.WOOD, 1.5F, labelType, MULTI_LINE, SignType.COUNTRY);
         Item countrySignItem = blockItem(COUNTRY_SIGN_ID, countrySign);
-        Block nationSign = labelBlock(NATION_SIGN_ID, MapColor.WOOD, SoundType.WOOD, 1.5F, labelType, MULTI_LINE);
+        Block nationSign = labelBlock(NATION_SIGN_ID, MapColor.WOOD, SoundType.WOOD, 1.5F, labelType, MULTI_LINE, SignType.NATION);
         Item nationSignItem = blockItem(NATION_SIGN_ID, nationSign);
 
         ResourceKey<BlockEntityType<?>> entityTypeKey = ResourceKey.create(Registries.BLOCK_ENTITY_TYPE, LABEL_BLOCK_ENTITY_ID);
@@ -195,6 +202,7 @@ public final class CivContent {
                     output.accept(market);
                     output.accept(constitution);
                     output.accept(lawBook);
+                    output.accept(IdCardItems.item());
                     output.accept(ballotBox);
                     output.accept(electionPoster);
                     output.accept(mailbox);
@@ -236,13 +244,14 @@ public final class CivContent {
     /** Straßenschild/Hausnummer/Orts-/Länder-/Nationenschild: trägt den im Amboss vergebenen Text. */
     private static Block labelBlock(Identifier id, MapColor color, SoundType sound, float hardness,
                                      java.util.function.Supplier<BlockEntityType<LabelBlockEntity>> entityType,
-                                     int maxLines) {
+                                     int maxLines, SignType signType) {
         ResourceKey<Block> key = ResourceKey.create(Registries.BLOCK, id);
         return Registry.register(BuiltInRegistries.BLOCK, key, new LabelBlock(BlockBehaviour.Properties.of()
                 .setId(key)
                 .mapColor(color)
                 .strength(hardness, 6.0F)
-                .sound(sound), entityType, maxLines));
+                .noOcclusion()
+                .sound(sound), entityType, maxLines, signType));
     }
 
     private static Item blockItem(Identifier id, Block block) {

@@ -120,6 +120,11 @@ class SqliteStateStoreTest {
         assertTrue(saved.contains("  promise|"), saved);
         assertTrue(saved.contains("  poster|"), saved);
         assertTrue(saved.contains("street|Hauptstraße"), saved);
+        assertTrue(saved.contains("currency|GOLD|Gold|G|1/10|"), saved);
+        assertTrue(saved.contains("|DEFAULTED"), saved);
+        assertTrue(saved.contains("selfservice|"), saved);
+        assertTrue(saved.contains("offer|"), saved);
+        assertTrue(saved.contains("score|"), saved);
         assertTrue(saved.contains("contract|1|"), saved);
         assertTrue(saved.contains("contract|2|"), saved);
         assertTrue(saved.contains("letter|"), saved);
@@ -414,8 +419,11 @@ class SqliteStateStoreTest {
                     "Feuer ist verboten. Wer stiehlt, wird verbannt.", DAY)).statute().orElseThrow();
             app.enactParagraph().execute(new EnactParagraph.Command(nordhain, alice, "Fristen",
                     "Abstimmungen dauern 4 Tage.", DAY));
-            app.foundParty().execute(new FoundParty.Command(PolityName.of("Ordnungspartei"), dora,
-                    new PartyProfile(60, -10, "minecraft:blue_banner"), EMERALD, List.of(bertram), DAY));
+            var areaProfile = new PartyProfile(60, -10, "minecraft:blue_banner").withArea(Optional.of(westmark));
+            var party = app.foundParty().execute(new FoundParty.Command(PolityName.of("Ordnungspartei"), dora,
+                    areaProfile, EMERALD, List.of(bertram), DAY));
+            app.proposeMotion().execute(new ProposeMotion.Command(party, dora,
+                    new Motion.PartyProgram(areaProfile.withArea(Optional.of(eichenfurt))), DAY));
             app.proposeMotion().execute(new ProposeMotion.Command(nordhain, dora,
                     new Motion.Repeal(house, "Hausordnung"), DAY));
             app.amendLaw().execute(new AmendLaw.Command(eichenfurt, carla,
@@ -468,6 +476,17 @@ class SqliteStateStoreTest {
             app.production().autoSell(alice, company, false, DAY);
             app.production().endOfDay(commodity -> java.util.OptionalLong.of(8),
                     de.etiennebader.civ.domain.market.PriceLevel.NEUTRAL, DAY);
+            var gold = new CurrencyId("GOLD");
+            app.currencies().create(gold, "Gold", "G", new de.etiennebader.civ.domain.economy.ExchangeRate(1, 10), alice,
+                    "minecraft:gold_ingot", DAY);
+            app.currencies().setBaseRate(gold, 4, alice, DAY);
+            app.depositEmeralds().execute(new de.etiennebader.civ.application.economy.DepositEmeralds.Command(alice,
+                    Money.of(5_000, CurrencyId.EMERALD), DAY));
+            app.credit().licenseBank(alice, DAY);
+            app.credit().setSelfService(alice, true, DAY);
+            app.credit().takeLoan(alice, bertram, Money.of(1_000, CurrencyId.EMERALD), 30, DAY);
+            app.credit().offerLoan(alice, dora, Money.of(300, CurrencyId.EMERALD), 14, DAY.plus(40));
+            app.credit().endOfDay(DAY.plus(40)); // Kredit fällt aus, Kreditscore sinkt
             app.endOfDay().execute(DAY);
             app.runElections().execute(DAY.plus(1));
         }

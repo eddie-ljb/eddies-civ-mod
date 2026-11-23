@@ -8,6 +8,7 @@ import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.domain.territory.DimensionId;
 import de.etiennebader.civ.server.Announcement;
 import de.etiennebader.civ.server.CivServerFixture;
+import de.etiennebader.civ.server.civil.CivilService.SignType;
 import de.etiennebader.civ.server.command.Caller;
 import de.etiennebader.civ.server.command.MessageKey;
 import de.etiennebader.civ.server.command.Reply;
@@ -60,6 +61,10 @@ class CivilServiceTest {
         server.plots().selectCorner(at(alice, "Alice", 0, 0), 1);
         server.plots().selectCorner(at(alice, "Alice", 3, 3), 2);
         assertTrue(server.plots().createFromSelection(mayor, PlotService.typeNames().getFirst()).success());
+        assertEquals(List.of("Hauptstraße"), server.civil().signLines(SignType.STREET, at(alice, "Alice", 2, 8).position()));
+        assertEquals(List.of("Hauptstraße"), server.civil().signLines(SignType.STREET, mayor.position()));
+        assertEquals(List.of("1"), server.civil().signLines(SignType.HOUSE, mayor.position()));
+        assertEquals(List.of(), server.civil().signLines(SignType.HOUSE, at(alice, "Alice", 2, 8).position()));
         server.takeAnnouncements();
 
         Reply offered = server.civil().offerLease(mayor, "Bob", "1", Optional.of("2"), 0);
@@ -81,6 +86,51 @@ class CivilServiceTest {
         assertTrue(server.takeAnnouncements().stream()
                 .anyMatch(a -> a.message().key().equals(MessageKey.CONTRACT_ENDED.key())));
         assertFalse(server.civil().show(tenant, 99).success());
+    }
+
+    @Test
+    @DisplayName("Personalausweis: nur für Mitglieder einer Gemeinde ausgestellt, nach Änderung der Daten veraltet")
+    void idCardIssueAndValidity() {
+        setUpTown();
+        Caller mayor = at(alice, "Alice", 8, 8);
+        PlayerRef stranger = new PlayerRef(PlayerId.generate(ids));
+        server.playerJoined(stranger, "Stranger");
+        Caller outside = at(stranger, "Stranger", 8, 8);
+        assertFalse(server.civil().issueIdCard(outside, Optional.empty(), issue -> {
+            throw new AssertionError("ohne Gemeinde darf nichts ausgestellt werden");
+        }).success());
+
+        java.util.concurrent.atomic.AtomicReference<CivilService.IdCardIssue> issued =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        Reply reply = server.civil().issueIdCard(mayor, Optional.empty(), issued::set);
+        assertTrue(has(reply, MessageKey.ID_CARD_ISSUED), reply.toString());
+        assertEquals("Alice", issued.get().data().holderName());
+        assertTrue(has(server.civil().checkIdCard(issued.get().holder(), issued.get().data()), MessageKey.ID_CARD_VALID));
+
+        assertTrue(server.civil().gender(mayor, Optional.empty()).lines().stream()
+                .anyMatch(line -> line.key().equals(MessageKey.GENDER_NONE.key())));
+        server.civil().gender(mayor, Optional.of(de.etiennebader.civ.domain.population.Gender.FEMALE));
+        assertTrue(has(server.civil().checkIdCard(issued.get().holder(), issued.get().data()), MessageKey.ID_CARD_OUTDATED),
+                "Geschlechtsänderung macht den Ausweis veraltet");
+        var stale = new de.etiennebader.civ.application.civil.IdCards.Data("Alice",
+                issued.get().data().gender(), Optional.of("Altstraße 9"), issued.get().data().citizenOf(), issued.get().data().issuedOn());
+        assertTrue(has(server.civil().checkIdCard(issued.get().holder(), stale), MessageKey.ID_CARD_OUTDATED));
+    }
+
+    @Test
+    @DisplayName("Ort, Land und Nation erscheinen abhängig vom Schildtyp und vom tatsächlichen Aufstellort")
+    void territorialSignLines() {
+        setUpTown();
+        Caller mayor = at(alice, "Alice", 8, 8);
+        assertEquals(List.of("Gemeinde: Nordhain"), server.civil().signLines(SignType.TOWN, mayor.position()));
+        assertEquals(List.of(), server.civil().signLines(SignType.COUNTRY, mayor.position()));
+        assertTrue(server.federations().found(mayor, "land", "Ost").success());
+        assertTrue(server.federations().found(mayor, "nation", "Reich").success());
+        assertEquals(List.of("Gemeinde: Nordhain", "Land: Ost", "Nation: Reich"),
+                server.civil().signLines(SignType.TOWN, mayor.position()));
+        assertEquals(List.of("Land: Ost", "Nation: Reich"), server.civil().signLines(SignType.COUNTRY, mayor.position()));
+        assertEquals(List.of("Nation: Reich"), server.civil().signLines(SignType.NATION, mayor.position()));
+        assertEquals(List.of(), server.civil().signLines(SignType.TOWN, at(alice, "Alice", 500, 500).position()));
     }
 
     @Test
