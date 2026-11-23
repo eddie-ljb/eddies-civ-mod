@@ -20,6 +20,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LawBookServiceTest {
@@ -75,6 +76,77 @@ class LawBookServiceTest {
         assertEquals(Optional.of("Westmark"), build.federal());
         assertTrue(server.lawBooks().list(caller(bob), Optional.empty()).lines().stream()
                 .anyMatch(line -> line.key().equals(MessageKey.LAW_BOOK_FEDERAL.key())));
+    }
+
+    @Test
+    @DisplayName("Rechte-Editor: ausdrückliche Werte werden Paragraph; Fremde und ungültige Werte scheitern")
+    void rightsEditor() {
+        town();
+        var polity = named("Nordhain");
+        assertTrue(server.lawBooks().canLegislate(caller(alice), polity.id()));
+        assertTrue(server.lawBooks().canLegislate(caller(bob), polity.id()), "Bürger sind Gesetzgeber der Gemeinde");
+        assertFalse(server.lawBooks().enactRights(caller(alice), polity.id(), "Leer", java.util.Map.of()).success());
+        assertFalse(server.lawBooks().enactRights(caller(alice), polity.id(), "Falsch",
+                java.util.Map.of("outsiders_may_build", "vielleicht")).success());
+        assertFalse(server.lawBooks().enactRights(caller(alice), polity.id(), "Unbekannt",
+                java.util.Map.of("gibt_es_nicht", "1")).success());
+        assertTrue(server.lawBooks().enactRights(caller(alice), polity.id(), "Offene Stadt",
+                java.util.Map.of("outsiders_may_build", "true")).success());
+        assertTrue(named("Nordhain").laws().valueOf(StandardParameters.OUTSIDERS_MAY_BUILD));
+        ParagraphView paragraph = server.lawBooks().paragraphsOf(named("Nordhain")).getFirst();
+        assertEquals("", paragraph.text());
+        assertEquals(1, paragraph.effects().size());
+        assertTrue(server.lawBooks().rightsOf(named("Nordhain")).stream()
+                .anyMatch(right -> right.key().id().equals("outsiders_may_build") && right.explicit()));
+        assertFalse(server.lawBooks().canLegislate(caller(alice), new de.etiennebader.civ.domain.shared.PolityId(
+                java.util.UUID.randomUUID())));
+    }
+
+    @Test
+    @DisplayName("Entwürfe: nur Autor überschreibt/löscht, Partei sieht mit, Eingaben und Anzahl begrenzt")
+    void drafts() {
+        town();
+        var books = server.lawBooks();
+        var draft = books.saveDraft(caller(alice), Optional.empty(), Optional.empty(), "  Entwurf ", " Text ");
+        assertEquals("Entwurf", draft.title());
+        assertEquals(1, books.draftsVisibleTo(caller(alice)).size());
+        assertTrue(books.draftsVisibleTo(caller(bob)).isEmpty(), "ohne gemeinsame Partei unsichtbar");
+        assertThrows(IllegalArgumentException.class, () -> books.saveDraft(caller(bob), Optional.of(draft.id()),
+                Optional.empty(), "Bobs", "x"));
+        assertThrows(IllegalArgumentException.class, () -> books.saveDraft(caller(alice), Optional.empty(),
+                Optional.empty(), " ", "x"));
+        assertThrows(IllegalArgumentException.class, () -> books.saveDraft(caller(alice), Optional.empty(),
+                Optional.empty(), "t", "x".repeat(1001)));
+        var updated = books.saveDraft(caller(alice), Optional.of(draft.id()), Optional.empty(), "Neu", "");
+        assertEquals(draft.id(), updated.id());
+        assertEquals(1, books.draftsVisibleTo(caller(alice)).size());
+        assertFalse(books.deleteDraft(caller(bob), draft.id()));
+        assertTrue(books.deleteDraft(caller(alice), draft.id()));
+        assertFalse(books.deleteDraft(caller(alice), draft.id()));
+        for (int i = 0; i < LawBookService.MAX_DRAFTS_PER_AUTHOR; i++) {
+            books.saveDraft(caller(alice), Optional.empty(), Optional.empty(), "t" + i, "");
+        }
+        assertThrows(IllegalArgumentException.class, () -> books.saveDraft(caller(alice), Optional.empty(),
+                Optional.empty(), "zu viel", ""));
+    }
+
+    @Test
+    @DisplayName("Optional: Entwürfe überstehen einen Neustart, auch mit Tab, Zeilenumbruch und Backslash")
+    void draftsPersistWhenEnabled(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) {
+        town();
+        java.nio.file.Path file = dir.resolve("law-drafts.tsv");
+        var first = new LawBookService(server.app(), server.calendar(), server.texts(), new de.etiennebader.civ.server.Announcements(),
+                server.federations(), Optional.of(file));
+        var saved = first.saveDraft(caller(alice), Optional.empty(), Optional.of(named("Nordhain").id()), "A\tB",
+                "Zeile 1\nZeile 2 \\ Ende");
+        var second = new LawBookService(server.app(), server.calendar(), server.texts(), new de.etiennebader.civ.server.Announcements(),
+                server.federations(), Optional.of(file));
+        assertEquals(List.of(saved), second.draftsVisibleTo(caller(alice)));
+        assertTrue(second.deleteDraft(caller(alice), saved.id()));
+        assertTrue(new LawBookService(server.app(), server.calendar(), server.texts(), new de.etiennebader.civ.server.Announcements(),
+                server.federations(), Optional.of(file)).draftsVisibleTo(caller(alice)).isEmpty());
+        assertTrue(new LawBookService(server.app(), server.calendar(), server.texts(), new de.etiennebader.civ.server.Announcements(),
+                server.federations()).draftsVisibleTo(caller(alice)).isEmpty(), "Standard: flüchtig");
     }
 
     private void town() {

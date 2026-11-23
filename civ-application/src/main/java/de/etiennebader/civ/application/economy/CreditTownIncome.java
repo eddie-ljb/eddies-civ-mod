@@ -36,7 +36,8 @@ public final class CreditTownIncome {
 
     public void execute(Command command) {
         Polity polity = aggregates.polity(command.polity());
-        if (!command.amount().currency().equals(polity.currency())) {
+        if (!command.amount().currency().equals(polity.currency())
+                && aggregates.currencies().find(command.amount().currency()).isEmpty()) {
             throw new IllegalArgumentException("Einnahmen müssen in der Währung der Gemeinde sein: " + command.amount());
         }
         Ledger ledger = aggregates.ledger();

@@ -6,6 +6,7 @@ import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.server.civic.CivicService;
+import de.etiennebader.civ.server.civic.HomePortService;
 import de.etiennebader.civ.server.justice.JusticeService;
 import de.etiennebader.civ.application.CivApplication;
 import de.etiennebader.civ.application.Repositories;
@@ -26,6 +27,8 @@ import de.etiennebader.civ.domain.shared.IdGenerator;
 import de.etiennebader.civ.domain.shared.RandomIdGenerator;
 import de.etiennebader.civ.persistence.store.SqliteStateStore;
 import de.etiennebader.civ.server.bank.BankService;
+import de.etiennebader.civ.server.credit.CreditService;
+import de.etiennebader.civ.server.currency.CurrencyService;
 import de.etiennebader.civ.server.campaign.CampaignService;
 import de.etiennebader.civ.server.civil.CivilService;
 import de.etiennebader.civ.server.command.Caller;
@@ -97,12 +100,15 @@ public final class CivServer {
     private final CivCommands commands;
     private final ProtectionService protection;
     private final BankService bank;
+    private final CurrencyService currencyService;
+    private final CreditService creditService;
     private final MarketService market;
     private final TerritoryWatcher territory;
     private final TownService towns;
     private final PlotService plots;
     private final de.etiennebader.civ.server.construction.ConstructionService construction;
     private final de.etiennebader.civ.server.war.WarService war;
+    private final de.etiennebader.civ.server.family.FamilyService family;
     private final VillagerService villagers;
     private final de.etiennebader.civ.server.villager.EducationStore educationStore;
     private final VillagerFederations villagerFederations;
@@ -114,6 +120,7 @@ public final class CivServer {
     private final FederationService federations;
     private final LevelService levels;
     private final CivicService civic;
+    private final HomePortService homePorts;
     private final JusticeService justice;
     private volatile java.nio.file.Path mapDirectory;
     private final Optional<java.nio.file.Path> imagesDirectory;
@@ -128,6 +135,7 @@ public final class CivServer {
     private final CivilService civil;
     private final CommunityService community;
     private final CompanyService companies;
+    private final de.etiennebader.civ.server.ranking.RankingService rankings;
     private final PressService press;
     private final TownHallService townHalls;
     private final ShopService shops;
@@ -157,16 +165,21 @@ public final class CivServer {
         this.protection = new ProtectionService(app.queries(), texts);
         this.voting = new VotingService(app, calendar, texts, announcements);
         this.offices = new OfficeService(app, calendar, players, texts, announcements);
-        this.federations = new FederationService(app, calendar, settings.levels(), texts, announcements);
-        this.commands = new CivCommands(app, calendar, settings.currency(), texts, protection, voting);
+        this.federations = new FederationService(app, calendar, settings.levels(), texts, announcements,
+                settings.founding(), settings.currency());
+        this.commands = new CivCommands(app, calendar, settings.currency(), texts, protection, voting,
+                settings.founding());
         this.parties = new PartyService(app, calendar, settings.currency(), settings.parties(), players, texts,
                 announcements);
-        this.lawBooks = new LawBookService(app, calendar, texts, announcements, federations);
+        this.lawBooks = new LawBookService(app, calendar, texts, announcements, federations,
+                settings.persistLawDrafts() ? dataDirectory.map(dir -> dir.resolve("law-drafts.tsv")) : Optional.empty());
         this.parliaments = new ParliamentService(app, texts, offices, voting);
         this.campaigns = new CampaignService(app, calendar, texts, offices);
         this.constitutions = new ConstitutionService(app, calendar, texts, announcements, commands, offices, voting,
                 federations);
         this.bank = new BankService(app, calendar, settings.currency(), players, texts);
+        this.currencyService = new CurrencyService(app, calendar, players, texts);
+        this.creditService = new CreditService(app, calendar, players, texts);
         this.market = new MarketService(app, calendar, settings, players, texts);
         this.territory = new TerritoryWatcher(app.queries(), texts);
         this.towns = new TownService(app.queries(), settings, texts, commands, territory);
@@ -182,18 +195,25 @@ public final class CivServer {
         this.educationStore = new de.etiennebader.civ.server.villager.EducationStore(
                 dataDirectory.map(dir -> dir.resolve("education.tsv")));
         educationStore.load(app.villagerEducation());
+        this.family = new de.etiennebader.civ.server.family.FamilyService(app.queries(), announcements,
+                dataDirectory.map(dir -> dir.resolve("family.tsv")));
+        villagers.familyLines(family::describe);
         this.villagerFoundations = new de.etiennebader.civ.server.villager.VillagerFoundations(app, villagers::lastSeen,
-                announcements);
+                announcements, settings.founding());
         this.townHalls = new TownHallService(app, calendar, texts, announcements);
         this.shops = new ShopService(app, calendar, settings.currency(), texts);
         this.civil = new CivilService(app, calendar, players, settings.currency(), texts, announcements,
                 player -> plots.selection(player).area());
         this.community = new CommunityService(app, calendar, players, texts, announcements, Clock.systemUTC());
         this.companies = new CompanyService(app, calendar, players, settings.currency(), texts, announcements,
-                conjuncture);
+                conjuncture, settings.founding());
+        app.companies().foundingFee(settings.founding().company());
         this.companies.pricing(market::priceLevel);
+        this.rankings = new de.etiennebader.civ.server.ranking.RankingService(app, texts, settings.currency(),
+                companies, federations);
         this.press = new PressService(app, calendar, players, settings.currency(), texts, announcements);
         this.civic = new CivicService(app, calendar, texts, announcements, plots);
+        this.homePorts = new HomePortService(app, calendar, texts, war::registry, settings.warPortLock());
         this.justice = new JusticeService(app, calendar, players, texts, announcements);
         this.liveCount = new LiveCountService(announcements, settings.show().liveCount(),
                 settings.show().liveCountSeconds(), settings.show().projections());
@@ -262,10 +282,12 @@ public final class CivServer {
         parties.endOfDay(day);
         villagers.endOfDay(day);
         educationStore.save(app.villagerEducation());
+        app.credit().endOfDay(day); // überfällige Kredite fallen aus
         if (settings.ambitions()) {
             villagerFoundations.endOfDay(day);
             villagerFederations.endOfDay(day);
             construction.villagersOrder(day);
+            family.endOfDay(day);
         }
         federations.autoDecideInvitations(day, settings.villagerPolitics());
         campaigns.endOfDay(day);
@@ -394,6 +416,14 @@ public final class CivServer {
         return bank;
     }
 
+    public CurrencyService currencies() {
+        return currencyService;
+    }
+
+    public CreditService credit() {
+        return creditService;
+    }
+
     public MarketService market() {
         return market;
     }
@@ -409,6 +439,11 @@ public final class CivServer {
 
     public de.etiennebader.civ.server.war.WarService war() {
         return war;
+    }
+
+    /** Heirat, Scheidung und Kinder der Dorfbewohner. */
+    public de.etiennebader.civ.server.family.FamilyService family() {
+        return family;
     }
 
     public de.etiennebader.civ.server.construction.ConstructionService construction() {
@@ -441,6 +476,10 @@ public final class CivServer {
 
     public CommunityService community() {
         return community;
+    }
+
+    public de.etiennebader.civ.server.ranking.RankingService rankings() {
+        return rankings;
     }
 
     public CompanyService companies() {
@@ -482,6 +521,10 @@ public final class CivServer {
     }
 
     /** Wahlkreise und Hoheitszeichen. */
+    public HomePortService homePorts() {
+        return homePorts;
+    }
+
     public CivicService civic() {
         return civic;
     }

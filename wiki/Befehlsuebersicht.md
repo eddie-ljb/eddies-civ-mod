@@ -55,6 +55,8 @@ Jeder deutsche Befehl unter `/civ` hat einen englischen Zwilling mit gleicher Fu
 | `/civ ebenen` | eigene Gemeinde/Land/Nation mit Spitze |
 | `/civ land\|nation <Befehl>` / `/civ ebene <Ebene> <Befehl>` | `info`, `menue`, `aemter`, `wahl …`, `amt …`, `parlament`, `recht [setzen]`, `abstimmungen`, `abstimmen`, `verfassung`, `gesetze`, `umfrage`, `wahlergebnis` für diese Ebene |
 | `/civ <Ebene> wahlkreis\|debatte\|flagge\|hymne\|gericht …` | Wahlkreise, Debatten, Hoheitszeichen, Gericht einer Ebene |
+| `/civ heim [Polity] [1-3]` | Zum Heimat-Hafen einer Polity porten (Standard: eigene Gemeinde, Hafen 1 = Gemeindehaus) |
+| `/civ <Ebene> heim liste\|setzen 2\|3\|entfernen 2\|3\|zugang <keiner\|buerger\|verbuendete\|alle>\|preis <Betrag>` | Heimat-Häfen einer Ebene verwalten (Spitze) |
 
 ## Recht und Verfassung
 | Befehl | Wirkung |

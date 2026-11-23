@@ -1,6 +1,8 @@
 package de.etiennebader.civ.application.query;
 
 import de.etiennebader.civ.domain.justice.JudiciaryView;
+import de.etiennebader.civ.domain.credit.CreditView;
+import de.etiennebader.civ.domain.economy.CurrencyView;
 import de.etiennebader.civ.domain.production.ProductionView;
 import de.etiennebader.civ.domain.civic.CivicView;
 import de.etiennebader.civ.application.Repositories;
@@ -92,6 +94,14 @@ public final class WorldQueries {
     /** Alle Zeitungsartikel. */
     public CivicView civic() {
         return repositories.civic().load();
+    }
+
+    public CurrencyView currencies() {
+        return repositories.currencies().load();
+    }
+
+    public CreditView credit() {
+        return repositories.credit().load();
     }
 
     public ProductionView production() {
@@ -322,13 +332,23 @@ public final class WorldQueries {
     }
 
     /**
+     * Die Geldmenge, die am Markt wirkt: Gesamtmenge ohne das Guthaben des
+     * {@link de.etiennebader.civ.domain.economy.ServerAccount Serverkontos}, das in Gründungsgebühren gebunden ist.
+     */
+    public Money marketSupply(de.etiennebader.civ.domain.shared.CurrencyId currency) {
+        Money total = ledger().totalSupply(currency);
+        Money server = ledger().balanceOf(de.etiennebader.civ.domain.economy.ServerAccount.REF, currency);
+        return server.amount() >= total.amount() ? Money.of(0, currency) : total.minus(server);
+    }
+
+    /**
      * Das Preisniveau aus Geldmenge und Bevölkerung.
      *
      * @param population Zahl der Wirtschaftsteilnehmer, z. B. bekannte Spieler
      * @param reference  Geldmenge je Kopf, bei der Preise ihrem Grundpreis entsprechen
      */
     public PriceLevel priceLevel(int population, Money reference) {
-        return PriceLevel.of(ledger().totalSupply(reference.currency()), population, reference);
+        return PriceLevel.of(marketSupply(reference.currency()), population, reference);
     }
 
     /**
@@ -336,7 +356,7 @@ public final class WorldQueries {
      * aus der Server-Konfiguration.
      */
     public PriceLevel priceLevel(int population, Money reference, double minFactor, double maxFactor, double damping) {
-        return PriceLevel.of(ledger().totalSupply(reference.currency()), population, reference, minFactor, maxFactor,
+        return PriceLevel.of(marketSupply(reference.currency()), population, reference, minFactor, maxFactor,
                 damping);
     }
 

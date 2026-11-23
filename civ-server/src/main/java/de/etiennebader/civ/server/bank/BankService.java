@@ -90,6 +90,67 @@ public final class BankService {
         });
     }
 
+    /** Das Item, in dem diese Währung ausgezahlt wird; leer, wenn die Bank sie nicht ausgibt. */
+    public Optional<String> payoutItem(CurrencyId payout) {
+        return queries.currencies().find(payout).flatMap(found -> found.itemId());
+    }
+
+    /** So viele ganze Einheiten der Währung kann der Spieler höchstens als Items abheben. */
+    public long withdrawableIn(ActorRef account, CurrencyId payout) {
+        if (payout.equals(currency)) {
+            return withdrawableEmeralds(account);
+        }
+        try {
+            return app.currencies().convert(balanceOf(account), payout).amount() / MoneyFormat.UNITS_PER_EMERALD;
+        } catch (DomainException | ArithmeticException e) {
+            return 0;
+        }
+    }
+
+    /**
+     * Wie {@link #withdraw}, aber in einer anderen Währung: Das Guthaben wird um den umgerechneten Wert gemindert, der
+     * Aufrufer gibt dem Spieler {@code count} Items der Währung (siehe {@link #payoutItem}). Nur Währungen mit Item
+     * werden ausgezahlt.
+     */
+    public Reply withdrawIn(Caller caller, int count, CurrencyId payout) {
+        if (count < 1) {
+            return Reply.failure(Message.of(MessageKey.INVALID_AMOUNT, String.valueOf(count)));
+        }
+        if (payoutItem(payout).isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.BANK_CURRENCY_UNSUPPORTED, payout.code()));
+        }
+        return attempt(() -> {
+            Money paidOut = Money.of(MoneyFormat.emeralds(count), payout);
+            Money cost = app.currencies().convert(paidOut, currency);
+            if (!cost.isPositive()) {
+                return Reply.failure(Message.of(MessageKey.INVALID_AMOUNT, String.valueOf(count)));
+            }
+            app.withdrawEmeralds().execute(new WithdrawEmeralds.Command(caller.player(), cost, calendar.today()));
+            return Reply.success(Message.of(MessageKey.BANK_WITHDRAWN_IN, texts.money(paidOut),
+                    texts.money(balanceOf(caller.player()))));
+        });
+    }
+
+    /**
+     * Schreibt den Wert von Währungs-Items gut, die der Aufrufer dem Spieler bereits abgenommen hat. Nur von der Bank
+     * ausgegebene (gekennzeichnete) Items dürfen hier ankommen; das prüft der Aufrufer.
+     */
+    public Reply depositIn(Caller caller, int count, CurrencyId payout) {
+        if (count < 1) {
+            return Reply.failure(Message.of(MessageKey.BANK_NOTHING_TO_DEPOSIT));
+        }
+        return attempt(() -> {
+            Money deposited = Money.of(MoneyFormat.emeralds(count), payout);
+            Money credit = app.currencies().convert(deposited, currency);
+            if (!credit.isPositive()) {
+                return Reply.failure(Message.of(MessageKey.INVALID_AMOUNT, String.valueOf(count)));
+            }
+            app.depositEmeralds().execute(new DepositEmeralds.Command(caller.player(), credit, calendar.today()));
+            return Reply.success(Message.of(MessageKey.BANK_DEPOSITED_IN, texts.money(deposited),
+                    texts.money(balanceOf(caller.player()))));
+        });
+    }
+
     /** {@code /civ ueberweisen <Spieler|Gemeinde> <Betrag>} */
     public Reply transfer(Caller caller, String recipientName, String amountInput) {
         Optional<ActorRef> recipient = recipient(recipientName);

@@ -5,6 +5,7 @@ import de.etiennebader.civ.application.civic.CivicUseCases;
 import de.etiennebader.civ.application.civil.Addresses;
 import de.etiennebader.civ.application.civil.CommunityUseCases;
 import de.etiennebader.civ.application.civil.ContractUseCases;
+import de.etiennebader.civ.application.civil.IdCards;
 import de.etiennebader.civ.application.civil.RunContracts;
 import de.etiennebader.civ.application.civil.StreetUseCases;
 import de.etiennebader.civ.application.company.CompanyUseCases;
@@ -71,6 +72,8 @@ import de.etiennebader.civ.application.population.PersonalityLegislator;
 import de.etiennebader.civ.application.population.PersonalityVoter;
 import de.etiennebader.civ.application.port.DomainEventPublisher;
 import de.etiennebader.civ.application.query.WorldQueries;
+import de.etiennebader.civ.application.economy.CreditUseCases;
+import de.etiennebader.civ.application.economy.CurrencyUseCases;
 import de.etiennebader.civ.application.shop.BuyFromShop;
 import de.etiennebader.civ.application.shop.CloseShop;
 import de.etiennebader.civ.application.shop.OpenShop;
@@ -149,6 +152,9 @@ public final class CivApplication {
     private final LeaveParty leaveParty;
     private final ChangePartyProgram changePartyProgram;
     private final MoveSeat moveSeat;
+    private final CurrencyUseCases currencyUseCases;
+    private final CreditUseCases creditUseCases;
+    private final de.etiennebader.civ.application.economy.VillagerBorrowing villagerBorrowing;
     private final OpenShop openShop;
     private final CloseShop closeShop;
     private final BuyFromShop buyFromShop;
@@ -211,7 +217,6 @@ public final class CivApplication {
         this.tallyProposals = new TallyProposals(aggregates, ids);
         this.callElection = new CallElection(aggregates, ids);
         this.standForElection = new StandForElection(aggregates);
-        this.castBallot = new CastBallot(aggregates);
         this.appointOfficer = new AppointOfficer(aggregates);
         Function<PolityView, LawView> effectiveLaws = polity -> new WorldQueries(repositories).effectiveLaws(polity);
         Function<ActorRef, Optional<PolityView>> partyOf = actor -> new WorldQueries(repositories).partyOf(actor);
@@ -226,6 +231,7 @@ public final class CivApplication {
                         + pressInfluence.bonus(villager, candidate, election, polity),
                 villagerEducation::bonusOf);
         this.runElections = new RunElections(aggregates, ids, villagerVoter, partyOf, homeOf);
+        this.castBallot = new CastBallot(aggregates, runElections::districtOf);
         this.contracts = new ContractUseCases(aggregates, ids);
         this.runContracts = new RunContracts(aggregates);
         this.streets = new StreetUseCases(aggregates);
@@ -260,6 +266,10 @@ public final class CivApplication {
         this.leaveParty = new LeaveParty(aggregates, dissolvePolity);
         this.changePartyProgram = new ChangePartyProgram(aggregates, ids, proposeMotion);
         this.moveSeat = new MoveSeat(aggregates);
+        this.currencyUseCases = new CurrencyUseCases(aggregates, new WorldQueries(repositories));
+        this.creditUseCases = new CreditUseCases(aggregates, new WorldQueries(repositories), ids);
+        this.villagerBorrowing = new de.etiennebader.civ.application.economy.VillagerBorrowing(
+                new WorldQueries(repositories), creditUseCases, currencyUseCases);
         this.openShop = new OpenShop(aggregates);
         this.closeShop = new CloseShop(aggregates);
         this.buyFromShop = new BuyFromShop(aggregates);
@@ -381,6 +391,11 @@ public final class CivApplication {
     /** Hausnummern und Wohnsitze. */
     public Addresses addresses() {
         return new Addresses(queries);
+    }
+
+    /** Personalausweise (#20). */
+    public IdCards idCards() {
+        return new IdCards(queries);
     }
 
     public Campaign campaign() {
@@ -530,6 +545,18 @@ public final class CivApplication {
 
     public MoveSeat moveSeat() {
         return moveSeat;
+    }
+
+    public CurrencyUseCases currencies() {
+        return currencyUseCases;
+    }
+
+    public CreditUseCases credit() {
+        return creditUseCases;
+    }
+
+    public de.etiennebader.civ.application.economy.VillagerBorrowing villagerBorrowing() {
+        return villagerBorrowing;
     }
 
     public OpenShop openShop() {

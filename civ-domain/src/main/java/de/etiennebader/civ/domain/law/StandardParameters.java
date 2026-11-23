@@ -257,6 +257,13 @@ public final class StandardParameters {
     public static final ParameterKey<Long> NEUTRALITY_FEE_PER_DAY = ParameterKey.constrained(
             "neutrality_fee_per_day", Long.class, 100L, fee -> fee >= 0);
 
+    /**
+     * Wartezeit in Sekunden zwischen zwei Teleports eines Spielers zu den Heimat-Häfen dieser Polity
+     * (0 = keine Wartezeit).
+     */
+    public static final ParameterKey<Long> HOME_PORT_COOLDOWN_SECONDS = ParameterKey.constrained(
+            "home_port_cooldown_seconds", Long.class, 10L, seconds -> seconds >= 0 && seconds <= 86_400);
+
     /** Ab diesem Kriegswillen (0-100) darf der Bürgermeister Krieg erklären; abhängig von Persönlichkeiten, Parteien, Ansprüchen. */
     public static final ParameterKey<Long> WAR_WILL_THRESHOLD = ParameterKey.constrained(
             "war_will_threshold", Long.class, 50L, value -> value >= 0 && value <= 100);
@@ -284,6 +291,29 @@ public final class StandardParameters {
     /** Täglicher Sold je Offizier in der Garnison, aus der Gemeindekasse. 0 (Standard) = unbezahlt. */
     public static final ParameterKey<Long> OFFICER_WAGE = ParameterKey.constrained("officer_wage", Long.class, 0L,
             wage -> wage >= 0);
+
+    /**
+     * Standardwährung dieser Polity als Währungscode (siehe {@code CurrencyRegistry}). Leer (Standard) = die
+     * Währung, mit der die Polity gegründet wurde. In ihr handeln die Dorfbewohner des Gebiets.
+     */
+    public static final ParameterKey<String> DEFAULT_CURRENCY = ParameterKey.constrained("default_currency",
+            String.class, "", code -> code.isEmpty() || code.matches("[A-Z_]{2,16}"));
+
+    /** Ob in dieser Polity Banken Kredite vergeben dürfen. */
+    public static final ParameterKey<Boolean> BANK_LENDING_ALLOWED =
+            ParameterKey.of("bank_lending_allowed", Boolean.class, true);
+
+    /** Höchster Jahreszins in Prozent, den Banken dieser Polity verlangen dürfen. */
+    public static final ParameterKey<Long> BANK_MAX_INTEREST_PERCENT = ParameterKey.constrained(
+            "bank_max_interest_percent", Long.class, 50L, value -> value >= 0 && value <= 1_000);
+
+    /** Mindest-Kreditscore (300-850) eines Kreditnehmers; 0 = keine Einschränkung. */
+    public static final ParameterKey<Long> BANK_MIN_CREDIT_SCORE = ParameterKey.constrained(
+            "bank_min_credit_score", Long.class, 0L, value -> value == 0 || value >= 300 && value <= 850);
+
+    /** Höchstes Leitzins-Niveau in Prozent, das ein Zentralbank-Vorsitzender setzen darf. */
+    public static final ParameterKey<Long> CENTRAL_BANK_MAX_BASE_RATE_PERCENT = ParameterKey.constrained(
+            "central_bank_max_base_rate_percent", Long.class, 100L, value -> value >= 0 && value <= 100);
 
      /** Alle Standardparameter in fester Reihenfolge. */
     public static List<ParameterKey<?>> all() {
@@ -342,11 +372,17 @@ public final class StandardParameters {
                 SOLDIER_WAGE,
                 OFFICER_WAGE,
                 NEUTRALITY_FEE_PER_DAY,
+                HOME_PORT_COOLDOWN_SECONDS,
                 WAR_WILL_THRESHOLD,
                 CONQUEST_CHUNKS_PER_WIN,
                 TRAINING_COST_PER_HEAD,
                 EQUIPMENT_COST_PER_HEAD,
-                HOSPITAL_BED_COST
+                HOSPITAL_BED_COST,
+                DEFAULT_CURRENCY,
+                BANK_LENDING_ALLOWED,
+                BANK_MAX_INTEREST_PERCENT,
+                BANK_MIN_CREDIT_SCORE,
+                CENTRAL_BANK_MAX_BASE_RATE_PERCENT
         );
     }
 
@@ -358,7 +394,7 @@ public final class StandardParameters {
         return List.of(LAWS_BY_VOTE, VOTE_DAYS, TERM_DAYS, ELECTION_DAYS, VILLAGER_VOTE_PERCENT,
                 AMENDMENT_MAJORITY_PERCENT, FEDERAL_LAW_PREVAILS, PARLIAMENT_SEATS, SESSION_DAYS, BALLOT_BOX_REQUIRED,
                 POSTAL_VOTE_ALLOWED, OFFICE_VOTING, PARLIAMENT_VOTING, BALLOT_TYPE, THRESHOLD_PERCENT, TERM_LIMIT,
-                PRESS_FREEDOM);
+                PRESS_FREEDOM, DEFAULT_CURRENCY);
     }
 
     public static boolean isConstitutional(ParameterKey<?> key) {

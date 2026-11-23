@@ -31,9 +31,16 @@ public final class ServerConfig {
     static final String EMIGRATION = "villager_emigration";
     static final String VILLAGER_POLITICS = "villager_politics_enabled";
     static final String AMBITIONS = "villager_ambitions";
+    static final String LAW_DRAFTS = "law_drafts_persist";
+    static final String WAR_PORT_LOCK = "war_port_lock";
     static final String LEVELS = "federation_levels";
     static final String VILLAGER_PARTIES = "villager_parties";
     static final String PARTY_FOUNDERS = "villager_party_founders";
+    static final String COST_MUNICIPALITY = "founding_cost_municipality";
+    static final String COST_COMPANY = "founding_cost_company";
+    static final String COST_LEVELS = "founding_cost_levels";
+    static final String COST_LEVEL_DEFAULT = "founding_cost_level_default";
+    static final String REQUIRE_PREVIOUS = "founding_require_previous_level";
     static final String WEB_ENABLED = "web_enabled";
     static final String WEB_BIND = "web_bind";
     static final String WEB_PORT = "web_port";
@@ -51,8 +58,9 @@ public final class ServerConfig {
     static final String PRICE_LEVEL_DAMPING = "price_level_damping";
     private static final java.util.List<String> KEYS = java.util.List.of(LIVE_COUNT, LIVE_COUNT_SECONDS, PROJECTIONS,
             DEBATE_MINUTES, ANTHEM_ON_ENTER, WORLD_MAP, MAP_RADIUS, WEB_TRUST_PROXY, VILLAGER_POLITICS,
-            AMBITIONS,
-            PRICE_LEVEL_MIN, PRICE_LEVEL_MAX, PRICE_LEVEL_DAMPING);
+            AMBITIONS, LAW_DRAFTS, WAR_PORT_LOCK,
+            PRICE_LEVEL_MIN, PRICE_LEVEL_MAX, PRICE_LEVEL_DAMPING, COST_MUNICIPALITY, COST_COMPANY, COST_LEVELS,
+            COST_LEVEL_DEFAULT, REQUIRE_PREVIOUS);
 
     private static final String HEADER = """
             Eddies Civ Mod
@@ -66,10 +74,18 @@ public final class ServerConfig {
               Buenden beitreten/gruenden und Firmen gruenden duerfen (true/false)
             villager_ambitions: ob ehrgeizige Dorfbewohner Firmen, Parteien und Buende gruenden, kandidieren, Gebiet
               beanspruchen, Firmen uebernehmen und fuehren (true/false)
+            law_drafts_persist: Gesetzesvorlagen des Web-Editors dauerhaft speichern (true/false, Standard false:
+              sie gehen sonst beim Neustart verloren)
+            war_port_lock: wer sich im Krieg nicht mehr zu den Heimat-Haefen einer kriegfuehrenden Polity porten darf:
+              all-outsiders (alle Nicht-Buerger, Standard), enemies (nur Buerger der Kriegsgegner) oder none (keine Sperre)
             federation_levels: eigene Ebenen fuer Buende als id:Name:Rang, z. B. kreis:Kreis:10,bund:Bund:40
               (eingebaut: gemeinde 0, land 20, nation 30; ein Bund steht immer hoeher als seine Glieder)
             villager_parties: ob Dorfbewohner Parteien beitreten und gruenden (true/false)
             villager_party_founders: wie viele parteilose Gleichgesinnte einer Gemeinde eine Partei gruenden (ab 2)
+            founding_cost_municipality, founding_cost_company: Gruendungskosten in Smaragden (0 = kostenlos)
+            founding_cost_levels: Gruendungskosten je Bundebene als id:Smaragde, z. B. land:200,nation:1000
+            founding_cost_level_default: Kosten einer Ebene, die in founding_cost_levels fehlt
+            founding_require_previous_level: Bund nur aus der Ebene direkt darunter (Land aus Gemeinde, Nation aus Land)
             web_enabled, web_bind, web_port: eingebettete Webseite; web_public_url: Adresse fuer Spieler (optional)
             web_bind=127.0.0.1 macht die Webseite nur auf diesem Rechner erreichbar (fuer einen Reverse-Proxy mit HTTPS)
             web_trust_proxy: true nur hinter einem Reverse-Proxy (nginx, Caddy): dann gelten X-Forwarded-For/-Proto
@@ -140,7 +156,44 @@ public final class ServerConfig {
                                 Boolean.toString(defaults.parties().villagers())).strip()),
                         (int) number(properties, PARTY_FOUNDERS, defaults.parties().founders(), 2)),
                 show(properties, defaults.show()), economy(properties, defaults.economy()),
-                flag(properties, AMBITIONS, defaults.ambitions()));
+                flag(properties, AMBITIONS, defaults.ambitions()),
+                ServerSettings.WarPortLock.parse(properties.getProperty(WAR_PORT_LOCK,
+                        defaults.warPortLock().key()), defaults.warPortLock()),
+                founding(properties, defaults.founding()), flag(properties, LAW_DRAFTS, defaults.persistLawDrafts()));
+    }
+
+    private static de.etiennebader.civ.server.founding.FoundingFees founding(Properties properties,
+            de.etiennebader.civ.server.founding.FoundingFees defaults) {
+        java.util.Map<String, Long> byLevel = new java.util.LinkedHashMap<>();
+        String spec = properties.getProperty(COST_LEVELS, levelCosts(defaults));
+        for (String entry : spec.split(",")) {
+            String[] parts = entry.strip().split(":");
+            if (parts.length == 2) {
+                try {
+                    long emeralds = Long.parseLong(parts[1].strip());
+                    if (emeralds >= 0) {
+                        byLevel.put(parts[0].strip().toLowerCase(java.util.Locale.ROOT),
+                                MoneyFormat.emeralds(emeralds));
+                    }
+                } catch (NumberFormatException e) {
+                    // fehlerhafter Eintrag: überspringen
+                }
+            }
+        }
+        return new de.etiennebader.civ.server.founding.FoundingFees(
+                MoneyFormat.emeralds(number(properties, COST_MUNICIPALITY,
+                        defaults.municipality() / MoneyFormat.UNITS_PER_EMERALD, 0)),
+                MoneyFormat.emeralds(number(properties, COST_COMPANY,
+                        defaults.company() / MoneyFormat.UNITS_PER_EMERALD, 0)),
+                byLevel,
+                MoneyFormat.emeralds(number(properties, COST_LEVEL_DEFAULT,
+                        defaults.federationDefault() / MoneyFormat.UNITS_PER_EMERALD, 0)),
+                flag(properties, REQUIRE_PREVIOUS, defaults.requirePreviousLevel()));
+    }
+
+    private static String levelCosts(de.etiennebader.civ.server.founding.FoundingFees fees) {
+        return String.join(",", fees.federationByLevel().entrySet().stream().sorted(java.util.Map.Entry.comparingByKey())
+                .map(entry -> entry.getKey() + ":" + entry.getValue() / MoneyFormat.UNITS_PER_EMERALD).toList());
     }
 
     private static ServerSettings.EconomySettings economy(Properties properties, ServerSettings.EconomySettings defaults) {
@@ -187,9 +240,18 @@ public final class ServerConfig {
         properties.setProperty(EMIGRATION, Boolean.toString(settings.emigration()));
         properties.setProperty(VILLAGER_POLITICS, Boolean.toString(settings.villagerPolitics()));
         properties.setProperty(AMBITIONS, Boolean.toString(settings.ambitions()));
+        properties.setProperty(LAW_DRAFTS, Boolean.toString(settings.persistLawDrafts()));
+        properties.setProperty(WAR_PORT_LOCK, settings.warPortLock().key());
         properties.setProperty(LEVELS, settings.levels().spec());
         properties.setProperty(VILLAGER_PARTIES, Boolean.toString(settings.parties().villagers()));
         properties.setProperty(PARTY_FOUNDERS, Integer.toString(settings.parties().founders()));
+        properties.setProperty(COST_MUNICIPALITY, Long.toString(
+                settings.founding().municipality() / MoneyFormat.UNITS_PER_EMERALD));
+        properties.setProperty(COST_COMPANY, Long.toString(settings.founding().company() / MoneyFormat.UNITS_PER_EMERALD));
+        properties.setProperty(COST_LEVELS, levelCosts(settings.founding()));
+        properties.setProperty(COST_LEVEL_DEFAULT, Long.toString(
+                settings.founding().federationDefault() / MoneyFormat.UNITS_PER_EMERALD));
+        properties.setProperty(REQUIRE_PREVIOUS, Boolean.toString(settings.founding().requirePreviousLevel()));
         properties.setProperty(WEB_ENABLED, Boolean.toString(settings.web().enabled()));
         properties.setProperty(WEB_BIND, settings.web().bind());
         properties.setProperty(WEB_PORT, Integer.toString(settings.web().port()));

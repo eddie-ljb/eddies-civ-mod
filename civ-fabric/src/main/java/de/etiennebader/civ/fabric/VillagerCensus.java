@@ -2,6 +2,7 @@ package de.etiennebader.civ.fabric;
 
 import de.etiennebader.civ.application.population.Satisfaction;
 import de.etiennebader.civ.domain.actor.PersonRef;
+import de.etiennebader.civ.domain.family.FamilyRegistry;
 import de.etiennebader.civ.domain.shared.PersonId;
 import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.server.CivServer;
@@ -16,10 +17,12 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.npc.villager.Villager;
 import net.minecraft.world.level.levelgen.Heightmap;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -71,8 +74,13 @@ final class VillagerCensus {
             return;
         }
         ticks = 0;
+        List<FamilyRegistry.Child> births = civ.family().pendingBirths();
         for (ServerLevel level : server.getAllLevels()) {
-            for (Villager villager : level.getEntities(EntityTypes.VILLAGER, villager -> villager.isAlive())) {
+            List<Villager> loaded = new java.util.ArrayList<>(level.getEntities(EntityTypes.VILLAGER, villager -> villager.isAlive()));
+            if (!births.isEmpty()) {
+                deliver(civ, level, loaded, births);
+            }
+            for (Villager villager : loaded) {
                 Optional<VillagerService.PendingDeparture> departure = civ.villagers().hasDepartures()
                         ? civ.villagers().takeDeparture(ref(villager))
                         : Optional.empty();
@@ -82,6 +90,38 @@ final class VillagerCensus {
                 }
                 seen(civ, villager);
                 showMood(civ, level, villager);
+            }
+        }
+    }
+
+    /**
+     * Bringt Kinder auf die Welt: ein Baby-Dorfbewohner mit der Kennung des Kindes erscheint neben einem Elternteil,
+     * dessen Chunk geladen ist. Ist beides unauffindbar, bleibt die Geburt für später vorgemerkt. Das Baby wächst wie
+     * jedes Dorfbewohner-Kind heran und wird danach als Einwohner gemeldet ({@link #seen}).
+     */
+    private void deliver(CivServer civ, ServerLevel level, List<Villager> loaded, List<FamilyRegistry.Child> births) {
+        for (FamilyRegistry.Child child : births) {
+            if (loaded.stream().anyMatch(villager -> villager.getUUID().equals(child.id().value()))) {
+                civ.family().born(child.id());
+                continue;
+            }
+            Optional<Villager> parent = loaded.stream().filter(villager -> !villager.isBaby()
+                    && (villager.getUUID().equals(child.parent1().uuid())
+                    || villager.getUUID().equals(child.parent2().uuid()))).findFirst();
+            if (parent.isEmpty()) {
+                continue;
+            }
+            Villager baby = EntityTypes.VILLAGER.create(level, EntitySpawnReason.BREEDING);
+            if (baby == null) {
+                continue;
+            }
+            baby.setUUID(child.id().value());
+            baby.setBaby(true);
+            baby.snapTo(parent.get().getX(), parent.get().getY(), parent.get().getZ(), 0.0F, 0.0F);
+            if (level.addFreshEntity(baby)) {
+                civ.family().born(child.id());
+                level.sendParticles(ParticleTypes.HEART, baby.getX(), baby.getY() + 1.2, baby.getZ(), 6, 0.3, 0.3, 0.3,
+                        0.0);
             }
         }
     }

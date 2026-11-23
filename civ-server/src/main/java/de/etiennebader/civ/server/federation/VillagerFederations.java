@@ -12,6 +12,8 @@ import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.DomainException;
 import de.etiennebader.civ.domain.shared.PolityId;
+import de.etiennebader.civ.domain.actor.PolityRef;
+import de.etiennebader.civ.server.founding.FoundingFees;
 import de.etiennebader.civ.server.Announcement;
 import de.etiennebader.civ.server.Announcements;
 import de.etiennebader.civ.server.command.Message;
@@ -96,11 +98,20 @@ public final class VillagerFederations {
         String label = next.get().builtIn()
                 ? next.get().id().substring(0, 1).toUpperCase() + next.get().id().substring(1) : next.get().name();
         String name = label + " " + polity.name().value();
+        long cost = federations.foundingCost(next.get());
+        PolityRef payer = new PolityRef(polity.id());
+        FoundingFees.Billing billing = federations.billing();
+        if (billing.shortfallBalance(payer, cost) != null) {
+            return false; // die Gemeindekasse kann die Gründungsgebühr nicht tragen
+        }
         try {
             PolityName federationName = PolityName.of(name.length() > PolityName.MAX_LENGTH
                     ? name.substring(0, PolityName.MAX_LENGTH) : name);
-            app.foundFederation().execute(new FoundFederation.Command(federationName, next.get().id(), polity.id(),
-                    head, day));
+            billing.chargeAfter(payer, cost, day, () -> {
+                app.foundFederation().execute(new FoundFederation.Command(federationName, next.get().id(),
+                        polity.id(), head, day));
+                return null;
+            });
             announcements.add(Announcement.toAll(Message.of(MessageKey.FEDERATION_ANNOUNCED, "Ein Dorfbewohner",
                     next.get().displayName(), federationName.value(), polity.name().value())));
             return true;

@@ -10,6 +10,9 @@ import de.etiennebader.civ.domain.civic.Constituency;
 import de.etiennebader.civ.domain.civic.ConstituencyId;
 import de.etiennebader.civ.domain.civic.CustomImage;
 import de.etiennebader.civ.domain.civic.Flag;
+import de.etiennebader.civ.domain.civic.HomePort;
+import de.etiennebader.civ.domain.civic.PortAccess;
+import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.domain.civic.ImageKind;
 import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.Polity;
@@ -95,6 +98,48 @@ public final class CivicUseCases {
         CivicRegistry registry = aggregates.civic();
         registry.setFlag(polity, flag, day);
         aggregates.commit(registry);
+    }
+
+    /** Wer sich zu den Heimat-Häfen der Polity porten darf. Nur die Spitze der Polity. */
+    public void setPortAccess(ActorRef head, PolityId polity, PortAccess access, Day day) {
+        requireHead(head, aggregates.polity(polity));
+        CivicRegistry registry = aggregates.civic();
+        registry.setPortSettings(polity, registry.portSettingsOf(polity).withAccess(access), day);
+        aggregates.commit(registry);
+    }
+
+    /** Preis je Teleport zu den Heimat-Häfen der Polity. Nur die Spitze der Polity. */
+    public void setPortFee(ActorRef head, PolityId polity, long fee, Day day) {
+        requireHead(head, aggregates.polity(polity));
+        CivicRegistry registry = aggregates.civic();
+        registry.setPortSettings(polity, registry.portSettingsOf(polity).withFee(fee), day);
+        aggregates.commit(registry);
+    }
+
+    /** Setzt oder verlegt einen zusätzlichen Hafen (Slot 2 oder 3). Nur die Spitze der Polity. */
+    public HomePort setPort(ActorRef head, PolityId polity, int slot, BlockPosition position, Day day) {
+        requireHead(head, aggregates.polity(polity));
+        CivicRegistry registry = aggregates.civic();
+        HomePort port = registry.setPort(polity, slot, position, day);
+        aggregates.commit(registry);
+        return port;
+    }
+
+    /** Entfernt einen zusätzlichen Hafen. Nur die Spitze der Polity. */
+    public boolean removePort(ActorRef head, PolityId polity, int slot, Day day) {
+        requireHead(head, aggregates.polity(polity));
+        CivicRegistry registry = aggregates.civic();
+        boolean removed = registry.removePort(polity, slot, day).isPresent();
+        aggregates.commit(registry);
+        return removed;
+    }
+
+    /** Räumt einen Hafen ab, der nicht mehr auf dem Gebiet der Polity liegt (kein Rechtecheck, vom Server veranlasst). */
+    public void dropPort(PolityId polity, int slot, Day day) {
+        CivicRegistry registry = aggregates.civic();
+        if (registry.removePort(polity, slot, day).isPresent()) {
+            aggregates.commit(registry);
+        }
     }
 
     public void setAnthem(ActorRef head, PolityId polity, Optional<Anthem> anthem, Day day) {

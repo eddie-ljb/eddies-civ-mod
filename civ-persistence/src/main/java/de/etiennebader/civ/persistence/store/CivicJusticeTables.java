@@ -9,6 +9,10 @@ import de.etiennebader.civ.domain.civic.Constituency;
 import de.etiennebader.civ.domain.civic.ConstituencyId;
 import de.etiennebader.civ.domain.civic.CustomImage;
 import de.etiennebader.civ.domain.civic.Flag;
+import de.etiennebader.civ.domain.civic.HomePort;
+import de.etiennebader.civ.domain.civic.PortAccess;
+import de.etiennebader.civ.domain.civic.PortSettings;
+import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.domain.civic.ImageKind;
 import de.etiennebader.civ.domain.justice.CaseId;
 import de.etiennebader.civ.domain.justice.CaseKind;
@@ -47,7 +51,7 @@ final class CivicJusticeTables {
 
     void writeCivic(Connection connection, CivicView civic) throws SQLException {
         clear(connection, "constituency", "constituency_area", "constituency_town", "polity_flag", "polity_anthem",
-                "polity_image");
+                "polity_image", "polity_port_settings", "polity_port");
         try (PreparedStatement insert = connection.prepareStatement(
                 "INSERT INTO constituency (id, position, polity_id, name) VALUES (?, ?, ?, ?)");
              PreparedStatement area = connection.prepareStatement("""
@@ -121,6 +125,29 @@ final class CivicJusticeTables {
             }
             insert.executeBatch();
         }
+        try (PreparedStatement insert = connection.prepareStatement(
+                "INSERT INTO polity_port_settings (polity_id, access, fee) VALUES (?, ?, ?)")) {
+            for (Map.Entry<PolityId, PortSettings> entry : civic.portSettings().entrySet()) {
+                insert.setString(1, entry.getKey().value().toString());
+                insert.setString(2, entry.getValue().access().name());
+                insert.setLong(3, entry.getValue().fee());
+                insert.addBatch();
+            }
+            insert.executeBatch();
+        }
+        try (PreparedStatement insert = connection.prepareStatement(
+                "INSERT INTO polity_port (polity_id, slot, dimension, x, y, z) VALUES (?, ?, ?, ?, ?, ?)")) {
+            for (HomePort port : civic.ports()) {
+                insert.setString(1, port.polity().value().toString());
+                insert.setInt(2, port.slot());
+                insert.setString(3, port.position().dimension().value());
+                insert.setInt(4, port.position().x());
+                insert.setInt(5, port.position().y());
+                insert.setInt(6, port.position().z());
+                insert.addBatch();
+            }
+            insert.executeBatch();
+        }
     }
 
     CivicRegistry loadCivic(Connection connection) throws SQLException {
@@ -184,7 +211,24 @@ final class CivicJusticeTables {
                         rows.getInt("height"), Day.of(rows.getLong("uploaded"))));
             }
         }
-        return CivicRegistry.restore(constituencies, flags, anthems, images);
+        Map<PolityId, PortSettings> portSettings = new LinkedHashMap<>();
+        try (PreparedStatement select = connection.prepareStatement("SELECT * FROM polity_port_settings");
+             ResultSet rows = select.executeQuery()) {
+            while (rows.next()) {
+                portSettings.put(polity(rows.getString("polity_id")), new PortSettings(
+                        PortAccess.valueOf(rows.getString("access")), rows.getLong("fee")));
+            }
+        }
+        List<HomePort> ports = new ArrayList<>();
+        try (PreparedStatement select = connection.prepareStatement("SELECT * FROM polity_port ORDER BY polity_id, slot");
+             ResultSet rows = select.executeQuery()) {
+            while (rows.next()) {
+                ports.add(new HomePort(polity(rows.getString("polity_id")), rows.getInt("slot"),
+                        new BlockPosition(new DimensionId(rows.getString("dimension")), rows.getInt("x"),
+                                rows.getInt("y"), rows.getInt("z"))));
+            }
+        }
+        return CivicRegistry.restore(constituencies, flags, anthems, images, portSettings, ports);
     }
 
     void writeJustice(Connection connection, JudiciaryView justice) throws SQLException {
