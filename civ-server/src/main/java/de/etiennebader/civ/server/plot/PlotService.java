@@ -283,7 +283,7 @@ public final class PlotService {
 
     /** Die Namen der Grundstücksarten für Befehle, z. B. {@code wohnen}. */
     public static List<String> typeNames() {
-        return List.of("wohnen", "gewerbe", "industrie", "landwirtschaft", "oeffentlich", "botschaft", "bildung");
+        return List.of("wohnen", "gewerbe", "industrie", "landwirtschaft", "oeffentlich", "botschaft", "bildung", "gotteshaus");
     }
 
     static Optional<PlotType> parseType(String input) {
@@ -296,6 +296,7 @@ public final class PlotService {
             case "oeffentlich", "öffentlich", "public" -> PlotType.PUBLIC;
             case "botschaft", "embassy" -> PlotType.EMBASSY;
             case "bildung", "education" -> PlotType.EDUCATION;
+            case "gotteshaus", "religious" -> PlotType.RELIGIOUS;
             default -> null;
         });
     }

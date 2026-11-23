@@ -11,9 +11,9 @@ Dorfbewohner: `Personality.religiosity()` (>0 gläubig, <0 atheistisch). Gläubi
 15 % der größten Religion an, Atheisten nie. Beim Auszählen einer Klerus-Wahl stimmen Dorfbewohner-Mitglieder zufällig
 mit; ein vakantes Amt wird alle 7 Tage neu ausgeschrieben. Auskunft beim Anschauen zeigt Glaube und Gläubigkeit.
 
-Wirkungen: Beten (1x/Tag/Spieler, +1) und Gottesdienste (+3) erhöhen die **Inbrunst** der Religion (max. 6, sinkt täglich
+Wirkungen: Beten (1x/Tag/Spieler, +1, in einem Gotteshaus-Grundstück `gotteshaus` +2) und Gottesdienste (+3) erhöhen die **Inbrunst** der Religion (max. 6, sinkt täglich
 um 1). Gläubige Mitglieder erhalten Zufriedenheitspunkte `1 + Inbrunst/2 + Macht/50`; Atheisten spüren -1, wenn ein
 Klerus mit Macht >= 70 und Mitgliedern existiert. Die Zufriedenheit fließt in Amtsbonus und Wahlverhalten ein.
 Logo: `/civ religion logo <Symbol>`; GUI: `/civ religion menue`. Alle Meldungen de/en (Fehlertexte aus der Domäne bleiben deutsch).
 
-Nicht umgesetzt: eigenes Aussehen (Blöcke/Texturen) von Schrift und Gotteshaus.
+Gotteshaus ist eine neue Grundstücksart (`PlotType.RELIGIOUS`, Befehlstyp `gotteshaus`). Nicht umgesetzt: eigene Blöcke/Texturen für Schrift und Gotteshaus.

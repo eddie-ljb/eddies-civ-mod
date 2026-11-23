@@ -256,7 +256,11 @@ public final class ReligionService {
         if (!prayedToday.add(caller.player())) {
             return no(MessageKey.RELIGION_PRAYED_ALREADY);
         }
-        fervor.merge(r.id(), 1, (a, b) -> Math.min(MAX_FERVOR, a + b));
+        boolean inHouse = queries.territory().sovereignOf(caller.chunk())
+                .flatMap(id -> queries.land(id).plotAt(caller.position().dimension(), caller.position().x(),
+                        caller.position().z()))
+                .filter(plot -> plot.type() == de.etiennebader.civ.domain.land.PlotType.RELIGIOUS).isPresent();
+        fervor.merge(r.id(), inHouse ? 2 : 1, (a, b) -> Math.min(MAX_FERVOR, a + b));
         save();
         return ok(MessageKey.RELIGION_PRAYED, r.templeName(), r.scriptureName(), memberCount(r));
     }

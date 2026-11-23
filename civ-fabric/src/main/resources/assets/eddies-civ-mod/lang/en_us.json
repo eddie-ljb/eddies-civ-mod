@@ -235,6 +235,7 @@
   "eddies-civ-mod.plot_type.agricultural": "Farmland",
   "eddies-civ-mod.plot_type.public": "Public plot",
   "eddies-civ-mod.plot_type.education": "School",
+  "eddies-civ-mod.plot_type.religious": "House of worship",
   "eddies-civ-mod.plot_type.embassy": "Embassy",
   "eddies-civ-mod.command.help_plots": "Plots: /civ grundstueck – ecke1, ecke2, erstellen <type>, chunk <type>, anbieten <price>, kaufen, vergeben <player>",
   "eddies-civ-mod.command.plot_corner_set": "Corner %1$s set: %2$s, %3$s",

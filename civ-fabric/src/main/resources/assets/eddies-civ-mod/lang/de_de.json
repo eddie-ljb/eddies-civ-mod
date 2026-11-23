@@ -235,6 +235,7 @@
   "eddies-civ-mod.plot_type.agricultural": "Ackerland",
   "eddies-civ-mod.plot_type.public": "Öffentliches Grundstück",
   "eddies-civ-mod.plot_type.education": "Schule",
+  "eddies-civ-mod.plot_type.religious": "Gotteshaus",
   "eddies-civ-mod.plot_type.embassy": "Botschaft",
   "eddies-civ-mod.command.help_plots": "Grundstücke: /civ grundstueck – ecke1, ecke2, erstellen <Art>, chunk <Art>, anbieten <Preis>, kaufen, vergeben <Spieler>",
   "eddies-civ-mod.command.plot_corner_set": "Ecke %1$s gesetzt: %2$s, %3$s",
