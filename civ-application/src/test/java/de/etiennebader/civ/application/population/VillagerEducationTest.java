@@ -40,4 +40,14 @@ class VillagerEducationTest {
     void unknownVillagerIsNeutral() {
         assertEquals(VillagerEducationLedger.NEUTRAL_BONUS, new VillagerEducationLedger().bonusOf(villager));
     }
+
+    @Test
+    void snapshotRestoreKeepsValues() {
+        VillagerEducationLedger ledger = new VillagerEducationLedger();
+        ledger.recordChildDay(villager, true);
+        ledger.grownUp(villager);
+        VillagerEducationLedger copy = new VillagerEducationLedger();
+        copy.restore(ledger.snapshot());
+        assertEquals(ledger.of(villager), copy.of(villager));
+    }
 }

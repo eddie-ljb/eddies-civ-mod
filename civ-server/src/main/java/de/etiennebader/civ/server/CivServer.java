@@ -104,6 +104,7 @@ public final class CivServer {
     private final de.etiennebader.civ.server.construction.ConstructionService construction;
     private final de.etiennebader.civ.server.war.WarService war;
     private final VillagerService villagers;
+    private final de.etiennebader.civ.server.villager.EducationStore educationStore;
     private final VillagerFederations villagerFederations;
     private final de.etiennebader.civ.server.villager.VillagerFoundations villagerFoundations;
     private final de.etiennebader.civ.server.conjuncture.ConjunctureService conjuncture;
@@ -178,6 +179,9 @@ public final class CivServer {
         this.villagerFederations = new VillagerFederations(app, federations, announcements);
         this.conjuncture = new de.etiennebader.civ.server.conjuncture.ConjunctureService(app.queries());
         this.villagers = new VillagerService(app, settings, texts, announcements, conjuncture, calendar);
+        this.educationStore = new de.etiennebader.civ.server.villager.EducationStore(
+                dataDirectory.map(dir -> dir.resolve("education.tsv")));
+        educationStore.load(app.villagerEducation());
         this.villagerFoundations = new de.etiennebader.civ.server.villager.VillagerFoundations(app, villagers::lastSeen,
                 announcements);
         this.townHalls = new TownHallService(app, calendar, texts, announcements);
@@ -257,6 +261,7 @@ public final class CivServer {
         offices.endOfDay(day);
         parties.endOfDay(day);
         villagers.endOfDay(day);
+        educationStore.save(app.villagerEducation());
         if (settings.ambitions()) {
             villagerFoundations.endOfDay(day);
             villagerFederations.endOfDay(day);

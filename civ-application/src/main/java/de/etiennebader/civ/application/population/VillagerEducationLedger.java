@@ -24,6 +24,17 @@ public final class VillagerEducationLedger {
         return state.computeIfAbsent(villager, VillagerEducation::initial);
     }
 
+    /** Kopie des gesamten Stands zum Speichern. */
+    public Map<PersonRef, VillagerEducation> snapshot() {
+        return new java.util.LinkedHashMap<>(state);
+    }
+
+    /** Stellt einen gespeicherten Stand wieder her. */
+    public void restore(Map<PersonRef, VillagerEducation> stored) {
+        state.clear();
+        state.putAll(stored);
+    }
+
     /** Der verfolgte Bildungsstand, falls vorhanden; legt keinen neuen an. */
     public java.util.Optional<VillagerEducation> find(PersonRef villager) {
         return java.util.Optional.ofNullable(state.get(villager));
