@@ -1,4 +1,4 @@
-package de.etiennebader.civ.client.mixin;
+package de.etiennebader.civ.client;
 
 import java.util.UUID;
 
