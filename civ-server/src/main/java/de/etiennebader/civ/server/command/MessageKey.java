@@ -737,6 +737,12 @@ public enum MessageKey {
     VILLAGER_CRIME_SUSPECTED,
     VILLAGER_LOYALTY,
     VILLAGER_PARTY_LOYALTY,
+    RELIGION_DONE,
+    RELIGION_ERROR,
+    RELIGION_LIST_ENTRY,
+    RELIGION_INFO,
+    RELIGION_INFO_CLERGY,
+    RELIGION_VILLAGER,
     HELP_CIVIL,
     // Ankündigungen und Fehler ohne Domänenbezug
     NEW_DAY,

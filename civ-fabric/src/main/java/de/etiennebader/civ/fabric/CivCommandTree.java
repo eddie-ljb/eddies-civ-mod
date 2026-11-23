@@ -260,6 +260,7 @@ public final class CivCommandTree {
                 .then(constructionCommands())
                 .then(warCommands())
                 .then(familyCommands())
+                .then(religionCommands())
                 .then(Commands.literal("laden")
                         .then(Commands.literal("eroeffnen")
                                 .then(Commands.argument(PRICE, StringArgumentType.word())
@@ -1451,6 +1452,60 @@ public final class CivCommandTree {
                         .executes(context -> withCiv(context, (civ, player) -> civ.war().campaign(
                                 Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER), kind,
                                 IntegerArgumentType.getInteger(context, COUNT)))));
+    }
+
+    /** {@code /civ religion}: Religionen gründen, beitreten, beten, Gottesdienste, Klerus-Wahlen und Riten (Issue #13). */
+    private LiteralArgumentBuilder<CommandSourceStack> religionCommands() {
+        return Commands.literal("religion")
+                .then(Commands.literal("liste")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.religion().list())))
+                .then(Commands.literal("info").then(Commands.argument(NAME, StringArgumentType.string())
+                        .executes(context -> withCiv(context, (civ, player) -> civ.religion().info(
+                                StringArgumentType.getString(context, NAME))))))
+                .then(Commands.literal("gruenden").then(Commands.argument(NAME, StringArgumentType.string())
+                        .then(Commands.argument("glaube", StringArgumentType.word())
+                        .then(Commands.argument("schrift", StringArgumentType.string())
+                        .then(Commands.argument("gotteshaus", StringArgumentType.string())
+                        .then(Commands.argument("sprache", StringArgumentType.string())
+                        .executes(context -> withCiv(context, (civ, player) -> civ.religion().found(
+                                Players.caller(player), StringArgumentType.getString(context, NAME),
+                                !StringArgumentType.getString(context, "glaube").startsWith("poly"),
+                                StringArgumentType.getString(context, "schrift"),
+                                StringArgumentType.getString(context, "gotteshaus"),
+                                StringArgumentType.getString(context, "sprache"),
+                                civ.calendar().today())))))))))
+                .then(Commands.literal("beitreten").then(Commands.argument(NAME, StringArgumentType.string())
+                        .executes(context -> withCiv(context, (civ, player) -> civ.religion().join(
+                                Players.caller(player), StringArgumentType.getString(context, NAME))))))
+                .then(Commands.literal("austreten")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.religion().leave(Players.caller(player)))))
+                .then(Commands.literal("konfession").then(Commands.argument(NAME, StringArgumentType.string())
+                        .executes(context -> withCiv(context, (civ, player) -> civ.religion().denomination(
+                                Players.caller(player), StringArgumentType.getString(context, NAME),
+                                civ.calendar().today())))))
+                .then(Commands.literal("macht").then(Commands.argument(COUNT, IntegerArgumentType.integer(0, 100))
+                        .executes(context -> withCiv(context, (civ, player) -> civ.religion().power(
+                                Players.caller(player), IntegerArgumentType.getInteger(context, COUNT),
+                                civ.calendar().today())))))
+                .then(Commands.literal("beten")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.religion().pray(Players.caller(player)))))
+                .then(Commands.literal("gottesdienst")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.religion().service(Players.caller(player)))))
+                .then(Commands.literal("taufe").then(Commands.argument(PLAYER, StringArgumentType.word())
+                        .executes(context -> withCiv(context, (civ, player) -> civ.religion().rite(Players.caller(player),
+                                "taufe", StringArgumentType.getString(context, PLAYER), civ.calendar().today())))))
+                .then(Commands.literal("segnen").then(Commands.argument(PLAYER, StringArgumentType.word())
+                        .executes(context -> withCiv(context, (civ, player) -> civ.religion().rite(Players.caller(player),
+                                "segnung", StringArgumentType.getString(context, PLAYER), civ.calendar().today())))))
+                .then(Commands.literal("wahl")
+                        .then(Commands.literal("ausrufen").executes(context -> withCiv(context, (civ, player) ->
+                                civ.religion().callElection(Players.caller(player), civ.calendar().today()))))
+                        .then(Commands.literal("kandidieren").executes(context -> withCiv(context, (civ, player) ->
+                                civ.religion().candidate(Players.caller(player), civ.calendar().today()))))
+                        .then(Commands.literal("waehlen").then(Commands.argument(PLAYER, StringArgumentType.word())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.religion().vote(
+                                        Players.caller(player), StringArgumentType.getString(context, PLAYER),
+                                        civ.calendar().today()))))));
     }
 
     /** {@code /civ familie}: Ehepaare und Kinder der eigenen Gemeinde (Issue #27). */
