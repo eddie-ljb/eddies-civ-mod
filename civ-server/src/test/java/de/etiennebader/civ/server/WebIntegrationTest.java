@@ -104,6 +104,19 @@ class WebIntegrationTest {
             assertTrue(request(base + "/api/me", null, cookie).body().contains("\"balance\":\"7,50\""));
             assertEquals(422, request(base + "/api/transfer", "{\"to\":\"Niemand\",\"amount\":\"1\"}", cookie).status());
             assertEquals(404, request(base + "/api/unbekannt", null, null).status());
+
+            Response religions = request(base + "/api/religions", null, null);
+            assertEquals(200, religions.status());
+            assertTrue(religions.body().contains("\"religions\":[]") && religions.body().contains("\"census\":{"),
+                    religions.body());
+            assertEquals(401, request(base + "/api/religions", "{\"action\":\"leave\"}", null).status());
+            Response founded = request(base + "/api/religions", "{\"action\":\"found\",\"name\":\"Lichtbund\","
+                    + "\"monotheistic\":\"true\",\"scripture\":\"Das Licht\",\"temple\":\"Dom\",\"language\":\"Deutsch\"}",
+                    cookie);
+            assertEquals(200, founded.status(), founded.body());
+            Response after = request(base + "/api/religions", null, cookie);
+            assertTrue(after.body().contains("\"name\":\"Lichtbund\"") && after.body().contains("\"mine\":true"),
+                    after.body());
         } finally {
             running.set(false);
             gameThread.join();

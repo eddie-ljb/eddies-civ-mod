@@ -170,10 +170,19 @@ class ConstructionServiceTest {
     }
 
     @Test
-    @DisplayName("Eingebaute Pläne: drei Stile mit Hütte, Haus und Mehrfamilienhaus")
+    @DisplayName("Eingebaute Pläne: drei Stile mit Wohn-, Gewerbe-, Industrie-, Land- und kommunalen Bauten")
     void builtIns() {
         List<Blueprint> plans = BuiltInBlueprints.all();
-        assertEquals(9, plans.size());
+        assertEquals(57, plans.size());
+        for (var type : de.etiennebader.civ.domain.land.PlotType.values()) {
+            if (type != de.etiennebader.civ.domain.land.PlotType.EMBASSY) {
+                assertTrue(plans.stream().anyMatch(plan -> BuiltInBlueprints.plotTypesOf(plan).contains(type)),
+                        "Plan für " + type);
+            }
+        }
+        assertTrue(plans.stream().allMatch(plan -> plan.sizeX() <= 14 || plan.name().contains("lagerhalle")
+                || plan.name().contains("rathaus") || plan.name().contains("schule")
+                || plan.name().contains("marktplatz")));
         assertTrue(plans.stream().anyMatch(plan -> plan.units() > 1));
         assertTrue(plans.stream().allMatch(plan -> plan.blockCount() > 0 && plan.sizeX() <= Blueprint.MAX_SIZE));
     }
@@ -233,5 +242,18 @@ class ConstructionServiceTest {
             out.writeByte(0);
         }
         return raw.toByteArray();
+    }
+
+    @Test
+    @DisplayName("Ein Baufeld, das tagelang blockiert bleibt, beendet den Auftrag")
+    void blockedSiteIsAbandoned() {
+        setUp();
+        assertTrue(server.construction().order(aliceAt, "holz-huette", "Bau AG").success());
+        Flat blocked = new Flat(true, false, 70);
+        long perDay = de.etiennebader.civ.server.CivServerFixture.SETTINGS.ticksPerDay();
+        for (int i = 0; i < 5; i++) {
+            server.construction().advance(perDay, blocked);
+        }
+        assertEquals(ConstructionProject.Status.CANCELLED, server.construction().projects().getFirst().status());
     }
 }

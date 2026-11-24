@@ -639,6 +639,16 @@ public final class VillagerService {
         return !departures.isEmpty();
     }
 
+    /**
+     * Ein Dorfbewohner soll zum Gemeindehaus einer anderen Gemeinde ziehen (z. B. als Gründer einer neuen Gemeinde).
+     * Das Spiel bringt ihn beim nächsten Rundgang dorthin; bis dahin wird er keiner anderen Gemeinde zugeschlagen.
+     */
+    public void relocate(PersonRef villager, BlockPosition destination) {
+        Objects.requireNonNull(villager, "villager");
+        Objects.requireNonNull(destination, "destination");
+        departures.put(villager, new PendingDeparture(villager, Optional.of(destination)));
+    }
+
     /** Holt einen Abgewanderten ab, damit das Spiel ihn fortbringt; danach gilt er als fort. */
     public Optional<PendingDeparture> takeDeparture(PersonRef villager) {
         return Optional.ofNullable(departures.remove(villager));

@@ -1,6 +1,7 @@
 package de.etiennebader.civ.server.religion;
 
 import de.etiennebader.civ.application.directory.PlayerDirectory;
+import de.etiennebader.civ.application.population.VillagerAmbitions;
 import de.etiennebader.civ.application.query.WorldQueries;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
@@ -149,6 +150,74 @@ public final class ReligionService {
             return ok(MessageKey.RELIGION_FOUNDED, religion.name(), kind(religion));
         } catch (IllegalArgumentException | IllegalStateException e) {
             return fail(e.getMessage());
+        }
+    }
+
+    /** Gläubigkeit, ab der ein Dorfbewohner eine eigene Religion gründet. */
+    static final int FOUNDER_FAITH = 35;
+    /** Eine Religion je so vielen Dorfbewohnern (mindestens eine) entsteht durch Dorfbewohner. */
+    static final int VILLAGERS_PER_RELIGION = 12;
+    /** Tageswahrscheinlichkeit einer Gründung bei vollem Glaubenseifer. */
+    static final double FOUNDING_CHANCE = 0.08;
+
+    /**
+     * Sehr gläubige Dorfbewohner gründen Religionen: Wer noch keiner angehört und eine Gläubigkeit ab
+     * {@value #FOUNDER_FAITH} hat, gründet mit täglicher Wahrscheinlichkeit eine, solange es weniger Religionen als ein
+     * {@value #VILLAGERS_PER_RELIGION}-tel der Dorfbewohner gibt. Höchstens eine Gründung je Tag. Der Gründer wird
+     * Klerus-Oberhaupt; Art (ein oder viele Götter), Namen und Sprache folgen seiner Persönlichkeit.
+     *
+     * @return ob heute eine Religion gegründet wurde
+     */
+    public synchronized boolean villagersFound(Day day) {
+        List<PersonRef> villagers = new ArrayList<>();
+        for (PolityView town : queries.polities()) {
+            if (town.kind() != PolityKind.TERRITORIAL) {
+                continue;
+            }
+            town.members().stream().map(Membership::member).filter(PersonRef.class::isInstance)
+                    .map(PersonRef.class::cast).forEach(villagers::add);
+        }
+        if (registry.religions().size() >= Math.max(1, villagers.size() / VILLAGERS_PER_RELIGION)
+                || registry.religions().size() >= de.etiennebader.civ.domain.religion.ReligionRegistry.MAX_RELIGIONS) {
+            return false;
+        }
+        villagers.sort(Comparator.comparing(PersonRef::uuid));
+        for (PersonRef villager : villagers) {
+            Personality personality = Personality.of(villager);
+            int faith = personality.religiosity();
+            if (faith < FOUNDER_FAITH || members.containsKey(villager)) {
+                continue;
+            }
+            double zeal = faith / (double) Personality.MAX;
+            if (VillagerAmbitions.roll(villager, day, 0x93) >= FOUNDING_CHANCE * zeal) {
+                continue;
+            }
+            if (found(villager, personality, day)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean found(PersonRef founder, Personality personality, Day day) {
+        boolean monotheistic = personality.order() + personality.tradition() >= 0;
+        String tag = Long.toHexString(founder.uuid().getLeastSignificantBits() & 0xFFFFFL).toUpperCase();
+        String stem = personality.nature() >= 30 ? "Hain" : personality.community() >= 30 ? "Gemeinschaft"
+                : personality.order() >= 30 ? "Orden" : personality.tradition() < -30 ? "Neuer Weg" : "Glaube";
+        String name = stem + (monotheistic ? " des Einen " : " der Götter ") + tag;
+        String scripture = monotheistic ? "Das Buch " + tag : "Die Sagen " + tag;
+        String temple = personality.nature() >= 30 ? "Heiliger Hain" : monotheistic ? "Kirche" : "Tempel";
+        String language = personality.tradition() >= 0 ? "Altdeutsch" : "Neudeutsch";
+        try {
+            Religion religion = registry.found(ReligionId.generate(ids), name, founder, monotheistic, scripture, temple,
+                    language, day);
+            members.put(founder, religion.id());
+            save();
+            announcements.add(Announcement.toAll(Message.of(MessageKey.VILLAGER_RELIGION_FOUNDED,
+                    nameOf(founder), religion.name())));
+            return true;
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return false;
         }
     }
 
@@ -374,6 +443,72 @@ public final class ReligionService {
 
     /** Eintrag der Religionsliste für die Oberfläche. */
     public record ReligionEntry(Religion religion, String logo, int members, Message head, boolean mine) {
+    }
+
+    /** Eine Religion für die Webseite: alles als Text und Zahl, ohne Domänentypen. */
+    public record Summary(String id, String name, String logo, boolean monotheistic, String scripture, String temple,
+                          String language, String head, int power, int members, int villagers, int fervor,
+                          List<String> denominations, String founder, long founded, boolean electionOpen,
+                          long electionCloses, List<String> candidates, boolean mine, String denomination) {
+    }
+
+    /** Wie gläubig die Dorfbewohner insgesamt sind. */
+    public record Census(int believers, int undecided, int atheists, int organised) {
+    }
+
+    /** Alle Religionen für die Webseite; {@code viewer} darf leer sein. */
+    public synchronized List<Summary> summaries(Optional<? extends ActorRef> viewer) {
+        Optional<Religion> mine = viewer.flatMap(this::religionOf);
+        List<Summary> out = new ArrayList<>();
+        for (Religion r : registry.religions()) {
+            int villagerMembers = (int) members.entrySet().stream()
+                    .filter(entry -> entry.getValue().equals(r.id()) && entry.getKey() instanceof PersonRef).count();
+            out.add(new Summary(r.id().toString(), r.name(), logos.getOrDefault(r.id(), ""), r.monotheistic(),
+                    r.scriptureName(), r.templeName(), r.language(), r.clergyHead().map(this::nameOf).orElse(""),
+                    r.clergyPower(), memberCount(r), villagerMembers, fervor.getOrDefault(r.id(), 0),
+                    r.denominations().stream().map(Denomination::name).toList(), nameOf(r.founder()),
+                    r.foundedOn().value(), r.election().isPresent(),
+                    r.election().map(e -> e.closesOn().value()).orElse(0L),
+                    r.election().map(e -> e.candidates().stream().map(this::nameOf).toList()).orElse(List.of()),
+                    mine.filter(r::equals).isPresent(),
+                    viewer.map(denominations::get).orElse("")));
+        }
+        return out;
+    }
+
+    /** Glaubensverteilung der Dorfbewohner in allen Gemeinden. */
+    public synchronized Census census() {
+        int believers = 0;
+        int undecided = 0;
+        int atheists = 0;
+        int organised = 0;
+        for (PolityView town : queries.polities()) {
+            if (town.kind() != PolityKind.TERRITORIAL) {
+                continue;
+            }
+            for (Membership membership : town.members()) {
+                if (membership.member() instanceof PersonRef villager) {
+                    int faith = Personality.of(villager).religiosity();
+                    if (faith >= JOIN_THRESHOLD) {
+                        believers++;
+                    } else if (faith <= -JOIN_THRESHOLD) {
+                        atheists++;
+                    } else {
+                        undecided++;
+                    }
+                    if (members.containsKey(villager)) {
+                        organised++;
+                    }
+                }
+            }
+        }
+        return new Census(believers, undecided, atheists, organised);
+    }
+
+    /** Die letzten Riten und Zeremonien. */
+    public synchronized List<String> recentRites(int limit) {
+        int from = Math.max(0, rites.size() - limit);
+        return List.copyOf(rites.subList(from, rites.size())).reversed();
     }
 
     public synchronized List<ReligionEntry> entries(ActorRef viewer) {

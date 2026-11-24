@@ -7,6 +7,7 @@ import de.etiennebader.civ.application.query.WorldQueries;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.actor.PlayerRef;
+import de.etiennebader.civ.domain.actor.PolityRef;
 import de.etiennebader.civ.domain.construction.Blueprint;
 import de.etiennebader.civ.domain.contract.ContractKind;
 import de.etiennebader.civ.domain.economy.TransferReason;
@@ -75,6 +76,8 @@ public final class ConstructionService {
     static final int MAX_BLOCKS_PER_CALL = 200;
     /** Tageswahrscheinlichkeit, dass ein Dorfbewohner einen Bau in Auftrag gibt. */
     static final double VILLAGER_ORDERS = 0.2;
+    /** Tageswahrscheinlichkeit, dass die Leitung einer Gemeinde, Firma, Zeitung oder Partei einen Bau in Auftrag gibt. */
+    static final double ORGANISATION_ORDERS = 0.35;
 
     /**
      * Zu setzende Blöcke einer Baustelle. Die Blöcke liegen bereits gedreht relativ zur Ecke {@code origin}; das Spiel
@@ -107,7 +110,14 @@ public final class ConstructionService {
     private final Map<UUID, ConstructionProject> projects = new java.util.LinkedHashMap<>();
     private final Map<UUID, Double> carry = new HashMap<>();
     private final Map<UUID, Long> blockedUntil = new HashMap<>();
+    private final Map<UUID, Long> blockedSince = new HashMap<>();
+    /** Grundstücke, deren Baufeld so lange blockiert war, dass der Auftrag aufgegeben wurde; bis zum Neustart. */
+    private final java.util.Set<PlotId> abandoned = new java.util.HashSet<>();
+    /** Nach so vielen Tagen blockiertem Baufeld wird ein Auftrag ohne Baubeginn aufgegeben. */
+    static final int ABANDON_DAYS = 3;
     private final de.etiennebader.civ.server.Announcements announcements;
+    private final TownPlanning planning;
+    private boolean interimGovernment = true;
     private long clock;
     private final long ticksPerDay;
     private int lastNumber;
@@ -123,6 +133,8 @@ public final class ConstructionService {
         this.texts = Objects.requireNonNull(texts, "texts");
         this.library = Objects.requireNonNull(library, "library");
         this.store = new ProjectStore(file);
+        this.planning = new TownPlanning(app, library, announcements, texts);
+        this.planning.authority(this::authority);
         for (ConstructionProject project : store.load()) {
             projects.put(project.id(), project);
             lastNumber = Math.max(lastNumber, project.number());
@@ -199,7 +211,7 @@ public final class ConstructionService {
         if (project.isEmpty() || !project.get().status().isActive()) {
             return Reply.failure(Message.of(MessageKey.BUILD_UNKNOWN_PROJECT, number));
         }
-        if (!project.get().client().equals(caller.player())) {
+        if (!controls(caller.player(), project.get())) {
             return Reply.failure(Message.of(MessageKey.BUILD_NOT_CLIENT));
         }
         put(project.get().withStatus(ConstructionProject.Status.CANCELLED));
@@ -210,7 +222,7 @@ public final class ConstructionService {
     public synchronized Reply list(Caller caller) {
         List<Message> lines = new ArrayList<>();
         for (ConstructionProject project : projects.values()) {
-            boolean mine = project.client().equals(caller.player());
+            boolean mine = controls(caller.player(), project);
             boolean decides = project.status() == ConstructionProject.Status.AWAITING_PERMIT
                     && mayDecide(caller.player(), project.town());
             if (mine || decides) {
@@ -262,10 +274,17 @@ public final class ConstructionService {
     private ConstructionProject place(ActorRef client, PolityId townId, Plot plot, Blueprint plan, PolityView firm,
                                       Day day, boolean selfSupplied, int rotation) {
         PolityView town = queries.polity(townId).orElseThrow();
-        boolean holder = plot.holder().equals(client);
-        boolean townPlot = plot.holder().equals(town.asActor()) && mayDecide(client, townId);
-        if (!holder && !townPlot) {
+        final ActorRef asked = client;
+        boolean holder = plot.holder().equals(asked);
+        boolean townPlot = plot.holder().equals(town.asActor()) && mayDecide(asked, townId);
+        boolean organisationPlot = plot.holder() instanceof PolityRef org
+                && queries.polity(org.id()).map(found -> found.holds(asked, Office.MAYOR)).orElse(false);
+        if (!holder && !townPlot && !organisationPlot) {
             throw new BuildRefused(Message.of(MessageKey.BUILD_NOT_HOLDER));
+        }
+        // Auf Grundstücken einer Gemeinde, Firma oder anderen Organisation baut die Organisation: Ihre Kasse zahlt.
+        if (!holder) {
+            client = plot.holder();
         }
         if (queries.production().enterpriseOf(firm.id()).map(e -> e.branch() != Branch.CONSTRUCTION).orElse(true)) {
             throw new BuildRefused(Message.of(MessageKey.BUILD_NOT_CONSTRUCTION, firm.name().value()));
@@ -320,7 +339,7 @@ public final class ConstructionService {
         }
         PolityView town = queries.polity(project.town()).orElseThrow();
         long fee = queries.effectiveLaws(town).valueOf(StandardParameters.BUILD_PERMIT_FEE);
-        if (fee > 0) {
+        if (fee > 0 && !project.client().equals(town.asActor())) {
             app.transferFunds().execute(new TransferFunds.Command(project.client(), town.asActor(),
                     Money.of(fee, town.currency()), TransferReason.PERMIT_FEE, calendar.today()));
         }
@@ -371,6 +390,11 @@ public final class ConstructionService {
                 int y = terrain.groundLevel(corner, fx, fz);
                 BlockPosition min = new BlockPosition(project.dimension(), project.originX(), y, project.originZ());
                 if (!terrain.isClear(min, fx, plan.get().sizeY(), fz)) {
+                    long since = blockedSince.computeIfAbsent(current.id(), id -> clock);
+                    if (clock - since >= ABANDON_DAYS * perDay) {
+                        abandon(current);
+                        continue;
+                    }
                     blockedUntil.put(current.id(), clock + RECHECK_TICKS);
                     if (current.client() instanceof PlayerRef player) {
                         announcements.add(de.etiennebader.civ.server.Announcement.toPlayer(player,
@@ -379,6 +403,7 @@ public final class ConstructionService {
                     continue;
                 }
                 blockedUntil.remove(current.id());
+                blockedSince.remove(current.id());
                 current = current.withOriginY(y);
                 put(current);
             }
@@ -415,6 +440,20 @@ public final class ConstructionService {
                     workers(firm.get()).stream().map(ActorRef::uuid).toList()));
         }
         return builds;
+    }
+
+    /** Das Baufeld blieb zu lange blockiert: Der Auftrag endet, der Bauherr (bei Organisationen deren Leitung) erfährt es. */
+    private void abandon(ConstructionProject project) {
+        put(project.withStatus(ConstructionProject.Status.CANCELLED));
+        blockedSince.remove(project.id());
+        blockedUntil.remove(project.id());
+        abandoned.add(project.plot());
+        ActorRef who = project.client() instanceof PolityRef org
+                ? queries.polity(org.id()).flatMap(PolityView::mayor).orElse(null) : project.client();
+        if (who instanceof PlayerRef player) {
+            announcements.add(de.etiennebader.civ.server.Announcement.toPlayer(player,
+                    Message.of(MessageKey.BUILD_SITE_ABANDONED, project.number(), ABANDON_DAYS)));
+        }
     }
 
     /** Wie viele der nächsten Blöcke aus dem Lager gedeckt sind; verbraucht die Baustoffe im {@code depot}. */
@@ -525,32 +564,40 @@ public final class ConstructionService {
 
     // ------------------------------------------------------------------ Dorfbewohner
 
+    /** Wer einen Auftrag steuern darf: der Bauherr, bei einer Organisation als Bauherr deren Leitung. */
+    private boolean controls(PlayerRef player, ConstructionProject project) {
+        if (project.client().equals(player)) {
+            return true;
+        }
+        return project.client() instanceof PolityRef org
+                && (queries.polity(org.id()).map(found -> found.holds(player, Office.MAYOR)).orElse(false)
+                || mayDecide(player, project.town()) && org.id().equals(project.town()));
+    }
+
     /**
-     * Tagesabschluss: Dorfbewohner als Bauamt genehmigen offene Anträge, und Dorfbewohner mit unbebautem
-     * Wohngrundstück beauftragen eine Baufirma ihrer Gemeinde.
+     * Tagesabschluss. Wer das Sagen hat, beauftragt Baufirmen, und zwar ohne Spieler:
+     * <ul>
+     *     <li>Dorfbewohner als Bauamt (Planer, sonst Bürgermeister) genehmigen offene Anträge.</li>
+     *     <li>Dorfbewohner als Bürgermeister oder Bauamt schneiden neue Grundstücke zu und schreiben sie zum Verkauf
+     *         aus ({@link TownPlanning}), und sie lassen kommunale Bauten (Schule, Gotteshaus, Rathaus, Plätze …) auf
+     *         Grundstücken der Gemeinde errichten, bezahlt aus der Gemeindekasse.</li>
+     *     <li>Dorfbewohner, die eine Firma, Zeitung oder Partei leiten, lassen auf deren Grundstücken bauen, bezahlt aus
+     *         der Kasse der Organisation.</li>
+     *     <li>Dorfbewohner kaufen angebotenes Wohnland und lassen darauf bauen, bezahlt aus eigener Tasche.</li>
+     * </ul>
+     * Welche Baufirma den Auftrag erhält: bevorzugt eine aus der eigenen Gemeinde, sonst die nächste beliebige.
      *
      * @return Zahl der neuen Aufträge
      */
     public synchronized int villagersOrder(Day day) {
         Objects.requireNonNull(day, "day");
-        for (ConstructionProject project : new ArrayList<>(projects.values())) {
-            if (project.status() == ConstructionProject.Status.AWAITING_PERMIT
-                    && authority(project.town()).filter(PersonRef.class::isInstance).isPresent()) {
-                try {
-                    decide(project, true);
-                } catch (DomainException ignored) {
-                    // der Bauherr kann die Gebühr nicht zahlen: bleibt liegen
-                }
-            }
-        }
+        approvePermits();
+        planning.endOfDay(day);
         int orders = 0;
-        for (PolityView town : queries.polities().stream().filter(p -> p.kind() == PolityKind.TERRITORIAL)
-                .sorted(Comparator.comparing(p -> p.id().value())).toList()) {
-            Optional<PolityView> firm = queries.companies().stream()
-                    .filter(company -> queries.production().enterpriseOf(company.id())
-                            .filter(e -> e.branch() == Branch.CONSTRUCTION).isPresent())
-                    .filter(company -> sameTown(company, town))
-                    .min(Comparator.comparing(company -> company.id().value()));
+        List<PolityView> towns = queries.polities().stream().filter(p -> p.kind() == PolityKind.TERRITORIAL)
+                .sorted(Comparator.comparing(p -> p.id().value())).toList();
+        for (PolityView town : towns) {
+            Optional<PolityView> firm = firmFor(town);
             if (firm.isEmpty()) {
                 continue;
             }
@@ -562,33 +609,81 @@ public final class ConstructionService {
                 }
             }
         }
+        for (PolityView owner : queries.polities().stream().filter(p -> p.kind() == PolityKind.TERRITORIAL
+                        || p.kind() == PolityKind.COMPANY || p.kind() == PolityKind.NEWSPAPER
+                        || p.kind() == PolityKind.PARTY || p.kind() == PolityKind.FEDERATION)
+                .sorted(Comparator.comparing(p -> p.id().value())).toList()) {
+            if (head(owner).filter(h -> VillagerAmbitions.roll(h, day, 0x94) < ORGANISATION_ORDERS).isPresent()
+                    && orderForOrganisation(owner, towns, day)) {
+                orders++;
+            }
+        }
         return orders;
     }
 
-    private boolean sameTown(PolityView company, PolityView town) {
-        return company.officeTerm(Office.MAYOR).map(OfficeTerm::holder).filter(PersonRef.class::isInstance)
-                .flatMap(head -> queries.municipalityOf((PersonRef) head)).map(PolityView::id)
-                .filter(town.id()::equals).isPresent();
+    private void approvePermits() {
+        for (ConstructionProject project : new ArrayList<>(projects.values())) {
+            if (project.status() == ConstructionProject.Status.AWAITING_PERMIT
+                    && authority(project.town()).filter(PersonRef.class::isInstance).isPresent()) {
+                try {
+                    decide(project, true);
+                } catch (DomainException ignored) {
+                    // der Bauherr kann die Gebühr nicht zahlen: bleibt liegen
+                }
+            }
+        }
     }
 
+    /** Die Person, die eine Polity führt, wenn es ein Dorfbewohner ist: bei Gemeinden das Bauamt. */
+    private Optional<PersonRef> head(PolityView owner) {
+        Optional<ActorRef> holder = owner.kind() == PolityKind.TERRITORIAL ? authority(owner.id())
+                : owner.officeTerm(Office.MAYOR).map(OfficeTerm::holder);
+        return holder.filter(PersonRef.class::isInstance).map(PersonRef.class::cast);
+    }
+
+    private boolean isBuilder(PolityView company) {
+        return queries.production().enterpriseOf(company.id()).filter(e -> e.branch() == Branch.CONSTRUCTION)
+                .isPresent();
+    }
+
+    /** Die Baufirma für Aufträge einer Gemeinde: eine aus der Gemeinde, sonst die mit der kleinsten Kennung. */
+    private Optional<PolityView> firmFor(PolityView town) {
+        List<PolityView> builders = queries.companies().stream().filter(this::isBuilder)
+                .sorted(Comparator.comparing(company -> company.id().value())).toList();
+        return builders.stream().filter(company -> sameTown(company, town)).findFirst()
+                .or(() -> builders.stream().findFirst());
+    }
+
+    private boolean sameTown(PolityView company, PolityView town) {
+        return company.officeTerm(Office.MAYOR).map(OfficeTerm::holder)
+                .flatMap(queries::municipalityOf).map(PolityView::id).filter(town.id()::equals).isPresent();
+    }
+
+    /** Ein Dorfbewohner lässt auf einem seiner Grundstücke ein Gebäude bauen, das zur Grundstücksart passt. */
     private boolean orderFor(PersonRef villager, PolityView town, PolityView firm, Day day) {
         Personality personality = Personality.of(villager);
         List<Plot> empty = queries.land(town.id()).plotsHeldBy(villager).stream()
-                .filter(plot -> plot.type() == PlotType.RESIDENTIAL)
-                .filter(plot -> projects.values().stream().noneMatch(p -> p.plot().equals(plot.id())))
-                .sorted(Comparator.comparing(plot -> plot.id().value())).toList();
+                .filter(plot -> plot.type() != PlotType.EMBASSY)
+                .filter(plot -> projects.values().stream().noneMatch(p -> p.plot().equals(plot.id())) && !abandoned.contains(plot.id()))
+                .sorted(Comparator.<Plot, Boolean>comparing(plot -> plot.type() != PlotType.RESIDENTIAL)
+                        .thenComparing(plot -> plot.id().value())).toList();
         if (empty.isEmpty()) {
             return false;
         }
         Plot plot = empty.getFirst();
         long cash = queries.ledger().balanceOf(villager, town.currency()).amount();
-        List<Blueprint> fitting = library.fitting(plot.area().width(), plot.area().depth());
-        Optional<Blueprint> choice = personality.thrift() >= 40
-                ? fitting.stream().filter(plan -> plan.units() > 1).max(Comparator.comparingInt(Blueprint::blockCount))
-                .or(() -> fitting.stream().max(Comparator.comparingInt(Blueprint::blockCount)))
-                : fitting.stream().filter(plan -> plan.units() == 1)
-                .max(Comparator.comparingInt(Blueprint::blockCount));
-        Optional<Blueprint> affordable = choice.filter(plan -> priceOf(plan) * 3 / 2 <= cash);
+        List<Blueprint> fitting = library.fittingFor(plot.type(), plot.area().width(), plot.area().depth()).stream()
+                .filter(plan -> priceOf(plan) * 3 / 2 <= cash).toList();
+        Optional<Blueprint> affordable;
+        if (plot.type() == PlotType.RESIDENTIAL) {
+            Comparator<Blueprint> biggest = Comparator.comparingInt(Blueprint::blockCount);
+            affordable = (personality.thrift() >= 40
+                    ? fitting.stream().filter(plan -> plan.units() > 1).max(biggest)
+                    : fitting.stream().filter(plan -> plan.units() == 1).max(biggest))
+                    .or(() -> fitting.stream().max(biggest));
+        } else {
+            affordable = pick(fitting, villager, day);
+        }
         if (affordable.isEmpty()) {
             return false;
         }
@@ -600,9 +695,78 @@ public final class ConstructionService {
         }
     }
 
+    /**
+     * Die Leitung einer Gemeinde, Firma, Zeitung oder Partei lässt ein Gebäude auf einem Grundstück der Organisation
+     * bauen. Gemeinden bauen nur kommunale Arten (öffentlich, Schule, Gotteshaus), Firmen auf allen ihren Grundstücken.
+     * Der Auftrag läuft auf die Organisation, bezahlt wird aus ihrer Kasse.
+     */
+    private boolean orderForOrganisation(PolityView owner, List<PolityView> towns, Day day) {
+        Optional<PersonRef> head = head(owner);
+        if (head.isEmpty()) {
+            return false;
+        }
+        for (PolityView town : towns) {
+            List<Plot> candidates = queries.land(town.id()).plotsHeldBy(owner.asActor()).stream()
+                    .filter(plot -> plot.type() != PlotType.EMBASSY)
+                    .filter(plot -> owner.kind() != PolityKind.TERRITORIAL || isCivic(plot.type()))
+                    .filter(plot -> !plot.isForSale())
+                    .filter(plot -> projects.values().stream().noneMatch(p -> p.plot().equals(plot.id())) && !abandoned.contains(plot.id()))
+                    .sorted(Comparator.comparing(plot -> plot.id().value())).toList();
+            if (candidates.isEmpty()) {
+                continue;
+            }
+            Optional<PolityView> firm = firmFor(town);
+            if (firm.isEmpty() || firm.get().equals(owner)) {
+                continue;
+            }
+            Plot plot = candidates.getFirst();
+            long cash = queries.ledger().balanceOf(owner.asActor(), owner.currency()).amount();
+            Optional<Blueprint> plan = pick(library.fittingFor(plot.type(), plot.area().width(), plot.area().depth()),
+                    head.get(), day).filter(found -> priceOf(found) * 2 <= cash);
+            if (plan.isEmpty()) {
+                continue;
+            }
+            try {
+                place(owner.asActor(), town.id(), plot, plan.get(), firm.get(), day, false, 0);
+                if (owner.kind() == PolityKind.TERRITORIAL) {
+                    announcements.add(de.etiennebader.civ.server.Announcement.toTown(town.id(),
+                            Message.of(MessageKey.MUNICIPAL_BUILD_ORDERED, plan.get().name(), firm.get().name().value(),
+                                    town.name().value())));
+                }
+                return true;
+            } catch (BuildRefused | DomainException e) {
+                // nicht genehmigt, zu klein, kein Geld: morgen vielleicht
+            }
+        }
+        return false;
+    }
+
+    private static boolean isCivic(PlotType type) {
+        return type == PlotType.PUBLIC || type == PlotType.EDUCATION || type == PlotType.RELIGIOUS;
+    }
+
+    /** Wählt unter passenden Plänen einen, fest je Person und Tag; größere Pläne sind kein Muss. */
+    private static Optional<Blueprint> pick(List<Blueprint> plans, PersonRef who, Day day) {
+        if (plans.isEmpty()) {
+            return Optional.empty();
+        }
+        List<Blueprint> sorted = plans.stream().sorted(Comparator.comparing(Blueprint::name)).toList();
+        return Optional.of(sorted.get((int) (VillagerAmbitions.roll(who, day, 0x95) * sorted.size())));
+    }
+
+    /**
+     * Das Bauamt: Planer, sonst Bürgermeister; ohne Amtsinhaber regiert kommissarisch ein Dorfbewohner, solange
+     * {@link #interimGovernment} eingeschaltet ist.
+     */
     private Optional<ActorRef> authority(PolityId townId) {
         return queries.polity(townId).flatMap(town -> town.officeTerm(Office.PLANNER)
-                .or(() -> town.officeTerm(Office.MAYOR)).map(OfficeTerm::holder));
+                .or(() -> town.officeTerm(Office.MAYOR)).map(OfficeTerm::holder)
+                .or(() -> interimGovernment ? town.mayor(true) : Optional.empty()));
+    }
+
+    /** Ob ein Dorfbewohner kommissarisch als Bauamt handelt, wenn die Gemeinde keinen Amtsinhaber hat. */
+    public synchronized void interimGovernment(boolean enabled) {
+        this.interimGovernment = enabled;
     }
 
     // ------------------------------------------------------------------ Hilfen

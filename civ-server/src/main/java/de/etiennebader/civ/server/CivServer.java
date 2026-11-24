@@ -99,6 +99,7 @@ public final class CivServer {
     private final AutoCloseable storage;
     private final CivCommands commands;
     private final ProtectionService protection;
+    private final de.etiennebader.civ.server.plot.PlotRightsService plotRights;
     private final BankService bank;
     private final CurrencyService currencyService;
     private final CreditService creditService;
@@ -165,6 +166,9 @@ public final class CivServer {
         Texts texts = new Texts(app.queries(), players);
         this.texts = texts;
         this.protection = new ProtectionService(app.queries(), texts);
+        this.plotRights = new de.etiennebader.civ.server.plot.PlotRightsService(app.queries(), players, texts,
+                dataDirectory.map(dir -> dir.resolve("plot-rights.tsv")));
+        app.queries().plotRights(plotRights);
         this.voting = new VotingService(app, calendar, texts, announcements);
         this.offices = new OfficeService(app, calendar, players, texts, announcements);
         this.federations = new FederationService(app, calendar, settings.levels(), texts, announcements,
@@ -189,6 +193,7 @@ public final class CivServer {
         this.construction = new de.etiennebader.civ.server.construction.ConstructionService(app, calendar, texts,
                 settings.ticksPerDay(), new de.etiennebader.civ.server.construction.BlueprintLibrary(
                 dataDirectory.map(dir -> dir.resolve("blueprints"))), dataDirectory.map(dir -> dir.resolve("construction.tsv")), announcements);
+        this.construction.interimGovernment(settings.villagerPolitics());
         this.war = new de.etiennebader.civ.server.war.WarService(app, calendar, texts, announcements, ids,
                 settings, dataDirectory.map(dir -> dir.resolve("war.tsv")));
         this.villagerFederations = new VillagerFederations(app, federations, announcements);
@@ -208,7 +213,7 @@ public final class CivServer {
             return lines;
         });
         this.villagerFoundations = new de.etiennebader.civ.server.villager.VillagerFoundations(app, villagers::lastSeen,
-                announcements, settings.founding());
+                announcements, settings.founding(), villagers::relocate);
         this.townHalls = new TownHallService(app, calendar, texts, announcements);
         this.shops = new ShopService(app, calendar, settings.currency(), texts);
         this.civil = new CivilService(app, calendar, players, settings.currency(), texts, announcements,
@@ -298,6 +303,8 @@ public final class CivServer {
         if (settings.ambitions()) {
             villagerFoundations.endOfDay(day);
             villagerFederations.endOfDay(day);
+            press.villagersFound(day);
+            religion.villagersFound(day);
             construction.villagersOrder(day);
             family.endOfDay(day);
         }
@@ -635,6 +642,10 @@ public final class CivServer {
     }
 
     /** Gebietsschutz; für jede Handlung eines Spielers an einem Block aufrufen. */
+    public de.etiennebader.civ.server.plot.PlotRightsService plotRights() {
+        return plotRights;
+    }
+
     public ProtectionService protection() {
         return protection;
     }

@@ -7,6 +7,7 @@ import de.etiennebader.civ.application.directory.PlayerDirectory;
 import de.etiennebader.civ.application.media.ArticleAnalysis;
 import de.etiennebader.civ.application.media.PressUseCases;
 import de.etiennebader.civ.application.media.VillagerEditors;
+import de.etiennebader.civ.application.population.VillagerAmbitions;
 import de.etiennebader.civ.application.query.WorldQueries;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
@@ -16,6 +17,7 @@ import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.polity.PolityName;
 import de.etiennebader.civ.domain.polity.PolityView;
+import de.etiennebader.civ.domain.population.VillagerIdentity;
 import de.etiennebader.civ.domain.shared.CurrencyId;
 import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.DomainException;
@@ -228,6 +230,93 @@ public final class PressService {
 
     /** Eine Ausgabe als Buch. */
     public record Edition(String title, String author, List<String> pages) {
+    }
+
+    /** Eine Zeitung je so vielen Dorfbewohnern (mindestens eine) darf es durch Dorfbewohner geben. */
+    static final int VILLAGERS_PER_PAPER = 12;
+    /** Höchstens so viele Mitbürger holt ein Dorfbewohner als Gründer in seine Redaktion. */
+    static final int MAX_FOUNDING_EDITORS = 2;
+    /** Tageswahrscheinlichkeit einer Zeitungsgründung bei vollem Ehrgeiz. */
+    static final double FOUNDING_CHANCE = 0.10;
+    private static final String[] PAPER_TITLES = {"Anzeiger", "Bote", "Kurier", "Tagblatt", "Rundschau", "Chronik",
+            "Zeitung", "Echo"};
+
+    /**
+     * Ehrgeizige Dorfbewohner gründen Zeitungen: höchstens eine je Tag und solange es weniger Zeitungen als ein
+     * {@value #VILLAGERS_PER_PAPER}-tel der Dorfbewohner gibt. Der Gründer leitet die Zeitung und holt bis zu
+     * {@value #MAX_FOUNDING_EDITORS} Mitbürger seiner Gemeinde in die Redaktion; geschrieben wird dann wie sonst auch
+     * ({@link VillagerEditors}).
+     *
+     * @return ob heute eine Zeitung gegründet wurde
+     */
+    public boolean villagersFound(Day day) {
+        List<PolityView> towns = queries.polities().stream().filter(town -> town.kind() == PolityKind.TERRITORIAL)
+                .sorted(java.util.Comparator.comparing(town -> town.id().value())).toList();
+        long villagers = towns.stream().mapToLong(town -> town.members().stream()
+                .filter(member -> member.member() instanceof PersonRef).count()).sum();
+        if (queries.newspapers().size() >= Math.max(1, villagers / VILLAGERS_PER_PAPER)) {
+            return false;
+        }
+        List<PolityView> papers = queries.newspapers();
+        for (PolityView town : towns) {
+            List<PersonRef> residents = town.members().stream().map(Membership::member)
+                    .filter(PersonRef.class::isInstance).map(PersonRef.class::cast)
+                    .sorted(java.util.Comparator.comparing(PersonRef::uuid)).toList();
+            for (PersonRef villager : residents) {
+                double drive = VillagerAmbitions.drive(villager) / 100.0;
+                if (!VillagerAmbitions.isAmbitious(villager)
+                        || papers.stream().anyMatch(paper -> paper.holds(villager, Office.MAYOR))
+                        || VillagerAmbitions.roll(villager, day, 0x91) >= FOUNDING_CHANCE * drive) {
+                    continue;
+                }
+                if (found(town, villager, residents, papers, day)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean found(PolityView town, PersonRef founder, List<PersonRef> residents, List<PolityView> papers,
+                          Day day) {
+        String stem = PAPER_TITLES[(int) Math.floorMod(founder.uuid().getLeastSignificantBits(),
+                (long) PAPER_TITLES.length)];
+        String tag = Long.toHexString(founder.uuid().getLeastSignificantBits() & 0xFFFFFL).toUpperCase();
+        String name = null;
+        for (String candidate : new String[] {stem + " " + town.name().value(), stem + " " + tag,
+                stem + " " + town.name().value() + " " + tag}) {
+            if (candidate.length() <= PolityName.MAX_LENGTH && paper(candidate).isEmpty()
+                    && queries.polityNamed(candidate).isEmpty()) {
+                name = candidate;
+                break;
+            }
+        }
+        if (name == null) {
+            return false;
+        }
+        try {
+            PolityId id = app.companies().found(founder, PolityName.of(name), PolityKind.NEWSPAPER, currency, day);
+            int editors = 0;
+            for (PersonRef resident : residents) {
+                if (editors >= MAX_FOUNDING_EDITORS) {
+                    break;
+                }
+                if (resident.equals(founder) || papers.stream().anyMatch(paper -> paper.isMember(resident))) {
+                    continue;
+                }
+                try {
+                    app.companies().admit(founder, id, PolityKind.NEWSPAPER, resident, day);
+                    editors++;
+                } catch (DomainException ignored) {
+                    // dann schreibt der Gründer eben allein weiter
+                }
+            }
+            announcements.add(Announcement.toTown(town.id(), Message.of(MessageKey.VILLAGER_NEWSPAPER_FOUNDED, name,
+                    VillagerIdentity.of(founder).fullName(), town.name().value())));
+            return true;
+        } catch (DomainException e) {
+            return false;
+        }
     }
 
     /** Tagesende: Dorfbewohner-Redakteure schreiben; neue Artikel erscheinen in den Gemeinden. */

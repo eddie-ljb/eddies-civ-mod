@@ -18,7 +18,7 @@ import de.etiennebader.civ.server.command.Reply;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -197,20 +197,43 @@ public final class FamilyService {
         }
     }
 
+    /**
+     * Ledige lernen sich kennen: Jeden Tag finden sich die am besten zueinander passenden Ledigen zu Paaren und
+     * verbringen den Tag miteinander. Dadurch wächst die Beziehung eines Paares an aufeinanderfolgenden Tagen
+     * (statt nur an den seltenen Tagen, an denen der Zufall genau diese beiden zusammenführt), und aus passenden
+     * Paaren werden in einer guten Woche Eheleute. Wer zu niemandem passt, bleibt für sich.
+     */
     private void meet(PolityView town, List<PersonRef> adults, Day day) {
-        List<PersonRef> singles = new ArrayList<>(adults.stream().filter(person -> !registry.isMarried(person)).toList());
-        Collections.shuffle(singles, new Random(day.value() * 104_729L + town.id().value().hashCode()));
-        for (int i = 0; i + 1 < singles.size(); i += 2) {
-            PersonRef first = singles.get(i);
-            PersonRef second = singles.get(i + 1);
-            if (related(first, second)) {
+        List<PersonRef> singles = adults.stream().filter(person -> !registry.isMarried(person)).toList();
+        record Match(PersonRef first, PersonRef second, int compat, int bond) {
+        }
+        List<Match> matches = new ArrayList<>();
+        for (int i = 0; i < singles.size(); i++) {
+            for (int j = i + 1; j < singles.size(); j++) {
+                PersonRef first = singles.get(i);
+                PersonRef second = singles.get(j);
+                int compat = Family.compatibility(first, second);
+                if (compat >= Family.GOOD_MATCH && !related(first, second)) {
+                    matches.add(new Match(first, second, compat, registry.bond(first, second)));
+                }
+            }
+        }
+        // Zuerst Paare mit der größten Beziehung, dann die verträglichsten: wer sich kennt, bleibt zusammen.
+        matches.sort(Comparator.comparingInt(Match::bond).reversed().thenComparing(
+                Comparator.comparingInt(Match::compat).reversed()));
+        Set<PersonRef> taken = new HashSet<>();
+        for (Match match : matches) {
+            if (taken.contains(match.first()) || taken.contains(match.second())) {
                 continue;
             }
-            int compat = Family.compatibility(first, second);
-            int bond = registry.changeBond(first, second, Family.dailyBondChange(compat, false));
-            if (bond >= Family.MARRY_BOND && compat >= Family.GOOD_MATCH) {
-                registry.marry(first, second, day);
-                announce(town, MessageKey.FAMILY_MARRIED, first, second);
+            taken.add(match.first());
+            taken.add(match.second());
+            int bond = registry.changeBond(match.first(), match.second(),
+                    Family.dailyBondChange(match.compat(), false));
+            if (bond >= Family.MARRY_BOND) {
+                registry.marry(match.first(), match.second(), day);
+                registry.changeBond(match.first(), match.second(), Family.WEDDING_BONUS);
+                announce(town, MessageKey.FAMILY_MARRIED, match.first(), match.second());
             }
         }
     }

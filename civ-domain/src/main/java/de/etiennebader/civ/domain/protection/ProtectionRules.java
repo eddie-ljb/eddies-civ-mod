@@ -4,6 +4,8 @@ import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PolityRef;
 import de.etiennebader.civ.domain.land.LandView;
 import de.etiennebader.civ.domain.land.Plot;
+import de.etiennebader.civ.domain.law.LawView;
+import de.etiennebader.civ.domain.law.StandardParameters;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.domain.territory.Claim;
@@ -53,7 +55,7 @@ public final class ProtectionRules {
             if (context.mayUsePlot(actor, polity.id(), plot.get().id())) {
                 return Optional.empty();
             }
-            return checkForeignPlot(actor, action, polity, plot.get().holder(), context);
+            return checkForeignPlot(actor, action, polity, plot.get(), context);
         }
 
         if (plot.isPresent() && context.mayUsePlot(actor, polity.id(), plot.get().id())) {
@@ -78,20 +80,52 @@ public final class ProtectionRules {
         if (claim.isEmpty()) {
             return true;
         }
-        return context.polity(claim.get().polity())
-                .map(polity -> context.laws(polity).valueOf(hazard.permission()))
-                .orElse(true);
+        return allows(PlotFlag.of(hazard), position, context);
+    }
+
+    /**
+     * Ob eine Regel (PvP, Monster, Explosionen, Feuer, Tierschutz) an diesem Block gilt: in der Wildnis immer, sonst
+     * nach dem Recht der Gemeinde. Auf einem fremden Grundstück darf dessen Inhaber davon abweichen, wenn das Recht
+     * {@link de.etiennebader.civ.domain.law.StandardParameters#PLOT_RIGHTS_OVERRIDE} es erlaubt.
+     */
+    public boolean allows(PlotFlag flag, BlockPosition position, ProtectionContext context) {
+        Objects.requireNonNull(flag, "flag");
+        Objects.requireNonNull(position, "position");
+        Objects.requireNonNull(context, "context");
+        Optional<Claim> claim = context.territory().claimAt(position.chunk());
+        if (claim.isEmpty()) {
+            return true;
+        }
+        Optional<? extends PolityView> polity = context.polity(claim.get().polity());
+        if (polity.isEmpty()) {
+            return true;
+        }
+        LawView laws = context.laws(polity.get());
+        boolean law = laws.valueOf(flag.law());
+        if (!laws.valueOf(StandardParameters.PLOT_RIGHTS_OVERRIDE)) {
+            return law;
+        }
+        return context.land(polity.get().id()).flatMap(land -> plotAt(land, position))
+                .filter(plot -> !plot.holder().equals(polity.get().asActor()))
+                .flatMap(plot -> context.plotRights(polity.get().id(), plot.id()))
+                .map(rights -> rights.stance(flag).resolve(law))
+                .orElse(law);
     }
 
     private static Optional<Denial> checkForeignPlot(ActorRef actor, ProtectedAction action, PolityView polity,
-                                                     ActorRef holder, ProtectionContext context) {
+                                                     Plot plot, ProtectionContext context) {
+        ActorRef holder = plot.holder();
         if (isHolder(actor, holder, context)) {
             return Optional.empty();
         }
-        if (action == ProtectedAction.INTERACT && polity.isMember(actor)) {
-            return Optional.empty();
-        }
-        return deny(DenialReason.FOREIGN_PLOT, polity, holder);
+        PlotRights rights = context.plotRights(polity.id(), plot.id()).orElse(PlotRights.DEFAULT);
+        boolean granted = rights.permits(actor, polity.isMember(actor), action);
+        LawView laws = context.laws(polity);
+        // Darf der Inhaber das Recht überschreiben, entscheidet allein seine Einstellung. Sonst gilt das Recht
+        // der Gemeinde, des Landes und der Nation auch hier: Erlaubt es Fremden die Handlung, erlaubt es sie überall.
+        boolean allowed = laws.valueOf(StandardParameters.PLOT_RIGHTS_OVERRIDE)
+                ? granted : granted || laws.valueOf(action.outsiderPermission());
+        return allowed ? Optional.empty() : deny(DenialReason.FOREIGN_PLOT, polity, holder);
     }
 
     private static boolean isHolder(ActorRef actor, ActorRef holder, ProtectionContext context) {

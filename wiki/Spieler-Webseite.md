@@ -21,3 +21,6 @@ Der Server stellt eine Webseite bereit, standardmäßig auf Port 8765, hell und 
 **Anmelden:** Mit `/civ web` holt man sich im Spiel einen Code und gibt ihn auf der Webseite ein. Sitzungen verfallen nach zwei Tagen ohne Nutzung oder nach sieben Tagen; `/civ web abmelden` meldet überall ab.
 
 Admin-Themen zum Betrieb der Webseite (Reverse-Proxy, HTTPS, Absicherung) stehen unter [Sicherungen und Webseiten-Betrieb](Admin-Sicherungen-und-Webseite.md).
+
+## Religion
+Der Reiter „Religion“ zeigt alle Religionen mit Oberhaupt, Klerusmacht, Mitgliedern, Inbrunst und laufender Klerus-Wahl sowie die Glaubensverteilung unter den Dorfbewohnern. Angemeldet kann man beitreten, austreten, eine Religion gründen, für das Klerusamt kandidieren und wählen.
