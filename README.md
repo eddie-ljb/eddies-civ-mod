@@ -57,6 +57,9 @@ Das Geld geht direkt auf dein Konto. Im Gemeindegebiet erhält die Gemeinde ihre
 
 Im Kreativmodus liegen alle Blöcke des Mods, der Grundstücksstab und nützliche Test-Items im eigenen Reiter **Eddies Zivilisation**.
 
+### Kultur und Rasse
+Jede Gemeinde hat eine Kultur (bestimmt die Kleidung der Dorfbewohner) und eine Rasse (Körpergröße, mit dem Mod auch Hautton und Haarfarbe). Der Gründer wählt beides nach dem Aufstellen des Gemeindehauses, der Bürgermeister ändert es später im Gemeindehaus oder mit `/civ kultur setzen <Kultur> <Rasse>`. Von Dorfbewohnern gegründete Gemeinden erben beides.
+
 ### Grundstücke
 Grundstücke teilen das Gemeindeland auf. Nur ihre Inhaber dürfen dort bauen, und nur für sie fällt Grundsteuer an.
 0. **Erst die Straße:** Grundstücke und Häuser gibt es nur an Straßen (Gesetz `street_required`, Standard ja). Zuerst wird die Straße gebaut und mit `/civ strasse anlegen <Name>` eingetragen; danach lassen sich Grundstücke in höchstens 12 Blöcken Abstand zuschneiden, ausschreiben und bebauen.

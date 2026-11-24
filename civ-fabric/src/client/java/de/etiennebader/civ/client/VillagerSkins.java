@@ -3,6 +3,7 @@ package de.etiennebader.civ.client;
 import com.mojang.blaze3d.platform.NativeImage;
 import de.etiennebader.civ.EddiesCivMod;
 import de.etiennebader.civ.domain.population.Gender;
+import de.etiennebader.civ.domain.population.Race;
 import de.etiennebader.civ.domain.population.VillagerIdentity;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
@@ -31,6 +32,12 @@ public final class VillagerSkins {
     private static final int[] HAIR = {
             0xFF231C1A, 0xFF462D1E, 0xFF6E4628, 0xFF8C3C23, 0xFFD6B464, 0xFFB05428, 0xFFAAAAA8};
 
+    // Rassen: eigener Hautton (Elfen blass, Zwerge rötlich, Orks grün) und Haarfarben aus der Palette oben.
+    private static final float[][] RACE_SKIN = {
+            null, {1.12F, 0.9F, 0.85F}, {1.2F, 1.22F, 1.2F}, {0.62F, 0.95F, 0.55F}};
+    private static final int[][] RACE_HAIR = {
+            null, {3, 5, 2, 6}, {4, 6, 0}, {0, 1, 2}};
+
     private static final Map<Long, Identifier> CACHE = new HashMap<>();
 
     private VillagerSkins() {
@@ -38,15 +45,23 @@ public final class VillagerSkins {
 
     /** Textur dieses Dorfbewohners; leer, wenn sich die Vanilla-Textur nicht lesen lässt. */
     public static Optional<Identifier> textureOf(UUID uuid) {
+        return textureOf(uuid, Race.HUMAN);
+    }
+
+    /** Textur dieses Dorfbewohners als Angehöriger seiner Rasse. */
+    public static Optional<Identifier> textureOf(UUID uuid, Race race) {
         VillagerIdentity.Look look = VillagerIdentity.lookOf(uuid);
-        long key = ((look.gender().ordinal() * 8L + look.skin()) * 16L + look.hair()) * 8L + look.style();
+        int hairIndex = race == Race.HUMAN ? look.hair() : RACE_HAIR[race.ordinal()][look.hair()
+                % RACE_HAIR[race.ordinal()].length];
+        long key = (((look.gender().ordinal() * 8L + look.skin()) * 16L + hairIndex) * 8L + look.style()) * 4L
+                + race.ordinal();
         Identifier cached = CACHE.get(key);
         if (cached != null) {
             return Optional.of(cached);
         }
         try (InputStream in = Minecraft.getInstance().getResourceManager().open(BASE);
              NativeImage image = NativeImage.read(in)) {
-            paint(image, look);
+            paint(image, look, race, hairIndex);
             Identifier id = EddiesCivMod.id("villager/look_" + key);
             Minecraft.getInstance().getTextureManager().register(id,
                     new DynamicTexture(() -> "eddies-civ-mod villager " + key, copy(image)));
@@ -65,8 +80,12 @@ public final class VillagerSkins {
     }
 
     static void paint(NativeImage image, VillagerIdentity.Look look) {
-        tintSkin(image, SKIN[look.skin()]);
-        paintHair(image, look, HAIR[look.hair()]);
+        paint(image, look, Race.HUMAN, look.hair());
+    }
+
+    static void paint(NativeImage image, VillagerIdentity.Look look, Race race, int hairIndex) {
+        tintSkin(image, race == Race.HUMAN ? SKIN[look.skin()] : RACE_SKIN[race.ordinal()]);
+        paintHair(image, look, HAIR[hairIndex]);
     }
 
     /** Färbt nur hautfarbene Pixel um; das graue Gewand bleibt, wie es ist. */

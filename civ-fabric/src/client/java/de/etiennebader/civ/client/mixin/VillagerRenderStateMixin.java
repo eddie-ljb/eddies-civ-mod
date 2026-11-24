@@ -13,6 +13,19 @@ public abstract class VillagerRenderStateMixin implements CivVillagerState {
     @Unique
     private UUID civ$uuid;
 
+    @Unique
+    private float civ$scale = 1.0F;
+
+    @Override
+    public float civ$scale() {
+        return civ$scale;
+    }
+
+    @Override
+    public void civ$setScale(float scale) {
+        this.civ$scale = scale;
+    }
+
     @Override
     public UUID civ$uuid() {
         return civ$uuid;

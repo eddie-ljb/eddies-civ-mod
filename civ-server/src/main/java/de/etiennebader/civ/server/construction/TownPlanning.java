@@ -182,7 +182,7 @@ final class TownPlanning {
         boolean streetRequired = this.streets == null || this.streets.required(town);
         // Erst die Straße, dann die Grundstücke: Die erste Straße kommt ohne Grundstücke, jede weitere, sobald je
         // Straße vier Grundstücke stehen. Solange ein Weg noch gebaut wird, kommt keine neue Straße.
-        boolean needed = streetRequired ? streetCount == 0 || plots.size() >= streetCount * 4
+        boolean needed = streetRequired ? streetCount == 0 || !roomForPlot(town, plots)
                 : plots.size() >= 2 && streetCount * 4 < plots.size() + 2;
         if (streetCount >= MAX_STREETS || !needed || (roads != null && roads.unfinished(town.id()) > 0)
                 || VillagerAmbitions.roll(planner, day, 0x9A) >= STREET_CHANCE) {
@@ -218,6 +218,29 @@ final class TownPlanning {
                 return;
             }
         }
+    }
+
+    /**
+     * Ob an den bisherigen Straßen noch ein Grundstück Platz hat: ein Chunk (nicht der Kern), dessen mittiger Platz frei
+     * und an einer gebauten Straße liegt. Ist nichts mehr frei, braucht die Gemeinde die nächste Straße. (Früher kam sie
+     * erst bei vier Grundstücken je Straße; lagen weniger Chunks an der Straße, kam nie wieder eine.)
+     */
+    private boolean roomForPlot(PolityView town, List<Plot> plots) {
+        WorldQueries world = app.queries();
+        for (ChunkCoord chunk : world.territory().territoryOf(town.id())) {
+            if (town.seat().filter(seat -> seat.chunk().equals(chunk)).isPresent()) {
+                continue;
+            }
+            int size = sizeOf(PlotType.RESIDENTIAL);
+            int inset = (ChunkCoord.SIZE - size) / 2;
+            Area area = new Area(chunk.dimension(), chunk.minBlockX() + inset, chunk.minBlockZ() + inset,
+                    chunk.minBlockX() + inset + size - 1, chunk.minBlockZ() + inset + size - 1);
+            if (plots.stream().noneMatch(plot -> plot.area().overlaps(area)) && onStreet(town, area)
+                    && site.test(area)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
