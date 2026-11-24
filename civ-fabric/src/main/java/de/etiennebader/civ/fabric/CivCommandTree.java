@@ -2069,7 +2069,16 @@ public final class CivCommandTree {
                                 Feedback.fanfare(player);
                             }
                             return reply;
-                        })))
+                        }))
+                        .then(arg(COMPANY, StringArgumentType.string())
+                                .executes(context -> withCiv(context, (civ, player) -> {
+                                    Reply reply = civ.plots().buyForCompany(Players.caller(player),
+                                            StringArgumentType.getString(context, COMPANY));
+                                    if (reply.success()) {
+                                        Feedback.fanfare(player);
+                                    }
+                                    return reply;
+                                }))))
                 .then(Commands.literal("vergeben")
                         .then(arg(PLAYER, StringArgumentType.word())
                                 .suggests((context, builder) -> SharedSuggestionProvider.suggest(

@@ -256,6 +256,8 @@
   "eddies-civ-mod.command.plot_offer_withdrawn": "Sale offer withdrawn.",
   "eddies-civ-mod.command.plot_already_yours": "You already own this plot.",
   "eddies-civ-mod.command.plot_bought": "Bought the plot for %s. It is yours now.",
+  "eddies-civ-mod.command.plot_bought_for_company": "Bought the plot for %2$s. It now belongs to the company %1$s (paid from the company treasury).",
+  "eddies-civ-mod.command.plot_not_company_head": "Only the head of the company %s buys plots in its name.",
   "eddies-civ-mod.command.plot_assigned": "Plot given to %s.",
   "eddies-civ-mod.command.plot_dissolved": "Plot dissolved; the area is town land again.",
   "eddies-civ-mod.command.plot_entered": "%1$s of %2$s",

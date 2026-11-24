@@ -256,6 +256,8 @@
   "eddies-civ-mod.command.plot_offer_withdrawn": "Verkaufsangebot zurückgezogen.",
   "eddies-civ-mod.command.plot_already_yours": "Das Grundstück gehört dir bereits.",
   "eddies-civ-mod.command.plot_bought": "Grundstück für %s gekauft. Es gehört jetzt dir.",
+  "eddies-civ-mod.command.plot_bought_for_company": "Grundstück für %2$s gekauft. Es gehört jetzt der Firma %1$s (bezahlt aus der Firmenkasse).",
+  "eddies-civ-mod.command.plot_not_company_head": "Nur die Leitung der Firma %s kauft in ihrem Namen Grundstücke.",
   "eddies-civ-mod.command.plot_assigned": "Grundstück an %s vergeben.",
   "eddies-civ-mod.command.plot_dissolved": "Grundstück aufgelöst; die Fläche ist wieder Gemeindeland.",
   "eddies-civ-mod.command.plot_entered": "%1$s von %2$s",

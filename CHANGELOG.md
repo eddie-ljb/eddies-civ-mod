@@ -2,6 +2,8 @@
 
 ## 1.1.0 (in Arbeit)
 
+- **Grundstücke für die Firma kaufen (neu):** `/civ grundstueck kaufen "<Firma>"` kauft das angebotene Grundstück unter dir für die Firma; der Preis kommt aus der Firmenkasse, nur die Leitung darf das. Bisher kaufte der Befehl nur für den Spieler selbst, Firmen kamen nur über Dorfbewohner an Grundstücke.
+
 - **Straßen und Grundstücke der Dorfbewohner (Korrektur):** Die Geländeprüfung hielt jeden Streifen für „bebaut“, in dem auch nur eine Blume, ein Erz, ein Kaktus, Zuckerrohr, ein Pilz oder Moos lag. Lange Straßenstreifen (bis 80 Blöcke) wurden deshalb fast immer abgelehnt. Jetzt zählt all das als Natur, und ist der längste Streifen blockiert, nimmt das Bauamt einen kürzeren. Neu: `/civ bau planung` zeigt, wer in der eigenen Gemeinde plant (ein Dorfbewohner oder ein Spieler), wie viele Streifen und Chunks geprüft wurden und woran es scheiterte (bebaut, Gelände nicht geladen, Wasser, ohne Straße, belegt).
 
 - **Schnellerer Städtebau der Dorfbewohner (Korrektur):** Mit der Straßenpflicht dauerte es Stunden bis zum ersten Haus (ein Tag im Spiel sind 20 Minuten). Das Bauamt legt jetzt die nötige Straße am ersten Tag mit Bedarf an (statt mit 40 % Wahrscheinlichkeit je Tag) und schneidet die ersten drei Grundstücke fast täglich zu (90 % statt 30 %). Der Wegebau, der Verkauf und der Bauauftrag brauchen weiter ihre Zeit.

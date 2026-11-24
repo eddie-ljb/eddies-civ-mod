@@ -221,6 +221,37 @@ public final class PlotService {
         });
     }
 
+    /**
+     * Die Leitung einer Firma kauft das angebotene Grundstück unter sich für die Firma: Der Preis kommt aus der
+     * Firmenkasse, das Grundstück gehört danach der Firma (Voraussetzung für Maschinen und {@code company_plot_required}).
+     */
+    public Reply buyForCompany(Caller caller, String companyName) {
+        Optional<PlotView> plot = plotAt(caller.player(), caller.position());
+        if (plot.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.PLOT_NONE_HERE));
+        }
+        Optional<PolityView> company = queries.companies().stream()
+                .filter(found -> found.name().value().equalsIgnoreCase(companyName.strip())).findFirst();
+        if (company.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.BUILD_UNKNOWN_FIRM, companyName.strip()));
+        }
+        if (!company.get().holds(caller.player(), de.etiennebader.civ.domain.polity.Office.MAYOR)) {
+            return Reply.failure(Message.of(MessageKey.PLOT_NOT_COMPANY_HEAD, company.get().name().value()));
+        }
+        Optional<Plot> current = queries.land(plot.get().town()).plot(plot.get().id());
+        if (current.isPresent() && current.get().holder().equals(company.get().asActor())) {
+            return Reply.failure(Message.of(MessageKey.PLOT_ALREADY_YOURS));
+        }
+        PolityId town = plot.get().town();
+        PlotId id = plot.get().id();
+        return attempt(() -> {
+            Money price = app.buyPlot().execute(new BuyPlot.Command(town, id, company.get().asActor(),
+                    calendar.today()));
+            return Reply.success(Message.of(MessageKey.PLOT_BOUGHT_FOR_COMPANY, company.get().name().value(),
+                    texts.money(price)));
+        });
+    }
+
     /** Ein Bürger vergibt Gemeindeland kostenlos an einen Spieler. */
     public Reply assign(Caller caller, String playerName) {
         Optional<PlayerRef> recipient = players.findByName(playerName.strip());
