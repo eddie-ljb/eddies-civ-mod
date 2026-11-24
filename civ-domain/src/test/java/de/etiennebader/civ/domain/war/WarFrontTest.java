@@ -41,7 +41,7 @@ class WarFrontTest {
         War war = registry.declareWar(ids, north, south, Day.ZERO);
         raise(north, 20);
         raise(south, 10);
-        BattleReport report = registry.fight(war.id(), north, BattleKind.ASSAULT, 0, 0, new Day(1));
+        BattleReport report = registry.fight(war.id(), north, BattleKind.ASSAULT, new Day(1));
         assertTrue(report.frontShift() > 0);
         assertEquals(report.front(), registry.frontOf(war.id()));
         assertEquals(2, report.woundedAggressor());
@@ -58,13 +58,22 @@ class WarFrontTest {
         raise(south, 5);
         BattleReport last = null;
         for (int day = 1; day <= 5 && registry.war(war.id()).orElseThrow().ongoing(); day++) {
-            last = registry.fight(war.id(), north, BattleKind.ASSAULT, 10, 2, new Day(day));
+            last = registry.fight(war.id(), north, BattleKind.ASSAULT, new Day(day));
         }
         assertFalse(registry.war(war.id()).orElseThrow().ongoing());
         PeaceTerms terms = last.decided().orElseThrow();
         assertEquals(north, terms.winner());
-        assertEquals(2, terms.conquest());
-        assertTrue(terms.reparations() > 0);
+        assertTrue(terms.points() >= 1, "ein Sieg bringt mindestens einen Siegpunkt");
+        assertFalse(terms.settled(), "die Punkte sind noch nicht verteilt");
+        assertEquals(0, terms.conquest());
+        assertEquals(0, terms.reparations());
+        assertEquals(1, registry.pendingSpoils().size());
+        PeaceTerms settled = registry.settleSpoils(war.id(), 30, 1, new Day(6));
+        assertTrue(settled.settled());
+        assertEquals(1, settled.conquest());
+        assertEquals(30, settled.reparations());
+        assertTrue(registry.pendingSpoils().isEmpty());
+        assertThrows(WarRuleException.class, () -> registry.settleSpoils(war.id(), 0, 0, new Day(6)));
     }
 
     @Test
@@ -74,7 +83,7 @@ class WarFrontTest {
         raise(north, 10);
         raise(south, 10);
         registry.buildHospitalBeds(north, 5);
-        registry.fight(war.id(), north, BattleKind.ASSAULT, 0, 0, new Day(1));
+        registry.fight(war.id(), north, BattleKind.ASSAULT, new Day(1));
         long hurt = registry.wounded().get(north).size();
         assertTrue(hurt > 0);
         assertTrue(registry.wounded().get(north).values().stream().allMatch(day -> day.equals(new Day(1).plus(WarRegistry.HOSPITAL_RECOVERY_DAYS))));
@@ -95,8 +104,8 @@ class WarFrontTest {
         registry.enlist(north, person(), MilitaryRank.SCOUT, Day.ZERO);
         registry.planCampaign(war.id(), north, BattleKind.AMBUSH, new Day(2), Day.ZERO);
         registry.planCampaign(war.id(), south, BattleKind.DEFENSIVE, new Day(2), Day.ZERO);
-        assertTrue(registry.runDueCampaigns(new Day(1), 0, 0).isEmpty());
-        assertEquals(2, registry.runDueCampaigns(new Day(2), 0, 0).size());
+        assertTrue(registry.runDueCampaigns(new Day(1)).isEmpty());
+        assertEquals(2, registry.runDueCampaigns(new Day(2)).size());
         assertTrue(registry.campaigns().isEmpty());
     }
 
@@ -163,7 +172,7 @@ class WarFrontTest {
         raise(north, 4);
         raise(south, 4);
         registry.train(north, Day.ZERO);
-        registry.fight(war.id(), north, BattleKind.ASSAULT, 0, 0, new Day(1));
+        registry.fight(war.id(), north, BattleKind.ASSAULT, new Day(1));
         registry.lodgeClaim(north, south, Day.ZERO);
         WarRegistry copy = WarRegistry.restore(registry.snapshot());
         assertEquals(registry.snapshot(), copy.snapshot());

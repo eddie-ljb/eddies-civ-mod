@@ -45,6 +45,37 @@ class PlotServiceTest {
     }
 
     @Test
+    @DisplayName("Straßenpflicht: Grundstücke nur an einer angelegten Straße, ausgeschrieben nur dort")
+    void plotsNeedAStreet() {
+        server.enforceStreets(true);
+        server.commands().found(at(alice, 8, 8), "Nordhain");
+        var town = server.queries().polityNamed("Nordhain").orElseThrow();
+
+        Reply refused = plots.createChunk(at(alice, 5, 5), "wohnen");
+        assertFalse(refused.success());
+        assertEquals(MessageKey.PLOT_NEEDS_STREET.key(), refused.lines().get(0).key());
+
+        server.app().streets().lay(alice, town.id(), "Hauptstrasse",
+                new de.etiennebader.civ.domain.land.Area(DimensionId.OVERWORLD, 0, 0, 15, 1),
+                de.etiennebader.civ.domain.shared.Day.of(1));
+        plots.selectCorner(at(alice, 2, 6), 1);
+        plots.selectCorner(at(alice, 10, 12), 2);
+        assertTrue(plots.createFromSelection(at(alice, 5, 5), "wohnen").success(), "an der Straße geht es");
+        plots.selectCorner(at(alice, 2, 40), 1);
+        plots.selectCorner(at(alice, 10, 46), 2);
+        assertFalse(plots.createFromSelection(at(alice, 5, 5), "wohnen").success(), "zu weit von der Straße");
+
+        // Gebaut wird der Weg erst mit dem Wegebau: bis dahin zählt die Straße nicht.
+        var street = server.queries().polity(town.id()).orElseThrow().streets().get(0);
+        server.roads().start(server.queries().polity(town.id()).orElseThrow(), street, false);
+        assertEquals(MessageKey.PLOT_NEEDS_STREET.key(), plots.offer(at(alice, 5, 8), "5").lines().get(0).key());
+        for (int i = 0; i < 20; i++) {
+            server.roads().advance(10_000);
+        }
+        assertTrue(plots.offer(at(alice, 5, 8), "5").success(), "mit gebauter Straße darf ausgeschrieben werden");
+    }
+
+    @Test
     @DisplayName("Ohne Auswahl, mit falscher Art oder als Nicht-Bürger wird abgelehnt")
     void rejectsInvalidCreation() {
         server.commands().found(at(alice, 8, 8), "Nordhain");

@@ -38,6 +38,10 @@ public sealed interface WarEvent extends DomainEvent {
     record BattleFought(WarId war, int front, Day occurredOn) implements WarEvent {
     }
 
+    /** Der Sieger hat seine Siegpunkte für Reparationen und Gebiet ausgegeben. */
+    record SpoilsSettled(WarId war, long reparations, int conquest, Day occurredOn) implements WarEvent {
+    }
+
     /** Ein Mitglied wurde verwundet und fällt bis {@code until} aus. */
     record Wounded(PolityId polity, ActorRef member, Day until, Day occurredOn) implements WarEvent {
     }

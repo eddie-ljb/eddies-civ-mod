@@ -39,6 +39,7 @@ public final class CivServerHost {
     private CivServer civ;
     private final TerritoryNotifier territoryNotifier = new TerritoryNotifier();
     private final BorderDisplay borders = new BorderDisplay();
+    private final BlueprintHolograms holograms = new BlueprintHolograms();
     private final VillagerCensus villagers = new VillagerCensus(this);
     private final ConstructionSites constructionSites = new ConstructionSites();
     private final RoadSites roadSites = new RoadSites();
@@ -122,6 +123,7 @@ public final class CivServerHost {
             territoryNotifier.tick(server, civ);
             villagers.tick(server, civ);
             borders.tick(server, civ);
+            holograms.tick(server);
             constructionSites.tick(server, civ);
             roadSites.tick(server, civ);
             logoDisplays.tick(server, civ);
@@ -181,6 +183,16 @@ public final class CivServerHost {
     /** Zeigt dem Spieler einige Sekunden lang die Gebietsgrenzen in seiner Nähe. */
     void showBorders(ServerPlayer player) {
         borders.show(player);
+    }
+
+    /** Zeigt dem Spieler das Hologramm eines Bauplans auf seinem Grundstück. */
+    void showHologram(ServerPlayer player, de.etiennebader.civ.server.construction.ConstructionService.Preview preview) {
+        holograms.show(player, preview);
+    }
+
+    /** Blendet das Hologramm des Spielers aus. @return ob eines zu sehen war */
+    boolean hideHologram(ServerPlayer player) {
+        return holograms.clear(player);
     }
 
     /** Zeigt dem Spieler einige Sekunden lang den Umriss einer Fläche. */

@@ -107,7 +107,7 @@ final class MoodScreen extends MenuScreen {
                 .build();
     }
 
-    private static Item traitItem(Trait trait) {
+    static Item traitItem(Trait trait) {
         return switch (trait) {
             case ORDERLY -> Items.SHIELD;
             case FREE_SPIRITED -> Items.FEATHER;

@@ -74,6 +74,14 @@ public final class StandardParameters {
     public static final ParameterKey<Long> INCOME_TAX_PERCENT =
             ParameterKey.constrained("income_tax_percent", Long.class, 0L, percent -> percent >= 0 && percent <= 50);
 
+    /**
+     * Ob Grundstücke nur an einer Straße zugeschnitten, ausgeschrieben und bebaut werden dürfen: Erst wird die Straße
+     * gebaut und im Grundbuch der Gemeinde angelegt ({@code /civ strasse anlegen}), dann folgen Grundstücke und Häuser
+     * (höchstens {@code Addresses.REACH} Blöcke von der Straße entfernt).
+     */
+    public static final ParameterKey<Boolean> STREET_REQUIRED =
+            ParameterKey.of("street_required", Boolean.class, true);
+
     /** Ob Bauprojekte auf Grundstücken der Gemeinde vom Bauamt genehmigt werden müssen (Issue #19). */
     public static final ParameterKey<Boolean> BUILD_PERMIT_REQUIRED =
             ParameterKey.of("build_permit_required", Boolean.class, false);
@@ -276,9 +284,19 @@ public final class StandardParameters {
     public static final ParameterKey<Long> WAR_WILL_THRESHOLD = ParameterKey.constrained(
             "war_will_threshold", Long.class, 50L, value -> value >= 0 && value <= 100);
 
-    /** Grenz-Chunks, die der Sieger eines entschiedenen Kriegs fordert (0 = keine Gebietseroberung). */
+    /**
+     * Höchstzahl Grenz-Chunks, die der Sieger eines entschiedenen Kriegs insgesamt erobern darf (0 = keine
+     * Gebietseroberung). Wie viele es tatsächlich werden, bestimmen seine Siegpunkte ({@link #CONQUEST_POINTS_PER_CHUNK}).
+     */
     public static final ParameterKey<Long> CONQUEST_CHUNKS_PER_WIN = ParameterKey.constrained(
             "conquest_chunks_per_win", Long.class, 2L, value -> value >= 0 && value <= 16);
+
+    /**
+     * Siegpunkte, die ein erobertes Grenz-Chunk kostet. Der Sieger erhält je Soldat Kräftevorsprung einen Siegpunkt und
+     * gibt ihn für Chunks oder Reparationen aus (ein Punkt Reparationen = {@link #WAR_REPARATIONS_PER_STRENGTH_POINT}).
+     */
+    public static final ParameterKey<Long> CONQUEST_POINTS_PER_CHUNK = ParameterKey.constrained(
+            "conquest_points_per_chunk", Long.class, 4L, value -> value >= 1 && value <= 100);
 
     /** Kosten je Soldat für eine Stufe Ausbildung, aus der Gemeindekasse (kleinste Währungseinheit). */
     public static final ParameterKey<Long> TRAINING_COST_PER_HEAD = ParameterKey.constrained(
@@ -341,6 +359,7 @@ public final class StandardParameters {
                 VOTE_DAYS,
                 SALES_TAX_PERCENT,
                 INCOME_TAX_PERCENT,
+                STREET_REQUIRED,
                 BUILD_PERMIT_REQUIRED,
                 BUILD_PERMIT_FEE,
                 MAX_TENANTS_PER_PLOT,
@@ -384,6 +403,7 @@ public final class StandardParameters {
                 HOME_PORT_COOLDOWN_SECONDS,
                 WAR_WILL_THRESHOLD,
                 CONQUEST_CHUNKS_PER_WIN,
+                CONQUEST_POINTS_PER_CHUNK,
                 TRAINING_COST_PER_HEAD,
                 EQUIPMENT_COST_PER_HEAD,
                 HOSPITAL_BED_COST,

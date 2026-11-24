@@ -28,7 +28,16 @@ public final class CivServerFixture {
     }
 
     public static CivServerFixture start(IdGenerator ids, ServerSettings settings) {
-        return new CivServerFixture(CivServer.start(new MemoryStateStore(), settings, ids, SaveListener.NONE));
+        CivServerFixture fixture = new CivServerFixture(
+                CivServer.start(new MemoryStateStore(), settings, ids, SaveListener.NONE));
+        // Die meisten Tests handeln nicht von Straßen: ohne Straßenpflicht starten; StreetRuleTest schaltet sie an.
+        fixture.server.streetAccess().enforced(false);
+        return fixture;
+    }
+
+    /** Schaltet die Straßenpflicht (Grundstücke und Häuser nur an gebauten Straßen) an oder ab. */
+    public void enforceStreets(boolean enforced) {
+        server.streetAccess().enforced(enforced);
     }
 
     public CivCommands commands() {

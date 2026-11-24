@@ -35,6 +35,12 @@ public final class MenuOpener {
                 () -> Feedback.reply(player, civ.commands().describeTownHall(seat)));
     }
 
+    /** Das Menü eines Dorfbewohners: Auskunft und Handlungen (reden, beeinflussen, Post). */
+    public static void villager(CivServer civ, ServerPlayer player, de.etiennebader.civ.domain.actor.PersonRef villager) {
+        Feedback.click(player);
+        Screens.open(player, new de.etiennebader.civ.fabric.screen.VillagerScreen(civ, player, villager));
+    }
+
     /** Die Verfassung der Gemeinde, in deren Gebiet der Block steht; in der Wildnis ein Hinweis. */
     public static void constitution(CivServer civ, ServerPlayer player, BlockPosition position) {
         civ.constitutions().governing(position).ifPresentOrElse(

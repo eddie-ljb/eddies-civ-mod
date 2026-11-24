@@ -3,7 +3,14 @@
 ## Umgesetzt
 - **Kriegsgrundlage** (`civ-domain/.../war`, `WarService`): Kriegserklärung, Garnison, Gefecht, Frieden, Neutralität gegen
   Gebühr, Sold aus der Gemeindekasse, Reparationen; kriegerische Dorfbewohner melden sich selbst.
-- **Gebietseroberung:** der Sieger erobert Grenz-Chunks ohne Grundstücke (`conquest_chunks_per_win`).
+- **Gebietseroberung und Reparationen per Siegpunkten:** Ein entschiedener Krieg gibt dem Sieger Siegpunkte (ein Punkt je
+  Soldat Kräftevorsprung, `WarRegistry.victoryPoints`, mindestens einer; `PeaceTerms.points`). Der Bürgermeister des Siegers gibt sie
+  mit `/civ krieg beute <Nr> <Chunks> <Punkte für Reparationen>` aus (`WarService.spoils`): ein Grenz-Chunk ohne Grundstücke kostet
+  `conquest_points_per_chunk` Punkte (Standard 4), höchstens `conquest_chunks_per_win` Chunks (Obergrenze, Standard 2), ein Punkt
+  Reparationen bringt `war_reparations_per_strength_point`. Chunks, die sich nicht erobern lassen (nicht angrenzend, mit Grundstücken, der
+  Sitz, letzter Chunk des Verlierers), werden als Reparationen verrechnet. Offene Punkte verteilt das Spiel nach 3 Tagen selbst
+  (`WarService.SPOILS_DAYS`: so viele Chunks wie möglich, Rest Reparationen); Dorfbewohner-Bürgermeister verteilen sofort.
+  Persistenz: `WAR`-Zeilen in `war.tsv` tragen zusätzlich Punkte und „verteilt“ (alte Zeilen laden als verteilt).
 - **Feldzüge und Schlachtplanung:** Angriff, Hinterhalt (mit Ausspähern) und Verteidigung werden für einen Tag geplant
   (`BattleKind`, `Campaign`) und am Tagesende ausgetragen; Entscheidungsschlacht beendet den Krieg.
 - **Ausspäher** (`MilitaryRank.SCOUT`), **Frontverlauf** (`WarRegistry.frontOf`) im Spiel (`/civ krieg front`) und im Web

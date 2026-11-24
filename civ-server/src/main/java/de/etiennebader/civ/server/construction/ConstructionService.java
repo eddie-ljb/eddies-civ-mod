@@ -200,6 +200,13 @@ public final class ConstructionService {
         return library;
     }
 
+    public synchronized void streetAccess(de.etiennebader.civ.server.road.StreetAccess streets) {
+        this.streets = streets;
+        this.planning.streetAccess(streets);
+    }
+
+    private de.etiennebader.civ.server.road.StreetAccess streets;
+
     public synchronized List<ConstructionProject> projects() {
         return new ArrayList<>(projects.values());
     }
@@ -291,6 +298,54 @@ public final class ConstructionService {
         } catch (DomainException e) {
             return Reply.failure(texts.error(e));
         }
+    }
+
+    /** Wo und wie ein Bauplan stünde: Ecke (Höhe nur ungefähr), Drehung und Plan; Grundlage des Hologramms. */
+    public record Preview(BlockPosition origin, int rotation, Blueprint plan) {
+    }
+
+    /** Antwort an den Spieler, dazu die Vorschau, wenn der Plan auf das Grundstück passt. */
+    public record PreviewResult(Reply reply, Optional<Preview> preview) {
+
+        static PreviewResult failure(Reply reply) {
+            return new PreviewResult(reply, Optional.empty());
+        }
+    }
+
+    /**
+     * Wo der Plan {@code planName} auf dem Grundstück unter dem Spieler stünde, mit derselben Platzierung wie beim
+     * Bauauftrag (mittig, Drehung zur Straße oder die gewünschte). Baut nichts und kostet nichts; der Mod zeigt daraus
+     * ein Hologramm.
+     */
+    public synchronized PreviewResult preview(Caller caller, String planName, int degrees) {
+        if (degrees != AUTO && (degrees < 0 || degrees % 90 != 0 || degrees > 270)) {
+            return PreviewResult.failure(Reply.failure(Message.of(MessageKey.BUILD_BAD_ROTATION)));
+        }
+        Optional<Blueprint> plan = library.find(planName);
+        if (plan.isEmpty()) {
+            return PreviewResult.failure(Reply.failure(Message.of(MessageKey.BUILD_UNKNOWN_PLAN, planName.strip())));
+        }
+        Optional<PolityId> townId = queries.territory().sovereignOf(caller.chunk());
+        Optional<Plot> plot = townId.flatMap(id -> queries.land(id)
+                .plotAt(caller.position().dimension(), caller.position().x(), caller.position().z()));
+        if (plot.isEmpty()) {
+            return PreviewResult.failure(Reply.failure(Message.of(MessageKey.BUILD_NO_PLOT)));
+        }
+        PolityView town = queries.polity(townId.get()).orElseThrow();
+        int rotation = degrees == AUTO ? facingStreet(town, plot.get(), plan.get()) : degrees / 90;
+        int footprintX = plan.get().footprintX(rotation);
+        int footprintZ = plan.get().footprintZ(rotation);
+        var area = plot.get().area();
+        if (footprintX > area.width() || footprintZ > area.depth()) {
+            return PreviewResult.failure(Reply.failure(Message.of(MessageKey.BUILD_TOO_BIG, plan.get().name(),
+                    footprintX, footprintZ, area.width(), area.depth())));
+        }
+        int originX = area.minX() + (int) ((area.width() - footprintX) / 2);
+        int originZ = area.minZ() + (int) ((area.depth() - footprintZ) / 2);
+        Preview preview = new Preview(new BlockPosition(area.dimension(), originX, caller.position().y(), originZ),
+                rotation, plan.get());
+        return new PreviewResult(Reply.success(Message.of(MessageKey.BUILD_PREVIEW, plan.get().name(), footprintX,
+                footprintZ, plan.get().sizeY(), rotation * 90)), Optional.of(preview));
     }
 
     private ConstructionProject startReview(ConstructionProject project, PlayerRef contractor,
@@ -527,6 +582,10 @@ public final class ConstructionService {
         }
         if (queries.production().enterpriseOf(firm.id()).map(e -> e.branch() != Branch.CONSTRUCTION).orElse(true)) {
             throw new BuildRefused(Message.of(MessageKey.BUILD_NOT_CONSTRUCTION, firm.name().value()));
+        }
+        if (streets != null && !streets.served(town, plot.area())) {
+            throw new BuildRefused(Message.of(MessageKey.BUILD_NEEDS_STREET,
+                    de.etiennebader.civ.server.road.StreetAccess.reach()));
         }
         if (rotation == AUTO) {
             rotation = facingStreet(town, plot, plan);

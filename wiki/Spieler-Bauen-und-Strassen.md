@@ -4,6 +4,14 @@
 
 Hier steht alles zu Bauaufträgen, Baustellen, Straßen und dem Wegebau, für Spieler und für Dorfbewohner.
 
+## Erst die Straße, dann das Haus
+Grundstücke und Häuser gibt es nur an Straßen (Gesetz `street_required`, Standard ja):
+1. Bürgermeister oder Bauamt legen die Straße an (`/civ strasse anlegen <Name>`) und bauen den Weg (Wegebau unten) oder bauen ihn von Hand und tragen ihn danach ein.
+2. Erst wenn die Straße eingetragen und, falls ein Wegebau läuft, fertig ist, lässt sich in höchstens 12 Blöcken Abstand ein Grundstück zuschneiden und ausschreiben.
+3. Ein Bauauftrag braucht ein Grundstück an einer solchen Straße. Sonst meldet das Spiel, dass erst eine Straße gebaut werden muss.
+
+Dorfbewohner als Bauamt gehen genauso vor: erst die Straße samt Weg, dann die Grundstücke. Das Gesetz lässt sich pro Gemeinde abschalten.
+
 ## Bauaufträge
 Der Inhaber eines Grundstücks beauftragt eine **Baufirma** (Branche `bau`). Die Bauarbeiter, angestellte Dorfbewohner, setzen den Plan sichtbar Stück für Stück.
 
@@ -11,6 +19,7 @@ Der Inhaber eines Grundstücks beauftragt eine **Baufirma** (Branche `bau`). Die
 |---|---|
 | `/civ bau plaene` | alle Bauvorlagen (57 eingebaute in den Stilen `holz`, `stein`, `ziegel`, dazu eigene Pläne) |
 | `/civ bau beauftragen <Plan> "<Firma>" [material firma\|selbst] [Drehung]` | Bau auf dem Grundstück unter dir beauftragen |
+| `/civ bau vorschau <Plan> [Drehung]` / `vorschau aus` | Hologramm des Bauwerks auf dem Grundstück unter dir (45 Sekunden), ohne zu beauftragen; ein neuer Auftrag zeigt es ebenfalls |
 | `/civ bau liste` / `material <Nr>` / `abbrechen <Nr>` | Aufträge, Material liefern, abbrechen |
 | `/civ bau genehmigen <Nr>` / `ablehnen <Nr>` | Baugenehmigung durch das Bauamt (Gesetz `build_permit_required`) |
 | `/civ bau selbstbau <Plan> "<Firma>" <Spieler>` | ein Spieler baut selbst im Auftrag der Firma |

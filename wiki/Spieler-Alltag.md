@@ -39,7 +39,7 @@ Dorfbewohner haben einen stabilen Vor- und Nachnamen. Bei Namensgleichheit unter
 
 Ein Minecraft-Namensschild überschreibt weiterhin den sichtbaren Minecraft-Namen, ändert aber weder die bürgerliche Identität noch die Registernummer. In Wahlbefehlen kann der vollständige Name in Anführungszeichen oder die Registernummer angegeben werden.
 
-Schleichen + Rechtsklick mit leerer Hand auf einen Dorfbewohner zeigt seine Auskunft (Name, Gemeinde, Persönlichkeit, Stimmung, Anschrift, Arbeitgeber, letzte Post). Darüber hinaus:
+Schleichen + Rechtsklick mit leerer Hand auf einen Dorfbewohner öffnet sein **Menü**: Name und Registernummer, Persönlichkeit, Stimmung mit allen Einflüssen und die Auskunft (Gemeinde, Loyalität, Bildung, Anschrift, Arbeitgeber, Familie, letzte Post). Im Menü lässt sich auch gleich handeln: Reden (vier Themen), politisch beeinflussen und Post schicken. Dieselbe Auskunft steht als Befehl im Chat, `/civ dorfbewohner info` (das Menü öffnet `/civ dorfbewohner menue`). Die Handlungen gibt es auch als Befehle:
 - **Reden:** `/civ dorfbewohner reden <Thema>` (`greeting`, `weather`, `work`, `politics`) – die Antwort richtet sich nach seiner aktuellen Stimmung (zufrieden, gleichgültig, unzufrieden).
 - **Beeinflussen:** `/civ dorfbewohner beeinflussen` hebt die Stimmung des angesehenen bzw. nächsten Dorfbewohners ein wenig an – höchstens alle 3 Tage je Spieler-Dorfbewohner-Paar, sonst wirkt es nicht.
 - **Post:** `/civ dorfbewohner post <Thema>` schickt ihm einen vorformulierten Gruß; die letzte Post erscheint in seiner Auskunft. Das ist eine eigene, bewusst einfache Pinnwand nur für Dorfbewohner – für echte Briefe zwischen Spielern gilt weiterhin der Briefkasten oben.
