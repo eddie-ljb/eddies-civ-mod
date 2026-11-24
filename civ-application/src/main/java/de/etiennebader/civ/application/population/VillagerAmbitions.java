@@ -88,6 +88,15 @@ public final class VillagerAmbitions {
     private final Trading trading;
     private final TakeOverCompany takeOver;
     private final ClaimChunk claimChunk;
+    private volatile java.util.function.Predicate<ChunkCoord> claimable = chunk -> true;
+
+    /**
+     * Welche Chunks Dorfbewohner als Bürgermeister überhaupt beanspruchen (Land statt Wasser); das Spiel in der Welt
+     * setzt das, ohne Angabe ist jeder Chunk recht.
+     */
+    public void claimable(java.util.function.Predicate<ChunkCoord> claimable) {
+        this.claimable = Objects.requireNonNull(claimable, "claimable");
+    }
 
     public VillagerAmbitions(Supplier<WorldQueries> queries, CompanyUseCases companies, FoundParty foundParty,
                              StandForElection standForElection, Trading trading, TakeOverCompany takeOver,
@@ -242,7 +251,7 @@ public final class VillagerAmbitions {
                         .thenComparingInt(ChunkCoord::z)).toList();
         for (ChunkCoord chunk : own) {
             for (ChunkCoord candidate : chunk.neighbours()) {
-                if (territory.claimAt(candidate).isPresent()) {
+                if (territory.claimAt(candidate).isPresent() || !claimable.test(candidate)) {
                     continue;
                 }
                 long foreign = candidate.neighbours().stream()

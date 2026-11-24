@@ -72,6 +72,13 @@ public final class VillagerFoundations {
     /** Anteil der Gründungsgebühr, den ein Dorfbewohner als Siedler zahlt. */
     static final int SETTLER_FEE_PERCENT = 20;
 
+    private java.util.function.Predicate<ChunkCoord> habitable = chunk -> true;
+
+    /** Welche Chunks als Ort einer neuen Gemeinde taugen (Land statt Wasser); ohne Angabe jeder freie. */
+    public void habitable(java.util.function.Predicate<ChunkCoord> habitable) {
+        this.habitable = Objects.requireNonNull(habitable, "habitable");
+    }
+
     private java.util.function.BiConsumer<PolityId, PolityId> founded = (home, created) -> { };
 
     /** Wer erfahren soll, dass aus einer Heimatgemeinde heraus eine neue entstand (Kultur und Rasse erben). */
@@ -237,7 +244,7 @@ public final class VillagerFoundations {
     Optional<BlockPosition> site(BlockPosition seen) {
         TerritoryView territory = app.queries().territory();
         ChunkCoord origin = seen.chunk();
-        if (isFree(territory, origin)) {
+        if (isFree(territory, origin) && habitable.test(origin)) {
             return Optional.of(seen);
         }
         ChunkCoord best = null;
@@ -249,7 +256,7 @@ public final class VillagerFoundations {
                     continue;
                 }
                 ChunkCoord candidate = new ChunkCoord(origin.dimension(), origin.x() + dx, origin.z() + dz);
-                if (isFree(territory, candidate)) {
+                if (isFree(territory, candidate) && habitable.test(candidate)) {
                     best = candidate;
                     bestDistance = distance;
                 }

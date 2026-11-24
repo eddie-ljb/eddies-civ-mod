@@ -372,6 +372,7 @@
   "eddies-civ-mod.law.build_permit_required": "Bauprojekte brauchen eine Baugenehmigung",
   "eddies-civ-mod.command.plot_needs_street": "Hier gibt es keine Straße: Ein Grundstück darf höchstens %1$s Blöcke von einer angelegten und gebauten Straße der Gemeinde entfernt liegen. Erst Straße bauen und mit /civ strasse anlegen eintragen.",
   "eddies-civ-mod.command.build_needs_street": "Das Grundstück liegt an keiner Straße: Erst muss die Gemeinde eine Straße bauen und mit /civ strasse anlegen eintragen (höchstens %1$s Blöcke vom Grundstück).",
+  "eddies-civ-mod.command.build_on_water": "Hier ist Wasser: Gebäude stehen an Land. Nur Wassergebäude wie Leuchtturm und Schiff (oder Steg, Hafen, Brücke) dürfen aufs Wasser; wähle ein Grundstück an Land.",
   "eddies-civ-mod.law.street_required": "Grundstücke und Häuser nur an einer gebauten, eingetragenen Straße",
   "eddies-civ-mod.law.build_permit_fee": "Gebühr für eine Baugenehmigung",
   "eddies-civ-mod.law.max_tenants_per_plot": "Höchstzahl der Mieter je Grundstück (Mehrfamilienhäuser)",

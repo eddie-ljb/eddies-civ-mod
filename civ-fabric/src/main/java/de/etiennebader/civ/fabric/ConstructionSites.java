@@ -283,7 +283,7 @@ final class ConstructionSites {
             case 3 -> Rotation.COUNTERCLOCKWISE_90;
             default -> Rotation.NONE;
         };
-        if (build.first()) {
+        if (build.first() && !build.afloat()) {
             excavate(level, build);
         }
         BlockPos last = null;
@@ -296,7 +296,7 @@ final class ConstructionSites {
             }
             BlockState turned = state.rotate(rotation);
             level.setBlock(pos, turned, Block.UPDATE_ALL);
-            if (placement.y() == 0) {
+            if (placement.y() == 0 && !build.afloat()) {
                 foundation(level, pos, turned);
             }
             last = pos;

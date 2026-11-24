@@ -169,6 +169,21 @@ class ConstructionServiceTest {
     }
 
     @Test
+    @DisplayName("Land vor Wasser: Häuser nur an Land, Leuchtturm und Schiff auch im Wasser")
+    void housesOnlyOnLand() {
+        setUp();
+        server.landRules().survey(area -> java.util.Optional.of(100)); // alles Wasser
+        assertTrue(has(server.construction().order(aliceAt, "holz-huette", "Bau AG"), MessageKey.BUILD_ON_WATER));
+        assertTrue(has(server.construction().preview(aliceAt, "holz-huette", 0).reply(), MessageKey.BUILD_ON_WATER));
+        assertTrue(server.construction().order(aliceAt, "leuchtturm", "Bau AG").success(), "Wassergebäude gehen");
+        var build = server.construction().advance(2_000, FLAT).getFirst();
+        assertTrue(build.afloat(), "Wassergebäude schwimmen: kein Fundament");
+        server.construction().cancel(aliceAt, 1);
+        server.landRules().survey(area -> java.util.Optional.of(0)); // trocken
+        assertTrue(server.construction().order(aliceAt, "holz-huette", "Bau AG").success(), "an Land geht es");
+    }
+
+    @Test
     @DisplayName("Ist das Baufeld nicht frei, ruht die Baustelle und der Bauherr bekommt eine Nachricht")
     void blockedSite() {
         setUp();
@@ -211,7 +226,7 @@ class ConstructionServiceTest {
     @DisplayName("Eingebaute Pläne: drei Stile mit Wohn-, Gewerbe-, Industrie-, Land- und kommunalen Bauten")
     void builtIns() {
         List<Blueprint> plans = BuiltInBlueprints.all();
-        assertEquals(57, plans.size());
+        assertEquals(59, plans.size());
         for (var type : de.etiennebader.civ.domain.land.PlotType.values()) {
             if (type != de.etiennebader.civ.domain.land.PlotType.EMBASSY) {
                 assertTrue(plans.stream().anyMatch(plan -> BuiltInBlueprints.plotTypesOf(plan).contains(type)),

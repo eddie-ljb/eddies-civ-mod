@@ -118,6 +118,7 @@ public final class CivServerHost {
             return;
         }
         try {
+            civ.landRules().survey(WaterSurvey.of(server));
             civ.tick().ifPresent(report -> Components.broadcast(server, civ.commands().newDay(report)));
             civ.takeAnnouncements().forEach(announcement -> announce(server, civ, announcement));
             territoryNotifier.tick(server, civ);

@@ -79,7 +79,55 @@ public final class BuiltInBlueprints {
             plans.add(pavilion(style, id + "-pavillon"));
             plans.add(park(style, id + "-park"));
         }
+        plans.add(lighthouse());
+        plans.add(ship());
         return plans;
+    }
+
+    /**
+     * Ein Leuchtturm: Sockel, schlanker Turm, Galerie, Laternenraum mit Seelaterne. Ein Wassergebäude; niemand wählt es
+     * von selbst, Spieler bestellen es am Ufer oder im Wasser.
+     */
+    private static Blueprint lighthouse() {
+        Grid grid = new Grid(5, 17, 5);
+        String brick = "minecraft:stone_bricks";
+        grid.fill(0, 0, 0, 4, 0, 4, brick);
+        grid.shell(0, 1, 0, 4, 4, 4, brick);
+        for (int y = 5; y <= 11; y++) {
+            grid.shell(1, y, 1, 3, y, 3, y % 3 == 0 ? "minecraft:red_terracotta" : "minecraft:white_terracotta");
+        }
+        grid.fill(0, 12, 0, 4, 12, 4, "minecraft:stone_brick_slab");
+        grid.shell(1, 13, 1, 3, 14, 3, "minecraft:glass");
+        grid.set(2, 13, 2, "minecraft:sea_lantern");
+        grid.fill(1, 15, 1, 3, 15, 3, "minecraft:stone_brick_slab");
+        grid.set(2, 16, 2, "minecraft:lightning_rod");
+        grid.set(2, 1, 0, "minecraft:iron_door[half=lower]");
+        grid.set(2, 2, 0, "minecraft:iron_door[half=upper]");
+        return grid.build("leuchtturm", "wasser", 1);
+    }
+
+    /** Ein Segelschiff: spitzer Rumpf, Deck mit Reling, Mast und Segel. Ein Wassergebäude. */
+    private static Blueprint ship() {
+        Grid grid = new Grid(5, 11, 15);
+        String planks = "minecraft:oak_planks";
+        for (int z = 0; z < 15; z++) {
+            int half = z == 0 || z == 14 ? 0 : z <= 2 || z >= 12 ? 1 : 2;
+            grid.fill(2 - half, 0, z, 2 + half, 0, z, planks);
+            grid.set(2 - half, 1, z, planks);
+            grid.set(2 + half, 1, z, planks);
+            grid.set(2 - half, 2, z, planks);
+            grid.set(2 + half, 2, z, planks);
+            grid.fill(2 - half, 3, z, 2 + half, 3, z, "minecraft:spruce_planks");
+            if (z > 0 && z < 14) {
+                grid.set(2 - half, 4, z, "minecraft:oak_fence");
+                grid.set(2 + half, 4, z, "minecraft:oak_fence");
+            }
+        }
+        grid.fill(2, 4, 6, 2, 10, 6, "minecraft:oak_log");
+        grid.fill(2, 5, 4, 2, 9, 8, "minecraft:white_wool");
+        grid.set(2, 4, 6, "minecraft:oak_log");
+        grid.set(2, 4, 12, "minecraft:lantern");
+        return grid.build("schiff", "wasser", 1);
     }
 
     /**

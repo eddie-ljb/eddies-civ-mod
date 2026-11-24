@@ -86,7 +86,8 @@ public final class ConstructionService {
      * @param workers die Bauarbeiter (Angestellte der Firma), die sichtbar zur Baustelle gehen sollen
      */
     public record Build(UUID project, BlockPosition origin, int rotation, List<Blueprint.Placement> blocks,
-                        List<UUID> workers, boolean first, int footprintX, int footprintZ, int sizeY) {
+                        List<UUID> workers, boolean first, int footprintX, int footprintZ, int sizeY,
+                        boolean afloat) {
     }
 
     /**
@@ -198,6 +199,19 @@ public final class ConstructionService {
 
     public BlueprintLibrary library() {
         return library;
+    }
+
+    /** Land vor Wasser: Häuser nur an Land, Wassergebäude (Leuchtturm, Schiff …) auch im Wasser. */
+    public synchronized void landRules(de.etiennebader.civ.server.land.LandRules land) {
+        this.land = land;
+        this.planning.landRules(land);
+    }
+
+    private de.etiennebader.civ.server.land.LandRules land;
+
+    /** Ob das Baufeld an Land liegt oder der Plan ein Wassergebäude ist. */
+    private boolean buildable(Blueprint plan, de.etiennebader.civ.domain.land.Area footprint) {
+        return land == null || plan.isWaterBuilding() || land.isLandPlot(footprint);
     }
 
     public synchronized void streetAccess(de.etiennebader.civ.server.road.StreetAccess streets) {
@@ -342,6 +356,10 @@ public final class ConstructionService {
         }
         int originX = area.minX() + (int) ((area.width() - footprintX) / 2);
         int originZ = area.minZ() + (int) ((area.depth() - footprintZ) / 2);
+        if (!buildable(plan.get(), new de.etiennebader.civ.domain.land.Area(area.dimension(), originX, originZ,
+                originX + footprintX - 1, originZ + footprintZ - 1))) {
+            return PreviewResult.failure(Reply.failure(Message.of(MessageKey.BUILD_ON_WATER)));
+        }
         Preview preview = new Preview(new BlockPosition(area.dimension(), originX, caller.position().y(), originZ),
                 rotation, plan.get());
         return new PreviewResult(Reply.success(Message.of(MessageKey.BUILD_PREVIEW, plan.get().name(), footprintX,
@@ -599,6 +617,12 @@ public final class ConstructionService {
         if (projects.values().stream().anyMatch(p -> p.plot().equals(plot.id()) && p.status().isActive())) {
             throw new BuildRefused(Message.of(MessageKey.BUILD_ALREADY));
         }
+        int footX = plot.area().minX() + (int) ((plot.area().width() - footprintX) / 2);
+        int footZ = plot.area().minZ() + (int) ((plot.area().depth() - footprintZ) / 2);
+        if (!buildable(plan, new de.etiennebader.civ.domain.land.Area(plot.area().dimension(), footX, footZ,
+                footX + footprintX - 1, footZ + footprintZ - 1))) {
+            throw new BuildRefused(Message.of(MessageKey.BUILD_ON_WATER));
+        }
         boolean permit = queries.effectiveLaws(town).valueOf(StandardParameters.BUILD_PERMIT_REQUIRED);
         int originX = plot.area().minX() + (int) ((plot.area().width() - footprintX) / 2);
         int originZ = plot.area().minZ() + (int) ((plot.area().depth() - footprintZ) / 2);
@@ -841,7 +865,7 @@ public final class ConstructionService {
             builds.add(new Build(current.id(), new BlockPosition(current.dimension(), current.originX(),
                     current.originY().orElseThrow(), current.originZ()), current.rotation(), blocks,
                     workers(firm.get()).stream().map(ActorRef::uuid).toList(), current.placed() == 0, fx, fz,
-                    plan.get().sizeY()));
+                    plan.get().sizeY(), plan.get().isWaterBuilding()));
         }
         return builds;
     }

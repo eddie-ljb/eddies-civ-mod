@@ -372,6 +372,7 @@
   "eddies-civ-mod.law.build_permit_required": "Building projects need a building permit",
   "eddies-civ-mod.command.plot_needs_street": "There is no road here: a plot may be at most %1$s blocks from a laid and built road of the town. Build the road first and register it with /civ street create.",
   "eddies-civ-mod.command.build_needs_street": "The plot is not on a road: the town must first build a road and register it with /civ street create (at most %1$s blocks from the plot).",
+  "eddies-civ-mod.command.build_on_water": "This is water: buildings stand on land. Only water buildings such as a lighthouse or a ship (or a pier, harbour, bridge) may go on the water; choose a plot on land.",
   "eddies-civ-mod.law.street_required": "Plots and houses only on a built, registered road",
   "eddies-civ-mod.law.build_permit_fee": "Fee for a building permit",
   "eddies-civ-mod.law.max_tenants_per_plot": "Maximum tenants per plot (multi-family houses)",
