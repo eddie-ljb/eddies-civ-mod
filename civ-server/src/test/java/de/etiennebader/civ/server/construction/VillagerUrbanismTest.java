@@ -156,6 +156,19 @@ class VillagerUrbanismTest {
     }
 
     @Test
+    @DisplayName("Land vor Wasser: Auf Wasser legt das Bauamt weder Straßen noch Grundstücke an")
+    void villagerPlannerAvoidsWater() {
+        server.landRules().survey(area -> java.util.Optional.of(100));
+        setUp(8);
+        for (int day = 2; day < 200; day++) {
+            server.construction().villagersOrder(Day.of(day));
+        }
+        PolityView updated = server.queries().polity(town.id()).orElseThrow();
+        assertTrue(updated.streets().isEmpty(), "keine Straße im Wasser");
+        assertTrue(server.queries().land(town.id()).plots().isEmpty(), "keine Grundstücke im Wasser");
+    }
+
+    @Test
     @DisplayName("Dorfbewohner kaufen angebotenes Wohnland und lassen darauf bauen")
     void villagersBuyLandAndBuild() {
         setUp(8);

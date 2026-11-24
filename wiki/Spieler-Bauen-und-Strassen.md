@@ -4,6 +4,9 @@
 
 Hier steht alles zu Bauaufträgen, Baustellen, Straßen und dem Wegebau, für Spieler und für Dorfbewohner.
 
+## Land vor Wasser
+Gemeinden beanspruchen nur Land: Dorfbewohner als Bürgermeister claimen keine Chunks mit mehr als 35 % Wasser und gründen dort keine Gemeinden. Straßen, Grundstücke und Häuser entstehen nur an Land (höchstens 5 % Wasser im Baufeld, 10 % bei Straßen); ein Bauauftrag im Wasser wird abgelehnt. Ausnahme sind **Wassergebäude** wie Leuchtturm und Schiff (eingebaut als `leuchtturm` und `schiff`; auch eigene Pläne mit Namen wie `steg`, `hafen`, `bruecke`, `boot` oder dem Stil `wasser`): Sie dürfen auf dem Wasser stehen, schwimmen ohne Fundament, und Dorfbewohner wählen sie nicht von selbst.
+
 ## Erst die Straße, dann das Haus
 Grundstücke und Häuser gibt es nur an Straßen (Gesetz `street_required`, Standard ja):
 1. Bürgermeister oder Bauamt legen die Straße an (`/civ strasse anlegen <Name>`) und bauen den Weg (Wegebau unten) oder bauen ihn von Hand und tragen ihn danach ein.
@@ -17,7 +20,7 @@ Der Inhaber eines Grundstücks beauftragt eine **Baufirma** (Branche `bau`). Die
 
 | Befehl | Wirkung |
 |---|---|
-| `/civ bau plaene` | alle Bauvorlagen (57 eingebaute in den Stilen `holz`, `stein`, `ziegel`, dazu eigene Pläne) |
+| `/civ bau plaene` | alle Bauvorlagen (59 eingebaute: 57 in den Stilen `holz`, `stein`, `ziegel`, dazu die Wassergebäude `leuchtturm` und `schiff` und eigene Pläne) |
 | `/civ bau beauftragen <Plan> "<Firma>" [material firma\|selbst] [Drehung]` | Bau auf dem Grundstück unter dir beauftragen |
 | `/civ bau vorschau <Plan> [Drehung]` / `vorschau aus` | Hologramm des Bauwerks auf dem Grundstück unter dir (45 Sekunden), ohne zu beauftragen; ein neuer Auftrag zeigt es ebenfalls |
 | `/civ bau liste` / `material <Nr>` / `abbrechen <Nr>` | Aufträge, Material liefern, abbrechen |

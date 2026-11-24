@@ -113,6 +113,7 @@ public final class CivServer {
     private final de.etiennebader.civ.server.road.StreetAccess streetAccess;
     private final de.etiennebader.civ.server.family.FamilyService family;
     private final de.etiennebader.civ.server.culture.CultureService culture;
+    private final de.etiennebader.civ.server.land.LandRules landRules = new de.etiennebader.civ.server.land.LandRules();
     private final de.etiennebader.civ.server.machine.MachineService machines;
     private final de.etiennebader.civ.server.religion.ReligionService religion;
     private final VillagerService villagers;
@@ -230,6 +231,9 @@ public final class CivServer {
         this.villagerFoundations = new de.etiennebader.civ.server.villager.VillagerFoundations(app, villagers::lastSeen,
                 announcements, settings.founding(), villagers::relocate);
         this.villagerFoundations.founded(culture::inherit);
+        this.villagerFoundations.habitable(landRules::isLandChunk);
+        app.villagerAmbitions().claimable(landRules::isLandChunk);
+        this.construction.landRules(landRules);
         this.townHalls = new TownHallService(app, calendar, texts, announcements);
         this.shops = new ShopService(app, calendar, settings.currency(), texts);
         this.civil = new CivilService(app, calendar, players, settings.currency(), texts, announcements,
@@ -472,6 +476,10 @@ public final class CivServer {
 
     public TownService towns() {
         return towns;
+    }
+
+    public de.etiennebader.civ.server.land.LandRules landRules() {
+        return landRules;
     }
 
     public de.etiennebader.civ.server.culture.CultureService culture() {

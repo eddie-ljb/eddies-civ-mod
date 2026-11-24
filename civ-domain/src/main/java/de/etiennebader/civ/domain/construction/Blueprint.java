@@ -39,6 +39,20 @@ public record Blueprint(String name, String style, int units, int sizeX, int siz
     public record Door(int x, int y, int z, int outward) {
     }
 
+    /** Namensteile von Wassergebäuden: Sie dürfen auf dem Wasser stehen, alle anderen Gebäude nur an Land. */
+    private static final List<String> WATER_WORDS = List.of("leuchtturm", "lighthouse", "schiff", "ship", "boot",
+            "boat", "hafen", "harbor", "harbour", "steg", "pier", "werft", "shipyard", "bruecke", "bridge");
+
+    /**
+     * Ob es ein Wassergebäude ist (Leuchtturm, Schiff, Steg, Hafen, Brücke …): Nur solche Pläne werden auf dem Wasser
+     * gebaut, alle anderen an Land. Erkannt am Namen oder am Stil {@code wasser}.
+     */
+    public boolean isWaterBuilding() {
+        String lower = name.toLowerCase(Locale.ROOT);
+        return style.equalsIgnoreCase("wasser") || style.equalsIgnoreCase("water")
+                || WATER_WORDS.stream().anyMatch(lower::contains);
+    }
+
     /** Die niedrigste Tür in der Außenwand; leer, wenn der Plan keine hat (Plätze, Brunnen, Parks). */
     public java.util.Optional<Door> door() {
         Door best = null;

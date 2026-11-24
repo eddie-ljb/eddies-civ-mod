@@ -86,6 +86,21 @@ final class TownPlanning {
         this.streets = streets;
     }
 
+    private de.etiennebader.civ.server.land.LandRules land;
+
+    /** Land vor Wasser: Grundstücke und Straßen legt das Bauamt nur an Land an. */
+    void landRules(de.etiennebader.civ.server.land.LandRules land) {
+        this.land = land;
+    }
+
+    private boolean plotOnLand(Area area) {
+        return land == null || land.isLandPlot(area);
+    }
+
+    private boolean streetOnLand(Area area) {
+        return land == null || land.isLandStreet(area);
+    }
+
     private boolean onStreet(PolityView town, Area area) {
         return streets == null || streets.served(town, area);
     }
@@ -150,6 +165,9 @@ final class TownPlanning {
             if (!onStreet(town, area)) {
                 continue; // erst die Straße, dann das Grundstück
             }
+            if (!plotOnLand(area)) {
+                continue; // nicht ins Wasser
+            }
             try {
                 PlotId id = app.createPlot().execute(new CreatePlot.Command(town.id(), area, type, day));
                 publish(town, id, area, type, day);
@@ -203,7 +221,7 @@ final class TownPlanning {
                 if (plots.stream().anyMatch(plot -> plot.area().overlaps(area))
                         || town.streets().stream().anyMatch(street -> street.area().overlaps(area))
                         || town.seat().filter(seat -> area.contains(seat.dimension(), seat.x(), seat.z())).isPresent()
-                        || !site.test(area)) {
+                        || !site.test(area) || !streetOnLand(area)) {
                     continue;
                 }
                 String name = de.etiennebader.civ.application.population.FoundingNames.street(planner,
@@ -236,7 +254,7 @@ final class TownPlanning {
             Area area = new Area(chunk.dimension(), chunk.minBlockX() + inset, chunk.minBlockZ() + inset,
                     chunk.minBlockX() + inset + size - 1, chunk.minBlockZ() + inset + size - 1);
             if (plots.stream().noneMatch(plot -> plot.area().overlaps(area)) && onStreet(town, area)
-                    && site.test(area)) {
+                    && plotOnLand(area) && site.test(area)) {
                 return true;
             }
         }
