@@ -46,6 +46,8 @@ public final class TownHallPlacement implements TownHallBlock.PlacementHandler {
         Components.send(player, reply);
         if (reply.success()) {
             Feedback.fanfare(player);
+            // Bei der Gründung gleich Kultur und Rasse der neuen Gemeinde wählen (später im Gemeindehaus änderbar).
+            MenuOpener.culture(civ.get(), player);
         }
         return reply.success();
     }

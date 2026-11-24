@@ -87,6 +87,7 @@ Alle Befehle schlagen beim Tippen (Tabulator) passende Werte vor, mit einer kurz
 | `/civ strasse anlegen\|aufheben <Name>` / `strasse liste` | Straßen (Bürgermeister, Bauamt) |
 | `/civ strasse bauen schaufel\|pflaster <Name>` / `strasse wege` | Weg auf einer Straße bauen lassen / Stand der Wegebauten |
 | `/civ krieg beute <Nr> [<Chunks> <Punkte für Reparationen>]` | Siegpunkte eines gewonnenen Kriegs ansehen und ausgeben |
+| `/civ kultur [setzen <Kultur> <Rasse>\|menue]` | Kultur und Rasse der eigenen Gemeinde ansehen und (Bürgermeister) ändern |
 | `/civ dorfbewohner info\|menue` | Auskunft über den nächsten Dorfbewohner im Chat oder als Menü |
 | `/civ bau vorschau <Plan> [Drehung]\|aus` | Hologramm eines Bauplans auf dem Grundstück unter dir |
 | `/civ bau plaene\|liste\|beauftragen\|material\|genehmigen\|ablehnen\|abbrechen …` | Bauaufträge (ohne Drehung: Tür zur Straße), siehe [Bauen](Spieler-Bauen-und-Strassen.md) |

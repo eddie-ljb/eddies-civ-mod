@@ -157,6 +157,7 @@ final class VillagerCensus {
         civ.villagers().grownUp(ref(villager));
         civ.villagers().seen(ref(villager), Players.position(villager.level(), villager.blockPosition()),
                 civ.calendar().today());
+        VillagerLooks.apply(civ, villager);
     }
 
     /**

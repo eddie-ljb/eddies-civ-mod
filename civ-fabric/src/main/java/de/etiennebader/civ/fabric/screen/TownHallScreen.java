@@ -99,6 +99,13 @@ public final class TownHallScreen extends MenuScreen {
             Screens.open(click.player(), new PartiesScreen(civ, player, Optional.of(this)));
         });
 
+        canvas.set(5, Icon.of(Items.PLAYER_HEAD).name(GuiKeys.CULTURE_OPEN.text(), Icon.TITLE)
+                .hint(GuiKeys.CULTURE_OPEN_HINT.text()).build(), click -> {
+                    Feedback.click(click.player());
+                    Screens.open(click.player(), new CultureScreen(civ, player, this.town, town.name(),
+                            Optional.of(this)));
+                });
+
         canvas.set(37, Icon.of(Items.SPYGLASS).name(GuiKeys.ELECTIONS_OPEN.text(), Icon.TITLE)
                 .hint(GuiKeys.ELECTIONS_OPEN_HINT.text()).build(), click -> civ.queries().polity(this.town)
                 .ifPresent(polity -> {

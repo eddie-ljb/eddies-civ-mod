@@ -302,6 +302,25 @@ public final class CivCommandTree {
                                 .then(Commands.literal("nein")
                                         .executes(context -> withCiv(context, (civ, player) -> civ.voting().vote(
                                                 Players.caller(player), IntegerArgumentType.getInteger(context, COUNT), false))))))
+                .then(Commands.literal("kultur")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.culture()
+                                .describe(Players.caller(player))))
+                        .then(Commands.literal("menue")
+                                .executes(context -> withCiv(context, (civ, player) -> {
+                                    MenuOpener.culture(civ, player);
+                                    return Reply.success(Message.of(MessageKey.VILLAGER_MENU_OPENED));
+                                })))
+                        .then(Commands.literal("setzen")
+                                .then(arg(TYPE, StringArgumentType.word())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                de.etiennebader.civ.domain.population.Culture.words(), builder))
+                                        .then(arg(NAME, StringArgumentType.word())
+                                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                        de.etiennebader.civ.domain.population.Race.words(), builder))
+                                                .executes(context -> withCiv(context, (civ, player) -> civ.culture()
+                                                        .set(Players.caller(player),
+                                                                StringArgumentType.getString(context, TYPE),
+                                                                StringArgumentType.getString(context, NAME))))))))
                 .then(Commands.literal("stimmung")
                         .executes(context -> withCiv(context, (civ, player) -> civ.villagers().mood(Players.caller(player)))))
                 .then(Commands.literal("dorfbewohner")

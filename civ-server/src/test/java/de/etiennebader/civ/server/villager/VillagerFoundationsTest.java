@@ -107,6 +107,27 @@ class VillagerFoundationsTest {
     }
 
     @Test
+    @DisplayName("Mit Gründungsgebühr zahlt die Heimatgemeinde die Starthilfe, wenn ihre Kasse es trägt")
+    void homeTreasuryFundsSettlers() {
+        PolityView town = nordhainWithVillagers(6, true);
+        var fees = de.etiennebader.civ.server.founding.FoundingFees.DEFAULT;
+        long fee = fees.municipality() * VillagerFoundations.SETTLER_FEE_PERCENT / 100;
+        server.bank().deposit(new Caller(alice, "Alice", new BlockPosition(DimensionId.OVERWORLD, 8, 64, 8)), 500);
+        server.app().transferFunds().execute(new de.etiennebader.civ.application.economy.TransferFunds.Command(alice,
+                town.asActor(), de.etiennebader.civ.domain.shared.Money.of(fee * 10, town.currency()),
+                de.etiennebader.civ.domain.economy.TransferReason.GRANT, Day.of(2)));
+        VillagerFoundations paying = new VillagerFoundations(server.app(),
+                villager -> Optional.ofNullable(seen.get(villager)), new Announcements(), fees);
+        boolean founded = false;
+        for (int i = 0; i < 400 && !founded; i++) {
+            founded = paying.endOfDay(Day.of(10 + i));
+        }
+        assertTrue(founded, "die Heimatgemeinde rüstet die Siedler aus");
+        assertEquals(2, towns());
+        assertTrue(server.queries().ledger().balanceOf(town.asActor(), town.currency()).amount() < fee * 10);
+    }
+
+    @Test
     @DisplayName("Ohne Ehrgeiz oder in kleinen Gemeinden gründet niemand etwas")
     void nothingWithoutAmbitionOrSize() {
         nordhainWithVillagers(6, false);

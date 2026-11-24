@@ -139,6 +139,23 @@ class VillagerUrbanismTest {
     }
 
     @Test
+    @DisplayName("Straßenpflicht: Das Gebiet wird vollständig beplant, ohne dass es an der Straßenzahl hängt")
+    void villagerPlannerFillsTerritory() {
+        server.enforceStreets(true);
+        setUp(8);
+        for (int day = 2; day < 600; day++) {
+            server.construction().villagersOrder(Day.of(day));
+            server.roads().advance(10_000);
+        }
+        PolityView updated = server.queries().polity(town.id()).orElseThrow();
+        var plots = server.queries().land(town.id()).plots();
+        assertFalse(updated.streets().isEmpty());
+        // Vier Chunks außerhalb des Kerns: Alle bekommen ein Grundstück, obwohl nur eine Straße (statt vier
+        // Grundstücke je Straße) nötig ist; früher blieb es bei zwei oder drei.
+        assertEquals(4, plots.size(), "die Grundstücke füllen das Gebiet");
+    }
+
+    @Test
     @DisplayName("Dorfbewohner kaufen angebotenes Wohnland und lassen darauf bauen")
     void villagersBuyLandAndBuild() {
         setUp(8);

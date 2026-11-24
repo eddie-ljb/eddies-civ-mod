@@ -6,6 +6,7 @@ import de.etiennebader.civ.application.polity.JoinPolity;
 import de.etiennebader.civ.application.polity.LeavePolity;
 import de.etiennebader.civ.application.population.VillagerAmbitions;
 import de.etiennebader.civ.application.query.WorldQueries;
+import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.polity.Membership;
 import de.etiennebader.civ.domain.polity.MembershipType;
@@ -46,8 +47,9 @@ import java.util.function.Function;
  *       Gemeinde.</li>
  *   <li><b>Umzug:</b> Gründer und Gefolge werden zum neuen Gemeindehaus gebracht ({@code relocate}); sonst würde sie
  *       die Gemeindezuordnung beim nächsten Rundgang zurück in die alte Gemeinde ziehen.</li>
- *   <li><b>Gebühr:</b> Siedler zahlen nur {@value #SETTLER_FEE_PERCENT} % der Gründungsgebühr; ihre Ersparnisse
- *       reichen sonst nie für die volle Gebühr.</li>
+ *   <li><b>Gebühr:</b> Siedler zahlen nur {@value #SETTLER_FEE_PERCENT} % der Gründungsgebühr. Sind sie selbst nicht
+ *       flüssig (meist), übernimmt die Heimatgemeinde die Gebühr aus ihrer Kasse, solange danach noch das
+ *       {@value #TREASURY_RESERVE_FACTOR}fache der Gebühr als Reserve bleibt.</li>
  *   <li><b>Gefolge:</b> Bis zu {@value #MAX_FOLLOWERS} Mitbürger, die zuletzt am nächsten am neuen Ort gesehen wurden,
  *       ziehen mit; mindestens {@value #MIN_LEFT_BEHIND} Dorfbewohner bleiben zurück.</li>
  * </ul>
@@ -69,6 +71,15 @@ public final class VillagerFoundations {
     static final int SITE_GAP = 2;
     /** Anteil der Gründungsgebühr, den ein Dorfbewohner als Siedler zahlt. */
     static final int SETTLER_FEE_PERCENT = 20;
+
+    private java.util.function.BiConsumer<PolityId, PolityId> founded = (home, created) -> { };
+
+    /** Wer erfahren soll, dass aus einer Heimatgemeinde heraus eine neue entstand (Kultur und Rasse erben). */
+    public void founded(java.util.function.BiConsumer<PolityId, PolityId> listener) {
+        this.founded = Objects.requireNonNull(listener, "listener");
+    }
+    /** Die Heimatgemeinde zahlt die Gebühr nur, wenn ihre Kasse danach noch so viele Gebühren enthält. */
+    static final int TREASURY_RESERVE_FACTOR = 3;
 
     private final FoundingFees fees;
     private final CivApplication app;
@@ -151,8 +162,15 @@ public final class VillagerFoundations {
         }
         FoundingFees.Billing billing = fees.billing(app, home.currency());
         long fee = fees.municipality() * SETTLER_FEE_PERCENT / 100;
+        // Zahlt der Dorfbewohner selbst, wenn er kann; sonst rüstet die Heimatgemeinde die Siedler aus der Kasse aus,
+        // solange danach eine Reserve bleibt. Das Einkommen der Dorfbewohner fließt in die Gemeindekasse, sie selbst
+        // sind fast nie flüssig; ohne diese Starthilfe gründeten sie nie eine Gemeinde.
+        ActorRef payer = villager;
         if (billing.shortfallBalance(villager, fee) != null) {
-            return false; // zu arm für die Gründungsgebühr: bleibt, wo er ist
+            if (billing.shortfallBalance(home.asActor(), fee * TREASURY_RESERVE_FACTOR) != null) {
+                return false; // weder der Dorfbewohner noch die Gemeinde können es tragen
+            }
+            payer = home.asActor();
         }
         try {
             app.leavePolity().execute(new LeavePolity.Command(home.id(), villager, day));
@@ -160,7 +178,7 @@ public final class VillagerFoundations {
             return false; // z. B. Amtsinhaber, die nicht gehen dürfen
         }
         try {
-            billing.chargeAfter(villager, fee, day, () -> {
+            billing.chargeAfter(payer, fee, day, () -> {
                 app.foundPolity().execute(new FoundPolity.Command(name, villager, home.currency(), seat.get(), day));
                 return null;
             });
@@ -169,6 +187,7 @@ public final class VillagerFoundations {
             return false;
         }
         PolityId created = app.queries().polityNamed(name.value()).orElseThrow().id();
+        founded.accept(home.id(), created);
         relocate.accept(villager, seat.get());
         int followers = follow(home, created, villager, seat.get(), day);
         announcements.add(Announcement.toAll(Message.of(MessageKey.VILLAGER_TOWN_FOUNDED, name.value(),
