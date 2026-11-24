@@ -79,7 +79,7 @@ class VillagerFoundationsTest {
         assertTrue(founded, "eine Gemeinde entstand");
         assertEquals(before + 1, towns());
         PolityView created = server.queries().polities().stream()
-                .filter(p -> p.kind() == PolityKind.TERRITORIAL && p.name().value().!p.name().value().equals("Nordhain"))
+                .filter(p -> p.kind() == PolityKind.TERRITORIAL && !p.name().value().equals("Nordhain"))
                 .findFirst().orElseThrow();
         // Bis zur ersten Wahl führt der Gründer als kommissarischer Bürgermeister (villagerPolitics).
         assertTrue(created.mayor(true).filter(PersonRef.class::isInstance).isPresent(), "ein Dorfbewohner führt sie");
@@ -134,7 +134,7 @@ class VillagerFoundationsTest {
         assertTrue(founded, "trotz Wohnsitz im fremden Gebiet entsteht eine Gemeinde");
         assertEquals(2, towns());
         PolityView created = server.queries().polities().stream()
-                .filter(p -> p.kind() == PolityKind.TERRITORIAL && p.name().value().!p.name().value().equals("Nordhain"))
+                .filter(p -> p.kind() == PolityKind.TERRITORIAL && !p.name().value().equals("Nordhain"))
                 .findFirst().orElseThrow();
         BlockPosition seat = created.seat().orElseThrow();
         assertTrue(server.queries().territory().sovereignOf(seat.chunk()).filter(created.id()::equals).isPresent(),

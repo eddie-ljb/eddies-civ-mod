@@ -95,6 +95,28 @@ class VillagerUrbanismTest {
     }
 
     @Test
+    @DisplayName("Das Bauamt aus Dorfbewohnern gründet Straßen mit richtigen Namen und lässt Wege bauen")
+    void villagerPlannerFoundsStreetsAndRoads() {
+        setUp(8);
+        for (int day = 2; day < 120; day++) {
+            server.construction().villagersOrder(Day.of(day));
+        }
+        PolityView updated = server.queries().polity(town.id()).orElseThrow();
+        assertFalse(updated.streets().isEmpty(), "das Bauamt hat eine Straße angelegt");
+        updated.streets().forEach(street -> assertTrue(street.name().chars().noneMatch(Character::isDigit),
+                "Straßenname ohne Zahl: " + street.name()));
+        assertTrue(updated.streets().stream().noneMatch(street ->
+                server.queries().land(town.id()).plots().stream().anyMatch(plot -> plot.area().overlaps(street.area()))),
+                "keine Straße über einem Grundstück");
+        assertFalse(server.roads().jobs().isEmpty(), "und den Wegebau beauftragt");
+        // Der Weg wächst mit der Zeit und endet fertig.
+        for (int i = 0; i < 40; i++) {
+            server.roads().advance(10_000);
+        }
+        assertTrue(server.roads().jobs().stream().anyMatch(job -> job.finished()), "ein Weg ist fertig");
+    }
+
+    @Test
     @DisplayName("Dorfbewohner kaufen angebotenes Wohnland und lassen darauf bauen")
     void villagersBuyLandAndBuild() {
         setUp(8);

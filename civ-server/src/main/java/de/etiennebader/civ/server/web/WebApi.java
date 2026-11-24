@@ -332,6 +332,7 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                         lawAction(login, body)), texts));
                 case "GET /api/show" -> HttpResponse.json(200, game.call(() -> show(texts)));
                 case "GET /api/civic" -> HttpResponse.json(200, game.call(() -> civic(texts)));
+                case "GET /api/logos" -> withLogin(request, login -> HttpResponse.json(200, game.call(() -> logos(login))));
                 case "POST /api/image" -> withLogin(request, login -> imageUpload(request, login, texts));
                 case "GET /api/image" -> imageGet(request.query().getOrDefault("id", ""));
                 case "POST /api/image/remove" -> withLogin(request, login -> {
@@ -884,6 +885,27 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                 .build();
     }
 
+    /**
+     * {@code GET /api/logos}: die Einheiten, die der Angemeldete führt (Bürgermeister, Vorsitz, Firmenchef), mit ihren
+     * hochgeladenen Bildern. Nur die Spitze darf Wappen, Wahlplakat und Leuchtreklame hochladen; im Spiel erscheinen die
+     * Wappen über dem Gemeindehaus, alle Bilder gibt es mit {@code /civ logo} als Karte.
+     */
+    private String logos(WebSessions.Login login) {
+        return Json.object().raw("polities", Json.array(civ.queries().polities().stream()
+                .filter(polity -> de.etiennebader.civ.application.civic.CivicUseCases.isHead(polity, login.player()))
+                .toList(), polity -> Json.object()
+                .put("name", polity.name().value())
+                .put("kind", polity.kind().name())
+                .raw("images", Json.array(civ.civic().imagesOf(polity.id()), image -> Json.object()
+                        .put("id", image.id())
+                        .put("kind", image.kind().name())
+                        .put("width", image.width())
+                        .put("height", image.height())
+                        .put("uploaded", image.uploadedAt().value())
+                        .build()))
+                .build())).build();
+    }
+
     private String religions(Optional<WebSessions.Login> login) {
         var census = civ.religion().census();
         return Json.object()
@@ -909,6 +931,16 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                                 .raw("candidates", Json.array(r.candidates(), Json::string))
                                 .put("mine", r.mine())
                                 .put("denomination", r.denomination())
+                                .put("scriptureText", civ.religion().scriptureText(r.id()))
+                                .put("canEdit", login.map(l -> civ.religion().canEditScripture(l.player(), r.id()))
+                                        .orElse(false))
+                                .put("leads", login.map(l -> civ.religion().leadsReligion(l.player(), r.id()))
+                                        .orElse(false))
+                                .raw("roles", Json.array(civ.religion().roleViews(r.id()), role -> Json.object()
+                                        .put("name", role.name())
+                                        .raw("rights", Json.array(role.rights(), Json::string))
+                                        .raw("holders", Json.array(role.holders(), Json::string))
+                                        .build()))
                                 .build()))
                 .raw("census", Json.object()
                         .put("believers", census.believers())
@@ -934,6 +966,24 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
             case "candidate" -> religion.candidate(caller, today);
             case "vote" -> religion.vote(caller, body.getOrDefault("candidate", ""), today);
             case "denomination" -> religion.denomination(caller, body.getOrDefault("name", ""), today);
+            case "scripture" -> religion.writeScripture(caller, body.getOrDefault("text", ""),
+                    Boolean.parseBoolean(body.getOrDefault("append", "false")), today);
+            case "rename" -> religion.rename(caller, body.getOrDefault("what", ""), body.getOrDefault("value", ""), today);
+            case "role" -> religion.defineRole(caller, body.getOrDefault("name", ""),
+                    java.util.Arrays.stream(body.getOrDefault("rights", "").split("[ ,]+")).filter(w -> !w.isBlank())
+                            .toList());
+            case "roledelete" -> religion.deleteRole(caller, body.getOrDefault("name", ""));
+            case "roleassign" -> civ.players().findByName(body.getOrDefault("player", ""))
+                    .map(target -> religion.assignRole(caller, body.getOrDefault("name", ""), target,
+                            body.getOrDefault("player", "")))
+                    .orElseGet(() -> Reply.failure(Message.of(MessageKey.RELIGION_UNKNOWN_PLAYER,
+                            body.getOrDefault("player", ""))));
+            case "rolerevoke" -> civ.players().findByName(body.getOrDefault("player", ""))
+                    .map(target -> religion.revokeRoles(caller, target, body.getOrDefault("player", "")))
+                    .orElseGet(() -> Reply.failure(Message.of(MessageKey.RELIGION_UNKNOWN_PLAYER,
+                            body.getOrDefault("player", ""))));
+            case "bless" -> religion.rite(caller, "segnung", body.getOrDefault("player", ""), today);
+            case "baptize" -> religion.rite(caller, "taufe", body.getOrDefault("player", ""), today);
             default -> Reply.failure(Message.of(MessageKey.RELIGION_ERROR, "Unbekannte Aktion"));
         };
     }

@@ -29,6 +29,8 @@ Ein JAR für Server **und** Client: Der Mod bringt eigene Blöcke mit, deshalb b
 | `price_level_min`, `price_level_max` | Grenzen des Marktpreisfaktors (Standard `0.5`/`4.0`) |
 | `price_level_damping` | Dämpfung der Preisreaktion auf die Geldmenge je Kopf (Standard `0.5` = Quadratwurzel-Formel; `1.0` ließe Preise linear mit der Geldmenge schwanken, also stärkere Inflation/Deflation) |
 
+Weitere Dateien im Datenordner: `roads.tsv` (Wegebauten), `religion.tsv` (jetzt auch Schriften, Klerus-Ämter und Segen), `construction.tsv` (Bauaufträge) und im Bilderordner `maps.tsv` (Karte je Logo). Alle werden atomar geschrieben und beim Start gelesen.
+
 Fehlen Einträge (nach einem Update), ergänzt der Mod sie beim Start mit Standardwerten.
 
 Der Zustand liegt je Welt in `<Welt>/data/eddies-civ-mod/civ.sqlite` und wird im Hintergrund zusammen mit der Welt gespeichert.

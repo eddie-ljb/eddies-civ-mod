@@ -645,6 +645,38 @@ public final class ReligionService {
         return lines.isEmpty() ? ok(MessageKey.RELIGION_ROLE_NONE) : Reply.success(lines);
     }
 
+    /** Ein Amt für die Webseite. */
+    public record RoleView(String name, List<String> rights, List<String> holders) {
+    }
+
+    private Optional<Religion> byId(String id) {
+        return registry.religions().stream().filter(r -> r.id().toString().equals(id)).findFirst();
+    }
+
+    /** Die Ämter einer Religion mit Rechten und Amtsträgern. */
+    public synchronized List<RoleView> roleViews(String religionId) {
+        return byId(religionId).map(r -> roles.stream().filter(role -> role.religion().equals(r.id()))
+                .map(role -> new RoleView(role.name(),
+                        role.rights().stream().map(ClergyRole.Right::word).toList(),
+                        role.holders().stream().map(this::nameOf).toList())).toList()).orElse(List.of());
+    }
+
+    /** Der Wortlaut der Schrift einer Religion. */
+    public synchronized String scriptureText(String religionId) {
+        return byId(religionId).map(r -> texts.getOrDefault(r.id(), "")).orElse("");
+    }
+
+    /** Ob der Betrachter die Schrift dieser Religion bearbeiten darf. */
+    public synchronized boolean canEditScripture(ActorRef viewer, String religionId) {
+        return byId(religionId).filter(r -> r.founder().equals(viewer) || may(r, viewer, ClergyRole.Right.SCRIPTURE))
+                .isPresent();
+    }
+
+    /** Ob der Betrachter Gründer oder Oberhaupt der Religion ist (und damit Ämter festlegt). */
+    public synchronized boolean leadsReligion(ActorRef viewer, String religionId) {
+        return byId(religionId).filter(r -> leads(r, viewer)).isPresent();
+    }
+
     /** Die Namen der Ämter der eigenen Religion, für die Befehlsvorschläge. */
     public synchronized List<String> roleNames(ActorRef actor) {
         return religionOf(actor).map(r -> roles.stream().filter(role -> role.religion().equals(r.id()))

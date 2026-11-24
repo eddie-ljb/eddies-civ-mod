@@ -982,6 +982,9 @@ public enum MessageKey {
     RELIGION_ROLE_ENTRY,
     RELIGION_ROLE_NONE,
     RELIGION_NEEDS_VILLAGER,
+    LOGO_UNKNOWN_POLITY,
+    LOGO_NONE,
+    LOGO_GIVEN,
     INTERNAL_ERROR;
 
     private static final String PREFIX = "eddies-civ-mod.command.";

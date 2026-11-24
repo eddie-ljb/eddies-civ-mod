@@ -30,6 +30,12 @@ final class ReligionStore {
     record State(List<Religion> religions, Map<ActorRef, ReligionId> members, Map<ActorRef, String> denominations,
                  List<String> rites, Map<ReligionId, Integer> fervor, Map<ReligionId, String> logos,
                  Map<ReligionId, String> texts, List<ClergyRole> roles, Map<ActorRef, Long> blessed) {
+        State(List<Religion> religions, Map<ActorRef, ReligionId> members, Map<ActorRef, String> denominations,
+              List<String> rites, Map<ReligionId, Integer> fervor, Map<ReligionId, String> logos) {
+            this(religions, members, denominations, rites, fervor, logos, new LinkedHashMap<>(), new ArrayList<>(),
+                    new LinkedHashMap<>());
+        }
+
         static State empty() {
             return new State(List.of(), new LinkedHashMap<>(), new LinkedHashMap<>(), new ArrayList<>(),
                     new LinkedHashMap<>(), new LinkedHashMap<>(), new LinkedHashMap<>(), new ArrayList<>(),

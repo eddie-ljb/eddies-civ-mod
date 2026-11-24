@@ -238,9 +238,6 @@ public final class PressService {
     static final int MAX_FOUNDING_EDITORS = 2;
     /** Tageswahrscheinlichkeit einer Zeitungsgründung bei vollem Ehrgeiz. */
     static final double FOUNDING_CHANCE = 0.10;
-    private static final String[] PAPER_TITLES = {"Anzeiger", "Bote", "Kurier", "Tagblatt", "Rundschau", "Chronik",
-            "Zeitung", "Echo"};
-
     /**
      * Ehrgeizige Dorfbewohner gründen Zeitungen: höchstens eine je Tag und solange es weniger Zeitungen als ein
      * {@value #VILLAGERS_PER_PAPER}-tel der Dorfbewohner gibt. Der Gründer leitet die Zeitung und holt bis zu

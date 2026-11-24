@@ -1794,5 +1794,8 @@
   "eddies-civ-mod.command.religion_role_holds_none": "%s hat kein Amt.",
   "eddies-civ-mod.command.religion_role_entry": "%s – Rechte: %s – Amtsträger: %s",
   "eddies-civ-mod.command.religion_role_none": "Deine Religion hat noch keine eigenen Ämter. Lege eines an mit /civ religion amt festlegen <Name> [segnen] [taufen] [gottesdienst] [schrift].",
-  "eddies-civ-mod.command.religion_needs_villager": "Kein Dorfbewohner in Reichweite."
+  "eddies-civ-mod.command.religion_needs_villager": "Kein Dorfbewohner in Reichweite.",
+  "eddies-civ-mod.command.logo_unknown_polity": "Unbekannte Einheit „%s“.",
+  "eddies-civ-mod.command.logo_none": "%s hat noch kein Bild dieser Art. Die Spitze lädt es auf der Webseite hoch (Reiter „Logos“).",
+  "eddies-civ-mod.command.logo_given": "Du hältst das Logo von %s als Karte in der Hand."
 }

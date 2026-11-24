@@ -4,6 +4,9 @@
 
 Jeder deutsche Befehl unter `/civ` hat einen englischen Zwilling mit gleicher Funktion, z. B. `/civ gericht fall 3` ↔ `/civ court case 3`, `/civ firma investieren "Holz AG" 20` ↔ `/civ company invest "Holz AG" 20`. Argumentwerte wie Ämter (`buergermeister`), Branchen oder `schuldig` bleiben deutsch. Die Übersetzung ist mechanisch (ein Wörterbuch deutsch→englisch pro Befehlswort), die Logik ist identisch – siehe [Architektur](Entwickler-Architektur.md).
 
+## Eingabehilfe
+Alle Befehle schlagen beim Tippen (Tabulator) passende Werte vor, mit einer kurzen Erklärung daneben: Nummern eigener Bauaufträge, Fälle, Verträge und Briefe; Straßen, Firmen, Zeitungen, Parteien, Religionen und Gemeinden; Währungen und Symbole; Spielernamen; Beträge, Tage und Prozente; die Drehung in Grad; Machtgrade und die Achsen der Parteirichtung; Gegenstände; die Rechte der Klerus-Ämter.
+
 ## Allgemein
 | Befehl | Wirkung |
 |---|---|
@@ -82,6 +85,12 @@ Jeder deutsche Befehl unter `/civ` hat einen englischen Zwilling mit gleicher Fu
 | Befehl | Wirkung |
 |---|---|
 | `/civ strasse anlegen\|aufheben <Name>` / `strasse liste` | Straßen (Bürgermeister, Bauamt) |
+| `/civ strasse bauen schaufel\|pflaster <Name>` / `strasse wege` | Weg auf einer Straße bauen lassen / Stand der Wegebauten |
+| `/civ bau plaene\|liste\|beauftragen\|material\|genehmigen\|ablehnen\|abbrechen …` | Bauaufträge (ohne Drehung: Tür zur Straße), siehe [Bauen](Spieler-Bauen-und-Strassen.md) |
+| `/civ religion schrift [lesen\|schreiben\|anhaengen\|benennen] …` | Heilige Schrift lesen und bearbeiten |
+| `/civ religion segnen\|taufe <Spieler\|dorfbewohner>` | segnen und taufen, auch Dorfbewohner |
+| `/civ religion amt festlegen\|vergeben\|entziehen\|abschaffen\|liste …` | Klerus-Ämter selbst definieren, siehe [Religion](Spieler-Religion.md) |
+| `/civ logo <Einheit> [wappen\|plakat\|reklame]` | hochgeladenes Logo als Karte, siehe [Logos](Spieler-Logos.md) |
 | `/civ adresse [Spieler]` / `/civ adressen` | Anschrift, Straßen und Hausnummern |
 | `/civ vertrag …` / `vertrag menue` | Verträge |
 | `/civ post [lesen <Nr>\|menue]` / `/civ brief <Spieler> <Betreff> \| <Text>` | Post |

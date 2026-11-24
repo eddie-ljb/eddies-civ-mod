@@ -56,7 +56,10 @@ public final class StreetUseCases {
     }
 
     private static void requirePlanner(Polity polity, ActorRef actor) {
-        if (!polity.holds(actor, Office.MAYOR) && !polity.holds(actor, Office.PLANNER)) {
+        // Ein Dorfbewohner, der die Gemeinde kommissarisch führt, ist als Bauamt zugelassen.
+        boolean interim = actor instanceof de.etiennebader.civ.domain.actor.PersonRef
+                && polity.mayor(true).filter(actor::equals).isPresent();
+        if (!interim && !polity.holds(actor, Office.MAYOR) && !polity.holds(actor, Office.PLANNER)) {
             throw new NotOfficeHolderException(actor, Office.PLANNER);
         }
     }

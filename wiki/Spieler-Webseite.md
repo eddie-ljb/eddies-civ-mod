@@ -15,6 +15,7 @@ Der Server stellt eine Webseite bereit, standardmäßig auf Port 8765, hell und 
 - **Presse:** Artikel mit Haltung und Thema, Zeitungen mit Redaktion und Verbreitung, Artikel schreiben mit Live-Erkennung.
 - **Post:** Postfach, gesendete Briefe, Briefe schreiben und beantworten.
 - **Chat:** allgemeiner Chat (mit dem Spiel verbunden) und Direktnachrichten an Freunde.
+- **Logos:** Wappen, Wahlplakate und Leuchtreklamen der Einheiten hochladen, die man führt (Bilder werden im Browser auf 128 × 128 verkleinert), und entfernen; siehe [Logos](Spieler-Logos.md).
 - **Freunde:** Anfragen senden, annehmen, ablehnen; wer online ist.
 - **Mein Bereich:** Kontostand, Anschrift, Überweisen, Verträge unterschreiben/anbieten/kündigen, Ämter, Wahlen und Abstimmungen.
 
@@ -23,4 +24,7 @@ Der Server stellt eine Webseite bereit, standardmäßig auf Port 8765, hell und 
 Admin-Themen zum Betrieb der Webseite (Reverse-Proxy, HTTPS, Absicherung) stehen unter [Sicherungen und Webseiten-Betrieb](Admin-Sicherungen-und-Webseite.md).
 
 ## Religion
-Der Reiter „Religion“ zeigt alle Religionen mit Oberhaupt, Klerusmacht, Mitgliedern, Inbrunst und laufender Klerus-Wahl sowie die Glaubensverteilung unter den Dorfbewohnern. Angemeldet kann man beitreten, austreten, eine Religion gründen, für das Klerusamt kandidieren und wählen.
+Der Reiter „Religion“ zeigt alle Religionen mit Oberhaupt, Klerusmacht, Mitgliedern, Inbrunst und laufender Klerus-Wahl sowie die Glaubensverteilung unter den Dorfbewohnern. Angemeldet kann man beitreten, austreten, eine Religion gründen, für das Klerusamt kandidieren und wählen. Die **Heilige Schrift** jeder Religion steht im Wortlaut dort; wer sie bearbeiten darf (Gründer, Oberhaupt, Amtsträger mit dem Recht `schrift`), bekommt einen Editor mit Speichern und Umbenennen. Gründer und Oberhaupt legen **Klerus-Ämter** fest, vergeben und entziehen sie; Mitglieder mit dem Recht segnen und taufen Spieler. Siehe [Religion](Spieler-Religion.md).
+
+## Aufbau
+Die Navigation ist nach Themen gruppiert (Welt, Politik, Wirtschaft, Gesellschaft, Kontakt) und klappt auf dem Handy als Menü auf; Inhalte und Adressen der Reiter (`#karte`, `#recht` …) sind unverändert.

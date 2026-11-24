@@ -42,6 +42,8 @@ public final class CivServerHost {
     private final VillagerCensus villagers = new VillagerCensus(this);
     private final ConstructionSites constructionSites = new ConstructionSites();
     private final RoadSites roadSites = new RoadSites();
+    private final LogoMaps logoMaps = new LogoMaps();
+    private final LogoDisplays logoDisplays = new LogoDisplays(logoMaps);
 
     public void register() {
         ServerLifecycleEvents.SERVER_STARTING.register(this::start);
@@ -105,6 +107,10 @@ public final class CivServerHost {
         }
     }
 
+    LogoMaps logoMaps() {
+        return logoMaps;
+    }
+
     private void tick(MinecraftServer server) {
         Screens.runPending();
         if (civ == null) {
@@ -118,6 +124,7 @@ public final class CivServerHost {
             borders.tick(server, civ);
             constructionSites.tick(server, civ);
             roadSites.tick(server, civ);
+            logoDisplays.tick(server, civ);
         } catch (RuntimeException e) {
             LOGGER.error("Fehler beim Tagesabschluss", e);
         }

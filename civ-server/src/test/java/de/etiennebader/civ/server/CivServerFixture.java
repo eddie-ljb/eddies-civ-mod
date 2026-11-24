@@ -51,6 +51,10 @@ public final class CivServerFixture {
         return server.territory();
     }
 
+    public de.etiennebader.civ.server.road.RoadService roads() {
+        return server.roads();
+    }
+
     public de.etiennebader.civ.server.construction.ConstructionService construction() {
         return server.construction();
     }
