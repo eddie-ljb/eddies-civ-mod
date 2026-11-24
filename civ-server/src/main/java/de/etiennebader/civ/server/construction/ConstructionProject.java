@@ -1,12 +1,14 @@
 package de.etiennebader.civ.server.construction;
 
 import de.etiennebader.civ.domain.actor.ActorRef;
+import de.etiennebader.civ.domain.actor.PlayerRef;
 import de.etiennebader.civ.domain.land.PlotId;
 import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.territory.DimensionId;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.Objects;
 import java.util.TreeMap;
 import java.util.OptionalInt;
@@ -28,7 +30,31 @@ import java.util.UUID;
 public record ConstructionProject(UUID id, int number, PolityId town, PlotId plot, ActorRef client, PolityId builder,
                                   String blueprint, DimensionId dimension, int originX, OptionalInt originY,
                                   int originZ, Status status, int placed, int total, long price, long paid,
-                                  Day orderedOn, int rotation, boolean selfSupplied, Map<String, Integer> depot) {
+                                  Day orderedOn, int rotation, boolean selfSupplied, Map<String, Integer> depot,
+                                  Optional<PlayerRef> contractor, Contractor contractorState) {
+
+    /**
+     * Wer baut: die Baufirma mit ihren Bauarbeitern ({@link #NONE}) oder ein Spieler als Auftragnehmer der Firma, der
+     * selbst baut und nach verifiziertem Baufortschritt bezahlt wird.
+     */
+    public enum Contractor {
+        NONE,
+        /** Der Bauherr hat den Auftrag so gestellt; die Firma muss zustimmen. */
+        FIRM_REVIEW,
+        /** Die Firma hat einen Spieler als Auftragnehmer vorgesehen; er muss annehmen. */
+        PLAYER_REVIEW,
+        /** Der Spieler hat angenommen und baut. */
+        ACTIVE
+    }
+
+    /** Auftrag ohne Auftragnehmer: die Firma baut. */
+    public ConstructionProject(UUID id, int number, PolityId town, PlotId plot, ActorRef client, PolityId builder,
+                               String blueprint, DimensionId dimension, int originX, OptionalInt originY, int originZ,
+                               Status status, int placed, int total, long price, long paid, Day orderedOn,
+                               int rotation, boolean selfSupplied, Map<String, Integer> depot) {
+        this(id, number, town, plot, client, builder, blueprint, dimension, originX, originY, originZ, status, placed,
+                total, price, paid, orderedOn, rotation, selfSupplied, depot, Optional.empty(), Contractor.NONE);
+    }
 
     /** Stand des Auftrags. */
     public enum Status {
@@ -56,6 +82,8 @@ public record ConstructionProject(UUID id, int number, PolityId town, PlotId plo
         Objects.requireNonNull(originY, "originY");
         Objects.requireNonNull(status, "status");
         Objects.requireNonNull(orderedOn, "orderedOn");
+        Objects.requireNonNull(contractor, "contractor");
+        Objects.requireNonNull(contractorState, "contractorState");
         depot = Map.copyOf(new TreeMap<>(depot));
         if (rotation < 0 || rotation > 3) {
             throw new IllegalArgumentException("rotation");
@@ -67,17 +95,17 @@ public record ConstructionProject(UUID id, int number, PolityId town, PlotId plo
 
     public ConstructionProject withStatus(Status next) {
         return new ConstructionProject(id, number, town, plot, client, builder, blueprint, dimension, originX,
-                originY, originZ, next, placed, total, price, paid, orderedOn, rotation, selfSupplied, depot);
+                originY, originZ, next, placed, total, price, paid, orderedOn, rotation, selfSupplied, depot, contractor, contractorState);
     }
 
     public ConstructionProject withOriginY(int y) {
         return new ConstructionProject(id, number, town, plot, client, builder, blueprint, dimension, originX,
-                OptionalInt.of(y), originZ, status, placed, total, price, paid, orderedOn, rotation, selfSupplied, depot);
+                OptionalInt.of(y), originZ, status, placed, total, price, paid, orderedOn, rotation, selfSupplied, depot, contractor, contractorState);
     }
 
     public ConstructionProject withDepot(Map<String, Integer> next) {
         return new ConstructionProject(id, number, town, plot, client, builder, blueprint, dimension, originX,
-                originY, originZ, status, placed, total, price, paid, orderedOn, rotation, selfSupplied, next);
+                originY, originZ, status, placed, total, price, paid, orderedOn, rotation, selfSupplied, next, contractor, contractorState);
     }
 
     /** Nach {@code count} weiteren Blöcken und einer Zahlung; fertig, wenn alle Blöcke stehen. */
@@ -85,6 +113,18 @@ public record ConstructionProject(UUID id, int number, PolityId town, PlotId plo
         int next = placed + count;
         return new ConstructionProject(id, number, town, plot, client, builder, blueprint, dimension, originX,
                 originY, originZ, next >= total ? Status.DONE : status, next, total, price, paid + payment, orderedOn, rotation, selfSupplied,
-                newDepot);
+                newDepot, contractor, contractorState);
+    }
+
+    /** Mit Auftragnehmer in dem angegebenen Stand; ohne Spieler heißt es: die Firma baut. */
+    public ConstructionProject withContractor(Optional<PlayerRef> player, Contractor state) {
+        return new ConstructionProject(id, number, town, plot, client, builder, blueprint, dimension, originX,
+                originY, originZ, status, placed, total, price, paid, orderedOn, rotation, selfSupplied, depot, player,
+                state);
+    }
+
+    /** Nach Fortschritt eines Spieler-Baus: weitere Blöcke und Zahlung, ohne dass das Spiel Blöcke setzt. */
+    public ConstructionProject verified(int count, long payment) {
+        return progressed(count, payment, depot);
     }
 }

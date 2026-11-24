@@ -178,4 +178,32 @@ class VillagerUrbanismTest {
             return true;
         }
     }
+
+    @Test
+    @DisplayName("Bebaute Grundstücke werden nicht überbaut, auch ohne früheren Bauauftrag")
+    void builtUpPlotsAreSkipped() {
+        setUp(8);
+        server.app().creditTownIncome().execute(new CreditTownIncome.Command(town.id(),
+                Money.of(2_000_000, town.currency()), Day.of(1)));
+        server.app().createPlot().execute(new CreatePlot.Command(town.id(), new Area(OW, 17, 1, 30, 14),
+                PlotType.PUBLIC, Day.of(1)));
+        server.construction().siteSurvey(area -> java.util.Optional.of(true));
+        for (int day = 2; day < 60; day++) {
+            server.construction().villagersOrder(Day.of(day));
+        }
+        assertTrue(server.construction().projects().isEmpty(), "nichts wird über Gebautes bestellt");
+        assertTrue(server.queries().land(town.id()).plots().size() == 1, "und auch keine neuen Grundstücke darüber");
+
+        server.construction().siteSurvey(area -> java.util.Optional.empty());
+        for (int day = 60; day < 90; day++) {
+            server.construction().villagersOrder(Day.of(day));
+        }
+        assertTrue(server.construction().projects().isEmpty(), "ungeladenes Gelände: erst abwarten");
+
+        server.construction().siteSurvey(area -> java.util.Optional.of(false));
+        for (int day = 90; day < 150; day++) {
+            server.construction().villagersOrder(Day.of(day));
+        }
+        assertFalse(server.construction().projects().isEmpty(), "freies Gelände: es wird bestellt");
+    }
 }

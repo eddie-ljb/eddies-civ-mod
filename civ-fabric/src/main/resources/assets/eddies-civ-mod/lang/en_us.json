@@ -1742,5 +1742,22 @@
   "eddies-civ-mod.command.build_site_abandoned": "Build order %1$s cancelled: the building site was not clear for %2$s days.",
   "eddies-civ-mod.gui.plot_rights_guest_entry": "Guest: %1$s",
   "eddies-civ-mod.gui.plot_rights_guest_hint": "Click: build, right-click: doors, shift: remove",
-  "eddies-civ-mod.gui.plot_rights_guest_add": "Add guest"
+  "eddies-civ-mod.gui.plot_rights_guest_add": "Add guest",
+  "eddies-civ-mod.command.build_notice_firm_review": "Build order %1$s from %2$s (%3$s): The client wants %4$s to build it. Agree with /civ bau firma annehmen %1$s, otherwise decline.",
+  "eddies-civ-mod.command.build_notice_player_review": "Build order %1$s: The firm %2$s wants you to build %3$s yourself. /civ bau auftrag annehmen %1$s, /civ bau vorlage %1$s shows site and materials.",
+  "eddies-civ-mod.command.build_not_firm_head": "Only the head of the construction firm may do that.",
+  "eddies-civ-mod.command.build_not_reassignable": "Order %1$s cannot be passed on: it has started or been assigned.",
+  "eddies-civ-mod.command.build_contractor_offered": "Order %1$s is offered to %2$s. If they accept, they build it themselves.",
+  "eddies-civ-mod.command.build_firm_accepted": "The firm takes on order %1$s.",
+  "eddies-civ-mod.command.build_firm_declined": "The firm declines order %1$s; it is closed.",
+  "eddies-civ-mod.command.build_not_contractor": "There is no open order %1$s for you.",
+  "eddies-civ-mod.command.build_job_accepted": "You build order %1$s yourself. You are paid by progress.",
+  "eddies-civ-mod.command.build_job_declined": "You declined order %1$s; the firm builds it.",
+  "eddies-civ-mod.command.build_contract_site": "Order %1$s (%2$s): corner at X %3$s, Z %4$s, size %5$s × %6$s, height %7$s, rotation %8$s°, lowest layer at ground level.",
+  "eddies-civ-mod.command.build_review_expired": "Build order %1$s: no answer, the order is closed.",
+  "eddies-civ-mod.command.build_line_contractor": "  Order %1$s: player building it: %2$s (%3$s)",
+  "eddies-civ-mod.command.build_contractor_state_none": "the firm builds",
+  "eddies-civ-mod.command.build_contractor_state_firm": "waiting for the firm",
+  "eddies-civ-mod.command.build_contractor_state_player": "waiting for the player",
+  "eddies-civ-mod.command.build_contractor_state_active": "building"
 }

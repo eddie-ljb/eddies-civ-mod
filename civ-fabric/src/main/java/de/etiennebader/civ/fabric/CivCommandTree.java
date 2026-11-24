@@ -1716,6 +1716,53 @@ public final class CivCommandTree {
                                     lines.addAll(left.lines());
                                     return left.success() ? Reply.success(lines) : left;
                                 }))))
+                .then(Commands.literal("selbstbau")
+                        .then(Commands.argument(TYPE, StringArgumentType.word())
+                                .then(Commands.argument(COMPANY, StringArgumentType.string())
+                                        .then(Commands.argument(PLAYER, StringArgumentType.word())
+                                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                        context.getSource().getOnlinePlayerNames(), builder))
+                                                .executes(context -> withCiv(context, (civ, player) -> civ.construction()
+                                                        .order(Players.caller(player),
+                                                                StringArgumentType.getString(context, TYPE),
+                                                                StringArgumentType.getString(context, COMPANY), false, 0,
+                                                                StringArgumentType.getString(context, PLAYER))))))))
+                .then(Commands.literal("weitergeben")
+                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                                .then(Commands.argument(PLAYER, StringArgumentType.word())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                context.getSource().getOnlinePlayerNames(), builder))
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.construction()
+                                                .subcontract(Players.caller(player),
+                                                        IntegerArgumentType.getInteger(context, NUMBER),
+                                                        StringArgumentType.getString(context, PLAYER)))))))
+                .then(Commands.literal("firma")
+                        .then(Commands.literal("annehmen")
+                                .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.construction()
+                                                .answerFirm(Players.caller(player),
+                                                        IntegerArgumentType.getInteger(context, NUMBER), true)))))
+                        .then(Commands.literal("ablehnen")
+                                .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.construction()
+                                                .answerFirm(Players.caller(player),
+                                                        IntegerArgumentType.getInteger(context, NUMBER), false))))))
+                .then(Commands.literal("auftrag")
+                        .then(Commands.literal("annehmen")
+                                .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.construction()
+                                                .answerJob(Players.caller(player),
+                                                        IntegerArgumentType.getInteger(context, NUMBER), true)))))
+                        .then(Commands.literal("ablehnen")
+                                .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.construction()
+                                                .answerJob(Players.caller(player),
+                                                        IntegerArgumentType.getInteger(context, NUMBER), false))))))
+                .then(Commands.literal("vorlage")
+                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.construction()
+                                        .blueprintInfo(Players.caller(player),
+                                                IntegerArgumentType.getInteger(context, NUMBER))))))
                 .then(Commands.literal("genehmigen")
                         .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.construction()

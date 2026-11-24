@@ -1742,5 +1742,22 @@
   "eddies-civ-mod.command.build_site_abandoned": "Bauauftrag %1$s abgebrochen: Das Baufeld war %2$s Tage lang nicht frei.",
   "eddies-civ-mod.gui.plot_rights_guest_entry": "Gast: %1$s",
   "eddies-civ-mod.gui.plot_rights_guest_hint": "Klick: Bauen, Rechtsklick: Türen, Umschalt: entfernen",
-  "eddies-civ-mod.gui.plot_rights_guest_add": "Gast hinzufügen"
+  "eddies-civ-mod.gui.plot_rights_guest_add": "Gast hinzufügen",
+  "eddies-civ-mod.command.build_notice_firm_review": "Bauauftrag %1$s von %2$s (%3$s): Der Bauherr möchte, dass %4$s selbst baut. Zustimmen mit /civ bau firma annehmen %1$s, sonst ablehnen.",
+  "eddies-civ-mod.command.build_notice_player_review": "Bauauftrag %1$s: Die Baufirma %2$s möchte, dass du %3$s selbst baust. /civ bau auftrag annehmen %1$s, /civ bau vorlage %1$s zeigt Ort und Baustoffe.",
+  "eddies-civ-mod.command.build_not_firm_head": "Nur die Leitung der Baufirma darf das.",
+  "eddies-civ-mod.command.build_not_reassignable": "Auftrag %1$s kann nicht weitergegeben werden: Er ist schon begonnen oder vergeben.",
+  "eddies-civ-mod.command.build_contractor_offered": "Auftrag %1$s ist %2$s angeboten. Nimmt er an, baut er selbst.",
+  "eddies-civ-mod.command.build_firm_accepted": "Die Baufirma übernimmt Auftrag %1$s.",
+  "eddies-civ-mod.command.build_firm_declined": "Die Baufirma lehnt Auftrag %1$s ab; er ist beendet.",
+  "eddies-civ-mod.command.build_not_contractor": "Für dich gibt es keinen offenen Auftrag %1$s.",
+  "eddies-civ-mod.command.build_job_accepted": "Du baust Auftrag %1$s selbst. Bezahlt wird nach Baufortschritt.",
+  "eddies-civ-mod.command.build_job_declined": "Du hast Auftrag %1$s abgelehnt; die Baufirma baut selbst.",
+  "eddies-civ-mod.command.build_contract_site": "Auftrag %1$s (%2$s): Ecke bei X %3$s, Z %4$s, Maße %5$s × %6$s, Höhe %7$s, Drehung %8$s°, unterste Ebene auf Geländehöhe.",
+  "eddies-civ-mod.command.build_review_expired": "Bauauftrag %1$s: Keine Antwort, der Auftrag ist beendet.",
+  "eddies-civ-mod.command.build_line_contractor": "  Auftrag %1$s: selbst bauender Spieler %2$s (%3$s)",
+  "eddies-civ-mod.command.build_contractor_state_none": "die Firma baut",
+  "eddies-civ-mod.command.build_contractor_state_firm": "wartet auf die Baufirma",
+  "eddies-civ-mod.command.build_contractor_state_player": "wartet auf den Spieler",
+  "eddies-civ-mod.command.build_contractor_state_active": "baut"
 }

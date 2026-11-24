@@ -194,6 +194,7 @@ public final class CivServer {
                 settings.ticksPerDay(), new de.etiennebader.civ.server.construction.BlueprintLibrary(
                 dataDirectory.map(dir -> dir.resolve("blueprints"))), dataDirectory.map(dir -> dir.resolve("construction.tsv")), announcements);
         this.construction.interimGovernment(settings.villagerPolitics());
+        this.construction.playerLookup(players::findByName);
         this.war = new de.etiennebader.civ.server.war.WarService(app, calendar, texts, announcements, ids,
                 settings, dataDirectory.map(dir -> dir.resolve("war.tsv")));
         this.villagerFederations = new VillagerFederations(app, federations, announcements);
