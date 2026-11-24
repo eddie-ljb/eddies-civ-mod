@@ -256,4 +256,66 @@ class ConstructionServiceTest {
         }
         assertEquals(ConstructionProject.Status.CANCELLED, server.construction().projects().getFirst().status());
     }
+
+    @Test
+    @DisplayName("Die Baufirma gibt einen Auftrag an einen Spieler weiter, der selbst baut und nach Fortschritt bezahlt wird")
+    void firmPassesOrderToPlayer() {
+        setUp();
+        PlayerRef bob = new PlayerRef(PlayerId.generate(ids));
+        server.playerJoined(bob, "Bob");
+        Caller bobAt = new Caller(bob, "Bob", aliceAt.position());
+        assertTrue(server.construction().order(aliceAt, "holz-huette", "Bau AG").success());
+        assertTrue(server.construction().subcontract(aliceAt, 1, "Bob").success());
+        assertEquals(ConstructionProject.Contractor.PLAYER_REVIEW,
+                server.construction().projects().getFirst().contractorState());
+        assertEquals(0, server.construction().advance(100, FLAT).size(), "wartet auf den Spieler");
+        assertFalse(server.construction().answerJob(aliceAt, 1, true).success(), "nur der vorgesehene Spieler");
+        assertTrue(server.construction().blueprintInfo(bobAt, 1).success());
+        assertTrue(server.construction().answerJob(bobAt, 1, true).success());
+
+        Blueprint plan = server.construction().library().find("holz-huette").orElseThrow();
+        server.construction().advance(100, FLAT); // Höhe festlegen
+        ConstructionProject project = server.construction().projects().getFirst();
+        java.util.Map<String, String> world = new java.util.HashMap<>();
+        for (Blueprint.Placement p : plan.placements()) {
+            world.put(p.x() + "," + p.y() + "," + p.z(), Blueprint.baseName(p.state()));
+        }
+        ConstructionService.Terrain mirror = new ConstructionService.Terrain() {
+            public boolean isLoaded(BlockPosition position) {
+                return true;
+            }
+
+            public int groundLevel(BlockPosition min, int sizeX, int sizeZ) {
+                return 70;
+            }
+
+            public boolean isClear(BlockPosition min, int sizeX, int sizeY, int sizeZ) {
+                return true;
+            }
+
+            public String blockName(BlockPosition position) {
+                return world.get((position.x() - project.originX()) + "," + (position.y() - project.originY().getAsInt())
+                        + "," + (position.z() - project.originZ()));
+            }
+        };
+        long before = server.queries().ledger().balanceOf(bob, de.etiennebader.civ.domain.shared.CurrencyId.EMERALD).amount();
+        server.construction().advance(100, mirror);
+        assertEquals(ConstructionProject.Status.DONE, server.construction().projects().getFirst().status());
+        long paid = server.queries().ledger().balanceOf(bob, de.etiennebader.civ.domain.shared.CurrencyId.EMERALD).amount() - before;
+        assertEquals(project.price() * 90 / 100, paid, "der Spieler bekommt den Preis abzüglich 10 % Provision");
+    }
+
+    @Test
+    @DisplayName("Der Bauherr bestellt gleich mit Selbstbauer; die Firma muss zustimmen, sonst endet der Auftrag")
+    void clientRequestsPlayerBuild() {
+        setUp();
+        PlayerRef bob = new PlayerRef(PlayerId.generate(ids));
+        server.playerJoined(bob, "Bob");
+        assertTrue(server.construction().order(aliceAt, "holz-huette", "Bau AG", false, 0, "Bob").success());
+        assertEquals(ConstructionProject.Contractor.FIRM_REVIEW,
+                server.construction().projects().getFirst().contractorState());
+        assertTrue(server.construction().answerFirm(aliceAt, 1, false).success());
+        assertEquals(ConstructionProject.Status.CANCELLED, server.construction().projects().getFirst().status());
+        assertFalse(server.construction().order(aliceAt, "holz-huette", "Bau AG", false, 0, "Niemand").success());
+    }
 }

@@ -99,6 +99,19 @@ public final class ConstructionService {
 
         /** Ob im Quader nur Luft und Natur (Pflanzen, Laub, Holz) stehen, also nichts Gebautes überschrieben würde. */
         boolean isClear(BlockPosition min, int sizeX, int sizeY, int sizeZ);
+
+        /** Der Blockname an der Stelle (z. B. {@code minecraft:oak_planks}); {@code null}, wenn nicht geladen. */
+        default String blockName(BlockPosition position) {
+            return null;
+        }
+    }
+
+    /** Ob auf einer Fläche schon etwas gebaut wurde, mit oder ohne Bauauftrag. */
+    @FunctionalInterface
+    public interface SiteSurvey {
+
+        /** @return ob dort Gebautes steht; leer, wenn das Gelände nicht geladen ist und man es noch nicht weiß */
+        Optional<Boolean> isBuiltUp(de.etiennebader.civ.domain.land.Area area);
     }
 
     private final CivApplication app;
@@ -117,6 +130,16 @@ public final class ConstructionService {
     static final int ABANDON_DAYS = 3;
     private final de.etiennebader.civ.server.Announcements announcements;
     private final TownPlanning planning;
+    private SiteSurvey survey = area -> Optional.of(false);
+    private final Map<de.etiennebader.civ.domain.land.Area, Optional<Boolean>> surveyed = new HashMap<>();
+    private java.util.function.Function<String, Optional<PlayerRef>> playerLookup = name -> Optional.empty();
+    private final Map<UUID, Long> reviewSince = new HashMap<>();
+    /** Anteil des Preises, den eine Baufirma behält, wenn sie einen Auftrag an einen Spieler weitergibt. */
+    static final int COMMISSION_PERCENT = 10;
+    /** Ab diesem Anteil passender Blöcke gilt ein Spieler-Bau als fertig. */
+    static final int DONE_PERCENT = 95;
+    /** Nach so vielen Tagen ohne Antwort verfällt eine Anfrage an Firma oder Spieler. */
+    static final int REVIEW_DAYS = 3;
     private boolean interimGovernment = true;
     private long clock;
     private final long ticksPerDay;
@@ -135,6 +158,7 @@ public final class ConstructionService {
         this.store = new ProjectStore(file);
         this.planning = new TownPlanning(app, library, announcements, texts);
         this.planning.authority(this::authority);
+        this.planning.site(this::siteFree);
         for (ConstructionProject project : store.load()) {
             projects.put(project.id(), project);
             lastNumber = Math.max(lastNumber, project.number());
@@ -147,6 +171,27 @@ public final class ConstructionService {
 
     public synchronized List<ConstructionProject> projects() {
         return new ArrayList<>(projects.values());
+    }
+
+    /**
+     * Wer prüfen kann, ob auf einer Fläche schon gebaut wurde; das Spiel setzt ihn. Ohne ihn gilt jede Fläche als frei.
+     */
+    public synchronized void siteSurvey(SiteSurvey survey) {
+        this.survey = Objects.requireNonNull(survey, "survey");
+    }
+
+    /** Wie Spieler heißen, wenn man sie als Auftragnehmer nennt. */
+    public synchronized void playerLookup(java.util.function.Function<String, Optional<PlayerRef>> lookup) {
+        this.playerLookup = Objects.requireNonNull(lookup, "lookup");
+    }
+
+    /**
+     * Ob die Fläche sicher frei von Gebautem ist. Selbstständig handelnde Dorfbewohner und Organisationen bestellen nur
+     * dort, sonst würden sie vorhandene Gebäude überbauen, auch wenn nie jemand einen Bauauftrag dafür gestellt hat.
+     * Ist das Gelände nicht geladen, bleibt es offen und der Auftrag wartet.
+     */
+    private boolean siteFree(de.etiennebader.civ.domain.land.Area area) {
+        return surveyed.computeIfAbsent(area, survey::isBuiltUp).map(built -> !built).orElse(false);
     }
 
     // ------------------------------------------------------------------ Befehle
@@ -164,6 +209,24 @@ public final class ConstructionService {
      */
     public synchronized Reply order(Caller caller, String planName, String firmName, boolean selfSupplied,
                                     int degrees) {
+        return order(caller, planName, firmName, selfSupplied, degrees, "");
+    }
+
+    /**
+     * Wie {@link #order(Caller, String, String, boolean, int)}; nennt der Bauherr einen Spieler, soll dieser selbst
+     * bauen. Die Baufirma muss zustimmen ({@link #answerFirm}), danach der Spieler ({@link #answerJob}); bezahlt wird er
+     * nach verifiziertem Baufortschritt, die Firma behält {@value #COMMISSION_PERCENT} % Provision.
+     */
+    public synchronized Reply order(Caller caller, String planName, String firmName, boolean selfSupplied,
+                                    int degrees, String contractorName) {
+        Optional<PlayerRef> contractor = Optional.empty();
+        if (!contractorName.isBlank()) {
+            contractor = playerLookup.apply(contractorName.strip());
+            if (contractor.isEmpty()) {
+                return Reply.failure(Message.of(MessageKey.UNKNOWN_RECIPIENT, contractorName.strip()));
+            }
+            selfSupplied = false;
+        }
         if (degrees < 0 || degrees % 90 != 0 || degrees > 270) {
             return Reply.failure(Message.of(MessageKey.BUILD_BAD_ROTATION));
         }
@@ -185,6 +248,9 @@ public final class ConstructionService {
         try {
             ConstructionProject project = place(caller.player(), town.get(), plot.get(), plan.get(), firm.get(),
                     calendar.today(), selfSupplied, degrees / 90);
+            if (contractor.isPresent()) {
+                project = startReview(project, contractor.get(), ConstructionProject.Contractor.FIRM_REVIEW, firm.get());
+            }
             Message price = texts.money(Money.of(project.price(), firm.get().currency()));
             return Reply.success(Message.of(project.status() == ConstructionProject.Status.AWAITING_PERMIT
                             ? MessageKey.BUILD_ORDERED_PERMIT : MessageKey.BUILD_ORDERED, project.number(),
@@ -194,6 +260,141 @@ public final class ConstructionService {
         } catch (DomainException e) {
             return Reply.failure(texts.error(e));
         }
+    }
+
+    private ConstructionProject startReview(ConstructionProject project, PlayerRef contractor,
+                                            ConstructionProject.Contractor state, PolityView firm) {
+        ConstructionProject updated = project.withContractor(Optional.of(contractor), state);
+        put(updated);
+        reviewSince.put(updated.id(), clock);
+        if (state == ConstructionProject.Contractor.FIRM_REVIEW) {
+            firm.mayor().filter(PlayerRef.class::isInstance).map(PlayerRef.class::cast).ifPresent(head ->
+                    announcements.add(de.etiennebader.civ.server.Announcement.toPlayer(head, Message.of(
+                            MessageKey.BUILD_NOTICE_FIRM_REVIEW, updated.number(), texts.actor(updated.client()),
+                            updated.blueprint(), texts.actor(contractor)))));
+        } else {
+            announcements.add(de.etiennebader.civ.server.Announcement.toPlayer(contractor, Message.of(
+                    MessageKey.BUILD_NOTICE_PLAYER_REVIEW, updated.number(), firm.name().value(),
+                    updated.blueprint())));
+        }
+        return updated;
+    }
+
+    private boolean isHead(PlayerRef player, ConstructionProject project) {
+        return queries.polity(project.builder()).map(firm -> firm.holds(player, Office.MAYOR)).orElse(false);
+    }
+
+    /** Die Baufirma gibt einen Auftrag, der noch nicht begonnen hat, an einen Spieler weiter, der selbst baut. */
+    public synchronized Reply subcontract(Caller caller, int number, String playerName) {
+        Optional<ConstructionProject> project = byNumber(number).filter(found -> found.status().isActive());
+        if (project.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.BUILD_UNKNOWN_PROJECT, number));
+        }
+        if (!isHead(caller.player(), project.get())) {
+            return Reply.failure(Message.of(MessageKey.BUILD_NOT_FIRM_HEAD));
+        }
+        if (project.get().placed() > 0 || project.get().contractorState() != ConstructionProject.Contractor.NONE) {
+            return Reply.failure(Message.of(MessageKey.BUILD_NOT_REASSIGNABLE, number));
+        }
+        Optional<PlayerRef> contractor = playerLookup.apply(playerName.strip());
+        if (contractor.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.UNKNOWN_RECIPIENT, playerName.strip()));
+        }
+        PolityView firm = queries.polity(project.get().builder()).orElseThrow();
+        ConstructionProject.Contractor next = contractor.get().equals(caller.player())
+                ? ConstructionProject.Contractor.ACTIVE : ConstructionProject.Contractor.PLAYER_REVIEW;
+        if (next == ConstructionProject.Contractor.ACTIVE) {
+            put(project.get().withContractor(contractor, next));
+        } else {
+            startReview(project.get(), contractor.get(), next, firm);
+        }
+        return Reply.success(Message.of(MessageKey.BUILD_CONTRACTOR_OFFERED, number, texts.actor(contractor.get())));
+    }
+
+    /** Die Baufirma stimmt einem vom Bauherrn gewünschten Spieler-Bau zu oder lehnt ihn ab. */
+    public synchronized Reply answerFirm(Caller caller, int number, boolean accept) {
+        Optional<ConstructionProject> project = byNumber(number).filter(found -> found.status().isActive()
+                && found.contractorState() == ConstructionProject.Contractor.FIRM_REVIEW);
+        if (project.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.BUILD_UNKNOWN_PROJECT, number));
+        }
+        if (!isHead(caller.player(), project.get())) {
+            return Reply.failure(Message.of(MessageKey.BUILD_NOT_FIRM_HEAD));
+        }
+        return answerFirm(project.get(), accept);
+    }
+
+    private Reply answerFirm(ConstructionProject project, boolean accept) {
+        reviewSince.remove(project.id());
+        if (!accept) {
+            put(project.withStatus(ConstructionProject.Status.CANCELLED));
+            notifyClient(project, MessageKey.BUILD_FIRM_DECLINED);
+            return Reply.success(Message.of(MessageKey.BUILD_FIRM_DECLINED, project.number()));
+        }
+        PlayerRef contractor = project.contractor().orElseThrow();
+        PolityView firm = queries.polity(project.builder()).orElseThrow();
+        if (isHead(contractor, project)) {
+            put(project.withContractor(project.contractor(), ConstructionProject.Contractor.ACTIVE));
+        } else {
+            startReview(project, contractor, ConstructionProject.Contractor.PLAYER_REVIEW, firm);
+        }
+        notifyClient(project, MessageKey.BUILD_FIRM_ACCEPTED);
+        return Reply.success(Message.of(MessageKey.BUILD_FIRM_ACCEPTED, project.number()));
+    }
+
+    /** Der vorgesehene Spieler nimmt den Bau an oder lehnt ihn ab; dann baut wieder die Firma. */
+    public synchronized Reply answerJob(Caller caller, int number, boolean accept) {
+        Optional<ConstructionProject> project = byNumber(number).filter(found -> found.status().isActive()
+                && found.contractorState() == ConstructionProject.Contractor.PLAYER_REVIEW
+                && found.contractor().filter(caller.player()::equals).isPresent());
+        if (project.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.BUILD_NOT_CONTRACTOR, number));
+        }
+        reviewSince.remove(project.get().id());
+        put(accept ? project.get().withContractor(project.get().contractor(), ConstructionProject.Contractor.ACTIVE)
+                : project.get().withContractor(Optional.empty(), ConstructionProject.Contractor.NONE));
+        return Reply.success(Message.of(accept ? MessageKey.BUILD_JOB_ACCEPTED : MessageKey.BUILD_JOB_DECLINED,
+                number));
+    }
+
+    /** Wo und was ein Spieler als Auftragnehmer bauen soll: Ecke, Maße, Drehung und Baustoffe. */
+    public synchronized Reply blueprintInfo(Caller caller, int number) {
+        Optional<ConstructionProject> project = byNumber(number).filter(found -> found.status().isActive());
+        if (project.isEmpty() || project.get().contractor().isEmpty()
+                || !(project.get().contractor().filter(caller.player()::equals).isPresent()
+                || controls(caller.player(), project.get()) || isHead(caller.player(), project.get()))) {
+            return Reply.failure(Message.of(MessageKey.BUILD_UNKNOWN_PROJECT, number));
+        }
+        ConstructionProject found = project.get();
+        Blueprint plan = library.find(found.blueprint()).orElseThrow();
+        List<Message> lines = new ArrayList<>();
+        lines.add(Message.of(MessageKey.BUILD_CONTRACT_SITE, number, plan.name(), found.originX(), found.originZ(),
+                plan.footprintX(found.rotation()), plan.footprintZ(found.rotation()), plan.sizeY(),
+                found.rotation() * 90));
+        plan.materials().forEach((item, count) -> lines.add(Message.of(MessageKey.BUILD_MATERIAL_LINE, item, count)));
+        return Reply.success(lines);
+    }
+
+    private void notifyClient(ConstructionProject project, MessageKey key) {
+        if (project.client() instanceof PlayerRef player) {
+            announcements.add(de.etiennebader.civ.server.Announcement.toPlayer(player,
+                    Message.of(key, project.number())));
+        }
+    }
+
+    /** Wie viele Blöcke des Plans in der Welt schon stehen; zählt nur, wo der Blockname stimmt. */
+    private static int matching(ConstructionProject project, Blueprint plan, Terrain terrain) {
+        int origin = project.originY().orElseThrow();
+        int matched = 0;
+        for (Blueprint.Placement placement : plan.placements()) {
+            Blueprint.Placement turned = plan.rotated(placement, project.rotation());
+            String found = terrain.blockName(new BlockPosition(project.dimension(), project.originX() + turned.x(),
+                    origin + turned.y(), project.originZ() + turned.z()));
+            if (found != null && found.equals(Blueprint.baseName(placement.state()))) {
+                matched++;
+            }
+        }
+        return matched;
     }
 
     /** Das Bauamt genehmigt einen Antrag; die Gebühr zahlt der Bauherr an die Gemeindekasse. */
@@ -229,6 +430,13 @@ public final class ConstructionService {
                 lines.add(Message.of(MessageKey.BUILD_LINE, project.number(), project.blueprint(),
                         statusText(project.status()), project.placed(), project.total(),
                         texts.actor(project.client())));
+                project.contractor().ifPresent(contractor -> lines.add(Message.of(MessageKey.BUILD_LINE_CONTRACTOR,
+                        project.number(), texts.actor(contractor), Message.of(switch (project.contractorState()) {
+                            case NONE -> MessageKey.BUILD_CONTRACTOR_STATE_NONE;
+                            case FIRM_REVIEW -> MessageKey.BUILD_CONTRACTOR_STATE_FIRM;
+                            case PLAYER_REVIEW -> MessageKey.BUILD_CONTRACTOR_STATE_PLAYER;
+                            case ACTIVE -> MessageKey.BUILD_CONTRACTOR_STATE_ACTIVE;
+                        }))));
             }
         }
         return lines.isEmpty() ? Reply.success(Message.of(MessageKey.BUILD_NONE)) : Reply.success(lines);
@@ -377,6 +585,13 @@ public final class ConstructionService {
                 put(project.withStatus(ConstructionProject.Status.CANCELLED));
                 continue;
             }
+            if (expireReview(project, perDay)) {
+                continue;
+            }
+            if (project.contractorState() == ConstructionProject.Contractor.FIRM_REVIEW
+                    || project.contractorState() == ConstructionProject.Contractor.PLAYER_REVIEW) {
+                continue; // wartet auf die Zustimmung der Firma oder des Spielers
+            }
             int fx = plan.get().footprintX(project.rotation());
             int fz = plan.get().footprintZ(project.rotation());
             BlockPosition corner = new BlockPosition(project.dimension(), project.originX(), 0, project.originZ());
@@ -410,6 +625,10 @@ public final class ConstructionService {
             if (current.originY().isEmpty() || blockedUntil.containsKey(current.id())) {
                 continue;
             }
+            if (current.contractorState() == ConstructionProject.Contractor.ACTIVE) {
+                verifyContractor(current, firm.get(), plan.get(), terrain);
+                continue;
+            }
             double budget = carry.getOrDefault(current.id(), 0.0)
                     + (double) Math.max(1, workers(firm.get()).size()) * BLOCKS_PER_WORKER_DAY * ticks / perDay;
             int wanted = (int) Math.min(Math.min(budget, MAX_BLOCKS_PER_CALL), current.total() - current.placed());
@@ -440,6 +659,66 @@ public final class ConstructionService {
                     workers(firm.get()).stream().map(ActorRef::uuid).toList()));
         }
         return builds;
+    }
+
+    /**
+     * Ein Spieler baut selbst: Was von seinem Bau dem Plan entspricht, gilt als erledigt und wird bezahlt. Ab
+     * {@value #DONE_PERCENT} % passender Blöcke ist der Auftrag fertig.
+     */
+    private void verifyContractor(ConstructionProject project, PolityView firm, Blueprint plan, Terrain terrain) {
+        int matched = matching(project, plan, terrain);
+        int target = matched * 100 >= project.total() * DONE_PERCENT ? project.total() : Math.min(matched, project.total());
+        if (target <= project.placed()) {
+            return;
+        }
+        long due = project.price() * target / project.total() - project.paid();
+        if (due > 0 && !payContractor(project, firm, due)) {
+            return;
+        }
+        put(project.verified(target - project.placed(), Math.max(0, due)));
+    }
+
+    /** Der Bauherr zahlt den Spieler, abzüglich der Provision der Firma, die sie behält. */
+    private boolean payContractor(ConstructionProject project, PolityView firm, long amount) {
+        long commission = amount * COMMISSION_PERCENT / 100;
+        long wage = amount - commission;
+        if (queries.ledger().balanceOf(project.client(), firm.currency()).amount() < amount) {
+            return false;
+        }
+        try {
+            if (wage > 0) {
+                app.transferFunds().execute(new TransferFunds.Command(project.client(), project.contractor().orElseThrow(),
+                        Money.of(wage, firm.currency()), TransferReason.CONSTRUCTION, calendar.today()));
+            }
+            if (commission > 0) {
+                app.transferFunds().execute(new TransferFunds.Command(project.client(), firm.asActor(),
+                        Money.of(commission, firm.currency()), TransferReason.CONSTRUCTION, calendar.today()));
+            }
+            return true;
+        } catch (DomainException e) {
+            return false;
+        }
+    }
+
+    /** Anfragen an Firma oder Spieler verfallen nach {@value #REVIEW_DAYS} Tagen. */
+    private boolean expireReview(ConstructionProject project, long perDay) {
+        ConstructionProject.Contractor state = project.contractorState();
+        if (state != ConstructionProject.Contractor.FIRM_REVIEW
+                && state != ConstructionProject.Contractor.PLAYER_REVIEW) {
+            return false;
+        }
+        long since = reviewSince.computeIfAbsent(project.id(), id -> clock);
+        if (clock - since < REVIEW_DAYS * perDay) {
+            return false;
+        }
+        reviewSince.remove(project.id());
+        if (state == ConstructionProject.Contractor.FIRM_REVIEW) {
+            put(project.withStatus(ConstructionProject.Status.CANCELLED));
+            notifyClient(project, MessageKey.BUILD_REVIEW_EXPIRED);
+        } else {
+            put(project.withContractor(Optional.empty(), ConstructionProject.Contractor.NONE));
+        }
+        return true;
     }
 
     /** Das Baufeld blieb zu lange blockiert: Der Auftrag endet, der Bauherr (bei Organisationen deren Leitung) erfährt es. */
@@ -591,7 +870,15 @@ public final class ConstructionService {
      */
     public synchronized int villagersOrder(Day day) {
         Objects.requireNonNull(day, "day");
+        surveyed.clear();
         approvePermits();
+        for (ConstructionProject project : new ArrayList<>(projects.values())) {
+            if (project.status().isActive() && project.contractorState() == ConstructionProject.Contractor.FIRM_REVIEW
+                    && queries.polity(project.builder()).flatMap(PolityView::mayor)
+                    .filter(PersonRef.class::isInstance).isPresent()) {
+                answerFirm(project, true); // eine Baufirma unter Dorfbewohner-Leitung stimmt zu
+            }
+        }
         planning.endOfDay(day);
         int orders = 0;
         List<PolityView> towns = queries.polities().stream().filter(p -> p.kind() == PolityKind.TERRITORIAL)
@@ -665,6 +952,7 @@ public final class ConstructionService {
         List<Plot> empty = queries.land(town.id()).plotsHeldBy(villager).stream()
                 .filter(plot -> plot.type() != PlotType.EMBASSY)
                 .filter(plot -> projects.values().stream().noneMatch(p -> p.plot().equals(plot.id())) && !abandoned.contains(plot.id()))
+                .filter(plot -> siteFree(plot.area()))
                 .sorted(Comparator.<Plot, Boolean>comparing(plot -> plot.type() != PlotType.RESIDENTIAL)
                         .thenComparing(plot -> plot.id().value())).toList();
         if (empty.isEmpty()) {
@@ -710,6 +998,7 @@ public final class ConstructionService {
                     .filter(plot -> plot.type() != PlotType.EMBASSY)
                     .filter(plot -> owner.kind() != PolityKind.TERRITORIAL || isCivic(plot.type()))
                     .filter(plot -> !plot.isForSale())
+                    .filter(plot -> siteFree(plot.area()))
                     .filter(plot -> projects.values().stream().noneMatch(p -> p.plot().equals(plot.id())) && !abandoned.contains(plot.id()))
                     .sorted(Comparator.comparing(plot -> plot.id().value())).toList();
             if (candidates.isEmpty()) {

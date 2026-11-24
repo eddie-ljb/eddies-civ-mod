@@ -76,7 +76,8 @@ final class ProjectStore {
                 Integer.toString(p.originZ()), p.status().name(), Integer.toString(p.placed()),
                 Integer.toString(p.total()), Long.toString(p.price()), Long.toString(p.paid()),
                 Long.toString(p.orderedOn().value()), Integer.toString(p.rotation()),
-                p.selfSupplied() ? "1" : "0", depotText(p.depot()));
+                p.selfSupplied() ? "1" : "0", depotText(p.depot()),
+                p.contractor().map(c -> ActorCodec.encode(c)).orElse("-"), p.contractorState().name());
     }
 
     private static String depotText(java.util.Map<String, Integer> depot) {
@@ -104,6 +105,10 @@ final class ProjectStore {
                 Integer.parseInt(f[10]), ConstructionProject.Status.valueOf(f[11]), Integer.parseInt(f[12]),
                 Integer.parseInt(f[13]), Long.parseLong(f[14]), Long.parseLong(f[15]), Day.of(Long.parseLong(f[16])),
                 f.length > 17 ? Integer.parseInt(f[17]) : 0, f.length > 18 && f[18].equals("1"),
-                f.length > 19 ? depotOf(f[19]) : java.util.Map.of());
+                f.length > 19 ? depotOf(f[19]) : java.util.Map.of(),
+                f.length > 20 && !f[20].equals("-")
+                        ? java.util.Optional.of((de.etiennebader.civ.domain.actor.PlayerRef) ActorCodec.decode(f[20]))
+                        : java.util.Optional.empty(),
+                f.length > 21 ? ConstructionProject.Contractor.valueOf(f[21]) : ConstructionProject.Contractor.NONE);
     }
 }

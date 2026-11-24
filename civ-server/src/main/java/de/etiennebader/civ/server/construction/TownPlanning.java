@@ -77,6 +77,13 @@ final class TownPlanning {
         this.texts = Objects.requireNonNull(texts, "texts");
     }
 
+    private java.util.function.Predicate<Area> site = area -> true;
+
+    /** Ob eine Fläche sicher frei von Gebautem ist; kommt von {@link ConstructionService}. */
+    void site(java.util.function.Predicate<Area> site) {
+        this.site = Objects.requireNonNull(site, "site");
+    }
+
     /** Wer in einer Gemeinde das Bauamt ist; kommt von {@link ConstructionService}. */
     void authority(Function<PolityId, Optional<ActorRef>> authority) {
         this.authority = Objects.requireNonNull(authority, "authority");
@@ -118,6 +125,9 @@ final class TownPlanning {
             }
             Area area = new Area(chunk.dimension(), chunk.minBlockX() + inset, chunk.minBlockZ() + inset,
                     chunk.minBlockX() + inset + size - 1, chunk.minBlockZ() + inset + size - 1);
+            if (!site.test(area)) {
+                continue; // dort steht schon etwas: kein Grundstück darüber
+            }
             try {
                 PlotId id = app.createPlot().execute(new CreatePlot.Command(town.id(), area, type, day));
                 publish(town, id, area, type, day);
@@ -180,7 +190,7 @@ final class TownPlanning {
         WorldQueries world = app.queries();
         List<Plot> offers = world.land(town.id()).plots().stream()
                 .filter(plot -> plot.type() == PlotType.RESIDENTIAL && plot.isForSale()
-                        && plot.holder().equals(town.asActor()))
+                        && plot.holder().equals(town.asActor()) && site.test(plot.area()))
                 .sorted(Comparator.comparing((Plot plot) -> plot.askingPrice().orElseThrow().amount())
                         .thenComparing(plot -> plot.id().value())).toList();
         if (offers.isEmpty()) {

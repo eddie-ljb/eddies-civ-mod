@@ -20,6 +20,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.npc.villager.Villager;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -51,6 +52,7 @@ final class ConstructionSites {
         }
         long elapsed = ticks;
         ticks = 0;
+        civ.construction().siteSurvey(survey(server));
         for (ConstructionService.Build build : civ.construction().advance(elapsed, terrain(server))) {
             place(server, build);
         }
@@ -62,12 +64,65 @@ final class ConstructionSites {
                 : Optional.ofNullable(server.getLevel(ResourceKey.create(Registries.DIMENSION, dimension)));
     }
 
+    /**
+     * Ob auf einer Fläche schon gebaut wurde, auch ohne Bauauftrag: In jeder Spalte zählen die obersten Blöcke, die
+     * weder Luft, Flüssigkeit, Pflanzen, Laub, Holz noch natürliches Gelände (Erde, Stein, Sand, Schnee …) sind.
+     * Liegt ein Teil der Fläche in einem nicht geladenen Chunk, ist das Ergebnis offen.
+     */
+    private static ConstructionService.SiteSurvey survey(MinecraftServer server) {
+        return area -> {
+            Optional<ServerLevel> found = levelOf(server, new BlockPosition(area.dimension(), area.minX(), 0, area.minZ()));
+            if (found.isEmpty()) {
+                return Optional.empty();
+            }
+            ServerLevel level = found.get();
+            for (int x = area.minX(); x <= area.maxX() + 15; x += 16) {
+                for (int z = area.minZ(); z <= area.maxZ() + 15; z += 16) {
+                    if (!level.isLoaded(new BlockPos(Math.min(x, area.maxX()), 64, Math.min(z, area.maxZ())))) {
+                        return Optional.empty();
+                    }
+                }
+            }
+            BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+            for (int x = area.minX(); x <= area.maxX(); x++) {
+                for (int z = area.minZ(); z <= area.maxZ(); z++) {
+                    int top = level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z);
+                    for (int y = top - 1; y >= Math.max(level.getMinY(), top - 6); y--) {
+                        pos.set(x, y, z);
+                        if (!natural(level.getBlockState(pos))) {
+                            return Optional.of(true);
+                        }
+                    }
+                }
+            }
+            return Optional.of(false);
+        };
+    }
+
+    private static boolean natural(BlockState state) {
+        return state.isAir() || state.canBeReplaced() || !state.getFluidState().isEmpty()
+                || state.is(BlockTags.LEAVES) || state.is(BlockTags.LOGS)
+                || state.is(BlockTags.DIRT) || state.is(BlockTags.SAND) || state.is(BlockTags.TERRACOTTA)
+                || state.is(BlockTags.SNOW) || state.is(BlockTags.ICE) || state.is(BlockTags.BASE_STONE_OVERWORLD)
+                || state.is(Blocks.GRAVEL) || state.is(Blocks.CLAY) || state.is(Blocks.SANDSTONE)
+                || state.is(Blocks.RED_SANDSTONE) || state.is(Blocks.BEDROCK);
+    }
+
     private static ConstructionService.Terrain terrain(MinecraftServer server) {
         return new ConstructionService.Terrain() {
             @Override
             public boolean isLoaded(BlockPosition position) {
                 return levelOf(server, position)
                         .map(level -> level.isLoaded(new BlockPos(position.x(), 64, position.z()))).orElse(false);
+            }
+
+            @Override
+            public String blockName(BlockPosition position) {
+                return levelOf(server, position).map(level -> {
+                    BlockPos pos = new BlockPos(position.x(), position.y(), position.z());
+                    return level.isLoaded(pos) ? BuiltInRegistries.BLOCK.getKey(level.getBlockState(pos).getBlock())
+                            .toString() : null;
+                }).orElse(null);
             }
 
             @Override
