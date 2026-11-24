@@ -42,6 +42,7 @@ import de.etiennebader.civ.fabric.screen.ParliamentScreen;
 import de.etiennebader.civ.fabric.screen.PartiesScreen;
 import de.etiennebader.civ.fabric.screen.PressScreen;
 import de.etiennebader.civ.server.CivServer;
+import de.etiennebader.civ.server.construction.ConstructionService;
 import de.etiennebader.civ.server.ServerConfig;
 import de.etiennebader.civ.server.campaign.CampaignService;
 import de.etiennebader.civ.server.command.Caller;
@@ -304,6 +305,17 @@ public final class CivCommandTree {
                 .then(Commands.literal("stimmung")
                         .executes(context -> withCiv(context, (civ, player) -> civ.villagers().mood(Players.caller(player)))))
                 .then(Commands.literal("dorfbewohner")
+                        .then(Commands.literal("info")
+                                .executes(context -> withCiv(context, (civ, player) -> villagerRef(player)
+                                        .map(villager -> civ.villagers().describe(villager))
+                                        .orElseGet(() -> Reply.failure(Message.of(MessageKey.VILLAGER_NONE_NEAR))))))
+                        .then(Commands.literal("menue")
+                                .executes(context -> withCiv(context, (civ, player) -> villagerRef(player)
+                                        .map(villager -> {
+                                            MenuOpener.villager(civ, player, villager);
+                                            return Reply.success(Message.of(MessageKey.VILLAGER_MENU_OPENED));
+                                        })
+                                        .orElseGet(() -> Reply.failure(Message.of(MessageKey.VILLAGER_NONE_NEAR))))))
                         .then(Commands.literal("register")
                                 .executes(context -> withCiv(context, (civ, player) -> civ.villagers()
                                         .residentRegister(Players.caller(player), 1)))
@@ -1872,21 +1884,36 @@ public final class CivCommandTree {
                                                 .map(plan -> plan.name()).toList())
                                                 .orElse(java.util.List.of()), builder))
                                 .then(arg(COMPANY, StringArgumentType.string())
-                                        .executes(context -> order(context, false, 0))
+                                        .executes(context -> order(context, false, ConstructionService.AUTO))
                                         .then(Commands.literal("material")
                                                 .then(Commands.literal("firma")
-                                                        .executes(context -> order(context, false, 0))
+                                                        .executes(context -> order(context, false, ConstructionService.AUTO))
                                                         .then(arg(COUNT, IntegerArgumentType.integer(0, 270))
                                                                 .executes(context -> order(context, false,
                                                                         IntegerArgumentType.getInteger(context, COUNT)))))
                                                 .then(Commands.literal("selbst")
-                                                        .executes(context -> order(context, true, 0))
+                                                        .executes(context -> order(context, true, ConstructionService.AUTO))
                                                         .then(arg(COUNT, IntegerArgumentType.integer(0, 270))
                                                                 .executes(context -> order(context, true,
                                                                         IntegerArgumentType.getInteger(context, COUNT))))))
                                         .then(arg(COUNT, IntegerArgumentType.integer(0, 270))
                                                 .executes(context -> order(context, false,
                                                         IntegerArgumentType.getInteger(context, COUNT)))))))
+                .then(Commands.literal("vorschau")
+                        .then(Commands.literal("aus")
+                                .executes(context -> withCiv(context, (civ, player) -> {
+                                    host.hideHologram(player);
+                                    return Reply.success(Message.of(MessageKey.BUILD_PREVIEW_OFF));
+                                })))
+                        .then(arg(TYPE, StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                        host.current().map(civ -> civ.construction().library().all().stream()
+                                                .map(plan -> plan.name()).toList())
+                                                .orElse(java.util.List.of()), builder))
+                                .executes(context -> previewPlan(context, ConstructionService.AUTO))
+                                .then(arg(COUNT, IntegerArgumentType.integer(0, 270))
+                                        .executes(context -> previewPlan(context,
+                                                IntegerArgumentType.getInteger(context, COUNT))))))
                 .then(Commands.literal("material")
                         .then(arg(NUMBER, IntegerArgumentType.integer(1))
                                 .executes(context -> withCiv(context, (civ, player) -> {
@@ -1964,9 +1991,28 @@ public final class CivCommandTree {
 
     private int order(CommandContext<CommandSourceStack> context, boolean selfSupplied, int degrees)
             throws CommandSyntaxException {
-        return withCiv(context, (civ, player) -> civ.construction().order(Players.caller(player),
-                StringArgumentType.getString(context, TYPE), StringArgumentType.getString(context, COMPANY),
-                selfSupplied, degrees));
+        return withCiv(context, (civ, player) -> {
+            Reply reply = civ.construction().order(Players.caller(player),
+                    StringArgumentType.getString(context, TYPE), StringArgumentType.getString(context, COMPANY),
+                    selfSupplied, degrees);
+            if (reply.success()) {
+                // Wer einen Bau beauftragt, sieht das Bauwerk gleich als Hologramm auf dem Grundstück.
+                civ.construction().preview(Players.caller(player), StringArgumentType.getString(context, TYPE),
+                        degrees)
+                        .preview().ifPresent(preview -> host.showHologram(player, preview));
+            }
+            return reply;
+        });
+    }
+
+    /** {@code /civ bau vorschau <Plan> [Drehung]}: Hologramm des Plans auf dem Grundstück unter dem Spieler. */
+    private int previewPlan(CommandContext<CommandSourceStack> context, int degrees) throws CommandSyntaxException {
+        return withCiv(context, (civ, player) -> {
+            ConstructionService.PreviewResult result = civ.construction().preview(Players.caller(player),
+                    StringArgumentType.getString(context, TYPE), degrees);
+            result.preview().ifPresent(preview -> host.showHologram(player, preview));
+            return result.reply();
+        });
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> plotCommands() {

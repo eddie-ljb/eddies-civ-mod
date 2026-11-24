@@ -131,6 +131,44 @@ class ConstructionServiceTest {
     }
 
     @Test
+    @DisplayName("Hologramm: die Vorschau steht dort, wo der Bau stünde, und kostet nichts")
+    void previewMatchesPlacement() {
+        setUp();
+        var result = server.construction().preview(aliceAt, "holz-mehrfamilienhaus", 90);
+        assertTrue(result.reply().success());
+        var preview = result.preview().orElseThrow();
+        assertEquals(1, preview.rotation());
+        assertEquals(4, preview.origin().x());
+        assertEquals(2, preview.origin().z());
+        assertEquals(64, preview.origin().y());
+        assertTrue(server.construction().projects().isEmpty(), "eine Vorschau beauftragt nichts");
+        assertTrue(has(server.construction().preview(aliceAt, "holz-mehrfamilienhaus", 45).reply(),
+                MessageKey.BUILD_BAD_ROTATION));
+        assertTrue(has(server.construction().preview(aliceAt, "gibt-es-nicht", 90).reply(),
+                MessageKey.BUILD_UNKNOWN_PLAN));
+        Caller wilderness = new Caller(alice, "Alice", new BlockPosition(DimensionId.OVERWORLD, 900, 64, 900));
+        assertTrue(has(server.construction().preview(wilderness, "holz-huette", 0).reply(), MessageKey.BUILD_NO_PLOT));
+        // automatisch ausgerichtet wie beim Auftrag
+        var auto = server.construction().preview(aliceAt, "holz-huette", ConstructionService.AUTO).preview().orElseThrow();
+        assertTrue(server.construction().order(aliceAt, "holz-huette", "Bau AG").success());
+        assertEquals(server.construction().advance(2_000, FLAT).getFirst().rotation(), auto.rotation());
+    }
+
+    @Test
+    @DisplayName("Straßenpflicht: Gebaut wird erst, wenn die Straße am Grundstück angelegt ist")
+    void buildingNeedsAStreet() {
+        setUp();
+        server.enforceStreets(true);
+        Reply refused = server.construction().order(aliceAt, "holz-huette", "Bau AG");
+        assertTrue(has(refused, MessageKey.BUILD_NEEDS_STREET), refused.toString());
+        var town = server.queries().polityNamed("Nordhain").orElseThrow();
+        server.app().streets().lay(alice, town.id(), "Hauptstrasse",
+                new de.etiennebader.civ.domain.land.Area(DimensionId.OVERWORLD, 0, 0, 15, 1),
+                de.etiennebader.civ.domain.shared.Day.of(1));
+        assertTrue(server.construction().order(aliceAt, "holz-huette", "Bau AG").success());
+    }
+
+    @Test
     @DisplayName("Ist das Baufeld nicht frei, ruht die Baustelle und der Bauherr bekommt eine Nachricht")
     void blockedSite() {
         setUp();

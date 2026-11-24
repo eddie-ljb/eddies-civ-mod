@@ -24,7 +24,7 @@ final class EnglishCommands {
             Map.entry("akte", "file"), Map.entry("amt", "office"), Map.entry("anbieten", "offer"),
             Map.entry("anlegen", "create"), Map.entry("annehmen", "accept"), Map.entry("arbeit", "work"),
             Map.entry("artikel", "article"), Map.entry("aufheben", "repeal"), Map.entry("aufloesen", "dissolve"),
-            Map.entry("aufnehmen", "admit"), Map.entry("ausgeben", "issue"), Map.entry("ausrufen", "call"),
+            Map.entry("aufnehmen", "admit"), Map.entry("aus", "off"), Map.entry("vorschau", "preview"), Map.entry("ausgeben", "issue"), Map.entry("ausrufen", "call"),
             Map.entry("aussage", "testify"), Map.entry("aussenposten", "outpost"), Map.entry("austreten", "leave"),
             Map.entry("beanspruchen", "claim"), Map.entry("beeinflussen", "influence"),
             Map.entry("bau", "build"), Map.entry("beauftragen", "commission"), Map.entry("beitreten", "join"), Map.entry("berufung", "appeal"),
