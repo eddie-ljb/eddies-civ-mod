@@ -75,7 +75,11 @@ final class EnglishCommands {
             Map.entry("selbstbedienung", "selfservice"), Map.entry("als", "as"),
             Map.entry("wahl", "election"), Map.entry("wahlergebnis", "results"), Map.entry("wahlkreis", "district"),
             Map.entry("wappen", "crest"), Map.entry("zugang", "access"), Map.entry("weiter", "advance"), Map.entry("zeigen", "show"),
-            Map.entry("zeitung", "newspaper"), Map.entry("familie", "family"), Map.entry("kinder", "children"), Map.entry("zeuge", "witness"), Map.entry("zurueckziehen", "retract"));
+            Map.entry("zeitung", "newspaper"), Map.entry("bauen", "construct"), Map.entry("plakat", "poster"), Map.entry("reklame", "billboard"), Map.entry("schrift", "scripture"), Map.entry("wege", "roads"),
+            Map.entry("segnen", "bless"), Map.entry("taufe", "baptize"), Map.entry("anhaengen", "append"),
+            Map.entry("benennen", "rename"), Map.entry("festlegen", "define"), Map.entry("abschaffen", "abolish"),
+            Map.entry("entziehen", "revoke"),
+            Map.entry("schaufel", "shovel"), Map.entry("pflaster", "paving"), Map.entry("familie", "family"), Map.entry("kinder", "children"), Map.entry("zeuge", "witness"), Map.entry("zurueckziehen", "retract"));
 
     private EnglishCommands() {
     }

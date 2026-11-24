@@ -324,6 +324,51 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
   .hero .lead { animation-delay: .06s; } .hero .row { animation-delay: .12s; } .ledger { animation-delay: .18s; }
   @keyframes rise { from { opacity: 0; transform: translateY(10px); } }
 }
+
+/* Überarbeitung: gruppierte Navigation, ruhigere Flächen, klarere Hierarchie */
+body { background: radial-gradient(1200px 500px at 85% -10%, color-mix(in srgb, var(--emerald) 9%, transparent), transparent 70%), var(--paper); }
+.nav { overflow: visible; align-items: center; gap: 4px; }
+.nav > a, .grpbtn { position: relative; padding: 8px 12px; border-radius: var(--r-m); color: var(--muted); text-decoration: none; font-weight: 550;
+  white-space: nowrap; font-size: .95rem; background: none; border: none; cursor: pointer; font-family: var(--font); }
+.nav > a:hover, .grpbtn:hover, .grp:focus-within > .grpbtn { color: var(--ink); background: var(--sunk); }
+.grp { position: relative; }
+.grpbtn::after { content: ""; display: inline-block; width: 6px; height: 6px; margin: 0 0 3px 8px; border-right: 1.6px solid currentColor;
+  border-bottom: 1.6px solid currentColor; transform: rotate(45deg); opacity: .7; }
+.grp.active > .grpbtn { color: var(--ink); box-shadow: inset 0 -2px 0 var(--emerald); border-radius: var(--r-m) var(--r-m) 0 0; }
+.menu { display: none; position: absolute; top: calc(100% + 4px); left: 0; z-index: 40; min-width: 210px; padding: 6px; gap: 2px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-m); box-shadow: 0 14px 34px rgba(10, 20, 25, .18); }
+.menu::before { content: ""; position: absolute; left: 0; right: 0; top: -8px; height: 8px; }
+.grp:hover > .menu, .grp:focus-within > .menu, .grp.open > .menu { display: grid; }
+.menu a { padding: 9px 12px; border-radius: 6px; color: var(--ink); text-decoration: none; font-size: .95rem; font-weight: 500; }
+.menu a:hover { background: var(--sunk); }
+.menu a[aria-current="page"], .nav > a[aria-current="page"] { background: var(--emerald-soft); color: var(--ink); box-shadow: none; }
+.nav > a[aria-current="page"] { box-shadow: inset 0 -2px 0 var(--emerald); }
+.navtoggle { display: none; }
+@media (max-width: 960px) {
+  .top-in { height: auto; flex-wrap: wrap; padding-top: 10px; padding-bottom: 10px; }
+  .navtoggle { display: grid; order: 2; margin-left: auto; }
+  .who { order: 3; }
+  .nav { display: none; order: 4; width: 100%; flex-direction: column; align-items: stretch; padding: 6px 0 10px; }
+  .nav.open { display: flex; }
+  .grpbtn { width: 100%; text-align: left; cursor: default; font-weight: 700; color: var(--ink); }
+  .grpbtn::after { display: none; }
+  .menu { display: grid; position: static; border: none; box-shadow: none; padding: 0 0 6px 12px; background: none; }
+  .menu::before { display: none; }
+}
+.panel, .card, .entry { box-shadow: 0 1px 0 rgba(10, 20, 25, .04), 0 8px 24px -18px rgba(10, 20, 25, .35); }
+.pagehead h2 { position: relative; padding-bottom: 10px; }
+.pagehead h2::after { content: ""; position: absolute; left: 0; bottom: 0; width: 44px; height: 3px; border-radius: 2px; background: var(--emerald); }
+.feature { transition: background .15s; }
+.feature:hover { background: color-mix(in srgb, var(--emerald-soft) 45%, transparent); }
+.btn { transition: border-color .15s, filter .15s, transform .05s; }
+.btn:active { transform: translateY(1px); }
+.logogrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 12px; }
+.logocard { border: 1px solid var(--line); border-radius: var(--r-m); padding: 10px; background: var(--sunk); display: grid; gap: 6px; justify-items: center; text-align: center; }
+.logocard img { width: 96px; height: 96px; object-fit: contain; image-rendering: pixelated; background: repeating-conic-gradient(var(--line) 0 25%, transparent 0 50%) 0 0 / 16px 16px; border-radius: 6px; }
+.scripture { white-space: pre-wrap; font-family: Georgia, "Times New Roman", serif; line-height: 1.6; background: var(--sunk); border-left: 3px solid var(--brass);
+  padding: 12px 16px; border-radius: 0 var(--r-m) var(--r-m) 0; margin: 10px 0; max-height: 280px; overflow: auto; }
+.rolegrid { display: grid; gap: 8px; margin: 10px 0; }
+.role { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--r-m); }
 </style>
 </head>
 <body>
@@ -342,25 +387,19 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
 <header class="top">
   <div class="top-in">
     <a class="brand" href="#start" aria-label="Eddies Civ, Startseite"><svg id="brandcrest" viewBox="0 0 40 46"></svg><span>Eddies Civ</span></a>
-    <nav class="nav" aria-label="Hauptnavigation">
+    <button class="iconbtn navtoggle" id="navtoggle" aria-label="Menü öffnen" aria-expanded="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <nav class="nav" id="nav" aria-label="Hauptnavigation">
       <a href="#start">Start</a>
-      <a href="#welt">Welt</a>
-      <a href="#karte">Karte</a>
-      <a href="#wahlen">Wahlen</a>
-      <a href="#markt">Markt</a>
-      <a href="#boerse">Börse</a>
-      <a href="#ranglisten">Ranglisten</a>
-      <a href="#presse">Presse</a>
-      <a href="#staat">Staat</a>
-      <a href="#krieg">Krieg</a>
-      <a href="#familien">Familien</a>
-      <a href="#religion">Religion</a>
-      <a href="#recht">Recht</a>
-      <a href="#justiz">Justiz</a>
-      <a href="#post">Post<span class="badge" id="b-post"></span></a>
-      <a href="#chat">Chat<span class="badge" id="b-chat"></span></a>
-      <a href="#bauen">Bauen</a>
-      <a href="#freunde">Freunde<span class="badge" id="b-friends"></span></a>
+      <div class="grp"><button type="button" class="grpbtn" aria-haspopup="true">Welt</button><div class="menu">
+        <a href="#welt">Gemeinden und Länder</a><a href="#karte">Karte</a><a href="#ranglisten">Ranglisten</a></div></div>
+      <div class="grp"><button type="button" class="grpbtn" aria-haspopup="true">Politik</button><div class="menu">
+        <a href="#wahlen">Wahlen</a><a href="#staat">Staat</a><a href="#recht">Recht</a><a href="#justiz">Justiz</a><a href="#krieg">Krieg</a></div></div>
+      <div class="grp"><button type="button" class="grpbtn" aria-haspopup="true">Wirtschaft</button><div class="menu">
+        <a href="#markt">Markt</a><a href="#boerse">Börse</a><a href="#bauen">Bauen</a></div></div>
+      <div class="grp"><button type="button" class="grpbtn" aria-haspopup="true">Gesellschaft</button><div class="menu">
+        <a href="#presse">Presse</a><a href="#familien">Familien</a><a href="#religion">Religion</a><a href="#logos">Logos</a></div></div>
+      <div class="grp"><button type="button" class="grpbtn" aria-haspopup="true">Kontakt</button><div class="menu">
+        <a href="#post">Post<span class="badge" id="b-post"></span></a><a href="#chat">Chat<span class="badge" id="b-chat"></span></a><a href="#freunde">Freunde<span class="badge" id="b-friends"></span></a></div></div>
       <a href="#ich">Mein Bereich<span class="badge" id="b-me"></span></a>
     </nav>
     <div class="who">
@@ -398,6 +437,11 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
       <div class="feature"><svg><use href="#i-chart"/></svg><h3>Firmen und Börse</h3><p>Firmen starten mit Kapital und 1.000 Aktien. Kurse entstehen im Orderbuch, Dividenden kommen aus der Firmenkasse, sparsame Dorfbewohner kaufen mit.</p></div>
       <div class="feature"><svg><use href="#i-paper"/></svg><h3>Presse</h3><p>Zeitungen berichten mit Haltung. Wer welche Artikel liest, entscheidet mit über Stimmung und Wahlen; Dorfbewohner schreiben selbst.</p></div>
       <div class="feature"><svg><use href="#i-chat"/></svg><h3>Chat und Freunde</h3><p>Der Spielchat erscheint hier live. Freunden schreibst du Direktnachrichten, egal ob sie im Spiel oder im Browser sind.</p></div>
+      <div class="feature"><svg><use href="#i-town"/></svg><h3>Bauen mit Absperrung</h3><p>Baufirmen sperren ihre Baustelle mit Bauabsperrungen ab, tragen das Gelände ab und richten das Haus zur Straße aus: Die Tür liegt auf Straßenhöhe.</p></div>
+      <div class="feature"><svg><use href="#i-road"/></svg><h3>Straßen durch Dorfbewohner</h3><p>Bürgermeister und Bauamt unter den Dorfbewohnern legen eigene Straßen an, taufen sie mit echten Namen und lassen den Weg mit der Schaufel oder gepflastert bauen.</p></div>
+      <div class="feature"><svg><use href="#i-law"/></svg><h3>Religion und Schrift</h3><p>Schreibe die Heilige Schrift deiner Religion selbst, erfinde Ämter wie Priester oder Schriftwart und segne Spieler und Dorfbewohner.</p></div>
+      <div class="feature"><svg><use href="#i-paper"/></svg><h3>Eigene Logos</h3><p>Die Spitze lädt Wappen, Plakate und Leuchtreklamen hoch. Im Spiel schwebt das Wappen über dem Gemeindehaus und liegt als Karte bereit.</p></div>
+      <div class="feature"><svg><use href="#i-chat"/></svg><h3>Hilfe beim Tippen</h3><p>Alle Befehle schlagen passende Werte vor, mit kurzer Erklärung: eigene Aufträge, Verträge, Firmen, Spieler, Währungen und mehr.</p></div>
     </div>
 
     <div class="split">
@@ -419,6 +463,10 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
           <div><code>/civ freund &lt;Spieler&gt;</code><span>Freundschaft anfragen oder annehmen</span></div>
           <div><code>/civ vertrag</code><span>Miete, Arbeit, Bündnis, freie Verträge</span></div>
           <div><code>/civ strasse anlegen</code><span>Straße aus der Stab-Auswahl (Bauamt)</span></div>
+          <div><code>/civ strasse bauen schaufel|pflaster &lt;Name&gt;</code><span>Weg auf einer Straße bauen lassen</span></div>
+          <div><code>/civ religion schrift</code><span>Heilige Schrift lesen und schreiben</span></div>
+          <div><code>/civ religion segnen dorfbewohner</code><span>Den nächsten Dorfbewohner segnen</span></div>
+          <div><code>/civ logo &lt;Name&gt;</code><span>Logo einer Einheit als Karte</span></div>
           <div><code>/civ adresse</code><span>Deine Anschrift</span></div>
           <div><code>/civ boerse</code><span>Kurse, kaufen und verkaufen, Depot</span></div>
           <div><code>/civ zeitung</code><span>Zeitungen gründen, schreiben, lesen</span></div>
@@ -584,19 +632,7 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
     <div class="liveband" id="debates"></div>
     <h3 style="margin:8px 0 12px">Hoheitszeichen und Wahlkreise</h3>
     <div class="register" id="symbols"></div>
-    <div id="imageUploadBox" hidden style="margin-top:16px">
-      <h3 style="margin-bottom:12px">Eigenes Wappen, Wahlplakat oder Leuchtreklame hochladen</h3>
-      <p class="muted small">Höchstens 128×128 Pixel PNG. Nur die Spitze (Bürgermeister/Vorsitz) der angegebenen Einheit darf hochladen; Unternehmen gehen über ihren Namen genauso.</p>
-      <input id="imgPolity" type="text" placeholder="Name der Gemeinde, des Bundes oder Unternehmens" style="margin-right:8px">
-      <select id="imgKind" style="margin-right:8px">
-        <option value="WAPPEN">Wappen</option>
-        <option value="WAHLPLAKAT">Wahlplakat</option>
-        <option value="LEUCHTREKLAME">Leuchtreklame</option>
-      </select>
-      <input id="imgFile" type="file" accept="image/png" style="margin-right:8px">
-      <button class="btn" onclick="uploadImage()">Hochladen</button>
-      <div class="msg" id="imgMsg"></div>
-    </div>
+    <p class="muted" style="margin-top:16px">Eigene Wappen, Wahlplakate und Leuchtreklamen lädst du auf der Seite <a href="#logos">Logos</a> hoch.</p>
   </section>
 
   <section data-page="recht">
@@ -659,7 +695,7 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
   </section>
 
   <section data-page="bauen">
-    <div class="pagehead"><div><h2>Bauen</h2><p>Baupläne für Baufirmen. Beauftragt wird im Spiel mit <code>/civ bau beauftragen</code>. Eigene Pläne lädst du hier als Litematica (<code>.litematic</code>) oder Sponge Schematic (<code>.schem</code>, z. B. aus WorldEdit) hoch; der Dateiname ist der Planname.</p></div></div>
+    <div class="pagehead"><div><h2>Bauen</h2><p>Baupläne für Baufirmen. Beauftragt wird im Spiel mit <code>/civ bau beauftragen</code>; ohne Drehung zeigt die Haustür zur nächsten Straße und liegt auf Straßenhöhe, das Gelände wird bei Bedarf abgetragen. Die Baustelle ist mit <em>Bauabsperrungen</em> eingezäunt, damit keine Unbefugten hineinlaufen. Eigene Pläne lädst du hier als Litematica (<code>.litematic</code>) oder Sponge Schematic (<code>.schem</code>, z. B. aus WorldEdit) hoch; der Dateiname ist der Planname.</p></div></div>
     <div data-locked></div>
     <form class="row" id="planform" data-unlocked>
       <input type="file" id="planfile" accept=".litematic,.schem" aria-label="Bauplandatei">
@@ -667,6 +703,28 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
     </form>
     <div class="msg" id="planmsg"></div>
     <div id="planlist"></div>
+  </section>
+
+  <section data-page="logos">
+    <div class="pagehead"><div><h2>Logos</h2><p>Lade ein eigenes Wappen, Wahlplakat oder eine Leuchtreklame für Gemeinden, Bünde, Firmen und Parteien hoch, die du führst. Das Wappen einer Gemeinde schwebt im Spiel über ihrem Gemeindehaus; jedes Bild bekommt jeder Spieler mit <code>/civ logo &lt;Name&gt;</code> als Karte in die Hand.</p></div></div>
+    <div data-locked></div>
+    <div data-unlocked>
+      <div class="panel">
+        <h3>Neues Bild hochladen</h3>
+        <form class="compose" id="logoform">
+          <div class="row">
+            <label class="field grow">Einheit<select id="logopolity" required></select></label>
+            <label class="field">Art<select id="logokind"><option value="WAPPEN">Wappen (ersetzt das alte)</option><option value="WAHLPLAKAT">Wahlplakat</option><option value="LEUCHTREKLAME">Leuchtreklame</option></select></label>
+          </div>
+          <label class="field">Bilddatei (PNG, JPG, GIF oder WebP, wird auf höchstens 128 × 128 Punkte verkleinert)<input type="file" id="logofile" accept="image/png,image/jpeg,image/gif,image/webp"></label>
+          <div class="row"><canvas id="logopreview" width="128" height="128" style="width:96px;height:96px;border:1px solid var(--line);border-radius:6px;image-rendering:pixelated" aria-label="Vorschau"></canvas>
+            <span class="muted small">Im Spiel wird das Bild auf die 61 Kartenfarben abgebildet; einfache Motive mit klaren Farben sehen am besten aus.</span></div>
+          <div><button class="btn primary" id="logosend" disabled>Hochladen</button></div>
+        </form>
+        <div class="msg" id="logomsg"></div>
+      </div>
+      <div id="logolist"></div>
+    </div>
   </section>
 
   <section data-page="freunde">
@@ -816,16 +874,18 @@ const head = name => el("img", { className: "avatar", alt: "", loading: "lazy", 
 const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
 /* Seiten */
-const pages = ["start", "welt", "karte", "wahlen", "markt", "boerse", "ranglisten", "presse", "krieg", "familien", "religion", "staat", "recht", "justiz", "post", "chat", "bauen", "freunde", "ich"];
+const pages = ["start", "welt", "karte", "wahlen", "markt", "boerse", "ranglisten", "presse", "krieg", "familien", "religion", "staat", "recht", "justiz", "post", "chat", "bauen", "logos", "freunde", "ich"];
 let page = "start";
 function route() {
   const wanted = location.hash.slice(1).split("/")[0];
   page = pages.includes(wanted) ? wanted : "start";
   document.querySelectorAll("section[data-page]").forEach(s => s.classList.toggle("on", s.dataset.page === page));
   document.querySelectorAll(".nav a").forEach(a => { if (a.getAttribute("href") === "#" + page) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+  document.querySelectorAll(".grp").forEach(g => g.classList.toggle("active", !!g.querySelector('a[aria-current="page"]')));
+  $("nav").classList.remove("open"); $("navtoggle").setAttribute("aria-expanded", "false");
   const loaders = { start: loadStart, welt: loadWorld, karte: openMap, wahlen: loadElections, markt: loadMarket,
     boerse: loadExchange, ranglisten: loadRankings, presse: loadPress, krieg: loadWar, familien: loadFamilies, religion: loadReligion, staat: loadState, recht: loadLaws, justiz: loadJustice, post: loadLetters,
-    chat: openChat, bauen: loadPlans, freunde: loadFriends, ich: loadMe };
+    chat: openChat, bauen: loadPlans, logos: loadLogos, freunde: loadFriends, ich: loadMe };
   loaders[page]();
   if (page !== "chat") stopChat();
   if (page !== "staat") clearTimeout(stateTimer);
@@ -1530,13 +1590,58 @@ async function loadReligion(keepMessage) {
         actions.append(el("button", { className: "btn small primary", textContent: "Beitreten", onclick: () => religionAct({ action: "join", name: rel.name }) }));
       }
     }
+    const extra = el("div", {});
+    extra.append(el("h3", { textContent: rel.scripture, style: "margin-top:14px" }),
+      rel.scriptureText ? el("div", { className: "scripture", textContent: rel.scriptureText }) : el("p", { className: "muted", textContent: "In dieser Schrift steht noch nichts geschrieben." }));
+    if (rel.canEdit) {
+      const text = el("textarea", { maxLength: 4000, ariaLabel: "Wortlaut der Heiligen Schrift", value: rel.scriptureText, style: "min-height:160px" });
+      const bar = el("div", { className: "row", style: "margin-top:8px" },
+        el("button", { className: "btn small primary", textContent: "Schrift speichern", onclick: () => religionAct({ action: "scripture", text: text.value, append: "false" }) }));
+      for (const [what, label] of [["schrift", "Schrift umbenennen"], ["gotteshaus", "Gotteshaus umbenennen"], ["sprache", "Sprache ändern"]]) {
+        bar.append(el("button", { className: "btn small", textContent: label, onclick: () => { const v = prompt(label); if (v) religionAct({ action: "rename", what, value: v }); } }));
+      }
+      extra.append(text, bar);
+    }
+    if (rel.roles.length || rel.leads) {
+      extra.append(el("h3", { textContent: "Ämter im Klerus", style: "margin-top:14px" }));
+      const grid = el("div", { className: "rolegrid" });
+      for (const role of rel.roles) {
+        const line = el("div", { className: "role" }, el("div", {}, el("b", { textContent: role.name }),
+          el("div", { className: "muted small", textContent: "Rechte: " + (role.rights.join(", ") || "keine") + " · Amtsträger: " + (role.holders.join(", ") || "niemand") })));
+        if (rel.leads) {
+          const who = el("div", { className: "row" },
+            el("button", { className: "btn small", textContent: "Vergeben", onclick: () => { const v = prompt("Spielername, der das Amt „" + role.name + "“ bekommt"); if (v) religionAct({ action: "roleassign", name: role.name, player: v }); } }),
+            el("button", { className: "btn small", textContent: "Entziehen", onclick: () => { const v = prompt("Spielername, dem alle Ämter entzogen werden"); if (v) religionAct({ action: "rolerevoke", player: v }); } }),
+            el("button", { className: "btn small danger", textContent: "Abschaffen", onclick: () => religionAct({ action: "roledelete", name: role.name }) }));
+          line.append(who);
+        }
+        grid.append(line);
+      }
+      extra.append(grid);
+      if (rel.leads) {
+        const name = el("input", { maxLength: 32, placeholder: "Name des Amtes, z. B. Priester", ariaLabel: "Amtsname" });
+        const boxes = ["segnen", "taufen", "gottesdienst", "schrift"].map(r => [r, el("input", { type: "checkbox" })]);
+        const form = el("form", { className: "row" }, name, ...boxes.map(([r, box]) => el("label", {}, box, " " + r)),
+          el("button", { className: "btn small primary", textContent: "Amt festlegen" }));
+        form.addEventListener("submit", e => { e.preventDefault(); religionAct({ action: "role", name: name.value, rights: boxes.filter(([r, b]) => b.checked).map(([r]) => r).join(",") }); });
+        extra.append(form);
+      }
+    }
+    if (rel.mine) {
+      const bless = el("form", { className: "row", style: "margin-top:10px" }, el("input", { placeholder: "Spielername", ariaLabel: "Spielername" }),
+        el("button", { className: "btn small", textContent: "Segnen", type: "button" }), el("button", { className: "btn small", textContent: "Taufen", type: "button" }));
+      const [input, b1, b2] = bless.children;
+      b1.addEventListener("click", () => input.value && religionAct({ action: "bless", player: input.value }));
+      b2.addEventListener("click", () => input.value && religionAct({ action: "baptize", player: input.value }));
+      extra.append(bless, el("p", { className: "muted small", textContent: "Dorfbewohner segnest du im Spiel: Dorfbewohner ansehen und /civ religion segnen dorfbewohner." }));
+    }
     return el("div", { className: "entry" }, crest(rel.id, rel.name, "religion"),
       el("div", {}, el("h3", { textContent: (rel.logo ? "[" + rel.logo + "] " : "") + rel.name + (rel.mine ? " (deine)" : "") }),
         el("div", { className: "sub", textContent: (rel.monotheistic ? "Ein Gott" : "Viele Götter") + " · gegründet von " + rel.founder + " an Tag " + rel.founded })),
       facts([["Oberhaupt", rel.head || "vakant"], ["Macht des Klerus", rel.power + " / 100"], ["Mitglieder", rel.members + " (davon Dorfbewohner " + rel.villagers + ")"],
         ["Inbrunst", rel.fervor + " / 6"], ["Heilige Schrift", rel.scripture], ["Gotteshaus", rel.temple], ["Sprache", rel.language],
         ["Konfessionen", rel.denominations.join(", ")], ["Klerus-Wahl", rel.electionOpen ? "läuft bis Tag " + rel.electionCloses + (rel.candidates.length ? ", Kandidaten: " + rel.candidates.join(", ") : "") : ""],
-        ["Deine Konfession", rel.mine ? rel.denomination : ""]]), actions);
+        ["Deine Konfession", rel.mine ? rel.denomination : ""]]), actions, extra);
   }) : [el("div", { className: "empty", textContent: "Noch keine Religion. Gründe eine mit /civ religion gruenden oder hier auf der Seite; sehr gläubige Dorfbewohner gründen auch von selbst welche." })]));
   $("religionrites").replaceChildren(...(religionData.rites.length ? religionData.rites.map(t => el("div", { className: "card" }, el("p", { textContent: t })))
     : [el("div", { className: "empty", style: "border:none", textContent: "Noch keine Zeremonien." })]));
@@ -2097,6 +2202,66 @@ $("planform").addEventListener("submit", async e => {
   say("planmsg", r.data.message || r.data.error, r.ok);
   if (r.ok) { $("planfile").value = ""; loadPlans(); }
 });
+
+/* Logos */
+let logoPng = null;
+async function loadLogos() {
+  const user = await refreshMe();
+  locked("logos", !user);
+  if (!user) return;
+  const r = await api("/api/logos");
+  if (!r.ok) return;
+  const polities = r.data.polities;
+  const selected = $("logopolity").value;
+  $("logopolity").replaceChildren(...polities.map(p => el("option", { value: p.name, textContent: p.name + " (" + kindName(p.kind) + ")" })));
+  if (selected) $("logopolity").value = selected;
+  $("logosend").disabled = !polities.length || !logoPng;
+  $("logolist").replaceChildren(...(polities.length ? polities.map(p => el("div", { className: "panel" }, el("h3", { textContent: p.name }),
+    p.images.length ? el("div", { className: "logogrid" }, ...p.images.map(img => el("div", { className: "logocard" },
+      el("img", { src: "/api/image?id=" + encodeURIComponent(img.id), alt: kindLabel(img.kind) + " von " + p.name }),
+      el("b", { textContent: kindLabel(img.kind) }), el("span", { className: "muted small", textContent: img.width + " × " + img.height + ", Tag " + img.uploaded }),
+      el("button", { className: "btn small danger", textContent: "Entfernen", onclick: async () => {
+        const x = await api("/api/image/remove", { id: img.id }); say("logomsg", x.data.message || x.data.error, x.ok); loadLogos(); } }))))
+      : el("p", { className: "muted", textContent: "Noch kein Bild hochgeladen." }))) :
+    [el("div", { className: "empty", textContent: "Du führst im Moment keine Gemeinde, keinen Bund und keine Firma. Nur wer eine Einheit anführt, darf ihre Logos hochladen." })]));
+}
+const kindLabel = k => ({ WAPPEN: "Wappen", WAHLPLAKAT: "Wahlplakat", LEUCHTREKLAME: "Leuchtreklame" }[k] || k);
+const kindName = k => ({ TERRITORIAL: "Gemeinde", COMPANY: "Firma", PARTY: "Partei", FEDERATION: "Bund", NEWSPAPER: "Zeitung" }[k] || k.toLowerCase());
+$("logofile").addEventListener("change", async () => {
+  const file = $("logofile").files[0];
+  logoPng = null; $("logosend").disabled = true;
+  const canvas = $("logopreview"), g = canvas.getContext("2d");
+  g.clearRect(0, 0, 128, 128);
+  if (!file) return;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, 128 / bitmap.width, 128 / bitmap.height);
+    const w = Math.max(1, Math.round(bitmap.width * scale)), h = Math.max(1, Math.round(bitmap.height * scale));
+    canvas.width = w; canvas.height = h;
+    canvas.getContext("2d").drawImage(bitmap, 0, 0, w, h);
+    logoPng = canvas.toDataURL("image/png").split(",")[1];
+    $("logosend").disabled = !$("logopolity").value;
+    say("logomsg", "", true);
+  } catch (e) { say("logomsg", "Diese Datei lässt sich nicht als Bild lesen.", false); }
+});
+$("logoform").addEventListener("submit", async e => {
+  e.preventDefault();
+  if (!logoPng) return;
+  const r = await api("/api/image", { polity: $("logopolity").value, kind: $("logokind").value, data: logoPng });
+  say("logomsg", r.data.message || r.data.error || (r.ok ? "Hochgeladen." : "Fehlgeschlagen."), r.ok);
+  if (r.ok) { $("logofile").value = ""; logoPng = null; $("logosend").disabled = true; }
+  loadLogos();
+});
+$("navtoggle").addEventListener("click", () => {
+  const open = $("nav").classList.toggle("open");
+  $("navtoggle").setAttribute("aria-expanded", String(open));
+});
+document.querySelectorAll(".grpbtn").forEach(b => b.addEventListener("click", () => {
+  const g = b.parentElement, was = g.classList.contains("open");
+  document.querySelectorAll(".grp.open").forEach(x => x.classList.remove("open"));
+  if (!was) g.classList.add("open");
+}));
+document.addEventListener("click", e => { if (!e.target.closest(".grp")) document.querySelectorAll(".grp.open").forEach(x => x.classList.remove("open")); });
 
 /* Freunde */
 async function loadFriends() {

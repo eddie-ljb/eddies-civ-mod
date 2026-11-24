@@ -55,6 +55,8 @@ Ob der Inhaber Gemeinde-, Länder- und Nationenrecht überschreiben darf, regelt
 ### Dorfbewohner als Bauamt und Bauherren
 Ist das Bauamt (Planer, sonst Bürgermeister) ein Dorfbewohner, schneidet er neue Grundstücke zu und schreibt sie zum Verkauf aus, plant Schule, Gotteshaus und öffentliche Plätze und lässt darauf kommunale Bauten von einer Baufirma errichten, bezahlt aus der Gemeindekasse. Dorfbewohner kaufen angebotenes Wohnland und bauen darauf; Firmenchefs und Zeitungsleiter lassen auf den Grundstücken ihrer Organisation bauen. Bleibt das Baufeld drei Tage lang blockiert, endet der Auftrag. Auf Grundstücken einer Gemeinde, Firma, Zeitung, Partei oder eines Bundes baut deren Leitung (Spieler oder Dorfbewohner) auf Kosten der Kasse. Über 50 eingebaute Bauvorlagen (`/civ bau plaene`) decken Wohnen, Gewerbe, Industrie, Landwirtschaft und kommunale Bauten ab.
 
+Mehr zu Bauaufträgen, Absperrung, Ausrichtung und Wegebau: [Bauen und Straßen](Spieler-Bauen-und-Strassen.md).
+
 ## Straßen und Adressen
 - Bürgermeister oder Bauamt markieren eine Straße mit dem Grundstücksstab und legen sie mit `/civ strasse anlegen <Name>` an; `aufheben <Name>` und `liste` gibt es auch.
 - Jede Gemeinde hat eine feste Postleitzahl. Grundstücke bis 12 Blöcke neben einer Straße bekommen Hausnummern: ungerade auf der einen, gerade auf der anderen Seite, aufsteigend entlang der Straße.

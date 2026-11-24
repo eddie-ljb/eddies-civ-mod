@@ -238,9 +238,6 @@ public final class PressService {
     static final int MAX_FOUNDING_EDITORS = 2;
     /** Tageswahrscheinlichkeit einer Zeitungsgründung bei vollem Ehrgeiz. */
     static final double FOUNDING_CHANCE = 0.10;
-    private static final String[] PAPER_TITLES = {"Anzeiger", "Bote", "Kurier", "Tagblatt", "Rundschau", "Chronik",
-            "Zeitung", "Echo"};
-
     /**
      * Ehrgeizige Dorfbewohner gründen Zeitungen: höchstens eine je Tag und solange es weniger Zeitungen als ein
      * {@value #VILLAGERS_PER_PAPER}-tel der Dorfbewohner gibt. Der Gründer leitet die Zeitung und holt bis zu
@@ -279,21 +276,9 @@ public final class PressService {
 
     private boolean found(PolityView town, PersonRef founder, List<PersonRef> residents, List<PolityView> papers,
                           Day day) {
-        String stem = PAPER_TITLES[(int) Math.floorMod(founder.uuid().getLeastSignificantBits(),
-                (long) PAPER_TITLES.length)];
-        String tag = Long.toHexString(founder.uuid().getLeastSignificantBits() & 0xFFFFFL).toUpperCase();
-        String name = null;
-        for (String candidate : new String[] {stem + " " + town.name().value(), stem + " " + tag,
-                stem + " " + town.name().value() + " " + tag}) {
-            if (candidate.length() <= PolityName.MAX_LENGTH && paper(candidate).isEmpty()
-                    && queries.polityNamed(candidate).isEmpty()) {
-                name = candidate;
-                break;
-            }
-        }
-        if (name == null) {
-            return false;
-        }
+        String name = de.etiennebader.civ.application.population.FoundingNames.newspaper(founder,
+                town.name().value(), candidate -> paper(candidate).isPresent()
+                        || queries.polityNamed(candidate).isPresent());
         try {
             PolityId id = app.companies().found(founder, PolityName.of(name), PolityKind.NEWSPAPER, currency, day);
             int editors = 0;

@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "SDS",
+    "SDS"
+  ],
+  "key": {
+    "S": "minecraft:stick",
+    "D": "minecraft:orange_dye"
+  },
+  "result": {
+    "id": "eddies-civ-mod:construction_barrier",
+    "count": 6
+  }
+}

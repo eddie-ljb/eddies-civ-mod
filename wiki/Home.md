@@ -13,6 +13,9 @@ Dieses Wiki ist nach Zielgruppe sortiert: Spieler finden hier, wie man Gemeinden
 - [Karte](Karte.md) – Web- und Ingame-Karte, Farben und Ebenen-Filter
 - [Recht, Verfassung und Bünde](Spieler-Recht-und-Verfassung.md) – Verfassung, Gesetzbuch, Gesetzes-Baukasten, Bünde und Ebenen
 - [Justiz](Spieler-Justiz.md) – Klagen, Gerichtsverfahren, Geschworene, Berufung
+- [Bauen und Straßen](Spieler-Bauen-und-Strassen.md) – Bauaufträge, Bauabsperrung, Ausrichtung zur Straße, Straßen und Wegebau, Namen von Dorfbewohner-Gründungen
+- [Religion](Spieler-Religion.md) – Religionen, Heilige Schrift bearbeiten, Klerus-Ämter, Segnen und Taufen
+- [Logos](Spieler-Logos.md) – eigene Wappen, Wahlplakate und Leuchtreklamen hochladen und im Spiel zeigen
 - [Wirtschaft: Bank, Markt, Firmen und Börse](Spieler-Wirtschaft.md) – Bank, Servermarkt, Firmen, Aktien, Presse
 - [Alltag: Post, Freunde, Verträge, Hoheitszeichen](Spieler-Alltag.md) – Post, Freunde und Chat, Verträge, Flaggen und Hymnen
 - [Webseite](Spieler-Webseite.md) – die eingebettete Server-Webseite

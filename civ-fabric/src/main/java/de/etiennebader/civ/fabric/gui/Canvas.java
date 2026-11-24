@@ -20,10 +20,13 @@ public final class Canvas {
 
     private final Container container;
     private final List<Consumer<Click>> actions;
+    /** Plätze, die ein Menü selbst belegt hat; {@link #fillRow} lässt sie in Ruhe. */
+    private final boolean[] occupied;
 
     Canvas(Container container) {
         this.container = container;
         this.actions = new ArrayList<>(Collections.nCopies(container.getContainerSize(), NOTHING));
+        this.occupied = new boolean[container.getContainerSize()];
     }
 
     public int size() {
@@ -36,8 +39,12 @@ public final class Canvas {
     }
 
     public void set(int slot, ItemStack icon, Consumer<Click> action) {
+        if (slot < 0 || slot >= actions.size()) {
+            return; // ein Platz außerhalb des Menüs darf nicht das ganze Menü zerstören
+        }
         container.setItem(slot, Objects.requireNonNull(icon, "icon"));
         actions.set(slot, Objects.requireNonNull(action, "action"));
+        occupied[slot] = true;
     }
 
     /** Spalte und Zeile ab 0. */
@@ -50,13 +57,23 @@ public final class Canvas {
         for (int slot = 0; slot < actions.size(); slot++) {
             container.setItem(slot, Icon.of(Items.STAINED_GLASS_PANE.gray()).hidden().build());
             actions.set(slot, NOTHING);
+            occupied[slot] = false;
         }
     }
 
-    /** Färbt eine ganze Zeile, z. B. als Rahmen für Steuerknöpfe. */
+    /**
+     * Färbt eine ganze Zeile, z. B. als Rahmen für Steuerknöpfe. Plätze, die das Menü schon belegt hat, bleiben
+     * unberührt: Früher überschrieb der Rahmen Knöpfe, die vorher in diese Zeile gesetzt wurden, und die Optionen
+     * ließen sich nicht mehr anklicken.
+     */
     public void fillRow(int row, ItemStack filler) {
         for (int column = 0; column < 9; column++) {
-            set(column, row, filler.copy(), NOTHING);
+            int slot = row * 9 + column;
+            if (slot < 0 || slot >= actions.size() || occupied[slot]) {
+                continue;
+            }
+            container.setItem(slot, filler.copy());
+            actions.set(slot, NOTHING);
         }
     }
 

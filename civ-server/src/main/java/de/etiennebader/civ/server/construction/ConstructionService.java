@@ -86,8 +86,22 @@ public final class ConstructionService {
      * @param workers die Bauarbeiter (Angestellte der Firma), die sichtbar zur Baustelle gehen sollen
      */
     public record Build(UUID project, BlockPosition origin, int rotation, List<Blueprint.Placement> blocks,
-                        List<UUID> workers) {
+                        List<UUID> workers, boolean first, int footprintX, int footprintZ, int sizeY) {
     }
+
+    /**
+     * Eine Baustelle, die abgesperrt wird.
+     *
+     * @param min    Ecke des Baufelds (kleinste Koordinaten, Höhe der untersten Ebene)
+     * @param limit  Grundstück; die Absperrung bleibt darin
+     * @param active ob noch gebaut wird (Absperrung aufstellen) oder fertig ist (Absperrung abbauen)
+     */
+    public record Site(UUID project, BlockPosition min, int sizeX, int sizeZ, de.etiennebader.civ.domain.land.Area limit,
+                       boolean active) {
+    }
+
+    /** Drehung "automatisch": die Tür zeigt zur Straße. */
+    public static final int AUTO = -1;
 
     /** Was das Spiel über das Gelände einer Baustelle weiß. */
     public interface Terrain {
@@ -96,6 +110,18 @@ public final class ConstructionService {
 
         /** Höchste Geländehöhe (erste freie Ebene über dem Boden) im Rechteck; die unterste Ebene des Plans liegt dort. */
         int groundLevel(BlockPosition min, int sizeX, int sizeZ);
+
+        /**
+         * Höhe der untersten Planebene, sodass die Haustür auf Straßenhöhe liegt: Der Boden vor der Tür ist der Maßstab
+         * (Oberfläche dort minus Höhe der Tür im Plan). Ohne Tür zählt die Mitte des Baufelds.
+         *
+         * @param doorFront Fläche unmittelbar vor der Tür (Höhe unwichtig); leer ohne Tür
+         * @param doorHeight Höhe der unteren Türhälfte im Plan über der untersten Ebene
+         */
+        default int floorLevel(BlockPosition corner, int sizeX, int sizeZ, Optional<BlockPosition> doorFront,
+                               int doorHeight) {
+            return groundLevel(corner, sizeX, sizeZ);
+        }
 
         /** Ob im Quader nur Luft und Natur (Pflanzen, Laub, Holz) stehen, also nichts Gebautes überschrieben würde. */
         boolean isClear(BlockPosition min, int sizeX, int sizeY, int sizeZ);
@@ -165,6 +191,11 @@ public final class ConstructionService {
         }
     }
 
+    /** Wegebau für die Straßen, die das Bauamt gründet. */
+    public synchronized void roads(de.etiennebader.civ.server.road.RoadService roads) {
+        this.planning.roads(roads);
+    }
+
     public BlueprintLibrary library() {
         return library;
     }
@@ -198,7 +229,7 @@ public final class ConstructionService {
 
     /** Beauftragt die Baufirma, auf dem Grundstück unter dem Spieler zu bauen. */
     public synchronized Reply order(Caller caller, String planName, String firmName) {
-        return order(caller, planName, firmName, false, 0);
+        return order(caller, planName, firmName, false, AUTO);
     }
 
     /**
@@ -227,7 +258,7 @@ public final class ConstructionService {
             }
             selfSupplied = false;
         }
-        if (degrees < 0 || degrees % 90 != 0 || degrees > 270) {
+        if (degrees != AUTO && (degrees < 0 || degrees % 90 != 0 || degrees > 270)) {
             return Reply.failure(Message.of(MessageKey.BUILD_BAD_ROTATION));
         }
         Optional<Blueprint> plan = library.find(planName);
@@ -247,7 +278,7 @@ public final class ConstructionService {
         }
         try {
             ConstructionProject project = place(caller.player(), town.get(), plot.get(), plan.get(), firm.get(),
-                    calendar.today(), selfSupplied, degrees / 90);
+                    calendar.today(), selfSupplied, degrees == AUTO ? AUTO : degrees / 90);
             if (contractor.isPresent()) {
                 project = startReview(project, contractor.get(), ConstructionProject.Contractor.FIRM_REVIEW, firm.get());
             }
@@ -497,6 +528,9 @@ public final class ConstructionService {
         if (queries.production().enterpriseOf(firm.id()).map(e -> e.branch() != Branch.CONSTRUCTION).orElse(true)) {
             throw new BuildRefused(Message.of(MessageKey.BUILD_NOT_CONSTRUCTION, firm.name().value()));
         }
+        if (rotation == AUTO) {
+            rotation = facingStreet(town, plot, plan);
+        }
         int footprintX = plan.footprintX(rotation);
         int footprintZ = plan.footprintZ(rotation);
         if (footprintX > plot.area().width() || footprintZ > plot.area().depth()) {
@@ -517,6 +551,93 @@ public final class ConstructionService {
                 Map.of());
         put(project);
         return project;
+    }
+
+    /**
+     * Die Drehung, bei der die Haustür zur nächsten Straße zeigt. Gibt es keine Straße, schaut das Haus zum Gemeindehaus.
+     * Passt der Plan so nicht aufs Grundstück, wird die andere Achse versucht.
+     */
+    static int facingStreet(PolityView town, Plot plot, Blueprint plan) {
+        int wanted = directionToStreet(town, plot.area());
+        int doorSide = plan.door().map(Blueprint.Door::outward).orElse(0);
+        int rotation = ((wanted - doorSide) % 4 + 4) % 4;
+        for (int attempt : new int[] {rotation, (rotation + 1) % 4, (rotation + 3) % 4, (rotation + 2) % 4}) {
+            if (plan.footprintX(attempt) <= plot.area().width() && plan.footprintZ(attempt) <= plot.area().depth()) {
+                return attempt;
+            }
+        }
+        return rotation;
+    }
+
+    /** Himmelsrichtung (0 Nord, 1 Ost, 2 Süd, 3 West), in der die nächste Straße (sonst das Gemeindehaus) liegt. */
+    static int directionToStreet(PolityView town, de.etiennebader.civ.domain.land.Area area) {
+        double cx = (area.minX() + area.maxX()) / 2.0;
+        double cz = (area.minZ() + area.maxZ()) / 2.0;
+        double tx = cx;
+        double tz = cz + 1;
+        double best = Double.MAX_VALUE;
+        for (de.etiennebader.civ.domain.polity.Street street : town.streets()) {
+            de.etiennebader.civ.domain.land.Area sa = street.area();
+            if (!sa.dimension().equals(area.dimension())) {
+                continue;
+            }
+            double px = Math.max(sa.minX(), Math.min(sa.maxX(), cx));
+            double pz = Math.max(sa.minZ(), Math.min(sa.maxZ(), cz));
+            double distance = Math.abs(px - cx) + Math.abs(pz - cz);
+            if (distance < best) {
+                best = distance;
+                tx = px;
+                tz = pz;
+            }
+        }
+        if (best == Double.MAX_VALUE && town.seat().isPresent()) {
+            tx = town.seat().get().x();
+            tz = town.seat().get().z();
+        }
+        double dx = tx - cx;
+        double dz = tz - cz;
+        if (Math.abs(dz) >= Math.abs(dx)) {
+            return dz < 0 ? 0 : 2;
+        }
+        return dx > 0 ? 1 : 3;
+    }
+
+    private static final int[][] STEP = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
+
+    /** Die Fläche vor der Haustür (außerhalb der Wand) in Weltkoordinaten. */
+    private static Optional<BlockPosition> doorFront(ConstructionProject project, Blueprint plan) {
+        return plan.door().map(door -> {
+            Blueprint.Placement turned = plan.rotated(new Blueprint.Placement(door.x(), door.y(), door.z(), ""),
+                    project.rotation());
+            int[] step = STEP[(door.outward() + project.rotation()) % 4];
+            return new BlockPosition(project.dimension(), project.originX() + turned.x() + step[0], 0,
+                    project.originZ() + turned.z() + step[1]);
+        });
+    }
+
+    /** Die Absperrungen, die gerade stehen sollen oder abzubauen sind. */
+    public synchronized List<Site> sites() {
+        List<Site> sites = new ArrayList<>();
+        for (ConstructionProject project : projects.values()) {
+            if (project.originY().isEmpty()) {
+                continue;
+            }
+            boolean active = project.status() == ConstructionProject.Status.BUILDING
+                    && project.contractorState() != ConstructionProject.Contractor.ACTIVE;
+            if (!active && project.status().isActive()) {
+                continue;
+            }
+            Optional<Blueprint> plan = library.find(project.blueprint());
+            Optional<de.etiennebader.civ.domain.land.Area> limit = queries.land(project.town()).plot(project.plot())
+                    .map(Plot::area);
+            if (plan.isEmpty() || limit.isEmpty()) {
+                continue;
+            }
+            sites.add(new Site(project.id(), new BlockPosition(project.dimension(), project.originX(),
+                    project.originY().getAsInt(), project.originZ()), plan.get().footprintX(project.rotation()),
+                    plan.get().footprintZ(project.rotation()), limit.get(), active));
+        }
+        return sites;
     }
 
     static long priceOf(Blueprint plan) {
@@ -602,7 +723,11 @@ public final class ConstructionService {
             }
             ConstructionProject current = project;
             if (current.placed() == 0 && blockedUntil.getOrDefault(current.id(), 0L) <= clock) {
-                int y = terrain.groundLevel(corner, fx, fz);
+                Optional<BlockPosition> front = doorFront(project, plan.get());
+                if (front.isPresent() && !terrain.isLoaded(front.get())) {
+                    continue;
+                }
+                int y = terrain.floorLevel(corner, fx, fz, front, plan.get().door().map(Blueprint.Door::y).orElse(0));
                 BlockPosition min = new BlockPosition(project.dimension(), project.originX(), y, project.originZ());
                 if (!terrain.isClear(min, fx, plan.get().sizeY(), fz)) {
                     long since = blockedSince.computeIfAbsent(current.id(), id -> clock);
@@ -656,7 +781,8 @@ public final class ConstructionService {
             put(current.progressed(blocks.size(), Math.max(0, due), depot));
             builds.add(new Build(current.id(), new BlockPosition(current.dimension(), current.originX(),
                     current.originY().orElseThrow(), current.originZ()), current.rotation(), blocks,
-                    workers(firm.get()).stream().map(ActorRef::uuid).toList()));
+                    workers(firm.get()).stream().map(ActorRef::uuid).toList(), current.placed() == 0, fx, fz,
+                    plan.get().sizeY()));
         }
         return builds;
     }
@@ -976,7 +1102,7 @@ public final class ConstructionService {
             return false;
         }
         try {
-            place(villager, town.id(), plot, affordable.get(), firm, day, false, 0);
+            place(villager, town.id(), plot, affordable.get(), firm, day, false, AUTO);
             return true;
         } catch (BuildRefused | DomainException e) {
             return false;
@@ -1016,7 +1142,7 @@ public final class ConstructionService {
                 continue;
             }
             try {
-                place(owner.asActor(), town.id(), plot, plan.get(), firm.get(), day, false, 0);
+                place(owner.asActor(), town.id(), plot, plan.get(), firm.get(), day, false, AUTO);
                 if (owner.kind() == PolityKind.TERRITORIAL) {
                     announcements.add(de.etiennebader.civ.server.Announcement.toTown(town.id(),
                             Message.of(MessageKey.MUNICIPAL_BUILD_ORDERED, plan.get().name(), firm.get().name().value(),

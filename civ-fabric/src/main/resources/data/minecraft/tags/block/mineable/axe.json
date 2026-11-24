@@ -3,6 +3,7 @@
   "values": [
     "eddies-civ-mod:market",
     "eddies-civ-mod:constitution",
-    "eddies-civ-mod:court_bench"
+    "eddies-civ-mod:court_bench",
+    "eddies-civ-mod:construction_barrier"
   ]
 }

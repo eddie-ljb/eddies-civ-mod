@@ -72,6 +72,11 @@ public record Religion(ReligionId id, String name, ActorRef founder, boolean mon
                 clergyHead, clergyPower, election, foundedOn);
     }
 
+    Religion withTexts(String scripture, String temple, String lang) {
+        return new Religion(id, name, founder, monotheistic, scripture, temple, lang, denominations,
+                clergyHead, clergyPower, election, foundedOn);
+    }
+
     Religion withClergy(Optional<ActorRef> head, int power) {
         return new Religion(id, name, founder, monotheistic, scriptureName, templeName, language, denominations,
                 head, power, election, foundedOn);
