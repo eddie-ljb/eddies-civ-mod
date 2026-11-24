@@ -150,9 +150,9 @@ class VillagerUrbanismTest {
         PolityView updated = server.queries().polity(town.id()).orElseThrow();
         var plots = server.queries().land(town.id()).plots();
         assertFalse(updated.streets().isEmpty());
-        // Vier Chunks außerhalb des Kerns: Alle bekommen ein Grundstück, obwohl nur eine Straße (statt vier
-        // Grundstücke je Straße) nötig ist; früher blieb es bei zwei oder drei.
-        assertEquals(4, plots.size(), "die Grundstücke füllen das Gebiet");
+        // Vier Chunks außerhalb des Kerns, höchstens drei Grundstücke stehen gleichzeitig zum Verkauf: Mit nur einer
+        // Straße wird das Gebiet bis dahin beplant; früher blieb es bei zwei, weil die zweite Straße nie kam.
+        assertTrue(plots.size() >= 3, "die Grundstücke füllen das Gebiet: " + plots.size());
     }
 
     @Test

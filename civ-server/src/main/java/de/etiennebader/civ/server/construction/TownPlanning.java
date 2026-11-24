@@ -59,6 +59,9 @@ final class TownPlanning {
     static final int MAX_OFFERED = 3;
     /** Tageswahrscheinlichkeit, dass das Bauamt ein neues Grundstück zuschneidet. */
     static final double PLAN_CHANCE = 0.3;
+    /** Bis zu so vielen Grundstücken plant das Bauamt mit {@link #EARLY_PLAN_CHANCE}. */
+    static final int EARLY_PLOTS = 3;
+    static final double EARLY_PLAN_CHANCE = 0.9;
     /** Tageswahrscheinlichkeit, dass ein Dorfbewohner ohne Wohnland eines kauft. */
     static final double BUY_CHANCE = 0.1;
     /** Höchstens so viele Grundstücke je beanspruchtem Chunk. */
@@ -137,10 +140,13 @@ final class TownPlanning {
     // ------------------------------------------------------------------ Ausschreiben
 
     private void plan(PolityView town, PersonRef planner, Day day) {
-        if (VillagerAmbitions.roll(planner, day, 0x96) >= PLAN_CHANCE) {
+        WorldQueries world = app.queries();
+        // Solange die Gemeinde fast noch keine Grundstücke hat, plant das Bauamt jeden Tag (sonst wartet man im
+        // Schnitt drei Tage, also eine Stunde, auf jedes der ersten).
+        double chance = world.land(town.id()).plots().size() < EARLY_PLOTS ? EARLY_PLAN_CHANCE : PLAN_CHANCE;
+        if (VillagerAmbitions.roll(planner, day, 0x96) >= chance) {
             return;
         }
-        WorldQueries world = app.queries();
         LandView land = world.land(town.id());
         List<ChunkCoord> chunks = world.territory().territoryOf(town.id()).stream()
                 .sorted(Comparator.comparing((ChunkCoord c) -> c.dimension().value()).thenComparingInt(ChunkCoord::x)
@@ -180,7 +186,10 @@ final class TownPlanning {
 
     // ------------------------------------------------------------------ Straßen
 
-    /** Tageswahrscheinlichkeit, dass das Bauamt eine neue Straße anlegt, wenn es Bedarf gibt. */
+    /**
+     * Tageswahrscheinlichkeit, dass das Bauamt eine neue Straße anlegt, wenn es Bedarf gibt. Mit Straßenpflicht
+     * (Standard) legt es sie am ersten Tag mit Bedarf an: Ohne Straße kann nichts weitergehen, Würfeln verzögert nur.
+     */
     static final double STREET_CHANCE = 0.4;
     /** Höchstens so viele Straßen; sonst je vier Grundstücke eine. */
     static final int MAX_STREETS = 8;
@@ -203,7 +212,7 @@ final class TownPlanning {
         boolean needed = streetRequired ? streetCount == 0 || !roomForPlot(town, plots)
                 : plots.size() >= 2 && streetCount * 4 < plots.size() + 2;
         if (streetCount >= MAX_STREETS || !needed || (roads != null && roads.unfinished(town.id()) > 0)
-                || VillagerAmbitions.roll(planner, day, 0x9A) >= STREET_CHANCE) {
+                || (!streetRequired && VillagerAmbitions.roll(planner, day, 0x9A) >= STREET_CHANCE)) {
             return;
         }
         java.util.Set<ChunkCoord> claimed = new java.util.HashSet<>(world.territory().territoryOf(town.id()));
