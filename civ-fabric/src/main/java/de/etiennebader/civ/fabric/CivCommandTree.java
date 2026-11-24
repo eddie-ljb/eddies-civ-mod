@@ -1918,6 +1918,9 @@ public final class CivCommandTree {
                                         .then(arg(COUNT, IntegerArgumentType.integer(0, 270))
                                                 .executes(context -> order(context, false,
                                                         IntegerArgumentType.getInteger(context, COUNT)))))))
+                .then(Commands.literal("planung")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.construction()
+                                .planningReport(Players.caller(player)))))
                 .then(Commands.literal("vorschau")
                         .then(Commands.literal("aus")
                                 .executes(context -> withCiv(context, (civ, player) -> {

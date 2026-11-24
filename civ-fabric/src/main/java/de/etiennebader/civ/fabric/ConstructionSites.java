@@ -193,7 +193,33 @@ final class ConstructionSites {
         };
     }
 
+    /** Namen natürlicher Blöcke, die in keinem Tag stehen (Pflanzen, Pilze, Moos, Tropfstein, Erz-Begleiter …). */
+    private static final java.util.Set<String> NATURAL_NAMES = java.util.Set.of("cactus", "sugar_cane", "bamboo",
+            "bamboo_sapling", "pumpkin", "melon", "brown_mushroom", "red_mushroom", "sweet_berry_bush", "lily_pad",
+            "kelp", "kelp_plant", "moss_block", "moss_carpet", "tuff", "calcite", "dripstone_block",
+            "pointed_dripstone", "magma_block", "obsidian", "cobweb", "glow_lichen", "amethyst_block",
+            "budding_amethyst", "amethyst_cluster", "azalea", "flowering_azalea", "spore_blossom", "big_dripleaf",
+            "small_dripleaf", "hanging_roots", "mangrove_roots", "muddy_mangrove_roots", "mud", "packed_ice",
+            "blue_ice", "powder_snow", "snow_block", "podzol", "mycelium", "rooted_dirt", "clay", "gravel",
+            "sandstone", "red_sandstone", "bedrock", "infested_stone", "sea_pickle", "turtle_egg", "dead_bush",
+            "fern", "large_fern", "tall_grass", "short_grass", "vine", "cave_vines", "weeping_vines", "twisting_vines",
+            "cocoa", "nether_wart", "chorus_plant", "chorus_flower", "end_stone");
+
+    /**
+     * Ob der Block von der Natur stammt: Erde, Stein, Sand, Wasser, Holz und Laub, aber auch Blumen, Erze, Pilze, Moos,
+     * Kakteen, Zuckerrohr und Ähnliches. Zählte das als „gebaut“, wäre fast jeder Streifen von 80 Blöcken Länge belegt.
+     */
     private static boolean natural(BlockState state) {
+        String path = BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath();
+        return naturalBlock(state) || path.endsWith("_ore") || path.endsWith("_flower") || path.endsWith("_tulip")
+                || path.endsWith("_leaves") || path.endsWith("_sapling") || path.endsWith("_roots")
+                || NATURAL_NAMES.contains(path) || state.is(BlockTags.FLOWERS) || state.is(BlockTags.SAPLINGS)
+                || state.is(BlockTags.REPLACEABLE_BY_TREES) || state.is(BlockTags.MOSS_REPLACEABLE)
+                || state.is(BlockTags.DRIPSTONE_REPLACEABLE) || state.is(BlockTags.LUSH_GROUND_REPLACEABLE)
+                || state.is(BlockTags.GOLD_ORES) || state.is(BlockTags.IRON_ORES) || state.is(BlockTags.COPPER_ORES);
+    }
+
+    private static boolean naturalBlock(BlockState state) {
         return state.isAir() || state.canBeReplaced() || !state.getFluidState().isEmpty()
                 || state.is(BlockTags.LEAVES) || state.is(BlockTags.LOGS)
                 || state.is(BlockTags.DIRT) || state.is(BlockTags.SAND) || state.is(BlockTags.TERRACOTTA)

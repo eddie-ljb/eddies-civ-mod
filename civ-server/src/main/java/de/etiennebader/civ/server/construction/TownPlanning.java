@@ -81,6 +81,47 @@ final class TownPlanning {
     }
 
     private java.util.function.Predicate<Area> site = area -> true;
+    private java.util.function.Function<Area, Optional<Boolean>> siteState = area -> Optional.of(false);
+
+    /** Ob eine Fläche bebaut ist (leer: Gelände nicht geladen); kommt von {@link ConstructionService}. */
+    void siteState(java.util.function.Function<Area, Optional<Boolean>> siteState) {
+        this.siteState = Objects.requireNonNull(siteState, "siteState");
+    }
+
+    /** Zählt, woran die Suche nach einem Platz scheiterte; zur Auskunft mit {@code /civ bau planung}. */
+    static final class Tally {
+        int tried;
+        int occupied;
+        int unknown;
+        int builtUp;
+        int water;
+        int noStreet;
+        int laid;
+
+        void reset() {
+            tried = occupied = unknown = builtUp = water = noStreet = laid = 0;
+        }
+    }
+
+    /** Was das Bauamt zuletzt für eine Gemeinde getan oder versucht hat. */
+    static final class Diagnosis {
+        Day day;
+        String planner = "";
+        String streetNote = "";
+        String plotNote = "";
+        final Tally streetTally = new Tally();
+        final Tally plotTally = new Tally();
+    }
+
+    private final java.util.Map<PolityId, Diagnosis> diagnoses = new java.util.HashMap<>();
+
+    Diagnosis diagnosis(PolityId town) {
+        return diagnoses.computeIfAbsent(town, key -> new Diagnosis());
+    }
+
+    Optional<Diagnosis> lastDiagnosis(PolityId town) {
+        return Optional.ofNullable(diagnoses.get(town));
+    }
     private de.etiennebader.civ.server.road.RoadService roads;
     private de.etiennebader.civ.server.road.StreetAccess streets;
 
@@ -128,7 +169,13 @@ final class TownPlanning {
         List<PolityView> towns = world.polities().stream().filter(p -> p.kind() == PolityKind.TERRITORIAL)
                 .sorted(Comparator.comparing(p -> p.id().value())).toList();
         for (PolityView town : towns) {
-            authority.apply(town.id()).filter(PersonRef.class::isInstance).map(PersonRef.class::cast)
+            Optional<ActorRef> head = authority.apply(town.id());
+            Diagnosis diagnosis = diagnosis(town.id());
+            diagnosis.day = day;
+            diagnosis.planner = head.map(actor -> actor instanceof PersonRef ? "villager" : "player").orElse("none");
+            diagnosis.streetNote = "";
+            diagnosis.plotNote = "";
+            head.filter(PersonRef.class::isInstance).map(PersonRef.class::cast)
                     .ifPresent(planner -> {
                         foundStreet(town, planner, day);
                         plan(town, planner, day);
@@ -144,7 +191,10 @@ final class TownPlanning {
         // Solange die Gemeinde fast noch keine Grundstücke hat, plant das Bauamt jeden Tag (sonst wartet man im
         // Schnitt drei Tage, also eine Stunde, auf jedes der ersten).
         double chance = world.land(town.id()).plots().size() < EARLY_PLOTS ? EARLY_PLAN_CHANCE : PLAN_CHANCE;
+        Diagnosis note = diagnosis(town.id());
+        note.plotTally.reset();
         if (VillagerAmbitions.roll(planner, day, 0x96) >= chance) {
+            note.plotNote = "chance";
             return;
         }
         LandView land = world.land(town.id());
@@ -154,8 +204,10 @@ final class TownPlanning {
         List<Plot> plots = new ArrayList<>(land.plots());
         long offered = plots.stream().filter(plot -> plot.holder().equals(town.asActor()) && plot.isForSale()).count();
         if (offered >= MAX_OFFERED || plots.size() >= (long) PLOTS_PER_CHUNK * chunks.size()) {
+            note.plotNote = offered >= MAX_OFFERED ? "offered_max" : "limit";
             return;
         }
+        note.plotNote = "searched";
         PlotType type = nextType(town, plots, planner, day);
         int size = sizeOf(type);
         int inset = (ChunkCoord.SIZE - size) / 2;
@@ -165,21 +217,32 @@ final class TownPlanning {
             }
             Area area = new Area(chunk.dimension(), chunk.minBlockX() + inset, chunk.minBlockZ() + inset,
                     chunk.minBlockX() + inset + size - 1, chunk.minBlockZ() + inset + size - 1);
-            if (!site.test(area)) {
+            Tally tally = note.plotTally;
+            tally.tried++;
+            Optional<Boolean> built = siteState.apply(area);
+            if (built.isEmpty()) {
+                tally.unknown++;
+                continue; // Gelände nicht geladen
+            }
+            if (built.get()) {
+                tally.builtUp++;
                 continue; // dort steht schon etwas: kein Grundstück darüber
             }
             if (!onStreet(town, area)) {
+                tally.noStreet++;
                 continue; // erst die Straße, dann das Grundstück
             }
             if (!plotOnLand(area)) {
+                tally.water++;
                 continue; // nicht ins Wasser
             }
             try {
                 PlotId id = app.createPlot().execute(new CreatePlot.Command(town.id(), area, type, day));
                 publish(town, id, area, type, day);
+                tally.laid++;
                 return;
             } catch (DomainException | IllegalArgumentException | IllegalStateException ignored) {
-                // überlappt oder liegt nicht ganz im Gebiet: nächster Chunk
+                tally.occupied++; // überlappt oder liegt nicht ganz im Gebiet: nächster Chunk
             }
         }
     }
@@ -211,38 +274,69 @@ final class TownPlanning {
         // Straße vier Grundstücke stehen. Solange ein Weg noch gebaut wird, kommt keine neue Straße.
         boolean needed = streetRequired ? streetCount == 0 || !roomForPlot(town, plots)
                 : plots.size() >= 2 && streetCount * 4 < plots.size() + 2;
+        Diagnosis note = diagnosis(town.id());
         if (streetCount >= MAX_STREETS || !needed || (roads != null && roads.unfinished(town.id()) > 0)
                 || (!streetRequired && VillagerAmbitions.roll(planner, day, 0x9A) >= STREET_CHANCE)) {
+            note.streetNote = streetCount >= MAX_STREETS ? "max" : !needed ? "no_need"
+                    : roads != null && roads.unfinished(town.id()) > 0 ? "road_pending" : "chance";
             return;
         }
+        note.streetNote = "searched";
         java.util.Set<ChunkCoord> claimed = new java.util.HashSet<>(world.territory().territoryOf(town.id()));
         List<ChunkCoord> chunks = claimed.stream()
                 .sorted(Comparator.comparingLong((ChunkCoord c) -> distanceToSeat(town, c))
                         .thenComparingInt(ChunkCoord::x).thenComparingInt(ChunkCoord::z)).toList();
         boolean horizontalFirst = VillagerAmbitions.roll(planner, day, 0x9B) < 0.5;
+        Tally tally = diagnosis(town.id()).streetTally;
+        tally.reset();
         for (ChunkCoord start : chunks) {
             for (boolean horizontal : new boolean[] {horizontalFirst, !horizontalFirst}) {
-                Optional<Area> corridor = corridor(claimed, start, horizontal);
-                if (corridor.isEmpty()) {
-                    continue;
+                // Zuerst der längste Streifen; ist er blockiert (eine Blume, ein Erz …), der nächstkürzere.
+                Area previous = null;
+                for (int cap = MAX_STREET_CHUNKS; cap >= 1; cap--) {
+                    Optional<Area> corridor = corridor(claimed, start, horizontal, cap);
+                    if (corridor.isEmpty()) {
+                        break;
+                    }
+                    Area area = corridor.get();
+                    if (area.equals(previous)) {
+                        continue; // kürzer geht nicht: derselbe Streifen
+                    }
+                    previous = area;
+                    tally.tried++;
+                    if (plots.stream().anyMatch(plot -> plot.area().overlaps(area))
+                            || town.streets().stream().anyMatch(street -> street.area().overlaps(area))
+                            || town.seat().filter(seat -> area.contains(seat.dimension(), seat.x(), seat.z()))
+                            .isPresent()) {
+                        tally.occupied++;
+                        continue;
+                    }
+                    Optional<Boolean> built = siteState.apply(area);
+                    if (built.isEmpty()) {
+                        tally.unknown++;
+                        continue;
+                    }
+                    if (built.get()) {
+                        tally.builtUp++;
+                        continue;
+                    }
+                    if (!streetOnLand(area)) {
+                        tally.water++;
+                        continue;
+                    }
+                    String name = de.etiennebader.civ.application.population.FoundingNames.street(planner,
+                            town.streets().stream().map(de.etiennebader.civ.domain.polity.Street::name)
+                                    .collect(java.util.stream.Collectors.toSet()), town.name().value());
+                    try {
+                        app.streets().lay(planner, town.id(), name, area, day);
+                    } catch (DomainException | IllegalArgumentException | IllegalStateException ignored) {
+                        tally.occupied++;
+                        continue;
+                    }
+                    tally.laid++;
+                    orderRoad(town, planner, name, area, day);
+                    return;
                 }
-                Area area = corridor.get();
-                if (plots.stream().anyMatch(plot -> plot.area().overlaps(area))
-                        || town.streets().stream().anyMatch(street -> street.area().overlaps(area))
-                        || town.seat().filter(seat -> area.contains(seat.dimension(), seat.x(), seat.z())).isPresent()
-                        || !site.test(area) || !streetOnLand(area)) {
-                    continue;
-                }
-                String name = de.etiennebader.civ.application.population.FoundingNames.street(planner,
-                        town.streets().stream().map(de.etiennebader.civ.domain.polity.Street::name)
-                                .collect(java.util.stream.Collectors.toSet()), town.name().value());
-                try {
-                    app.streets().lay(planner, town.id(), name, area, day);
-                } catch (DomainException | IllegalArgumentException | IllegalStateException ignored) {
-                    continue;
-                }
-                orderRoad(town, planner, name, area, day);
-                return;
             }
         }
     }
@@ -275,7 +369,8 @@ final class TownPlanning {
      * südlichen Nachbarn, so lang wie die Reihe zusammenhängender Chunks, die beide Seiten dem Ort gehören. Die Grundstücke
      * (innen eingerückt) lassen dort Platz.
      */
-    private static Optional<Area> corridor(java.util.Set<ChunkCoord> claimed, ChunkCoord start, boolean horizontal) {
+    private static Optional<Area> corridor(java.util.Set<ChunkCoord> claimed, ChunkCoord start, boolean horizontal,
+                                           int maxChunks) {
         int stepX = horizontal ? 1 : 0;
         int stepZ = horizontal ? 0 : 1;
         // horizontal: Straße in X-Richtung auf der Grenze zwischen Reihe z und z+1
@@ -286,7 +381,7 @@ final class TownPlanning {
         }
         int length = 1;
         ChunkCoord last = start;
-        while (length < MAX_STREET_CHUNKS) {
+        while (length < Math.min(maxChunks, MAX_STREET_CHUNKS)) {
             ChunkCoord next = new ChunkCoord(start.dimension(), last.x() + stepX, last.z() + stepZ);
             ChunkCoord nextNeighbour = new ChunkCoord(start.dimension(), next.x() + (horizontal ? 0 : 1),
                     next.z() + (horizontal ? 1 : 0));

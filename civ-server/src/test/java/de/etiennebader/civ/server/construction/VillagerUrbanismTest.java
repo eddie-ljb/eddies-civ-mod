@@ -156,6 +156,46 @@ class VillagerUrbanismTest {
     }
 
     @Test
+    @DisplayName("Ist der längste Streifen blockiert (eine Blume, ein Erz), wird ein kürzerer genommen")
+    void shorterStreetWhenLongOneIsBlocked() {
+        server.enforceStreets(true);
+        server.construction().siteSurvey(area -> java.util.Optional.of(Math.max(area.width(), area.depth()) > 20));
+        setUp(8);
+        for (int day = 2; day < 30; day++) {
+            server.construction().villagersOrder(Day.of(day));
+        }
+        PolityView updated = server.queries().polity(town.id()).orElseThrow();
+        assertFalse(updated.streets().isEmpty(), "ein kurzer Streifen wurde genommen");
+        assertTrue(updated.streets().stream().allMatch(street ->
+                Math.max(street.area().width(), street.area().depth()) <= 20));
+    }
+
+    @Test
+    @DisplayName("Planungsbericht: zeigt, wer plant und woran es hängt, auch bei unbekanntem Gelände")
+    void planningReportExplainsWhy() {
+        server.enforceStreets(true);
+        // Gelände nicht geladen: Das Bauamt kann nichts prüfen.
+        server.construction().siteSurvey(area -> java.util.Optional.empty());
+        setUp(8);
+        Caller viewer = new Caller(alice, "Alice", new BlockPosition(OW, 8, 64, 8));
+        assertTrue(server.construction().planningReport(viewer).lines().stream()
+                .anyMatch(line -> line.key().equals(de.etiennebader.civ.server.command.MessageKey.PLANNING_NONE_YET.key())
+                        || line.key().equals(de.etiennebader.civ.server.command.MessageKey.NOT_IN_MUNICIPALITY.key())));
+        for (int day = 2; day < 30; day++) {
+            server.construction().villagersOrder(Day.of(day));
+        }
+        PolityView updated = server.queries().polity(town.id()).orElseThrow();
+        assertTrue(updated.streets().isEmpty(), "ohne bekanntes Gelände entsteht nichts");
+        Caller member = new Caller(bob, "Bob", new BlockPosition(OW, 8, 64, 8));
+        server.app().joinPolity().execute(new de.etiennebader.civ.application.polity.JoinPolity.Command(town.id(), bob,
+                de.etiennebader.civ.domain.polity.MembershipType.RESIDENT, Day.of(31)));
+        var report = server.construction().planningReport(member);
+        assertTrue(report.success());
+        assertTrue(report.lines().stream().anyMatch(line -> line.key()
+                .equals(de.etiennebader.civ.server.command.MessageKey.PLANNING_STREET.key())), report.toString());
+    }
+
+    @Test
     @DisplayName("Land vor Wasser: Auf Wasser legt das Bauamt weder Straßen noch Grundstücke an")
     void villagerPlannerAvoidsWater() {
         server.landRules().survey(area -> java.util.Optional.of(100));

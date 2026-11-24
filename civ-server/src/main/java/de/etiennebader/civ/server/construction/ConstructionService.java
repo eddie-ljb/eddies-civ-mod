@@ -186,6 +186,7 @@ public final class ConstructionService {
         this.planning = new TownPlanning(app, library, announcements, texts);
         this.planning.authority(this::authority);
         this.planning.site(this::siteFree);
+        this.planning.siteState(area -> surveyed.computeIfAbsent(area, survey::isBuiltUp));
         for (ConstructionProject project : store.load()) {
             projects.put(project.id(), project);
             lastNumber = Math.max(lastNumber, project.number());
@@ -194,8 +195,11 @@ public final class ConstructionService {
 
     /** Wegebau für die Straßen, die das Bauamt gründet. */
     public synchronized void roads(de.etiennebader.civ.server.road.RoadService roads) {
+        this.roads = roads;
         this.planning.roads(roads);
     }
+
+    private de.etiennebader.civ.server.road.RoadService roads;
 
     public BlueprintLibrary library() {
         return library;
@@ -1260,6 +1264,54 @@ public final class ConstructionService {
         return queries.polity(townId).flatMap(town -> town.officeTerm(Office.PLANNER)
                 .or(() -> town.officeTerm(Office.MAYOR)).map(OfficeTerm::holder)
                 .or(() -> interimGovernment ? town.mayor(true) : Optional.empty()));
+    }
+
+    /**
+     * {@code /civ bau planung}: Was das Bauamt der eigenen Gemeinde zuletzt getan hat und woran es hängt. Für Spieler,
+     * die wissen wollen, warum keine Straßen und Grundstücke entstehen.
+     */
+    public synchronized Reply planningReport(Caller caller) {
+        Optional<PolityView> town = queries.municipalityOf(caller.player());
+        if (town.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.NOT_IN_MUNICIPALITY));
+        }
+        Optional<TownPlanning.Diagnosis> found = planning.lastDiagnosis(town.get().id());
+        if (found.isEmpty() || found.get().day == null) {
+            return Reply.success(Message.of(MessageKey.PLANNING_NONE_YET));
+        }
+        TownPlanning.Diagnosis d = found.get();
+        List<Message> lines = new ArrayList<>();
+        lines.add(Message.of(MessageKey.PLANNING_HEADER, town.get().name().value(), d.day.value(),
+                Message.of(switch (d.planner) {
+                    case "villager" -> MessageKey.PLANNING_VILLAGER;
+                    case "player" -> MessageKey.PLANNING_PLAYER;
+                    default -> MessageKey.PLANNING_NOBODY;
+                }), queries.territory().territoryOf(town.get().id()).size(), town.get().streets().size(),
+                roads == null ? 0 : roads.unfinished(town.get().id()),
+                queries.land(town.get().id()).plots().size()));
+        if (!d.planner.equals("villager")) {
+            return Reply.success(lines);
+        }
+        lines.add(Message.of(MessageKey.PLANNING_STREET, Message.of(note("street", d.streetNote)),
+                d.streetTally.tried, d.streetTally.builtUp, d.streetTally.unknown, d.streetTally.water,
+                d.streetTally.occupied));
+        lines.add(Message.of(MessageKey.PLANNING_PLOT, Message.of(note("plot", d.plotNote)), d.plotTally.tried,
+                d.plotTally.builtUp, d.plotTally.unknown, d.plotTally.water, d.plotTally.noStreet,
+                d.plotTally.occupied));
+        return Reply.success(lines);
+    }
+
+    private static MessageKey note(String what, String code) {
+        return switch (what + ":" + code) {
+            case "street:searched" -> MessageKey.PLANNING_NOTE_SEARCHED;
+            case "street:no_need" -> MessageKey.PLANNING_NOTE_STREET_NO_NEED;
+            case "street:road_pending" -> MessageKey.PLANNING_NOTE_ROAD_PENDING;
+            case "street:max" -> MessageKey.PLANNING_NOTE_STREET_MAX;
+            case "plot:searched" -> MessageKey.PLANNING_NOTE_SEARCHED;
+            case "plot:offered_max" -> MessageKey.PLANNING_NOTE_OFFERED_MAX;
+            case "plot:limit" -> MessageKey.PLANNING_NOTE_PLOT_LIMIT;
+            default -> MessageKey.PLANNING_NOTE_CHANCE;
+        };
     }
 
     /** Ob ein Dorfbewohner kommissarisch als Bauamt handelt, wenn die Gemeinde keinen Amtsinhaber hat. */
