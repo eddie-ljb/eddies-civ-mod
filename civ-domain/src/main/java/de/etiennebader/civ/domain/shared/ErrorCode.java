@@ -234,7 +234,9 @@ public enum ErrorCode {
     /** Der Anspruch ist nicht möglich. Argumente: keine. */
     INVALID_CLAIM,
     /** Die Truppe ist schon voll ausgebildet bzw. ausgerüstet. Argumente: keine. */
-    NOTHING_TO_IMPROVE;
+    NOTHING_TO_IMPROVE,
+    /** Der Krieg hat keine offenen Siegpunkte (nicht entschieden oder schon verteilt). Argumente: keine. */
+    NO_SPOILS;
 
     private static final String TRANSLATION_PREFIX = "eddies-civ-mod.error.";
 

@@ -28,7 +28,7 @@ final class EnglishCommands {
             Map.entry("aussage", "testify"), Map.entry("aussenposten", "outpost"), Map.entry("austreten", "leave"),
             Map.entry("beanspruchen", "claim"), Map.entry("beeinflussen", "influence"),
             Map.entry("bau", "build"), Map.entry("beauftragen", "commission"), Map.entry("beitreten", "join"), Map.entry("berufung", "appeal"),
-            Map.entry("beweis", "evidence"), Map.entry("boerse", "exchange"), Map.entry("branche", "branch"),
+            Map.entry("beweis", "evidence"), Map.entry("beute", "spoils"), Map.entry("boerse", "exchange"), Map.entry("branche", "branch"),
             Map.entry("brief", "letter"), Map.entry("buch", "book"), Map.entry("buendnis", "alliance"),
             Map.entry("bund", "federation"), Map.entry("debatte", "debate"), Map.entry("depot", "portfolio"),
             Map.entry("dividende", "dividend"), Map.entry("dorfbewohner", "villager"), Map.entry("ebene", "level"),

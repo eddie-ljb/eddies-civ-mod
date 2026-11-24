@@ -1794,6 +1794,16 @@ public final class CivCommandTree {
                         .then(arg(NUMBER, IntegerArgumentType.integer(1))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.war().battle(
                                         Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))))
+                .then(Commands.literal("beute")
+                        .then(arg(NUMBER, IntegerArgumentType.integer(1))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.war().spoilsInfo(
+                                        Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))
+                                .then(arg(COUNT, IntegerArgumentType.integer(0, 16))
+                                        .then(arg(AMOUNT, IntegerArgumentType.integer(0))
+                                                .executes(context -> withCiv(context, (civ, player) -> civ.war().spoils(
+                                                        Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER),
+                                                        IntegerArgumentType.getInteger(context, COUNT),
+                                                        IntegerArgumentType.getInteger(context, AMOUNT))))))))
                 .then(Commands.literal("frieden")
                         .then(arg(NUMBER, IntegerArgumentType.integer(1))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.war().peace(

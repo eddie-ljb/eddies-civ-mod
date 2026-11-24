@@ -79,6 +79,16 @@ final class TownPlanning {
 
     private java.util.function.Predicate<Area> site = area -> true;
     private de.etiennebader.civ.server.road.RoadService roads;
+    private de.etiennebader.civ.server.road.StreetAccess streets;
+
+    /** Die Straßenpflicht: Grundstücke schneidet das Bauamt nur an gebauten Straßen zu. */
+    void streetAccess(de.etiennebader.civ.server.road.StreetAccess streets) {
+        this.streets = streets;
+    }
+
+    private boolean onStreet(PolityView town, Area area) {
+        return streets == null || streets.served(town, area);
+    }
 
     /** Der Wegebau, den das Bauamt nach einer neuen Straße beauftragt. */
     void roads(de.etiennebader.civ.server.road.RoadService roads) {
@@ -137,6 +147,9 @@ final class TownPlanning {
             if (!site.test(area)) {
                 continue; // dort steht schon etwas: kein Grundstück darüber
             }
+            if (!onStreet(town, area)) {
+                continue; // erst die Straße, dann das Grundstück
+            }
             try {
                 PlotId id = app.createPlot().execute(new CreatePlot.Command(town.id(), area, type, day));
                 publish(town, id, area, type, day);
@@ -165,8 +178,13 @@ final class TownPlanning {
     private void foundStreet(PolityView town, PersonRef planner, Day day) {
         WorldQueries world = app.queries();
         List<Plot> plots = new ArrayList<>(world.land(town.id()).plots());
-        int streets = town.streets().size();
-        if (streets >= MAX_STREETS || plots.size() < 2 || streets * 4 >= plots.size() + 2
+        int streetCount = town.streets().size();
+        boolean streetRequired = this.streets == null || this.streets.required(town);
+        // Erst die Straße, dann die Grundstücke: Die erste Straße kommt ohne Grundstücke, jede weitere, sobald je
+        // Straße vier Grundstücke stehen. Solange ein Weg noch gebaut wird, kommt keine neue Straße.
+        boolean needed = streetRequired ? streetCount == 0 || plots.size() >= streetCount * 4
+                : plots.size() >= 2 && streetCount * 4 < plots.size() + 2;
+        if (streetCount >= MAX_STREETS || !needed || (roads != null && roads.unfinished(town.id()) > 0)
                 || VillagerAmbitions.roll(planner, day, 0x9A) >= STREET_CHANCE) {
             return;
         }

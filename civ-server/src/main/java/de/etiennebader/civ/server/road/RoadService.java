@@ -84,6 +84,17 @@ public final class RoadService {
         return jobs.values().stream().anyMatch(job -> job.town().equals(town) && job.street().equalsIgnoreCase(street));
     }
 
+    /** Ob der Wegebau auf der Straße fertig ist. */
+    public synchronized boolean isBuilt(PolityId town, String street) {
+        return jobs.values().stream().anyMatch(job -> job.town().equals(town)
+                && job.street().equalsIgnoreCase(street) && job.finished());
+    }
+
+    /** Wie viele Wegebauten der Gemeinde noch laufen. */
+    public synchronized long unfinished(PolityId town) {
+        return jobs.values().stream().filter(job -> job.town().equals(town) && !job.finished()).count();
+    }
+
     /**
      * Beauftragt den Wegebau auf einer Straße ohne weitere Prüfung der Berechtigung (Dorfbewohner als Bauamt).
      *

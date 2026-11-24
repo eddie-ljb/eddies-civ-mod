@@ -63,6 +63,16 @@ public final class PlotService {
     private final Texts texts;
     private final Map<PlayerRef, Selection> selections = new HashMap<>();
     private final Map<PlayerRef, Optional<PlotId>> lastPlot = new HashMap<>();
+    private de.etiennebader.civ.server.road.StreetAccess streets;
+
+    /** Die Straßenpflicht für neue und ausgeschriebene Grundstücke; ohne sie gibt es keine. */
+    public void streetAccess(de.etiennebader.civ.server.road.StreetAccess streets) {
+        this.streets = streets;
+    }
+
+    private boolean onStreet(PolityView town, Area area) {
+        return streets == null || streets.served(town, area);
+    }
 
     /** Die beiden ausgewählten Ecken eines künftigen Grundstücks. */
     public record Selection(Optional<BlockPosition> first, Optional<BlockPosition> second) {
@@ -135,7 +145,9 @@ public final class PlotService {
         if (area.size() > MAX_AREA) {
             return Reply.failure(Message.of(MessageKey.PLOT_TOO_LARGE, area.size(), MAX_AREA));
         }
-        return asPlotManager(caller, town -> attempt(() -> {
+        return asPlotManager(caller, town -> !onStreet(town, area)
+                ? Reply.failure(Message.of(MessageKey.PLOT_NEEDS_STREET, de.etiennebader.civ.server.road.StreetAccess.reach()))
+                : attempt(() -> {
             app.createPlot().execute(new CreatePlot.Command(town.id(), area, type.get(), calendar.today()));
             return Reply.success(Message.of(MessageKey.PLOT_CREATED, Message.of(TranslationKeys.plotType(type.get())),
                     area.width(), area.depth(), town.name().value()));
@@ -168,7 +180,10 @@ public final class PlotService {
         } catch (IllegalArgumentException e) {
             return Reply.failure(Message.of(MessageKey.INVALID_AMOUNT, priceInput.strip()));
         }
-        return withOwnPlot(caller, (view, seller) -> attempt(() -> {
+        return withOwnPlot(caller, (view, seller) -> !onStreet(queries.polity(view.town()).orElseThrow(), view.area())
+                && units > 0
+                ? Reply.failure(Message.of(MessageKey.PLOT_NEEDS_STREET, de.etiennebader.civ.server.road.StreetAccess.reach()))
+                : attempt(() -> {
             Money price = Money.of(units, queries.polity(view.town()).orElseThrow().currency());
             app.offerPlot().execute(new OfferPlot.Command(view.town(), view.id(), seller, Optional.of(price),
                     calendar.today()));

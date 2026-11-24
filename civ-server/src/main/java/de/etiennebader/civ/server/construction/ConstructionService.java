@@ -200,6 +200,13 @@ public final class ConstructionService {
         return library;
     }
 
+    public synchronized void streetAccess(de.etiennebader.civ.server.road.StreetAccess streets) {
+        this.streets = streets;
+        this.planning.streetAccess(streets);
+    }
+
+    private de.etiennebader.civ.server.road.StreetAccess streets;
+
     public synchronized List<ConstructionProject> projects() {
         return new ArrayList<>(projects.values());
     }
@@ -527,6 +534,10 @@ public final class ConstructionService {
         }
         if (queries.production().enterpriseOf(firm.id()).map(e -> e.branch() != Branch.CONSTRUCTION).orElse(true)) {
             throw new BuildRefused(Message.of(MessageKey.BUILD_NOT_CONSTRUCTION, firm.name().value()));
+        }
+        if (streets != null && !streets.served(town, plot.area())) {
+            throw new BuildRefused(Message.of(MessageKey.BUILD_NEEDS_STREET,
+                    de.etiennebader.civ.server.road.StreetAccess.reach()));
         }
         if (rotation == AUTO) {
             rotation = facingStreet(town, plot, plan);

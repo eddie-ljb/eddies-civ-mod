@@ -1543,7 +1543,7 @@ async function loadWar() {
       el("p", { textContent: (w.ongoing ? "läuft seit Tag " : "beendet an Tag ") + (w.ongoing ? w.declared : w.ended) + " · Front " + w.front +
         " · Truppen " + w.aggressorTroops + " : " + w.defenderTroops + " · Verwundete " + w.aggressorWounded + " : " + w.defenderWounded }),
       bar,
-      w.winner ? el("p", { textContent: "Sieger: " + w.winner + (w.reparations ? " · Reparationen " + w.reparations : "") }) : el("span"),
+      w.winner ? el("p", { textContent: "Sieger: " + w.winner + (w.spoilsOpen ? " · " + w.points + " Siegpunkte offen" : "") + (w.conquest ? " · " + w.conquest + " Chunks erobert" : "") + (w.reparations ? " · Reparationen " + w.reparations : "") }) : el("span"),
       ...w.campaigns.map(c => el("p", { textContent: "Geplant: " + c.kind + " von " + c.initiator + " am Tag " + c.on })));
   }) : [el("div", { className: "empty", style: "border:none", textContent: "Es herrscht Frieden." })]));
   $("alliances").replaceChildren(...(r.data.alliances.length ? r.data.alliances.map(a => el("div", { className: "card" }, el("p", { textContent: a.first + " ↔ " + a.second })))

@@ -117,6 +117,28 @@ class VillagerUrbanismTest {
     }
 
     @Test
+    @DisplayName("Straßenpflicht: Das Bauamt legt zuerst die Straße an und baut den Weg, erst dann gibt es Grundstücke")
+    void villagerPlannerLaysStreetsBeforePlots() {
+        server.enforceStreets(true);
+        setUp(8);
+        boolean plotBeforeRoad = false;
+        for (int day = 2; day < 160; day++) {
+            server.construction().villagersOrder(Day.of(day));
+            server.roads().advance(10_000);
+            boolean anyPlot = !server.queries().land(town.id()).plots().isEmpty();
+            boolean roadFinished = server.roads().jobs().stream().anyMatch(job -> job.finished());
+            plotBeforeRoad |= anyPlot && !roadFinished;
+        }
+        assertFalse(plotBeforeRoad, "kein Grundstück, bevor der erste Weg fertig ist");
+        PolityView updated = server.queries().polity(town.id()).orElseThrow();
+        assertFalse(updated.streets().isEmpty(), "die Straße kam zuerst");
+        var plots = server.queries().land(town.id()).plots();
+        assertFalse(plots.isEmpty(), "an der fertigen Straße entstehen Grundstücke");
+        assertTrue(plots.stream().allMatch(plot -> de.etiennebader.civ.application.civil.Addresses
+                .streetsNear(updated, plot.area()).size() > 0), "jedes Grundstück liegt an einer Straße");
+    }
+
+    @Test
     @DisplayName("Dorfbewohner kaufen angebotenes Wohnland und lassen darauf bauen")
     void villagersBuyLandAndBuild() {
         setUp(8);
