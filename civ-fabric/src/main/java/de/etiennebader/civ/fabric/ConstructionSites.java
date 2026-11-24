@@ -112,10 +112,24 @@ final class ConstructionSites {
         }
     }
 
-    /** Stellt an der Stelle einen Zaun auf den Boden, wenn dort Platz ist. */
+    /**
+     * Stellt an der Stelle einen Zaun auf den Boden, genau einen Block hoch. Die Höhe misst der Zaun selbst mit
+     * (er zählt als Boden); deshalb wird zuerst der unterste Zaun der Spalte gesucht und alles darüber abgeräumt, sonst
+     * wüchse er bei jedem Durchgang um einen Block.
+     */
     private static boolean raise(ServerLevel level, Block barrier, int x, int z) {
         int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
         BlockPos pos = new BlockPos(x, y, z);
+        if (level.getBlockState(pos.below()).is(barrier)) {
+            BlockPos lowest = pos.below();
+            while (level.getBlockState(lowest.below()).is(barrier)) {
+                lowest = lowest.below();
+            }
+            for (BlockPos stacked = lowest.above(); stacked.getY() < y; stacked = stacked.above()) {
+                level.setBlock(stacked, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+            }
+            return true;
+        }
         BlockState here = level.getBlockState(pos);
         if (here.is(barrier)) {
             return true;
