@@ -391,24 +391,13 @@ public final class PartyService {
 
     private void foundForVillagers(PartyAffiliation.Found found, Day day) {
         String town = queries.polity(found.town()).map(polity -> polity.name().value()).orElse("");
-        String base = VILLAGER_NAMES.get(found.direction()) + " " + town;
-        String name = uniqueName(base);
+        String name = de.etiennebader.civ.application.population.FoundingNames.party(found.members().getFirst(),
+                VILLAGER_NAMES.get(found.direction()), town, candidate -> queries.polityNamed(candidate).isPresent());
         PersonRef chair = found.members().getFirst();
         app.foundParty().execute(new FoundParty.Command(PolityName.of(name), chair,
                 PartyAffiliation.profileFor(found), currency, found.members().subList(1, found.members().size()), day));
         announcements.add(Announcement.toAll(Message.of(MessageKey.VILLAGER_PARTY_FOUNDED, found.members().size(),
                 town, name, Message.of(TranslationKeys.platform(found.direction())))));
-    }
-
-    private String uniqueName(String base) {
-        String trimmed = base.length() > PolityName.MAX_LENGTH ? base.substring(0, PolityName.MAX_LENGTH).strip() : base;
-        String name = trimmed;
-        for (int number = 2; queries.polityNamed(name).isPresent(); number++) {
-            String suffix = " " + number;
-            name = (trimmed.length() + suffix.length() > PolityName.MAX_LENGTH
-                    ? trimmed.substring(0, PolityName.MAX_LENGTH - suffix.length()).strip() : trimmed) + suffix;
-        }
-        return name;
     }
 
     /** {@code /civ partei programmodus [abstimmung|vorsitz]}: ohne Argument zeigt es den aktuellen Modus. */

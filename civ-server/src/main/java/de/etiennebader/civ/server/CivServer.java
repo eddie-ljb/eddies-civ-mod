@@ -109,6 +109,7 @@ public final class CivServer {
     private final PlotService plots;
     private final de.etiennebader.civ.server.construction.ConstructionService construction;
     private final de.etiennebader.civ.server.war.WarService war;
+    private final de.etiennebader.civ.server.road.RoadService roads;
     private final de.etiennebader.civ.server.family.FamilyService family;
     private final de.etiennebader.civ.server.machine.MachineService machines;
     private final de.etiennebader.civ.server.religion.ReligionService religion;
@@ -193,6 +194,9 @@ public final class CivServer {
         this.construction = new de.etiennebader.civ.server.construction.ConstructionService(app, calendar, texts,
                 settings.ticksPerDay(), new de.etiennebader.civ.server.construction.BlueprintLibrary(
                 dataDirectory.map(dir -> dir.resolve("blueprints"))), dataDirectory.map(dir -> dir.resolve("construction.tsv")), announcements);
+        this.roads = new de.etiennebader.civ.server.road.RoadService(app, calendar, settings.ticksPerDay(),
+                announcements, dataDirectory.map(dir -> dir.resolve("roads.tsv")));
+        this.construction.roads(roads);
         this.construction.interimGovernment(settings.villagerPolitics());
         this.construction.playerLookup(players::findByName);
         this.war = new de.etiennebader.civ.server.war.WarService(app, calendar, texts, announcements, ids,
@@ -476,6 +480,10 @@ public final class CivServer {
     /** Heirat, Scheidung und Kinder der Dorfbewohner. */
     public de.etiennebader.civ.server.family.FamilyService family() {
         return family;
+    }
+
+    public de.etiennebader.civ.server.road.RoadService roads() {
+        return roads;
     }
 
     public de.etiennebader.civ.server.construction.ConstructionService construction() {

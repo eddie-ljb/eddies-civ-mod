@@ -66,6 +66,25 @@ public final class ReligionRegistry extends AggregateRoot<ReligionEvent> impleme
         return replace(found.withClergy(Optional.of(head), power), day);
     }
 
+    /**
+     * Ändert Namen der Schrift, des Gotteshauses und die Sprache; leere Angaben bleiben unverändert. Nur Gründer oder
+     * Oberhaupt, über {@code authorised} auch Amtsträger mit dem Recht dazu.
+     *
+     * @throws IllegalArgumentException wenn {@code editor} keine Befugnis hat oder ein Name zu lang ist
+     */
+    public Religion redefine(ReligionId id, ActorRef editor, boolean authorised, String scriptureName,
+                             String templeName, String language, Day day) {
+        Religion found = require(id);
+        if (!authorised) {
+            requireAuthority(found, editor);
+        }
+        return replace(new Religion(found.id(), found.name(), found.founder(), found.monotheistic(),
+                scriptureName.isBlank() ? found.scriptureName() : scriptureName,
+                templeName.isBlank() ? found.templeName() : templeName,
+                language.isBlank() ? found.language() : language, found.denominations(), found.clergyHead(),
+                found.clergyPower(), found.election(), found.foundedOn()), day);
+    }
+
     /** Macht das Klerusamt vakant. */
     public Religion vacateClergy(ReligionId id, ActorRef remover, Day day) {
         Religion found = require(id);

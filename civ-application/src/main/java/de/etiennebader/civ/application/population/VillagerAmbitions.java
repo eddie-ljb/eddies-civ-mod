@@ -365,7 +365,9 @@ public final class VillagerAmbitions {
             return false;
         }
         try {
-            companies.foundCompany(villager, PolityName.of(companyName(villager)),
+            String town = home.get().name().value();
+            companies.foundCompany(villager, PolityName.of(FoundingNames.company(villager, town,
+                            name -> world.polityNamed(name).isPresent())),
                     Money.of(capital, home.get().currency()), day);
             return true;
         } catch (DomainException ignored) {
@@ -379,7 +381,8 @@ public final class VillagerAmbitions {
             return false;
         }
         try {
-            foundParty.execute(new FoundParty.Command(PolityName.of(partyName(villager, personality)), villager,
+            foundParty.execute(new FoundParty.Command(PolityName.of(partyName(villager, personality, home.get().name().value(),
+                    name -> world.polityNamed(name).isPresent())), villager,
                     profileFor(personality), home.get().currency(), day));
             return true;
         } catch (DomainException ignored) {
@@ -387,24 +390,16 @@ public final class VillagerAmbitions {
         }
     }
 
-    static String companyName(PersonRef villager) {
-        return "Handel " + tag(villager);
-    }
-
-    static String partyName(PersonRef villager, Personality personality) {
+    static String partyName(PersonRef villager, Personality personality, String town,
+                            java.util.function.Predicate<String> taken) {
         String stem = switch (profileFor(personality).platform()) {
-            case ORDER -> "Ordnung";
-            case FREEDOM -> "Freiheit";
-            case LOW_TAXES -> "Sparsame";
-            case INVESTMENT -> "Aufbau";
-            default -> "Bürger";
+            case ORDER -> "Ordnungspartei";
+            case FREEDOM -> "Freiheitsbund";
+            case LOW_TAXES -> "Sparsamkeitspartei";
+            case INVESTMENT -> "Aufbaupartei";
+            default -> "Bürgerliste";
         };
-        return stem + " " + tag(villager);
-    }
-
-    /** Kurzes eindeutiges Kennzeichen, damit Namen nicht kollidieren. */
-    private static String tag(PersonRef villager) {
-        return Long.toHexString(villager.uuid().getLeastSignificantBits() & 0xFFFFFL).toUpperCase();
+        return FoundingNames.party(villager, stem, town, taken);
     }
 
     /** Fester Zufall je Dorfbewohner, Tag und Tätigkeit, 0 bis unter 1. */

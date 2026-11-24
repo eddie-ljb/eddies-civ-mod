@@ -64,6 +64,14 @@ public final class ReligionService {
     private final List<String> rites;
     private final Map<ReligionId, Integer> fervor;
     private final Map<ReligionId, String> logos;
+    /** Die Heiligen Schriften im Wortlaut, von der Führung der Religion verfasst. */
+    private final Map<ReligionId, String> texts;
+    private final List<ClergyRole> roles;
+    /** Gesegnete bis zu einem Tag (einschließlich); Segen stärkt die Zufriedenheit. */
+    private final Map<ActorRef, Long> blessed;
+    /** Wie viele Tage ein Segen wirkt. */
+    static final int BLESSING_DAYS = 5;
+    static final int MAX_SCRIPTURE = 4000;
     private final java.util.Set<PlayerRef> prayedToday = new java.util.HashSet<>();
     private final Random random = new Random();
 
@@ -86,10 +94,14 @@ public final class ReligionService {
         this.rites = new ArrayList<>(state.rites());
         this.fervor = new LinkedHashMap<>(state.fervor());
         this.logos = new LinkedHashMap<>(state.logos());
+        this.texts = new LinkedHashMap<>(state.texts());
+        this.roles = new ArrayList<>(state.roles());
+        this.blessed = new LinkedHashMap<>(state.blessed());
     }
 
     private void save() {
-        store.save(new ReligionStore.State(registry.religions(), members, denominations, rites, fervor, logos));
+        store.save(new ReligionStore.State(registry.religions(), members, denominations, rites, fervor, logos, texts,
+                roles, blessed));
     }
 
     private static Reply ok(MessageKey key, Object... args) {
@@ -201,11 +213,13 @@ public final class ReligionService {
 
     private boolean found(PersonRef founder, Personality personality, Day day) {
         boolean monotheistic = personality.order() + personality.tradition() >= 0;
-        String tag = Long.toHexString(founder.uuid().getLeastSignificantBits() & 0xFFFFFL).toUpperCase();
         String stem = personality.nature() >= 30 ? "Hain" : personality.community() >= 30 ? "Gemeinschaft"
-                : personality.order() >= 30 ? "Orden" : personality.tradition() < -30 ? "Neuer Weg" : "Glaube";
-        String name = stem + (monotheistic ? " des Einen " : " der Götter ") + tag;
-        String scripture = monotheistic ? "Das Buch " + tag : "Die Sagen " + tag;
+                : personality.order() >= 30 ? "Orden" : personality.tradition() < -30 ? "Neuer Weg"
+                : monotheistic ? "Kirche" : "Glaube";
+        String name = de.etiennebader.civ.application.population.FoundingNames.religion(founder, stem, monotheistic,
+                candidate -> registry.religionNamed(candidate).isPresent());
+        String scripture = de.etiennebader.civ.application.population.FoundingNames.scripture(founder, monotheistic,
+                candidate -> registry.religions().stream().anyMatch(r -> r.scriptureName().equalsIgnoreCase(candidate)));
         String temple = personality.nature() >= 30 ? "Heiliger Hain" : monotheistic ? "Kirche" : "Tempel";
         String language = personality.tradition() >= 0 ? "Altdeutsch" : "Neudeutsch";
         try {
@@ -337,7 +351,7 @@ public final class ReligionService {
     /** Gottesdienst, nur durch das Klerus-Oberhaupt; alle Gläubigen erfahren davon. */
     public synchronized Reply service(Caller caller) {
         Optional<Religion> religion = religionOf(caller.player());
-        if (religion.isEmpty() || religion.get().clergyHead().filter(caller.player()::equals).isEmpty()) {
+        if (religion.isEmpty() || !may(religion.get(), caller.player(), ClergyRole.Right.SERVICE)) {
             return no(MessageKey.RELIGION_ONLY_HEAD_SERVICE);
         }
         Religion r = religion.get();
@@ -349,24 +363,47 @@ public final class ReligionService {
         return ok(MessageKey.RELIGION_SERVICE_DONE, attendees);
     }
 
-    /** Taufe oder Segnung (z. B. einer Hochzeit): nur durch das Klerus-Oberhaupt, wird als Ritus festgehalten. */
+    /** Ob der Akteur das Recht hat: als Oberhaupt immer, sonst über ein Amt mit diesem Recht. */
+    private boolean may(Religion religion, ActorRef actor, ClergyRole.Right right) {
+        return religion.clergyHead().filter(actor::equals).isPresent() || roles.stream()
+                .anyMatch(role -> role.religion().equals(religion.id()) && role.rights().contains(right)
+                        && role.holders().contains(actor));
+    }
+
+    /** Taufe oder Segnung eines Spielers (z. B. einer Hochzeit), wird als Ritus festgehalten. */
     public synchronized Reply rite(Caller caller, String kind, String targetName, Day day) {
-        Optional<Religion> religion = religionOf(caller.player());
-        if (religion.isEmpty() || religion.get().clergyHead().filter(caller.player()::equals).isEmpty()) {
-            return no(MessageKey.RELIGION_ONLY_HEAD_RITE);
-        }
         Optional<PlayerRef> target = players.findByName(targetName);
         if (target.isEmpty()) {
             return no(MessageKey.RELIGION_UNKNOWN_PLAYER, targetName);
         }
-        Religion r = religion.get();
-        if (kind.equals("taufe")) {
-            members.put(target.get(), r.id());
-            denominations.remove(target.get());
+        return rite(caller, kind, target.get(), targetName, day);
+    }
+
+    /**
+     * Taufe oder Segnung eines Spielers oder Dorfbewohners. Das darf das Klerus-Oberhaupt und jeder Amtsträger mit dem
+     * Recht dazu. Ein Segen stärkt einen Dorfbewohner {@value #BLESSING_DAYS} Tage lang; eine Taufe nimmt ihn in die
+     * Religion auf.
+     */
+    public synchronized Reply rite(Caller caller, String kind, ActorRef target, String targetName, Day day) {
+        boolean baptism = kind.equals("taufe");
+        Optional<Religion> religion = religionOf(caller.player());
+        if (religion.isEmpty() || !may(religion.get(), caller.player(),
+                baptism ? ClergyRole.Right.BAPTISE : ClergyRole.Right.BLESS)) {
+            return no(MessageKey.RELIGION_ONLY_HEAD_RITE);
         }
-        Message text = Message.of(kind.equals("taufe") ? MessageKey.RELIGION_RITE_BAPTISM
+        Religion r = religion.get();
+        if (baptism) {
+            members.put(target, r.id());
+            denominations.remove(target);
+        } else {
+            blessed.put(target, day.value() + BLESSING_DAYS);
+            if (target instanceof PersonRef) {
+                fervor.merge(r.id(), 1, (a, b) -> Math.min(MAX_FERVOR, a + b));
+            }
+        }
+        Message text = Message.of(baptism ? MessageKey.RELIGION_RITE_BAPTISM
                 : MessageKey.RELIGION_RITE_BLESSING, targetName, r.name(), day.value());
-        rites.add((kind.equals("taufe") ? "Taufe: " : "Segnung: ") + targetName + " (" + r.name() + ", " + day.value() + ")");
+        rites.add((baptism ? "Taufe: " : "Segnung: ") + targetName + " (" + r.name() + ", " + day.value() + ")");
         while (rites.size() > MAX_RITES) {
             rites.removeFirst();
         }
@@ -374,6 +411,246 @@ public final class ReligionService {
         announcements.add(Announcement.toAll(text));
         return Reply.success(text);
     }
+
+    // ------------------------------------------------------------------ Heilige Schrift
+
+    /** Der Wortlaut der Heiligen Schrift der eigenen Religion; leer, wenn noch nichts geschrieben wurde. */
+    public synchronized Reply scripture(Caller caller) {
+        Optional<Religion> religion = religionOf(caller.player());
+        if (religion.isEmpty()) {
+            return no(MessageKey.RELIGION_NOT_MEMBER);
+        }
+        return scriptureOf(religion.get());
+    }
+
+    /** Die Schrift einer Religion beim Namen (für alle lesbar). */
+    public synchronized Reply scripture(String religionName) {
+        return registry.religionNamed(religionName).map(this::scriptureOf)
+                .orElseGet(() -> no(MessageKey.RELIGION_UNKNOWN, religionName));
+    }
+
+    private Reply scriptureOf(Religion r) {
+        String text = texts.getOrDefault(r.id(), "");
+        if (text.isBlank()) {
+            return ok(MessageKey.RELIGION_SCRIPTURE_EMPTY, r.scriptureName(), r.name());
+        }
+        List<Message> lines = new ArrayList<>();
+        lines.add(Message.of(MessageKey.RELIGION_SCRIPTURE_HEADER, r.scriptureName(), r.name()));
+        for (String line : text.split("\n")) {
+            lines.add(Message.of(MessageKey.RELIGION_SCRIPTURE_LINE, line));
+        }
+        return Reply.success(lines);
+    }
+
+    /** Wortlaut der Schrift im Rohtext, z. B. für den Editor auf der Webseite. */
+    public synchronized String scriptureText(ReligionId id) {
+        return texts.getOrDefault(id, "");
+    }
+
+    /**
+     * Schreibt an der Heiligen Schrift: ersetzt den Wortlaut ({@code append} falsch) oder hängt einen Absatz an.
+     * Das darf das Oberhaupt oder ein Amtsträger mit dem Recht „schrift“. {@code \n} im Text ist ein Zeilenumbruch.
+     */
+    public synchronized Reply writeScripture(Caller caller, String text, boolean append, Day day) {
+        Optional<Religion> religion = religionOf(caller.player());
+        if (religion.isEmpty()) {
+            return no(MessageKey.RELIGION_NOT_MEMBER);
+        }
+        return writeScripture(religion.get(), caller.player(), text, append);
+    }
+
+    /** Wie {@link #writeScripture(Caller, String, boolean, Day)} für die Webseite, mit dem Namen der Religion. */
+    public synchronized Reply writeScripture(PlayerRef editor, String religionName, String text, boolean append) {
+        Optional<Religion> religion = registry.religionNamed(religionName);
+        if (religion.isEmpty()) {
+            return no(MessageKey.RELIGION_UNKNOWN, religionName);
+        }
+        return writeScripture(religion.get(), editor, text, append);
+    }
+
+    private Reply writeScripture(Religion r, ActorRef editor, String text, boolean append) {
+        if (!may(r, editor, ClergyRole.Right.SCRIPTURE) && !r.founder().equals(editor)) {
+            return no(MessageKey.RELIGION_SCRIPTURE_FORBIDDEN);
+        }
+        String clean = text.replace("\\n", "\n").replace("\r", "").strip();
+        String merged = append && !texts.getOrDefault(r.id(), "").isBlank()
+                ? texts.get(r.id()) + "\n" + clean : clean;
+        if (merged.length() > MAX_SCRIPTURE) {
+            return no(MessageKey.RELIGION_SCRIPTURE_TOO_LONG, MAX_SCRIPTURE);
+        }
+        if (merged.isBlank()) {
+            texts.remove(r.id());
+        } else {
+            texts.put(r.id(), merged);
+        }
+        save();
+        return ok(MessageKey.RELIGION_SCRIPTURE_SET, r.scriptureName(), merged.length());
+    }
+
+    /**
+     * Benennt Schrift, Gotteshaus oder Sprache der eigenen Religion um ({@code what}: {@code schrift},
+     * {@code gotteshaus} oder {@code sprache}). Nur Gründer, Oberhaupt oder Amtsträger mit dem Recht „schrift“.
+     */
+    public synchronized Reply rename(Caller caller, String what, String value, Day day) {
+        Optional<Religion> religion = religionOf(caller.player());
+        if (religion.isEmpty()) {
+            return no(MessageKey.RELIGION_NOT_MEMBER);
+        }
+        Religion r = religion.get();
+        try {
+            boolean allowed = may(r, caller.player(), ClergyRole.Right.SCRIPTURE);
+            switch (what.toLowerCase(java.util.Locale.ROOT)) {
+                case "schrift" -> registry.redefine(r.id(), caller.player(), allowed, value, "", "", day);
+                case "gotteshaus" -> registry.redefine(r.id(), caller.player(), allowed, "", value, "", day);
+                case "sprache" -> registry.redefine(r.id(), caller.player(), allowed, "", "", value, day);
+                default -> {
+                    return no(MessageKey.RELIGION_RENAME_USAGE);
+                }
+            }
+            save();
+            return ok(MessageKey.RELIGION_RENAMED, what, value.strip());
+        } catch (IllegalArgumentException e) {
+            return fail(e.getMessage());
+        }
+    }
+
+    // ------------------------------------------------------------------ Klerus-Ämter
+
+    private boolean leads(Religion r, ActorRef actor) {
+        return r.founder().equals(actor) || r.clergyHead().filter(actor::equals).isPresent();
+    }
+
+    /**
+     * Legt ein Amt im Klerus an, z. B. „Priester“ mit den Rechten segnen und taufen, oder ändert die Rechte eines
+     * bestehenden. Nur Gründer und Oberhaupt.
+     */
+    public synchronized Reply defineRole(Caller caller, String name, List<String> rightWords) {
+        Optional<Religion> religion = religionOf(caller.player());
+        if (religion.isEmpty()) {
+            return no(MessageKey.RELIGION_NOT_MEMBER);
+        }
+        Religion r = religion.get();
+        if (!leads(r, caller.player())) {
+            return no(MessageKey.RELIGION_ROLE_FORBIDDEN);
+        }
+        java.util.Set<ClergyRole.Right> rights = new java.util.LinkedHashSet<>();
+        for (String word : rightWords) {
+            Optional<ClergyRole.Right> right = ClergyRole.Right.ofWord(word);
+            if (right.isEmpty()) {
+                return no(MessageKey.RELIGION_ROLE_UNKNOWN_RIGHT, word);
+            }
+            rights.add(right.get());
+        }
+        ClergyRole role;
+        try {
+            role = new ClergyRole(r.id(), name, rights, java.util.Set.of());
+        } catch (IllegalArgumentException e) {
+            return no(MessageKey.RELIGION_ROLE_BAD_NAME, ClergyRole.MAX_NAME);
+        }
+        Optional<ClergyRole> existing = roleOf(r, role.name());
+        if (existing.isPresent()) {
+            roles.remove(existing.get());
+            role = new ClergyRole(r.id(), role.name(), rights, existing.get().holders());
+        } else if (roles.stream().filter(other -> other.religion().equals(r.id())).count() >= ClergyRole.MAX_PER_RELIGION) {
+            return no(MessageKey.RELIGION_ROLE_LIMIT, ClergyRole.MAX_PER_RELIGION);
+        }
+        roles.add(role);
+        save();
+        return ok(MessageKey.RELIGION_ROLE_DEFINED, role.name(), rightsText(role));
+    }
+
+    private Optional<ClergyRole> roleOf(Religion r, String name) {
+        return roles.stream().filter(role -> role.religion().equals(r.id()) && role.name().equalsIgnoreCase(name.strip()))
+                .findFirst();
+    }
+
+    private static String rightsText(ClergyRole role) {
+        return role.rights().isEmpty() ? "-"
+                : String.join(", ", role.rights().stream().map(ClergyRole.Right::word).toList());
+    }
+
+    /** Löscht ein Amt samt seinen Rechten. Nur Gründer und Oberhaupt. */
+    public synchronized Reply deleteRole(Caller caller, String name) {
+        Optional<Religion> religion = religionOf(caller.player());
+        if (religion.isEmpty()) {
+            return no(MessageKey.RELIGION_NOT_MEMBER);
+        }
+        if (!leads(religion.get(), caller.player())) {
+            return no(MessageKey.RELIGION_ROLE_FORBIDDEN);
+        }
+        Optional<ClergyRole> role = roleOf(religion.get(), name);
+        if (role.isEmpty()) {
+            return no(MessageKey.RELIGION_ROLE_UNKNOWN, name.strip());
+        }
+        roles.remove(role.get());
+        save();
+        return ok(MessageKey.RELIGION_ROLE_DELETED, role.get().name());
+    }
+
+    /** Überträgt ein Amt an ein Mitglied (Spieler oder Dorfbewohner); es muss selbst der Religion angehören. */
+    public synchronized Reply assignRole(Caller caller, String roleName, ActorRef target, String targetName) {
+        Optional<Religion> religion = religionOf(caller.player());
+        if (religion.isEmpty()) {
+            return no(MessageKey.RELIGION_NOT_MEMBER);
+        }
+        Religion r = religion.get();
+        if (!leads(r, caller.player())) {
+            return no(MessageKey.RELIGION_ROLE_FORBIDDEN);
+        }
+        Optional<ClergyRole> role = roleOf(r, roleName);
+        if (role.isEmpty()) {
+            return no(MessageKey.RELIGION_ROLE_UNKNOWN, roleName.strip());
+        }
+        if (!r.id().equals(members.get(target))) {
+            return no(MessageKey.RELIGION_ROLE_NOT_MEMBER, targetName);
+        }
+        role.get().holders().add(target);
+        save();
+        return ok(MessageKey.RELIGION_ROLE_ASSIGNED, role.get().name(), targetName);
+    }
+
+    /** Entzieht einem Mitglied alle Ämter. */
+    public synchronized Reply revokeRoles(Caller caller, ActorRef target, String targetName) {
+        Optional<Religion> religion = religionOf(caller.player());
+        if (religion.isEmpty()) {
+            return no(MessageKey.RELIGION_NOT_MEMBER);
+        }
+        if (!leads(religion.get(), caller.player())) {
+            return no(MessageKey.RELIGION_ROLE_FORBIDDEN);
+        }
+        boolean any = false;
+        for (ClergyRole role : roles) {
+            if (role.religion().equals(religion.get().id())) {
+                any |= role.holders().remove(target);
+            }
+        }
+        save();
+        return any ? ok(MessageKey.RELIGION_ROLE_REVOKED, targetName) : no(MessageKey.RELIGION_ROLE_HOLDS_NONE, targetName);
+    }
+
+    /** Die Ämter der eigenen Religion mit Rechten und Amtsträgern. */
+    public synchronized Reply listRoles(Caller caller) {
+        Optional<Religion> religion = religionOf(caller.player());
+        if (religion.isEmpty()) {
+            return no(MessageKey.RELIGION_NOT_MEMBER);
+        }
+        List<Message> lines = new ArrayList<>();
+        for (ClergyRole role : roles) {
+            if (role.religion().equals(religion.get().id())) {
+                lines.add(Message.of(MessageKey.RELIGION_ROLE_ENTRY, role.name(), rightsText(role),
+                        role.holders().isEmpty() ? "-"
+                                : String.join(", ", role.holders().stream().map(this::nameOf).toList())));
+            }
+        }
+        return lines.isEmpty() ? ok(MessageKey.RELIGION_ROLE_NONE) : Reply.success(lines);
+    }
+
+    /** Die Namen der Ämter der eigenen Religion, für die Befehlsvorschläge. */
+    public synchronized List<String> roleNames(ActorRef actor) {
+        return religionOf(actor).map(r -> roles.stream().filter(role -> role.religion().equals(r.id()))
+                .map(ClergyRole::name).toList()).orElse(List.of());
+    }
+
 
     /** Klerus-Wahl ausrufen (Mitglied). */
     public synchronized Reply callElection(Caller caller, Day day) {
@@ -524,6 +801,13 @@ public final class ReligionService {
      */
     public synchronized int faithPoints(PersonRef villager) {
         int faith = Personality.of(villager).religiosity();
+        if (blessed.containsKey(villager)) {
+            return faithPoints(villager, faith) + 2;
+        }
+        return faithPoints(villager, faith);
+    }
+
+    private int faithPoints(PersonRef villager, int faith) {
         Optional<Religion> own = religionOf(villager);
         if (own.isPresent() && faith > 0) {
             return 1 + fervor.getOrDefault(own.get().id(), 0) / 2 + Math.round(own.get().clergyPower() / 50f);
@@ -559,6 +843,9 @@ public final class ReligionService {
      */
     public synchronized void endOfDay(Day day) {
         prayedToday.clear();
+        blessed.values().removeIf(until -> until < day.value());
+        texts.keySet().removeIf(id -> registry.religion(id).isEmpty());
+        roles.removeIf(role -> registry.religion(role.religion()).isEmpty());
         fervor.replaceAll((id, value) -> Math.max(0, value - 1));
         fervor.values().removeIf(value -> value == 0);
         logos.keySet().removeIf(id -> registry.religion(id).isEmpty());

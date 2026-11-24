@@ -78,6 +78,12 @@ final class TownPlanning {
     }
 
     private java.util.function.Predicate<Area> site = area -> true;
+    private de.etiennebader.civ.server.road.RoadService roads;
+
+    /** Der Wegebau, den das Bauamt nach einer neuen Straße beauftragt. */
+    void roads(de.etiennebader.civ.server.road.RoadService roads) {
+        this.roads = roads;
+    }
 
     /** Ob eine Fläche sicher frei von Gebautem ist; kommt von {@link ConstructionService}. */
     void site(java.util.function.Predicate<Area> site) {
@@ -95,7 +101,10 @@ final class TownPlanning {
                 .sorted(Comparator.comparing(p -> p.id().value())).toList();
         for (PolityView town : towns) {
             authority.apply(town.id()).filter(PersonRef.class::isInstance).map(PersonRef.class::cast)
-                    .ifPresent(planner -> plan(town, planner, day));
+                    .ifPresent(planner -> {
+                        foundStreet(town, planner, day);
+                        plan(town, planner, day);
+                    });
             buyLand(town, day);
         }
     }
@@ -136,6 +145,114 @@ final class TownPlanning {
                 // überlappt oder liegt nicht ganz im Gebiet: nächster Chunk
             }
         }
+    }
+
+    // ------------------------------------------------------------------ Straßen
+
+    /** Tageswahrscheinlichkeit, dass das Bauamt eine neue Straße anlegt, wenn es Bedarf gibt. */
+    static final double STREET_CHANCE = 0.4;
+    /** Höchstens so viele Straßen; sonst je vier Grundstücke eine. */
+    static final int MAX_STREETS = 8;
+    /** So viele Chunks lang darf eine Straße höchstens werden. */
+    static final int MAX_STREET_CHUNKS = 5;
+
+    /**
+     * Das Bauamt gründet eine Straße, wenn es mehr Grundstücke als Straßen gibt (eine Straße je vier Grundstücke, die
+     * erste schon ab zwei): Es sucht im Gebiet einen freien Streifen zwischen zwei Chunks, an dem keine Grundstücke
+     * und keine andere Straße liegen, tauft ihn und lässt den Weg bauen. Ist die Kasse gut gefüllt, wird gepflastert, sonst
+     * trampelt das Bauamt den Weg mit der Schaufel.
+     */
+    private void foundStreet(PolityView town, PersonRef planner, Day day) {
+        WorldQueries world = app.queries();
+        List<Plot> plots = new ArrayList<>(world.land(town.id()).plots());
+        int streets = town.streets().size();
+        if (streets >= MAX_STREETS || plots.size() < 2 || streets * 4 >= plots.size() + 2
+                || VillagerAmbitions.roll(planner, day, 0x9A) >= STREET_CHANCE) {
+            return;
+        }
+        java.util.Set<ChunkCoord> claimed = new java.util.HashSet<>(world.territory().territoryOf(town.id()));
+        List<ChunkCoord> chunks = claimed.stream()
+                .sorted(Comparator.comparingLong((ChunkCoord c) -> distanceToSeat(town, c))
+                        .thenComparingInt(ChunkCoord::x).thenComparingInt(ChunkCoord::z)).toList();
+        boolean horizontalFirst = VillagerAmbitions.roll(planner, day, 0x9B) < 0.5;
+        for (ChunkCoord start : chunks) {
+            for (boolean horizontal : new boolean[] {horizontalFirst, !horizontalFirst}) {
+                Optional<Area> corridor = corridor(claimed, start, horizontal);
+                if (corridor.isEmpty()) {
+                    continue;
+                }
+                Area area = corridor.get();
+                if (plots.stream().anyMatch(plot -> plot.area().overlaps(area))
+                        || town.streets().stream().anyMatch(street -> street.area().overlaps(area))
+                        || town.seat().filter(seat -> area.contains(seat.dimension(), seat.x(), seat.z())).isPresent()
+                        || !site.test(area)) {
+                    continue;
+                }
+                String name = de.etiennebader.civ.application.population.FoundingNames.street(planner,
+                        town.streets().stream().map(de.etiennebader.civ.domain.polity.Street::name)
+                                .collect(java.util.stream.Collectors.toSet()), town.name().value());
+                try {
+                    app.streets().lay(planner, town.id(), name, area, day);
+                } catch (DomainException | IllegalArgumentException | IllegalStateException ignored) {
+                    continue;
+                }
+                orderRoad(town, planner, name, area, day);
+                return;
+            }
+        }
+    }
+
+    /**
+     * Ein zwei Blöcke breiter Streifen auf der Grenze zwischen {@code start} und seinem östlichen (waagerecht) bzw.
+     * südlichen Nachbarn, so lang wie die Reihe zusammenhängender Chunks, die beide Seiten dem Ort gehören. Die Grundstücke
+     * (innen eingerückt) lassen dort Platz.
+     */
+    private static Optional<Area> corridor(java.util.Set<ChunkCoord> claimed, ChunkCoord start, boolean horizontal) {
+        int stepX = horizontal ? 1 : 0;
+        int stepZ = horizontal ? 0 : 1;
+        // horizontal: Straße in X-Richtung auf der Grenze zwischen Reihe z und z+1
+        ChunkCoord neighbour = new ChunkCoord(start.dimension(), start.x() + (horizontal ? 0 : 1),
+                start.z() + (horizontal ? 1 : 0));
+        if (!claimed.contains(neighbour)) {
+            return Optional.empty();
+        }
+        int length = 1;
+        ChunkCoord last = start;
+        while (length < MAX_STREET_CHUNKS) {
+            ChunkCoord next = new ChunkCoord(start.dimension(), last.x() + stepX, last.z() + stepZ);
+            ChunkCoord nextNeighbour = new ChunkCoord(start.dimension(), next.x() + (horizontal ? 0 : 1),
+                    next.z() + (horizontal ? 1 : 0));
+            if (!claimed.contains(next) || !claimed.contains(nextNeighbour)) {
+                break;
+            }
+            last = next;
+            length++;
+        }
+        if (horizontal) {
+            int border = neighbour.minBlockZ();
+            return Optional.of(new Area(start.dimension(), start.minBlockX(), border - 1, last.maxBlockX(), border));
+        }
+        int border = neighbour.minBlockX();
+        return Optional.of(new Area(start.dimension(), border - 1, start.minBlockZ(), border, last.maxBlockZ()));
+    }
+
+    private static long distanceToSeat(PolityView town, ChunkCoord chunk) {
+        return town.seat().map(seat -> {
+            long dx = seat.chunk().x() - chunk.x();
+            long dz = seat.chunk().z() - chunk.z();
+            return dx * dx + dz * dz;
+        }).orElse(0L);
+    }
+
+    private void orderRoad(PolityView town, PersonRef planner, String name, Area area, Day day) {
+        boolean paving = false;
+        if (roads != null) {
+            de.etiennebader.civ.domain.polity.Street street = new de.etiennebader.civ.domain.polity.Street(name, area);
+            paving = roads.canAffordPaving(town, street);
+            roads.start(town, street, paving);
+        }
+        announcements.add(Announcement.toTown(town.id(), Message.of(MessageKey.VILLAGER_STREET_FOUNDED,
+                town.name().value(), name, Message.of(paving ? MessageKey.ROAD_TERM_PAVED : MessageKey.ROAD_TERM_PATH))));
     }
 
     private void publish(PolityView town, PlotId id, Area area, PlotType type, Day day) {

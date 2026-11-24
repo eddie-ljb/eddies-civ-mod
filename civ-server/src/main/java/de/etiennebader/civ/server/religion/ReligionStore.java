@@ -28,10 +28,12 @@ final class ReligionStore {
 
     /** Alles, was gespeichert wird. */
     record State(List<Religion> religions, Map<ActorRef, ReligionId> members, Map<ActorRef, String> denominations,
-                 List<String> rites, Map<ReligionId, Integer> fervor, Map<ReligionId, String> logos) {
+                 List<String> rites, Map<ReligionId, Integer> fervor, Map<ReligionId, String> logos,
+                 Map<ReligionId, String> texts, List<ClergyRole> roles, Map<ActorRef, Long> blessed) {
         static State empty() {
             return new State(List.of(), new LinkedHashMap<>(), new LinkedHashMap<>(), new ArrayList<>(),
-                    new LinkedHashMap<>(), new LinkedHashMap<>());
+                    new LinkedHashMap<>(), new LinkedHashMap<>(), new LinkedHashMap<>(), new ArrayList<>(),
+                    new LinkedHashMap<>());
         }
     }
 
@@ -51,6 +53,9 @@ final class ReligionStore {
         List<String> rites = new ArrayList<>();
         Map<ReligionId, Integer> fervor = new LinkedHashMap<>();
         Map<ReligionId, String> logos = new LinkedHashMap<>();
+        Map<ReligionId, String> texts = new LinkedHashMap<>();
+        List<ClergyRole> roles = new ArrayList<>();
+        Map<ActorRef, Long> blessed = new LinkedHashMap<>();
         try {
             for (String line : Files.readAllLines(file.get(), StandardCharsets.UTF_8)) {
                 String[] f = line.split("\t", -1);
@@ -93,6 +98,23 @@ final class ReligionStore {
                     case "RITE" -> rites.add(f[1]);
                     case "FER" -> fervor.put(new ReligionId(UUID.fromString(f[1])), Integer.parseInt(f[2]));
                     case "LOGO" -> logos.put(new ReligionId(UUID.fromString(f[1])), f[2]);
+                    case "TEXT" -> texts.put(new ReligionId(UUID.fromString(f[1])), unescape(f[2]));
+                    case "ROLE" -> {
+                        java.util.Set<ClergyRole.Right> rights = new java.util.LinkedHashSet<>();
+                        if (!f[3].isEmpty()) {
+                            for (String right : f[3].split(",")) {
+                                rights.add(ClergyRole.Right.valueOf(right));
+                            }
+                        }
+                        java.util.Set<ActorRef> holders = new java.util.LinkedHashSet<>();
+                        if (!f[4].isEmpty()) {
+                            for (String holder : f[4].split("\\|")) {
+                                holders.add(actor(holder));
+                            }
+                        }
+                        roles.add(new ClergyRole(new ReligionId(UUID.fromString(f[1])), f[2], rights, holders));
+                    }
+                    case "BLESS" -> blessed.put(actor(f[1]), Long.parseLong(f[2]));
                     default -> {
                     }
                 }
@@ -100,7 +122,7 @@ final class ReligionStore {
         } catch (IOException | RuntimeException e) {
             return State.empty();
         }
-        return new State(religions, members, denominations, rites, fervor, logos);
+        return new State(religions, members, denominations, rites, fervor, logos, texts, roles, blessed);
     }
 
     void save(State state) {
@@ -131,6 +153,13 @@ final class ReligionStore {
         state.rites().forEach(rite -> lines.add("RITE\t" + clean(rite)));
         state.fervor().forEach((id, value) -> lines.add("FER\t" + id.value() + "\t" + value));
         state.logos().forEach((id, logo) -> lines.add("LOGO\t" + id.value() + "\t" + clean(logo)));
+        state.texts().forEach((id, text) -> lines.add("TEXT\t" + id.value() + "\t" + escape(text)));
+        for (ClergyRole role : state.roles()) {
+            lines.add(String.join("\t", "ROLE", role.religion().value().toString(), clean(role.name()),
+                    String.join(",", role.rights().stream().map(Enum::name).toList()),
+                    String.join("|", role.holders().stream().map(ReligionStore::text).toList())));
+        }
+        state.blessed().forEach((actor, until) -> lines.add("BLESS\t" + text(actor) + "\t" + until));
         try {
             Path target = file.get().toAbsolutePath();
             Files.createDirectories(target.getParent());
@@ -140,6 +169,25 @@ final class ReligionStore {
         } catch (IOException e) {
             // best effort, nächster Tagesabschluss versucht es erneut
         }
+    }
+
+    /** Zeilenumbrüche und Tabs in Texten schützen. */
+    static String escape(String value) {
+        return value.replace("\\", "\\\\").replace("\t", "\\t").replace("\n", "\\n");
+    }
+
+    static String unescape(String value) {
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c == '\\' && i + 1 < value.length()) {
+                char next = value.charAt(++i);
+                out.append(next == 'n' ? '\n' : next == 't' ? '\t' : next);
+            } else {
+                out.append(c);
+            }
+        }
+        return out.toString();
     }
 
     /** Trennzeichen aus Freitext entfernen. */

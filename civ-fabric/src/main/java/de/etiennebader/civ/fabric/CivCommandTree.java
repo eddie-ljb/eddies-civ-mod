@@ -1573,11 +1573,87 @@ public final class CivCommandTree {
                 .then(Commands.literal("gottesdienst")
                         .executes(context -> withCiv(context, (civ, player) -> civ.religion().service(Players.caller(player)))))
                 .then(Commands.literal("taufe").then(Commands.argument(PLAYER, StringArgumentType.word())
-                        .executes(context -> withCiv(context, (civ, player) -> civ.religion().rite(Players.caller(player),
-                                "taufe", StringArgumentType.getString(context, PLAYER), civ.calendar().today())))))
+                        .suggests(CivCommandTree::suggestPeople)
+                        .executes(context -> withCiv(context, (civ, player) -> rite(civ, player, "taufe",
+                                StringArgumentType.getString(context, PLAYER))))))
                 .then(Commands.literal("segnen").then(Commands.argument(PLAYER, StringArgumentType.word())
-                        .executes(context -> withCiv(context, (civ, player) -> civ.religion().rite(Players.caller(player),
-                                "segnung", StringArgumentType.getString(context, PLAYER), civ.calendar().today())))))
+                        .suggests(CivCommandTree::suggestPeople)
+                        .executes(context -> withCiv(context, (civ, player) -> rite(civ, player, "segnung",
+                                StringArgumentType.getString(context, PLAYER))))))
+                .then(Commands.literal("schrift")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.religion().scripture(
+                                Players.caller(player))))
+                        .then(Commands.literal("lesen")
+                                .executes(context -> withCiv(context, (civ, player) -> civ.religion().scripture(
+                                        Players.caller(player))))
+                                .then(Commands.argument(NAME, StringArgumentType.string())
+                                        .suggests(this::suggestReligions)
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.religion().scripture(
+                                                StringArgumentType.getString(context, NAME))))))
+                        .then(Commands.literal("schreiben")
+                                .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.religion()
+                                                .writeScripture(Players.caller(player),
+                                                        StringArgumentType.getString(context, TEXT), false,
+                                                        civ.calendar().today())))))
+                        .then(Commands.literal("anhaengen")
+                                .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.religion()
+                                                .writeScripture(Players.caller(player),
+                                                        StringArgumentType.getString(context, TEXT), true,
+                                                        civ.calendar().today())))))
+                        .then(Commands.literal("benennen")
+                                .then(Commands.argument("was", StringArgumentType.word())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                List.of("schrift", "gotteshaus", "sprache"), builder))
+                                        .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                                                .executes(context -> withCiv(context, (civ, player) -> civ.religion()
+                                                        .rename(Players.caller(player),
+                                                                StringArgumentType.getString(context, "was"),
+                                                                StringArgumentType.getString(context, TEXT),
+                                                                civ.calendar().today())))))))
+                .then(Commands.literal("amt")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.religion().listRoles(
+                                Players.caller(player))))
+                        .then(Commands.literal("liste")
+                                .executes(context -> withCiv(context, (civ, player) -> civ.religion().listRoles(
+                                        Players.caller(player)))))
+                        .then(Commands.literal("festlegen")
+                                .then(Commands.argument(NAME, StringArgumentType.string())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                roleSuggestions(context), builder))
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.religion()
+                                                .defineRole(Players.caller(player),
+                                                        StringArgumentType.getString(context, NAME), List.of())))
+                                        .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                        List.of("segnen", "taufen", "gottesdienst", "schrift"), builder))
+                                                .executes(context -> withCiv(context, (civ, player) -> civ.religion()
+                                                        .defineRole(Players.caller(player),
+                                                                StringArgumentType.getString(context, NAME),
+                                                                List.of(StringArgumentType.getString(context, TEXT)
+                                                                        .trim().split("[ ,]+"))))))))
+                        .then(Commands.literal("abschaffen")
+                                .then(Commands.argument(NAME, StringArgumentType.string())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                roleSuggestions(context), builder))
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.religion()
+                                                .deleteRole(Players.caller(player),
+                                                        StringArgumentType.getString(context, NAME))))))
+                        .then(Commands.literal("vergeben")
+                                .then(Commands.argument(NAME, StringArgumentType.string())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                roleSuggestions(context), builder))
+                                        .then(Commands.argument(PLAYER, StringArgumentType.word())
+                                                .suggests(CivCommandTree::suggestPeople)
+                                                .executes(context -> withCiv(context, (civ, player) -> assign(civ, player,
+                                                        StringArgumentType.getString(context, NAME),
+                                                        StringArgumentType.getString(context, PLAYER)))))))
+                        .then(Commands.literal("entziehen")
+                                .then(Commands.argument(PLAYER, StringArgumentType.word())
+                                        .suggests(CivCommandTree::suggestPeople)
+                                        .executes(context -> withCiv(context, (civ, player) -> revoke(civ, player,
+                                                StringArgumentType.getString(context, PLAYER)))))))
                 .then(Commands.literal("wahl")
                         .then(Commands.literal("ausrufen").executes(context -> withCiv(context, (civ, player) ->
                                 civ.religion().callElection(Players.caller(player), civ.calendar().today()))))
@@ -1587,6 +1663,61 @@ public final class CivCommandTree {
                                 .executes(context -> withCiv(context, (civ, player) -> civ.religion().vote(
                                         Players.caller(player), StringArgumentType.getString(context, PLAYER),
                                         civ.calendar().today()))))));
+    }
+
+    /** Taufe oder Segnung: ein Spielername oder {@code dorfbewohner} für den nächsten Dorfbewohner in Reichweite. */
+    private static Reply rite(CivServer civ, ServerPlayer player, String kind, String who) {
+        if (who.equalsIgnoreCase("dorfbewohner")) {
+            return nearestVillager(player).map(villager -> civ.religion().rite(Players.caller(player), kind, villager,
+                            villagerName(villager), civ.calendar().today()))
+                    .orElseGet(() -> Reply.failure(Message.of(MessageKey.RELIGION_NEEDS_VILLAGER)));
+        }
+        return civ.religion().rite(Players.caller(player), kind, who, civ.calendar().today());
+    }
+
+    private static String villagerName(ActorRef villager) {
+        return de.etiennebader.civ.domain.population.VillagerIdentity.of((PersonRef) villager).fullName();
+    }
+
+    private static Reply assign(CivServer civ, ServerPlayer player, String role, String who) {
+        if (who.equalsIgnoreCase("dorfbewohner")) {
+            return nearestVillager(player).map(villager -> civ.religion().assignRole(Players.caller(player), role,
+                            villager, villagerName(villager)))
+                    .orElseGet(() -> Reply.failure(Message.of(MessageKey.RELIGION_NEEDS_VILLAGER)));
+        }
+        return civ.players().findByName(who)
+                .map(target -> civ.religion().assignRole(Players.caller(player), role, target, who))
+                .orElseGet(() -> Reply.failure(Message.of(MessageKey.RELIGION_UNKNOWN_PLAYER, who)));
+    }
+
+    private static Reply revoke(CivServer civ, ServerPlayer player, String who) {
+        if (who.equalsIgnoreCase("dorfbewohner")) {
+            return nearestVillager(player).map(villager -> civ.religion().revokeRoles(Players.caller(player), villager,
+                            villagerName(villager)))
+                    .orElseGet(() -> Reply.failure(Message.of(MessageKey.RELIGION_NEEDS_VILLAGER)));
+        }
+        return civ.players().findByName(who)
+                .map(target -> civ.religion().revokeRoles(Players.caller(player), target, who))
+                .orElseGet(() -> Reply.failure(Message.of(MessageKey.RELIGION_UNKNOWN_PLAYER, who)));
+    }
+
+    private List<String> roleSuggestions(CommandContext<CommandSourceStack> context) {
+        ServerPlayer player = context.getSource().getPlayer();
+        List<String> names = new java.util.ArrayList<>();
+        host.current().ifPresent(civ -> {
+            if (player != null) {
+                civ.religion().roleNames(Players.ref(player)).forEach(name -> names.add(quoted(name)));
+            }
+        });
+        return names;
+    }
+
+    private CompletableFuture<Suggestions> suggestReligions(CommandContext<CommandSourceStack> context,
+                                                            SuggestionsBuilder builder) {
+        List<String> names = new java.util.ArrayList<>();
+        host.current().ifPresent(civ -> civ.religion().summaries(Optional.empty())
+                .forEach(summary -> names.add(quoted(summary.name()))));
+        return SharedSuggestionProvider.suggest(names, builder);
     }
 
     /** {@code /civ familie}: Ehepaare und Kinder der eigenen Gemeinde (Issue #27). */
@@ -2182,7 +2313,21 @@ public final class CivCommandTree {
                         .then(Commands.argument(NAME, StringArgumentType.greedyString())
                                 .suggests(this::suggestStreets)
                                 .executes(context -> withCiv(context, (civ, player) -> civ.civil().removeStreet(
-                                        Players.caller(player), name(context))))));
+                                        Players.caller(player), name(context))))))
+                .then(Commands.literal("wege")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.roads().list(
+                                Players.caller(player)))))
+                .then(Commands.literal("bauen")
+                        .then(Commands.literal("schaufel")
+                                .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                                        .suggests(this::suggestStreets)
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.roads().order(
+                                                Players.caller(player), name(context), "schaufel")))))
+                        .then(Commands.literal("pflaster")
+                                .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                                        .suggests(this::suggestStreets)
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.roads().order(
+                                                Players.caller(player), name(context), "pflaster"))))));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> addressCommands() {

@@ -145,7 +145,7 @@ public final class VillagerFoundations {
         }
         PolityName name;
         try {
-            name = PolityName.of(nameFor(villager));
+            name = PolityName.of(nameFor(villager, app.queries()));
         } catch (DomainException ignored) {
             return false;
         }
@@ -264,8 +264,9 @@ public final class VillagerFoundations {
         }
     }
 
-    /** Kurzes, eindeutiges Namenskennzeichen je Dorfbewohner. */
-    static String nameFor(PersonRef villager) {
-        return "Neustadt " + Long.toHexString(villager.uuid().getLeastSignificantBits() & 0xFFFFFL).toUpperCase();
+    /** Ein freier, richtiger Ortsname (kein Kennzeichen, keine Zahl). */
+    static String nameFor(PersonRef villager, de.etiennebader.civ.application.query.WorldQueries world) {
+        return de.etiennebader.civ.application.population.FoundingNames.town(villager,
+                name -> world.polityNamed(name).isPresent());
     }
 }
