@@ -98,6 +98,26 @@ class PlotServiceTest {
     }
 
     @Test
+    @DisplayName("Der Inhaber übergibt ein eigenes Grundstück ohne Preis an seine Firma")
+    void ownerTransfersPlotToCompany() {
+        server.commands().found(at(alice, 8, 8), "Nordhain");
+        server.bank().deposit(at(alice, 8, 8), 600);
+        assertTrue(server.companies().found(at(alice, 8, 8), "100", "Bau AG").success());
+        server.players().record(alice, "Alice");
+        assertTrue(plots.createChunk(at(alice, 5, 5), "gewerbe").success());
+        assertTrue(plots.assign(at(alice, 5, 5), "Alice").success());
+        assertEquals(java.util.List.of("Bau AG"), plots.companiesHeadedBy(alice));
+        assertFalse(plots.transferToCompany(at(bob, 5, 5), "Bau AG").success(), "Bob leitet die Firma nicht");
+        assertFalse(plots.transferToCompany(at(alice, 5, 5), "Gibt es nicht").success());
+        assertTrue(plots.transferToCompany(at(alice, 5, 5), "Bau AG").success());
+        var company = server.queries().companies().stream()
+                .filter(c -> c.name().value().equals("Bau AG")).findFirst().orElseThrow();
+        var land = server.queries().land(server.queries().polityNamed("Nordhain").orElseThrow().id());
+        assertEquals(company.asActor(), land.plots().iterator().next().holder());
+        assertFalse(plots.transferToCompany(at(alice, 5, 5), "Bau AG").success(), "gehört nicht mehr ihr");
+    }
+
+    @Test
     @DisplayName("Ohne Auswahl, mit falscher Art oder als Nicht-Bürger wird abgelehnt")
     void rejectsInvalidCreation() {
         server.commands().found(at(alice, 8, 8), "Nordhain");

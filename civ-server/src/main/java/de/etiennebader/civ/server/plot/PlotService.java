@@ -221,6 +221,13 @@ public final class PlotService {
         });
     }
 
+    /** Namen der Firmen, die der Spieler leitet; für die Firmenwahl im Grundstücksmenü. */
+    public List<String> companiesHeadedBy(PlayerRef player) {
+        return queries.companies().stream()
+                .filter(company -> company.holds(player, de.etiennebader.civ.domain.polity.Office.MAYOR))
+                .map(company -> company.name().value()).sorted(String.CASE_INSENSITIVE_ORDER).toList();
+    }
+
     /**
      * Die Leitung einer Firma kauft das angebotene Grundstück unter sich für die Firma: Der Preis kommt aus der
      * Firmenkasse, das Grundstück gehört danach der Firma (Voraussetzung für Maschinen und {@code company_plot_required}).
@@ -230,26 +237,66 @@ public final class PlotService {
         if (plot.isEmpty()) {
             return Reply.failure(Message.of(MessageKey.PLOT_NONE_HERE));
         }
-        Optional<PolityView> company = queries.companies().stream()
-                .filter(found -> found.name().value().equalsIgnoreCase(companyName.strip())).findFirst();
+        return buyForCompany(caller, plot.get().town(), plot.get().id(), companyName);
+    }
+
+    /** Wie {@link #buyForCompany(Caller, String)} für ein bestimmtes Grundstück, z. B. aus dem Grundstücksmenü. */
+    public Reply buyForCompany(Caller caller, PolityId town, PlotId plotId, String companyName) {
+        Optional<PolityView> company = headedCompany(caller, companyName);
         if (company.isEmpty()) {
-            return Reply.failure(Message.of(MessageKey.BUILD_UNKNOWN_FIRM, companyName.strip()));
+            return companyFailure(caller, companyName);
         }
-        if (!company.get().holds(caller.player(), de.etiennebader.civ.domain.polity.Office.MAYOR)) {
-            return Reply.failure(Message.of(MessageKey.PLOT_NOT_COMPANY_HEAD, company.get().name().value()));
-        }
-        Optional<Plot> current = queries.land(plot.get().town()).plot(plot.get().id());
+        Optional<Plot> current = queries.land(town).plot(plotId);
         if (current.isPresent() && current.get().holder().equals(company.get().asActor())) {
             return Reply.failure(Message.of(MessageKey.PLOT_ALREADY_YOURS));
         }
-        PolityId town = plot.get().town();
-        PlotId id = plot.get().id();
         return attempt(() -> {
-            Money price = app.buyPlot().execute(new BuyPlot.Command(town, id, company.get().asActor(),
+            Money price = app.buyPlot().execute(new BuyPlot.Command(town, plotId, company.get().asActor(),
                     calendar.today()));
             return Reply.success(Message.of(MessageKey.PLOT_BOUGHT_FOR_COMPANY, company.get().name().value(),
                     texts.money(price)));
         });
+    }
+
+    /** Der Inhaber übergibt das Grundstück unter sich ohne Kaufpreis an seine Firma. */
+    public Reply transferToCompany(Caller caller, String companyName) {
+        Optional<PlotView> plot = plotAt(caller.player(), caller.position());
+        if (plot.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.PLOT_NONE_HERE));
+        }
+        return transferToCompany(caller, plot.get().town(), plot.get().id(), companyName);
+    }
+
+    /** Wie {@link #transferToCompany(Caller, String)} für ein bestimmtes Grundstück. */
+    public Reply transferToCompany(Caller caller, PolityId town, PlotId plotId, String companyName) {
+        Optional<PolityView> company = headedCompany(caller, companyName);
+        if (company.isEmpty()) {
+            return companyFailure(caller, companyName);
+        }
+        Optional<Plot> current = queries.land(town).plot(plotId);
+        if (current.isEmpty() || !current.get().isHeldBy(caller.player())) {
+            return Reply.failure(Message.of(MessageKey.PLOT_NOT_OWN));
+        }
+        return attempt(() -> {
+            app.transferPlot().execute(new de.etiennebader.civ.application.land.TransferPlot.Command(town, plotId,
+                    caller.player(), company.get().asActor(), calendar.today()));
+            lastPlot.remove(caller.player());
+            return Reply.success(Message.of(MessageKey.PLOT_TRANSFERRED_TO_COMPANY, company.get().name().value()));
+        });
+    }
+
+    private Optional<PolityView> headedCompany(Caller caller, String companyName) {
+        return queries.companies().stream()
+                .filter(found -> found.name().value().equalsIgnoreCase(companyName.strip()))
+                .filter(found -> found.holds(caller.player(), de.etiennebader.civ.domain.polity.Office.MAYOR))
+                .findFirst();
+    }
+
+    private Reply companyFailure(Caller caller, String companyName) {
+        boolean exists = queries.companies().stream()
+                .anyMatch(found -> found.name().value().equalsIgnoreCase(companyName.strip()));
+        return Reply.failure(exists ? Message.of(MessageKey.PLOT_NOT_COMPANY_HEAD, companyName.strip())
+                : Message.of(MessageKey.BUILD_UNKNOWN_FIRM, companyName.strip()));
     }
 
     /** Ein Bürger vergibt Gemeindeland kostenlos an einen Spieler. */

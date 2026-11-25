@@ -2079,6 +2079,10 @@ public final class CivCommandTree {
                                     }
                                     return reply;
                                 }))))
+                .then(Commands.literal("uebertragen")
+                        .then(arg(COMPANY, StringArgumentType.string())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.plots().transferToCompany(
+                                        Players.caller(player), StringArgumentType.getString(context, COMPANY))))))
                 .then(Commands.literal("vergeben")
                         .then(arg(PLAYER, StringArgumentType.word())
                                 .suggests((context, builder) -> SharedSuggestionProvider.suggest(

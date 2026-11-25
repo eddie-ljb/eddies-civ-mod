@@ -89,7 +89,7 @@ final class ConstructionSites {
             int z1 = Math.max(site.limit().minZ(), site.min().z() - 1);
             int x2 = Math.min(site.limit().maxX(), site.min().x() + site.sizeX());
             int z2 = Math.min(site.limit().maxZ(), site.min().z() + site.sizeZ());
-            if (!level.isLoaded(new BlockPos(x1, 64, z1)) || !level.isLoaded(new BlockPos(x2, 64, z2))) {
+            if (!ChunkLoader.ensureArea(level, x1, z1, x2, z2, false)) {
                 continue;
             }
             Block barrier = barrier();
@@ -170,12 +170,8 @@ final class ConstructionSites {
                 return Optional.empty();
             }
             ServerLevel level = found.get();
-            for (int x = area.minX(); x <= area.maxX() + 15; x += 16) {
-                for (int z = area.minZ(); z <= area.maxZ() + 15; z += 16) {
-                    if (!level.isLoaded(new BlockPos(Math.min(x, area.maxX()), 64, Math.min(z, area.maxZ())))) {
-                        return Optional.empty();
-                    }
-                }
+            if (!ChunkLoader.ensureArea(level, area.minX(), area.minZ(), area.maxX(), area.maxZ(), false)) {
+                return Optional.empty();
             }
             BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
             for (int x = area.minX(); x <= area.maxX(); x++) {
@@ -233,7 +229,7 @@ final class ConstructionSites {
             @Override
             public boolean isLoaded(BlockPosition position) {
                 return levelOf(server, position)
-                        .map(level -> level.isLoaded(new BlockPos(position.x(), 64, position.z()))).orElse(false);
+                        .map(level -> ChunkLoader.ensure(level, position.x(), position.z())).orElse(false);
             }
 
             @Override
@@ -309,6 +305,9 @@ final class ConstructionSites {
             case 3 -> Rotation.COUNTERCLOCKWISE_90;
             default -> Rotation.NONE;
         };
+        // Auch ohne Spieler in der Nähe bauen: die Chunks des Baufelds laden (zählt schon als gebaut).
+        ChunkLoader.ensureArea(level, build.origin().x(), build.origin().z(),
+                build.origin().x() + build.footprintX(), build.origin().z() + build.footprintZ(), true);
         if (build.first() && !build.afloat()) {
             excavate(level, build);
         }

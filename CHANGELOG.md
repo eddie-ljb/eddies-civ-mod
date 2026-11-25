@@ -2,6 +2,10 @@
 
 ## 1.1.0 (in Arbeit)
 
+- **Planen und Bauen ohne Spieler in der Nähe (Korrektur):** Straßen, Grundstücke, Gebäude und Wege entstanden nur in Chunks, die gerade geladen waren, also nur, wo ein Spieler stand. Jetzt lädt der Server die nötigen Chunks selbst (auch ungenerierte), prüft das Gelände, setzt die Blöcke und legt die Wege. Je Tick werden höchstens 24 Chunks neu geladen, damit der Server nicht stockt; fehlte dem Bauamt beim Tagesabschluss Gelände, plant es alle 5 Sekunden weiter, statt bis zum nächsten Tag zu warten. Der Wegebau zählte außerdem Felder in nicht geladenen Chunks als gelegt, ohne sie zu setzen; jetzt wird der Chunk dafür geladen.
+- **Grundstück an die Firma übergeben (neu):** `/civ grundstueck uebertragen "<Firma>"` übergibt das eigene Grundstück unter dir ohne Kaufpreis an eine Firma, die du leitest (englisch `/civ plot transfer`).
+- **Firmenwahl im Grundstücksmenü (neu):** Im Grundstücksmenü der Gemeinde wählt der Smaragdblock unten die Firma, die du leitest. Mit gewählter Firma kauft Shift-Klick ein angebotenes Grundstück aus der Firmenkasse für die Firma, und Shift-Klick auf ein eigenes Grundstück übergibt es der Firma.
+
 - **Grundstücke für die Firma kaufen (neu):** `/civ grundstueck kaufen "<Firma>"` kauft das angebotene Grundstück unter dir für die Firma; der Preis kommt aus der Firmenkasse, nur die Leitung darf das. Bisher kaufte der Befehl nur für den Spieler selbst, Firmen kamen nur über Dorfbewohner an Grundstücke.
 
 - **Straßen und Grundstücke der Dorfbewohner (Korrektur):** Die Geländeprüfung hielt jeden Streifen für „bebaut“, in dem auch nur eine Blume, ein Erz, ein Kaktus, Zuckerrohr, ein Pilz oder Moos lag. Lange Straßenstreifen (bis 80 Blöcke) wurden deshalb fast immer abgelehnt. Jetzt zählt all das als Natur, und ist der längste Streifen blockiert, nimmt das Bauamt einen kürzeren. Neu: `/civ bau planung` zeigt, wer in der eigenen Gemeinde plant (ein Dorfbewohner oder ein Spieler), wie viele Streifen und Chunks geprüft wurden und woran es scheiterte (bebaut, Gelände nicht geladen, Wasser, ohne Straße, belegt).

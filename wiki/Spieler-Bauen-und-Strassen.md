@@ -4,6 +4,9 @@
 
 Hier steht alles zu Bauaufträgen, Baustellen, Straßen und dem Wegebau, für Spieler und für Dorfbewohner.
 
+## Bauen ohne Spieler in der Nähe
+Das Bauamt aus Dorfbewohnern, die Baufirmen und der Wegebau arbeiten auch dort, wo kein Spieler steht: Der Server lädt die dafür nötigen Chunks selbst (höchstens 24 je Tick) und lässt sie danach wieder entladen. `/civ bau planung` zeigt, woran es hängt, falls doch nichts entsteht.
+
 ## Land vor Wasser
 Gemeinden beanspruchen nur Land: Dorfbewohner als Bürgermeister claimen keine Chunks mit mehr als 35 % Wasser und gründen dort keine Gemeinden. Straßen, Grundstücke und Häuser entstehen nur an Land (höchstens 5 % Wasser im Baufeld, 10 % bei Straßen); ein Bauauftrag im Wasser wird abgelehnt. Ausnahme sind **Wassergebäude** wie Leuchtturm und Schiff (eingebaut als `leuchtturm` und `schiff`; auch eigene Pläne mit Namen wie `steg`, `hafen`, `bruecke`, `boot` oder dem Stil `wasser`): Sie dürfen auf dem Wasser stehen, schwimmen ohne Fundament, und Dorfbewohner wählen sie nicht von selbst.
 

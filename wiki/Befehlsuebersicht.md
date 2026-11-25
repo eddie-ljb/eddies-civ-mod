@@ -88,6 +88,7 @@ Alle Befehle schlagen beim Tippen (Tabulator) passende Werte vor, mit einer kurz
 | `/civ strasse bauen schaufel\|pflaster <Name>` / `strasse wege` | Weg auf einer Straße bauen lassen / Stand der Wegebauten |
 | `/civ krieg beute <Nr> [<Chunks> <Punkte für Reparationen>]` | Siegpunkte eines gewonnenen Kriegs ansehen und ausgeben |
 | `/civ grundstueck kaufen ["<Firma>"]` | angebotenes Grundstück unter dir kaufen, mit Firma aus der Firmenkasse für die Firma (nur Firmenleitung) |
+| `/civ grundstueck uebertragen "<Firma>"` | eigenes Grundstück unter dir ohne Preis an die eigene Firma übergeben |
 | `/civ kultur [setzen <Kultur> <Rasse>\|menue]` | Kultur und Rasse der eigenen Gemeinde ansehen und (Bürgermeister) ändern |
 | `/civ dorfbewohner info\|menue` | Auskunft über den nächsten Dorfbewohner im Chat oder als Menü |
 | `/civ bau vorschau <Plan> [Drehung]\|aus` | Hologramm eines Bauplans auf dem Grundstück unter dir |

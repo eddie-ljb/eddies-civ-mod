@@ -1267,6 +1267,17 @@ public final class ConstructionService {
     }
 
     /**
+     * Setzt die Planung der Gemeinden fort, denen beim Tagesabschluss Gelände fehlte, weil es nicht geladen war. Das
+     * Spiel lädt es nach (auch ohne Spieler in der Nähe) und ruft das alle paar Sekunden auf; ohne offene Gemeinden
+     * kostet es nichts.
+     */
+    public synchronized void retryPlanning(Day today) {
+        Objects.requireNonNull(today, "today");
+        surveyed.values().removeIf(Optional::isEmpty); // Unbekanntes noch einmal ansehen
+        planning.retryUnknown(today);
+    }
+
+    /**
      * {@code /civ bau planung}: Was das Bauamt der eigenen Gemeinde zuletzt getan hat und woran es hängt. Für Spieler,
      * die wissen wollen, warum keine Straßen und Grundstücke entstehen.
      */

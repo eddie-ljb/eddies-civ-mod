@@ -114,6 +114,35 @@ final class TownPlanning {
     }
 
     private final java.util.Map<PolityId, Diagnosis> diagnoses = new java.util.HashMap<>();
+    /** Gemeinden, deren Planung am Tagesabschluss an nicht geladenem Gelände scheiterte; sie planen später weiter. */
+    private final java.util.Set<PolityId> retry = new java.util.LinkedHashSet<>();
+
+    /** Plant für Gemeinden weiter, denen beim Tagesabschluss Gelände fehlte (das Spiel hat es inzwischen geladen). */
+    void retryUnknown(Day day) {
+        if (retry.isEmpty()) {
+            return;
+        }
+        WorldQueries world = app.queries();
+        for (PolityId id : List.copyOf(retry)) {
+            retry.remove(id);
+            Optional<PolityView> town = world.polity(id);
+            Optional<ActorRef> head = authority.apply(id);
+            if (town.isEmpty() || head.filter(PersonRef.class::isInstance).isEmpty()) {
+                continue;
+            }
+            PersonRef planner = (PersonRef) head.get();
+            foundStreet(town.get(), planner, day);
+            plan(town.get(), planner, day);
+            remember(id, diagnosis(id));
+        }
+    }
+
+    private void remember(PolityId town, Diagnosis note) {
+        if (note.streetTally.laid == 0 && note.plotTally.laid == 0
+                && (note.streetTally.unknown > 0 || note.plotTally.unknown > 0)) {
+            retry.add(town);
+        }
+    }
 
     Diagnosis diagnosis(PolityId town) {
         return diagnoses.computeIfAbsent(town, key -> new Diagnosis());
@@ -179,6 +208,7 @@ final class TownPlanning {
                     .ifPresent(planner -> {
                         foundStreet(town, planner, day);
                         plan(town, planner, day);
+                        remember(town.id(), diagnosis);
                     });
             buyLand(town, day);
         }
@@ -275,6 +305,7 @@ final class TownPlanning {
         boolean needed = streetRequired ? streetCount == 0 || !roomForPlot(town, plots)
                 : plots.size() >= 2 && streetCount * 4 < plots.size() + 2;
         Diagnosis note = diagnosis(town.id());
+        note.streetTally.reset();
         if (streetCount >= MAX_STREETS || !needed || (roads != null && roads.unfinished(town.id()) > 0)
                 || (!streetRequired && VillagerAmbitions.roll(planner, day, 0x9A) >= STREET_CHANCE)) {
             note.streetNote = streetCount >= MAX_STREETS ? "max" : !needed ? "no_need"

@@ -171,6 +171,22 @@ class VillagerUrbanismTest {
     }
 
     @Test
+    @DisplayName("Fehlt beim Tagesabschluss Gelände (niemand in der Nähe), plant das Bauamt weiter, sobald es geladen ist")
+    void planningResumesWhenTerrainLoads() {
+        server.enforceStreets(true);
+        server.construction().siteSurvey(area -> java.util.Optional.empty()); // nicht geladen
+        setUp(8);
+        for (int day = 2; day < 10; day++) {
+            server.construction().villagersOrder(Day.of(day));
+        }
+        assertTrue(server.queries().polity(town.id()).orElseThrow().streets().isEmpty(), "ohne Gelände keine Straße");
+        server.construction().siteSurvey(area -> java.util.Optional.of(false)); // das Spiel hat nachgeladen
+        server.construction().retryPlanning(Day.of(9));
+        assertFalse(server.queries().polity(town.id()).orElseThrow().streets().isEmpty(),
+                "die Straße entsteht, ohne auf den nächsten Tag zu warten");
+    }
+
+    @Test
     @DisplayName("Planungsbericht: zeigt, wer plant und woran es hängt, auch bei unbekanntem Gelände")
     void planningReportExplainsWhy() {
         server.enforceStreets(true);

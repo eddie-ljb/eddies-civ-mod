@@ -48,7 +48,8 @@ final class RoadSites {
 
     private static void lay(ServerLevel level, int x, int z, RoadJob.Material material) {
         BlockPos column = new BlockPos(x, 64, z);
-        if (!level.isLoaded(column)) {
+        // Das Feld zählt schon als gelegt: Darum den Chunk laden, auch wenn niemand in der Nähe ist.
+        if (!ChunkLoader.ensure(level, x, z, true)) {
             return;
         }
         int top = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
