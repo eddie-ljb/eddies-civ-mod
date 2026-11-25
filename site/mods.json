@@ -1,0 +1,24 @@
+[
+  {
+    "id": "eddies-civ-mod",
+    "name": "Eddies Civ Mod",
+    "tagline": "Verwandle deine Welt in eine lebendige Zivilisation.",
+    "summary": "Gemeinden, Gebiete, Recht, Geld und ein Servermarkt mit dynamischen Preisen. Dorfbewohner leben als echte Bürger mit Persönlichkeit, wählen, gründen Firmen und bauen Städte.",
+    "status": "Aktiv entwickelt",
+    "gradleProps": "../gradle.properties",
+    "wikiHome": "index.html",
+    "modrinth": "",
+    "requirements": ["Fabric Loader {loader}+", "Fabric API {fabricApi}", "Java 25", "Minecraft {minecraft}"],
+    "install": "Eine JAR für Server <strong>und</strong> Client – beide brauchen den Mod, weil er eigene Blöcke mitbringt. In den <code>mods</code>-Ordner legen, starten, fertig. Die Konfiguration liegt in <code>config/eddies-civ-mod.properties</code>.",
+    "features": [
+      { "icon": "town", "title": "Gemeinden", "text": "Gemeindehaus, beanspruchtes Gebiet, Grundstücke zum Kaufen und Mieten, Schutz, Läden, Bank und ein Servermarkt mit dynamischen Preisen." },
+      { "icon": "people", "title": "Dorfbewohner als Bürger", "text": "Persönlichkeit, Stimmung, Einkommen, Wahlrecht, Parteien, Abwanderung – und ehrgeizige Dorfbewohner, die Firmen, Parteien und ganze Städte gründen." },
+      { "icon": "vote", "title": "Politik", "text": "Bürgermeister, Schatzmeister, Planer und Parlamente. Mehrheits-, Stichwahl- und Verhältniswahl (Sainte-Laguë, D'Hondt, Hare-Niemeyer), Wahlkreise und Mischsysteme." },
+      { "icon": "law", "title": "Recht", "text": "Verfassung und Gesetzbuch als Blöcke, Gesetze per Abstimmung, Bünde von Gemeinden zu Ländern und Nationen – mit Editor im Browser." },
+      { "icon": "coin", "title": "Wirtschaft", "text": "Firmen mit Branchen von Forst bis Bergwerk, Anstellung, Börse mit Orderbuch und Dividenden, eigene Währungen, Zentralbank, Kredite und Zeitungen, die Wahlen beeinflussen." },
+      { "icon": "court", "title": "Justiz", "text": "Straf-, Zivil- und Verfassungsverfahren mit Richtern, Anklage, Verteidigung, Zeugen, Geschworenen, Beweisen aus deiner Hand, Urteil, Berufung und Verbannung." },
+      { "icon": "build", "title": "Bauen und Straßen", "text": "Bauaufträge an Baufirmen, Hologramm-Vorschau, 59 eingebaute Pläne, eigene .litematic/.schem-Pläne, Straßenpflicht und Wegebau." },
+      { "icon": "map", "title": "Eingebaute Webseite", "text": "Live-Karte mit gerendertem Gelände, Wahlen, Markt, Börse, Presse, Staat, Justiz und Chat – ohne zusätzliches Plugin." }
+    ]
+  }
+]

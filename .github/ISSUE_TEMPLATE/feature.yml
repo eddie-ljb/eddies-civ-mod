@@ -1,0 +1,12 @@
+name: Wunsch / Idee
+description: Neue Funktion oder Verbesserung vorschlagen
+labels: [enhancement]
+title: "[Feature] "
+body:
+  - type: textarea
+    id: problem
+    attributes: { label: Problem / Motivation }
+  - type: textarea
+    id: desc
+    attributes: { label: Vorschlag }
+    validations: { required: true }
