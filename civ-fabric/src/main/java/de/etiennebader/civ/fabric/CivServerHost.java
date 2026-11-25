@@ -40,6 +40,9 @@ public final class CivServerHost {
     private final TerritoryNotifier territoryNotifier = new TerritoryNotifier();
     private final BorderDisplay borders = new BorderDisplay();
     private final BlueprintHolograms holograms = new BlueprintHolograms();
+    /** Alle 5 Sekunden plant das Bauamt weiter, wo Gelände fehlte. */
+    private static final int PLANNING_RETRY_INTERVAL = 100;
+    private int planningRetryTicks;
     private final VillagerCensus villagers = new VillagerCensus(this);
     private final ConstructionSites constructionSites = new ConstructionSites();
     private final RoadSites roadSites = new RoadSites();
@@ -118,7 +121,13 @@ public final class CivServerHost {
             return;
         }
         try {
+            ChunkLoader.startTick();
             civ.landRules().survey(WaterSurvey.of(server));
+            if (++planningRetryTicks >= PLANNING_RETRY_INTERVAL) {
+                planningRetryTicks = 0;
+                // Fehlte dem Bauamt beim Tagesabschluss Gelände, lädt es das jetzt nach und plant weiter.
+                civ.construction().retryPlanning(civ.calendar().today());
+            }
             civ.tick().ifPresent(report -> Components.broadcast(server, civ.commands().newDay(report)));
             civ.takeAnnouncements().forEach(announcement -> announce(server, civ, announcement));
             territoryNotifier.tick(server, civ);

@@ -1918,6 +1918,9 @@ public final class CivCommandTree {
                                         .then(arg(COUNT, IntegerArgumentType.integer(0, 270))
                                                 .executes(context -> order(context, false,
                                                         IntegerArgumentType.getInteger(context, COUNT)))))))
+                .then(Commands.literal("planung")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.construction()
+                                .planningReport(Players.caller(player)))))
                 .then(Commands.literal("vorschau")
                         .then(Commands.literal("aus")
                                 .executes(context -> withCiv(context, (civ, player) -> {
@@ -2066,7 +2069,20 @@ public final class CivCommandTree {
                                 Feedback.fanfare(player);
                             }
                             return reply;
-                        })))
+                        }))
+                        .then(arg(COMPANY, StringArgumentType.string())
+                                .executes(context -> withCiv(context, (civ, player) -> {
+                                    Reply reply = civ.plots().buyForCompany(Players.caller(player),
+                                            StringArgumentType.getString(context, COMPANY));
+                                    if (reply.success()) {
+                                        Feedback.fanfare(player);
+                                    }
+                                    return reply;
+                                }))))
+                .then(Commands.literal("uebertragen")
+                        .then(arg(COMPANY, StringArgumentType.string())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.plots().transferToCompany(
+                                        Players.caller(player), StringArgumentType.getString(context, COMPANY))))))
                 .then(Commands.literal("vergeben")
                         .then(arg(PLAYER, StringArgumentType.word())
                                 .suggests((context, builder) -> SharedSuggestionProvider.suggest(

@@ -89,7 +89,7 @@ final class ConstructionSites {
             int z1 = Math.max(site.limit().minZ(), site.min().z() - 1);
             int x2 = Math.min(site.limit().maxX(), site.min().x() + site.sizeX());
             int z2 = Math.min(site.limit().maxZ(), site.min().z() + site.sizeZ());
-            if (!level.isLoaded(new BlockPos(x1, 64, z1)) || !level.isLoaded(new BlockPos(x2, 64, z2))) {
+            if (!ChunkLoader.ensureArea(level, x1, z1, x2, z2, false)) {
                 continue;
             }
             Block barrier = barrier();
@@ -170,12 +170,8 @@ final class ConstructionSites {
                 return Optional.empty();
             }
             ServerLevel level = found.get();
-            for (int x = area.minX(); x <= area.maxX() + 15; x += 16) {
-                for (int z = area.minZ(); z <= area.maxZ() + 15; z += 16) {
-                    if (!level.isLoaded(new BlockPos(Math.min(x, area.maxX()), 64, Math.min(z, area.maxZ())))) {
-                        return Optional.empty();
-                    }
-                }
+            if (!ChunkLoader.ensureArea(level, area.minX(), area.minZ(), area.maxX(), area.maxZ(), false)) {
+                return Optional.empty();
             }
             BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
             for (int x = area.minX(); x <= area.maxX(); x++) {
@@ -193,7 +189,33 @@ final class ConstructionSites {
         };
     }
 
+    /** Namen natürlicher Blöcke, die in keinem Tag stehen (Pflanzen, Pilze, Moos, Tropfstein, Erz-Begleiter …). */
+    private static final java.util.Set<String> NATURAL_NAMES = java.util.Set.of("cactus", "sugar_cane", "bamboo",
+            "bamboo_sapling", "pumpkin", "melon", "brown_mushroom", "red_mushroom", "sweet_berry_bush", "lily_pad",
+            "kelp", "kelp_plant", "moss_block", "moss_carpet", "tuff", "calcite", "dripstone_block",
+            "pointed_dripstone", "magma_block", "obsidian", "cobweb", "glow_lichen", "amethyst_block",
+            "budding_amethyst", "amethyst_cluster", "azalea", "flowering_azalea", "spore_blossom", "big_dripleaf",
+            "small_dripleaf", "hanging_roots", "mangrove_roots", "muddy_mangrove_roots", "mud", "packed_ice",
+            "blue_ice", "powder_snow", "snow_block", "podzol", "mycelium", "rooted_dirt", "clay", "gravel",
+            "sandstone", "red_sandstone", "bedrock", "infested_stone", "sea_pickle", "turtle_egg", "dead_bush",
+            "fern", "large_fern", "tall_grass", "short_grass", "vine", "cave_vines", "weeping_vines", "twisting_vines",
+            "cocoa", "nether_wart", "chorus_plant", "chorus_flower", "end_stone");
+
+    /**
+     * Ob der Block von der Natur stammt: Erde, Stein, Sand, Wasser, Holz und Laub, aber auch Blumen, Erze, Pilze, Moos,
+     * Kakteen, Zuckerrohr und Ähnliches. Zählte das als „gebaut“, wäre fast jeder Streifen von 80 Blöcken Länge belegt.
+     */
     private static boolean natural(BlockState state) {
+        String path = BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath();
+        return naturalBlock(state) || path.endsWith("_ore") || path.endsWith("_flower") || path.endsWith("_tulip")
+                || path.endsWith("_leaves") || path.endsWith("_sapling") || path.endsWith("_roots")
+                || NATURAL_NAMES.contains(path) || state.is(BlockTags.FLOWERS) || state.is(BlockTags.SAPLINGS)
+                || state.is(BlockTags.REPLACEABLE_BY_TREES) || state.is(BlockTags.MOSS_REPLACEABLE)
+                || state.is(BlockTags.DRIPSTONE_REPLACEABLE) || state.is(BlockTags.LUSH_GROUND_REPLACEABLE)
+                || state.is(BlockTags.GOLD_ORES) || state.is(BlockTags.IRON_ORES) || state.is(BlockTags.COPPER_ORES);
+    }
+
+    private static boolean naturalBlock(BlockState state) {
         return state.isAir() || state.canBeReplaced() || !state.getFluidState().isEmpty()
                 || state.is(BlockTags.LEAVES) || state.is(BlockTags.LOGS)
                 || state.is(BlockTags.DIRT) || state.is(BlockTags.SAND) || state.is(BlockTags.TERRACOTTA)
@@ -207,7 +229,7 @@ final class ConstructionSites {
             @Override
             public boolean isLoaded(BlockPosition position) {
                 return levelOf(server, position)
-                        .map(level -> level.isLoaded(new BlockPos(position.x(), 64, position.z()))).orElse(false);
+                        .map(level -> ChunkLoader.ensure(level, position.x(), position.z())).orElse(false);
             }
 
             @Override
@@ -283,6 +305,9 @@ final class ConstructionSites {
             case 3 -> Rotation.COUNTERCLOCKWISE_90;
             default -> Rotation.NONE;
         };
+        // Auch ohne Spieler in der Nähe bauen: die Chunks des Baufelds laden (zählt schon als gebaut).
+        ChunkLoader.ensureArea(level, build.origin().x(), build.origin().z(),
+                build.origin().x() + build.footprintX(), build.origin().z() + build.footprintZ(), true);
         if (build.first() && !build.afloat()) {
             excavate(level, build);
         }

@@ -111,6 +111,7 @@ public final class CivApplication {
     private final ConquerChunks conquerChunks;
     private final CreatePlot createPlot;
     private final AssignPlot assignPlot;
+    private final de.etiennebader.civ.application.land.TransferPlot transferPlot;
     private final SellPlot sellPlot;
     private final OfferPlot offerPlot;
     private final BuyPlot buyPlot;
@@ -205,6 +206,7 @@ public final class CivApplication {
         this.conquerChunks = new ConquerChunks(aggregates);
         this.createPlot = new CreatePlot(aggregates, ids);
         this.assignPlot = new AssignPlot(aggregates);
+        this.transferPlot = new de.etiennebader.civ.application.land.TransferPlot(aggregates);
         this.sellPlot = new SellPlot(aggregates);
         this.offerPlot = new OfferPlot(aggregates);
         this.buyPlot = new BuyPlot(aggregates);
@@ -325,6 +327,10 @@ public final class CivApplication {
 
     public CreatePlot createPlot() {
         return createPlot;
+    }
+
+    public de.etiennebader.civ.application.land.TransferPlot transferPlot() {
+        return transferPlot;
     }
 
     public AssignPlot assignPlot() {

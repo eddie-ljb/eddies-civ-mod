@@ -69,7 +69,7 @@ Grundstücke teilen das Gemeindeland auf. Nur ihre Inhaber dürfen dort bauen, u
 3. Danach gibt es zwei Möglichkeiten:
    - `/civ grundstueck anbieten 12,5` bietet es zum Verkauf an. Jeder kann es mit `/civ grundstueck kaufen` oder per Shift-Klick im Grundstücksmenü erwerben.
    - `/civ grundstueck vergeben <Spieler>` verschenkt es.
-4. Inhaber bieten ihr eigenes Grundstück genauso an. `/civ grundstueck` zeigt das Grundstück unter dir und seinen Umriss.
+4. Die Leitung einer Firma kauft ein angebotenes Grundstück für die Firma mit `/civ grundstueck kaufen "<Firma>"` (bezahlt aus der Firmenkasse) oder übergibt ein eigenes Grundstück mit `/civ grundstueck uebertragen "<Firma>"` ohne Preis an die Firma; im Grundstücksmenü wählt der Smaragdblock die Firma, Shift-Klick kauft oder übergibt. Inhaber bieten ihr eigenes Grundstück genauso an. `/civ grundstueck` zeigt das Grundstück unter dir und seinen Umriss.
 
 ### Abstimmungen
 Gilt das Gesetz **Rechtsänderungen per Abstimmung**, wird jede Änderung im Recht-Menü oder per Befehl zum Antrag.

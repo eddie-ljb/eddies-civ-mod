@@ -37,6 +37,9 @@ final class WaterSurvey {
     }
 
     static Optional<Integer> measure(ServerLevel level, Area area) {
+        if (!ChunkLoader.ensureArea(level, area.minX(), area.minZ(), area.maxX(), area.maxZ(), false)) {
+            return Optional.empty();
+        }
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         int water = 0;
         int total = 0;
