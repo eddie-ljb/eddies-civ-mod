@@ -83,3 +83,7 @@ abzubrechen. Das Paket `de.etiennebader.civ.api` ist die stabile Oberfläche; al
 - `civ-server/.../justice`: `CourtStaffing` (Verfassungsautomatik `court_staffing`) und `CourtCandidacies` (`court_candidacies.tsv`).
 - `civ-domain/.../war`: `MilitaryRank` mit `level()` (Befehlskette), `WarRegistry.promote`; `WarService` führt das Schlachtenbuch (`LOG` in `war.tsv`) und leitet Kriegsberichte an die Zeitungen weiter.
 - `civ-fabric`: Item `handcuffs` (`HandcuffItems`), Durchsetzung in `ProtectionListener`, Stillstand gefesselter Dorfbewohner in `VillagerCensus`.
+
+## Neu: Villager-Skins nach Beruf
+- `Occupation` (civ-domain, `population`) listet die Berufe samt Vorrang und festem Netzwerkcode; `civ-server/.../villager/VillagerOccupations` leitet den Beruf eines Dorfbewohners aus Ämtern, Parlament, Gericht, Garnison, Polizei, Bank, Firma, Zeitung und Anstellung ab (`CivServer.villagerOccupations()`).
+- `civ-fabric/.../VillagerCensus` sendet die Berufe alle 10 s als `VillagerOccupationsPayload` (clientbound, nur an Spieler mit dem Mod). Der Client hält sie in `VillagerOccupationsClient`; `VillagerSkins` malt mit `look/OutfitPainter` die Kleidung auf die Vanilla-Textur. Einen neuen Beruf ergänzen: siehe `docs/villager-skins-nach-beruf.md`.

@@ -146,8 +146,12 @@ final class VillagerCensus {
         ticks = 0;
         MachineWork.verify(server, civ);
         List<FamilyRegistry.Child> births = civ.family().pendingBirths();
+        java.util.Map<PersonRef, de.etiennebader.civ.domain.population.Occupation> occupations =
+                civ.villagerOccupations();
         for (ServerLevel level : server.getAllLevels()) {
             List<Villager> loaded = new java.util.ArrayList<>(level.getEntities(EntityTypes.VILLAGER, villager -> villager.isAlive()));
+            java.util.Map<java.util.UUID, de.etiennebader.civ.domain.population.Occupation> dressed =
+                    new java.util.HashMap<>();
             if (!births.isEmpty()) {
                 deliver(civ, level, loaded, births);
             }
@@ -162,6 +166,26 @@ final class VillagerCensus {
                 seen(civ, villager);
                 MachineWork.commute(civ, level, villager, ref(villager));
                 showMood(civ, level, villager);
+                if (!villager.isBaby() && occupations.containsKey(ref(villager))) {
+                    dressed.put(villager.getUUID(), occupations.get(ref(villager)));
+                }
+            }
+            sendOccupations(level, dressed);
+        }
+    }
+
+    /**
+     * Schickt den Spielern mit dem Mod in dieser Dimension die Berufe der Dorfbewohner, damit ihr Client sie passend
+     * einkleidet. Auch eine leere Liste wird gesendet, damit nicht mehr zutreffende Kleidung verschwindet.
+     */
+    private static void sendOccupations(ServerLevel level,
+            java.util.Map<java.util.UUID, de.etiennebader.civ.domain.population.Occupation> dressed) {
+        de.etiennebader.civ.fabric.look.VillagerOccupationsPayload payload =
+                new de.etiennebader.civ.fabric.look.VillagerOccupationsPayload(dressed);
+        for (ServerPlayer player : level.players()) {
+            if (net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.canSend(player,
+                    de.etiennebader.civ.fabric.look.VillagerOccupationsPayload.TYPE)) {
+                net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player, payload);
             }
         }
     }

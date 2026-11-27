@@ -1,6 +1,7 @@
 package de.etiennebader.civ.client.mixin;
 
 import de.etiennebader.civ.client.CivVillagerState;
+import de.etiennebader.civ.client.VillagerOccupationsClient;
 import de.etiennebader.civ.client.VillagerSkins;
 import net.minecraft.client.renderer.entity.VillagerRenderer;
 import net.minecraft.client.renderer.entity.state.VillagerRenderState;
@@ -29,7 +30,8 @@ public abstract class VillagerRendererMixin {
     private void civ$individualSkin(VillagerRenderState state, CallbackInfoReturnable<Identifier> info) {
         var uuid = ((CivVillagerState) state).civ$uuid();
         if (uuid != null && !state.isBaby) {
-            VillagerSkins.textureOf(uuid, Race.fromScale(((CivVillagerState) state).civ$scale()))
+            VillagerSkins.textureOf(uuid, Race.fromScale(((CivVillagerState) state).civ$scale()),
+                            VillagerOccupationsClient.of(uuid))
                     .ifPresent(info::setReturnValue);
         }
     }

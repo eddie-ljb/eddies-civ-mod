@@ -60,6 +60,9 @@ Im Kreativmodus liegen alle Blöcke des Mods, der Grundstücksstab und nützlich
 ### Kultur und Rasse
 Jede Gemeinde hat eine Kultur (bestimmt die Kleidung der Dorfbewohner) und eine Rasse (Körpergröße, mit dem Mod auch Hautton und Haarfarbe). Der Gründer wählt beides nach dem Aufstellen des Gemeindehauses, der Bürgermeister ändert es später im Gemeindehaus oder mit `/civ kultur setzen <Kultur> <Rasse>`. Von Dorfbewohnern gegründete Gemeinden erben beides.
 
+### Berufe der Dorfbewohner
+Mit dem Mod auf dem Client erkennst du den Beruf eines Dorfbewohners an seiner Kleidung: Politiker im Anzug, Polizisten mit Schirmmütze und Abzeichen, Soldaten in Tarnuniform, Offiziere mit goldenen Schulterstücken, Richter in schwarzer Robe, Banker mit Zylinder, Unternehmer mit Hut und grüner Krawatte, Bauarbeiter mit Warnweste und Schutzhelm, dazu Mechaniker, Bergleute, Holzfäller, Bauern, Fischer, Journalisten und Arbeiter. Der Beruf ergibt sich aus Amt, Garnison, Polizei, Gericht, Bank, Firma und Anstellung des Dorfbewohners (Einzelheiten im Wiki unter „Alltag“). Ohne den Mod sieht man das normale Dorfbewohner-Gewand.
+
 ### Grundstücke
 Grundstücke teilen das Gemeindeland auf. Nur ihre Inhaber dürfen dort bauen, und nur für sie fällt Grundsteuer an.
 0. **Erst die Straße:** Grundstücke und Häuser gibt es nur an Straßen (Gesetz `street_required`, Standard ja). Zuerst wird die Straße gebaut und mit `/civ strasse anlegen <Name>` eingetragen; danach lassen sich Grundstücke in höchstens 12 Blöcken Abstand zuschneiden, ausschreiben und bebauen.

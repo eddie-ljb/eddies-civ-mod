@@ -3,6 +3,8 @@ package de.etiennebader.civ.client;
 import com.mojang.blaze3d.platform.NativeImage;
 import de.etiennebader.civ.EddiesCivMod;
 import de.etiennebader.civ.domain.population.Gender;
+import de.etiennebader.civ.domain.population.Occupation;
+import de.etiennebader.civ.fabric.look.OutfitPainter;
 import de.etiennebader.civ.domain.population.Race;
 import de.etiennebader.civ.domain.population.VillagerIdentity;
 import net.minecraft.client.Minecraft;
@@ -38,6 +40,9 @@ public final class VillagerSkins {
     private static final int[][] RACE_HAIR = {
             null, {3, 5, 2, 6}, {4, 6, 0}, {0, 1, 2}};
 
+    /** Größer als jeder Schlüssel aus Geschlecht, Hautton, Haar, Frisur und Rasse (höchstens 10751). */
+    private static final long KEYS_PER_OCCUPATION = 16_384L;
+
     private static final Map<Long, Identifier> CACHE = new HashMap<>();
 
     private VillagerSkins() {
@@ -50,11 +55,16 @@ public final class VillagerSkins {
 
     /** Textur dieses Dorfbewohners als Angehöriger seiner Rasse. */
     public static Optional<Identifier> textureOf(UUID uuid, Race race) {
+        return textureOf(uuid, race, Occupation.CIVILIAN);
+    }
+
+    /** Textur dieses Dorfbewohners als Angehöriger seiner Rasse, in der Kleidung seines Berufs. */
+    public static Optional<Identifier> textureOf(UUID uuid, Race race, Occupation occupation) {
         VillagerIdentity.Look look = VillagerIdentity.lookOf(uuid);
         int hairIndex = race == Race.HUMAN ? look.hair() : RACE_HAIR[race.ordinal()][look.hair()
                 % RACE_HAIR[race.ordinal()].length];
         long key = (((look.gender().ordinal() * 8L + look.skin()) * 16L + hairIndex) * 8L + look.style()) * 4L
-                + race.ordinal();
+                + race.ordinal() + KEYS_PER_OCCUPATION * occupation.code();
         Identifier cached = CACHE.get(key);
         if (cached != null) {
             return Optional.of(cached);
@@ -62,6 +72,7 @@ public final class VillagerSkins {
         try (InputStream in = Minecraft.getInstance().getResourceManager().open(BASE);
              NativeImage image = NativeImage.read(in)) {
             paint(image, look, race, hairIndex);
+            paintOutfit(image, occupation);
             Identifier id = EddiesCivMod.id("villager/look_" + key);
             Minecraft.getInstance().getTextureManager().register(id,
                     new DynamicTexture(() -> "eddies-civ-mod villager " + key, copy(image)));
@@ -77,6 +88,21 @@ public final class VillagerSkins {
         NativeImage target = new NativeImage(source.getWidth(), source.getHeight(), false);
         target.copyFrom(source);
         return target;
+    }
+
+    /** Zieht dem Dorfbewohner die Kleidung seines Berufs an (Hut, Gewand, Abzeichen). */
+    private static void paintOutfit(NativeImage image, Occupation occupation) {
+        OutfitPainter.paint(new OutfitPainter.Canvas() {
+            @Override
+            public int get(int x, int y) {
+                return image.getPixel(x, y);
+            }
+
+            @Override
+            public void set(int x, int y, int argb) {
+                image.setPixel(x, y, argb);
+            }
+        }, occupation);
     }
 
     static void paint(NativeImage image, VillagerIdentity.Look look) {

@@ -17,5 +17,6 @@ public class EddiesCivModClient implements ClientModInitializer {
 		var emblemType = (BlockEntityType<de.etiennebader.civ.fabric.content.EmblemBlockEntity>) BuiltInRegistries
 				.BLOCK_ENTITY_TYPE.getValue(de.etiennebader.civ.fabric.content.EmblemContent.ENTITY_ID);
 		BlockEntityRendererRegistry.register(emblemType, EmblemRenderer::new);
+		VillagerOccupationsClient.register();
 	}
 }

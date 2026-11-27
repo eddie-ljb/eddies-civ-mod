@@ -18,7 +18,7 @@ Dieses Wiki ist nach Zielgruppe sortiert: Spieler finden hier, wie man Gemeinden
 - [Religion](Spieler-Religion.md) – Religionen, Heilige Schrift bearbeiten, Klerus-Ämter, Segnen und Taufen
 - [Logos](Spieler-Logos.md) – eigene Wappen, Wahlplakate und Leuchtreklamen hochladen und im Spiel zeigen
 - [Wirtschaft: Bank, Markt, Firmen und Börse](Spieler-Wirtschaft.md) – Bank, Servermarkt, Firmen, Aktien, Presse
-- [Alltag: Post, Freunde, Verträge, Hoheitszeichen](Spieler-Alltag.md) – Post, Freunde und Chat, Verträge, Flaggen und Hymnen
+- [Alltag: Post, Freunde, Verträge, Hoheitszeichen](Spieler-Alltag.md) – Post, Freunde und Chat, Verträge, Flaggen und Hymnen, Dorfbewohner und ihre Berufskleidung
 - [Webseite](Spieler-Webseite.md) – die eingebettete Server-Webseite
 - [Befehlsübersicht](Befehlsuebersicht.md) – alle `/civ`-Befehle, deutsch und englisch
 
