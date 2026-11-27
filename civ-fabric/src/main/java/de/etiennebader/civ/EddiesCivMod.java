@@ -38,6 +38,7 @@ public class EddiesCivMod implements ModInitializer {
                 new de.etiennebader.civ.fabric.MachinePlacement(host));
         new de.etiennebader.civ.fabric.MachineWork(host).register();
         new PlotWand(host, content).register();
+        new de.etiennebader.civ.fabric.Emblems(host, content).register();
         new ProtectionListener(host, content).register();
         new TerritoryRules(host).register();
         new Ambience(host, content).register();

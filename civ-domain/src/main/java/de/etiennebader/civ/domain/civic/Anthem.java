@@ -13,12 +13,18 @@ import java.util.regex.Pattern;
  * <p>Noten: {@code C4 D4 E4 F#4 G4/2 - A4*2}: Ton mit Oktave (Notenblock-Bereich F#3 bis F#5), {@code #} oder
  * {@code b} für Halbtöne, {@code -} für eine Pause; {@code *2} verlängert, {@code /2} verkürzt. Ein Schlag dauert vier
  * Ticks (Fünftelsekunde).
+ *
+ * <p>Optional hängt an der Hymne eine hochgeladene Aufnahme ({@code audio}: SHA-256 der OGG-Datei, leer ohne). Die
+ * Noten bleiben als Ersatz für Spieler ohne Ressourcenpaket bestehen.
  */
-public record Anthem(String title, String instrument, String notes) {
+public record Anthem(String title, String instrument, String notes, String audio) {
 
     public static final int MAX_TITLE = 48;
     public static final int MAX_NOTES = 400;
     public static final int TICKS_PER_BEAT = 4;
+    /** Größte erlaubte Aufnahme (OGG) in Bytes. */
+    public static final int MAX_AUDIO_BYTES = 4 * 1024 * 1024;
+    private static final Pattern HASH = Pattern.compile("[0-9a-f]{64}");
     public static final List<String> INSTRUMENTS = List.of("harp", "bell", "flute", "chime", "guitar", "xylophone",
             "iron_xylophone", "pling", "banjo", "bit", "didgeridoo", "cow_bell", "bass");
 
@@ -38,7 +44,15 @@ public record Anthem(String title, String instrument, String notes) {
         }
     }
 
+    public Anthem(String title, String instrument, String notes) {
+        this(title, instrument, notes, "");
+    }
+
     public Anthem {
+        audio = audio == null ? "" : audio.strip().toLowerCase(Locale.ROOT);
+        if (!audio.isEmpty() && !HASH.matcher(audio).matches()) {
+            throw new IllegalArgumentException("Ungültige Aufnahme-Kennung");
+        }
         title = Objects.requireNonNull(title, "title").strip();
         instrument = Objects.requireNonNull(instrument, "instrument").strip().toLowerCase(Locale.ROOT);
         notes = Objects.requireNonNull(notes, "notes").strip();
@@ -54,6 +68,20 @@ public record Anthem(String title, String instrument, String notes) {
         if (parse(notes).isEmpty()) {
             throw new IllegalArgumentException("Keine lesbaren Noten: " + notes);
         }
+    }
+
+    public boolean hasAudio() {
+        return !audio.isEmpty();
+    }
+
+    /** Dieselbe Hymne mit anderer Aufnahme ({@code ""} entfernt sie). */
+    public Anthem withAudio(String hash) {
+        return new Anthem(title, instrument, notes, hash);
+    }
+
+    /** Name des Klangs im Ressourcenpaket; stabil je Aufnahme. */
+    public String soundName() {
+        return "anthem." + audio.substring(0, Math.min(16, audio.length()));
     }
 
     /** Die Noten in Spielreihenfolge. */

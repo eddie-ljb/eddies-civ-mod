@@ -1827,11 +1827,35 @@ function renderShow(d) {
     return c;
   }) : [el("div", { className: "empty", textContent: "Keine Debatte. Am letzten Wahltag starten sie von selbst, sonst mit /civ <Ebene> debatte starten." })]));
 }
+/* Hymnen-Aufnahme: OGG oder MP3 hochladen (Spitze der Einheit), anhören, entfernen */
+function anthemAudioControls(p) {
+  const box = el("div", { className: "muted small", style: "margin-top:8px" });
+  const msg = el("div", { className: "msg" });
+  const tell = (text, ok) => { msg.textContent = text || ""; msg.className = "msg " + (ok ? "ok" : "err"); };
+  if (p.anthem.audio) {
+    const player = el("audio", { controls: true, preload: "none", src: "/api/anthem-audio?hash=" + encodeURIComponent(p.anthem.audio), style: "max-width:100%" });
+    box.append(player, el("button", { className: "btn small", textContent: "Aufnahme entfernen", onclick: async () => {
+      const x = await api("/api/anthem-audio/remove", { polity: p.name }); tell(x.data.message || x.data.error, x.ok); if (x.ok) loadState(); } }));
+  }
+  const file = el("input", { type: "file", accept: ".ogg,.mp3,audio/ogg,audio/mpeg" });
+  const send = el("button", { className: "btn small", textContent: p.anthem.audio ? "Aufnahme ersetzen" : "Aufnahme hochladen (OGG/MP3, max. 4 MB)", onclick: async () => {
+    const f = file.files[0];
+    if (!f) return;
+    if (f.size > 4 * 1024 * 1024) { tell("Die Datei ist größer als 4 MB.", false); return; }
+    const bytes = new Uint8Array(await f.arrayBuffer());
+    let binary = ""; for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    const x = await api("/api/anthem-audio", { polity: p.name, data: btoa(binary) });
+    tell(x.data.message || x.data.error || (x.ok ? "Gespeichert." : "Fehlgeschlagen."), x.ok); if (x.ok) loadState();
+  } });
+  box.append(el("div", {}, file, send), msg);
+  return box;
+}
 function renderSymbols(d) {
   $("symbols").replaceChildren(...(d.polities.length ? d.polities.map(p => el("div", { className: "entry" },
     p.flag ? flagSvg(p.flag, p.name) : crest(p.id, p.name, p.level === "Gemeinde" ? "town" : "federation"),
     el("div", {}, el("h3", { textContent: p.name }), el("div", { className: "sub", textContent: p.level }),
-      p.anthem ? el("button", { className: "btn small", style: "margin-top:8px", textContent: "▶ " + p.anthem.title, onclick: () => playAnthem(p.anthem) }) : el("div", { className: "muted small", textContent: "Keine Hymne" })),
+      p.anthem ? el("button", { className: "btn small", style: "margin-top:8px", textContent: "▶ " + p.anthem.title, onclick: () => playAnthem(p.anthem) }) : el("div", { className: "muted small", textContent: "Keine Hymne" }),
+      p.anthem ? anthemAudioControls(p) : ""),
     facts([["Flagge", p.flag ? p.flag.layers.length + " Muster auf " + p.flag.base : "keine (Banner in die Hand, /civ <Ebene> flagge setzen)"],
       ["Wahlkreise", p.constituencies.length ? p.constituencies.map(c => c.name + (c.towns.length ? " (" + c.towns.join(", ") + ")" : "") + (c.areas.length ? " – " + c.areas.length + " Gebiet(e)" : "")).join("; ") : "keine eigenen, es gelten Gemeinden"]])))
     : [el("div", { className: "empty", textContent: "Noch keine Gemeinde." })]));
