@@ -2,6 +2,8 @@ package de.etiennebader.civ.fabric.content;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.item.component.CustomData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
@@ -47,6 +49,8 @@ public final class EmblemBlock extends Block implements EntityBlock {
     /** Die Vorderseite zeigt zum Spieler, der den Block gesetzt hat; das Modell ist nach Süden gezeichnet. */
     public static final EnumProperty<Direction> FACING = BlockStateProperties.HORIZONTAL_FACING;
 
+    public static final EnumProperty<EmblemSize> SIZE = EnumProperty.create("size", EmblemSize.class);
+
     private static volatile BlockEntityType<EmblemBlockEntity> entityType;
 
     private final Kind kind;
@@ -56,7 +60,7 @@ public final class EmblemBlock extends Block implements EntityBlock {
         super(properties);
         this.kind = kind;
         this.shapes = Shapes.rotateHorizontal(shape);
-        registerDefaultState(stateDefinition.any().setValue(FACING, Direction.SOUTH));
+        registerDefaultState(stateDefinition.any().setValue(FACING, Direction.SOUTH).setValue(SIZE, EmblemSize.S));
     }
 
     /** Legt fest, wer von gesetzten Blöcken erfährt; ersetzt den bisherigen Hook. */
@@ -75,6 +79,12 @@ public final class EmblemBlock extends Block implements EntityBlock {
         return kind == Kind.COLUMN ? null : new EmblemBlockEntity(entityType, pos, state);
     }
 
+    /** Die Größe, die am Item steht (Kennung {@code size} in den eigenen Daten); ohne Angabe S. */
+    public static EmblemSize sizeOf(ItemStack stack) {
+        CustomData data = stack.get(DataComponents.CUSTOM_DATA);
+        return data == null ? EmblemSize.S : EmblemSize.parse(data.copyTag().getStringOr("size", "s"));
+    }
+
     public Kind kind() {
         return kind;
     }
@@ -89,12 +99,13 @@ public final class EmblemBlock extends Block implements EntityBlock {
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(FACING);
+        builder.add(FACING, SIZE);
     }
 
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext context) {
-        return defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
+        return defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite())
+                .setValue(SIZE, sizeOf(context.getItemInHand()));
     }
 
     @Override

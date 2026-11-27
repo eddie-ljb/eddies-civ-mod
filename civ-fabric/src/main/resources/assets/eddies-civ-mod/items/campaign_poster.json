@@ -1,6 +1,6 @@
 {
   "model": {
     "type": "minecraft:model",
-    "model": "eddies-civ-mod:block/campaign_poster"
+    "model": "eddies-civ-mod:block/campaign_poster_s"
   }
 }

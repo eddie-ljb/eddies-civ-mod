@@ -1,17 +1,62 @@
 {
   "variants": {
-    "facing=south": {
+    "facing=south,size=s": {
       "model": "eddies-civ-mod:block/election_poster"
     },
-    "facing=west": {
+    "facing=west,size=s": {
       "model": "eddies-civ-mod:block/election_poster",
       "y": 90
     },
-    "facing=north": {
+    "facing=north,size=s": {
       "model": "eddies-civ-mod:block/election_poster",
       "y": 180
     },
-    "facing=east": {
+    "facing=east,size=s": {
+      "model": "eddies-civ-mod:block/election_poster",
+      "y": 270
+    },
+    "facing=south,size=m": {
+      "model": "eddies-civ-mod:block/election_poster"
+    },
+    "facing=west,size=m": {
+      "model": "eddies-civ-mod:block/election_poster",
+      "y": 90
+    },
+    "facing=north,size=m": {
+      "model": "eddies-civ-mod:block/election_poster",
+      "y": 180
+    },
+    "facing=east,size=m": {
+      "model": "eddies-civ-mod:block/election_poster",
+      "y": 270
+    },
+    "facing=south,size=l": {
+      "model": "eddies-civ-mod:block/election_poster"
+    },
+    "facing=west,size=l": {
+      "model": "eddies-civ-mod:block/election_poster",
+      "y": 90
+    },
+    "facing=north,size=l": {
+      "model": "eddies-civ-mod:block/election_poster",
+      "y": 180
+    },
+    "facing=east,size=l": {
+      "model": "eddies-civ-mod:block/election_poster",
+      "y": 270
+    },
+    "facing=south,size=xl": {
+      "model": "eddies-civ-mod:block/election_poster"
+    },
+    "facing=west,size=xl": {
+      "model": "eddies-civ-mod:block/election_poster",
+      "y": 90
+    },
+    "facing=north,size=xl": {
+      "model": "eddies-civ-mod:block/election_poster",
+      "y": 180
+    },
+    "facing=east,size=xl": {
       "model": "eddies-civ-mod:block/election_poster",
       "y": 270
     }

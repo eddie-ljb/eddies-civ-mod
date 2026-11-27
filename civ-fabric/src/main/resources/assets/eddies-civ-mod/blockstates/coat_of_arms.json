@@ -1,18 +1,63 @@
 {
   "variants": {
-    "facing=south": {
-      "model": "eddies-civ-mod:block/coat_of_arms"
+    "facing=south,size=s": {
+      "model": "eddies-civ-mod:block/coat_of_arms_s"
     },
-    "facing=west": {
-      "model": "eddies-civ-mod:block/coat_of_arms",
+    "facing=west,size=s": {
+      "model": "eddies-civ-mod:block/coat_of_arms_s",
       "y": 90
     },
-    "facing=north": {
-      "model": "eddies-civ-mod:block/coat_of_arms",
+    "facing=north,size=s": {
+      "model": "eddies-civ-mod:block/coat_of_arms_s",
       "y": 180
     },
-    "facing=east": {
-      "model": "eddies-civ-mod:block/coat_of_arms",
+    "facing=east,size=s": {
+      "model": "eddies-civ-mod:block/coat_of_arms_s",
+      "y": 270
+    },
+    "facing=south,size=m": {
+      "model": "eddies-civ-mod:block/coat_of_arms_m"
+    },
+    "facing=west,size=m": {
+      "model": "eddies-civ-mod:block/coat_of_arms_m",
+      "y": 90
+    },
+    "facing=north,size=m": {
+      "model": "eddies-civ-mod:block/coat_of_arms_m",
+      "y": 180
+    },
+    "facing=east,size=m": {
+      "model": "eddies-civ-mod:block/coat_of_arms_m",
+      "y": 270
+    },
+    "facing=south,size=l": {
+      "model": "eddies-civ-mod:block/coat_of_arms_l"
+    },
+    "facing=west,size=l": {
+      "model": "eddies-civ-mod:block/coat_of_arms_l",
+      "y": 90
+    },
+    "facing=north,size=l": {
+      "model": "eddies-civ-mod:block/coat_of_arms_l",
+      "y": 180
+    },
+    "facing=east,size=l": {
+      "model": "eddies-civ-mod:block/coat_of_arms_l",
+      "y": 270
+    },
+    "facing=south,size=xl": {
+      "model": "eddies-civ-mod:block/coat_of_arms_xl"
+    },
+    "facing=west,size=xl": {
+      "model": "eddies-civ-mod:block/coat_of_arms_xl",
+      "y": 90
+    },
+    "facing=north,size=xl": {
+      "model": "eddies-civ-mod:block/coat_of_arms_xl",
+      "y": 180
+    },
+    "facing=east,size=xl": {
+      "model": "eddies-civ-mod:block/coat_of_arms_xl",
       "y": 270
     }
   }
