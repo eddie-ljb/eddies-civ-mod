@@ -440,7 +440,7 @@ body { background: radial-gradient(1200px 500px at 85% -10%, color-mix(in srgb, 
       <div class="feature"><svg><use href="#i-town"/></svg><h3>Bauen mit Absperrung</h3><p>Baufirmen sperren ihre Baustelle mit Bauabsperrungen ab, tragen das Gelände ab und richten das Haus zur Straße aus: Die Tür liegt auf Straßenhöhe.</p></div>
       <div class="feature"><svg><use href="#i-road"/></svg><h3>Straßen durch Dorfbewohner</h3><p>Bürgermeister und Bauamt unter den Dorfbewohnern legen eigene Straßen an, taufen sie mit echten Namen und lassen den Weg mit der Schaufel oder gepflastert bauen.</p></div>
       <div class="feature"><svg><use href="#i-law"/></svg><h3>Religion und Schrift</h3><p>Schreibe die Heilige Schrift deiner Religion selbst, erfinde Ämter wie Priester oder Schriftwart und segne Spieler und Dorfbewohner.</p></div>
-      <div class="feature"><svg><use href="#i-paper"/></svg><h3>Eigene Logos</h3><p>Die Spitze lädt Wappen, Plakate und Leuchtreklamen hoch. Im Spiel schwebt das Wappen über dem Gemeindehaus und liegt als Karte bereit.</p></div>
+      <div class="feature"><svg><use href="#i-paper"/></svg><h3>Eigene Logos</h3><p>Die Spitze lädt Wappen, Flaggen, Plakate und Leuchtreklamen hoch. Im Spiel schwebt das Wappen über dem Gemeindehaus und liegt als Karte bereit.</p></div>
       <div class="feature"><svg><use href="#i-chat"/></svg><h3>Hilfe beim Tippen</h3><p>Alle Befehle schlagen passende Werte vor, mit kurzer Erklärung: eigene Aufträge, Verträge, Firmen, Spieler, Währungen und mehr.</p></div>
     </div>
 
@@ -645,7 +645,7 @@ body { background: radial-gradient(1200px 500px at 85% -10%, color-mix(in srgb, 
     <div class="liveband" id="debates"></div>
     <h3 style="margin:8px 0 12px">Hoheitszeichen und Wahlkreise</h3>
     <div class="register" id="symbols"></div>
-    <p class="muted" style="margin-top:16px">Eigene Wappen, Wahlplakate und Leuchtreklamen lädst du auf der Seite <a href="#logos">Logos</a> hoch.</p>
+    <p class="muted" style="margin-top:16px">Eigene Wappen, Flaggen, Wahlplakate und Leuchtreklamen lädst du auf der Seite <a href="#logos">Logos</a> hoch.</p>
   </section>
 
   <section data-page="recht">
@@ -719,7 +719,7 @@ body { background: radial-gradient(1200px 500px at 85% -10%, color-mix(in srgb, 
   </section>
 
   <section data-page="logos">
-    <div class="pagehead"><div><h2>Logos</h2><p>Lade ein eigenes Wappen, Wahlplakat oder eine Leuchtreklame für Gemeinden, Bünde, Firmen und Parteien hoch, die du führst. Das Wappen einer Gemeinde schwebt im Spiel über ihrem Gemeindehaus; jedes Bild bekommt jeder Spieler mit <code>/civ logo &lt;Name&gt;</code> als Karte in die Hand.</p></div></div>
+    <div class="pagehead"><div><h2>Logos</h2><p>Lade ein eigenes Wappen, eine Flagge, ein Wahlplakat oder eine Leuchtreklame für Gemeinden, Bünde, Firmen und Parteien hoch, die du führst. Das Wappen einer Gemeinde schwebt im Spiel über ihrem Gemeindehaus; jedes Bild bekommt jeder Spieler mit <code>/civ logo &lt;Name&gt;</code> als Karte in die Hand, und mit <code>/civ zeichen flagge|wappen|plakat bild &lt;Name&gt;</code> als aufstellbaren Block.</p></div></div>
     <div data-locked></div>
     <div data-unlocked>
       <div class="panel">
@@ -727,7 +727,7 @@ body { background: radial-gradient(1200px 500px at 85% -10%, color-mix(in srgb, 
         <form class="compose" id="logoform">
           <div class="row">
             <label class="field grow">Einheit<select id="logopolity" required></select></label>
-            <label class="field">Art<select id="logokind"><option value="WAPPEN">Wappen (ersetzt das alte)</option><option value="WAHLPLAKAT">Wahlplakat</option><option value="LEUCHTREKLAME">Leuchtreklame</option></select></label>
+            <label class="field">Art<select id="logokind"><option value="WAPPEN">Wappen (ersetzt das alte)</option><option value="FLAGGE">Flagge (ersetzt die alte)</option><option value="WAHLPLAKAT">Wahlplakat</option><option value="LEUCHTREKLAME">Leuchtreklame</option></select></label>
           </div>
           <label class="field">Bilddatei (PNG, JPG, GIF oder WebP, wird auf höchstens 128 × 128 Punkte verkleinert)<input type="file" id="logofile" accept="image/png,image/jpeg,image/gif,image/webp"></label>
           <div class="row"><canvas id="logopreview" width="128" height="128" style="width:96px;height:96px;border:1px solid var(--line);border-radius:6px;image-rendering:pixelated" aria-label="Vorschau"></canvas>
@@ -2340,7 +2340,7 @@ async function loadLogos() {
       : el("p", { className: "muted", textContent: "Noch kein Bild hochgeladen." }))) :
     [el("div", { className: "empty", textContent: "Du führst im Moment keine Gemeinde, keinen Bund und keine Firma. Nur wer eine Einheit anführt, darf ihre Logos hochladen." })]));
 }
-const kindLabel = k => ({ WAPPEN: "Wappen", WAHLPLAKAT: "Wahlplakat", LEUCHTREKLAME: "Leuchtreklame" }[k] || k);
+const kindLabel = k => ({ WAPPEN: "Wappen", FLAGGE: "Flagge", WAHLPLAKAT: "Wahlplakat", LEUCHTREKLAME: "Leuchtreklame" }[k] || k);
 const kindName = k => ({ TERRITORIAL: "Gemeinde", COMPANY: "Firma", PARTY: "Partei", FEDERATION: "Bund", NEWSPAPER: "Zeitung" }[k] || k.toLowerCase());
 $("logofile").addEventListener("change", async () => {
   const file = $("logofile").files[0];
