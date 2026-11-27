@@ -136,4 +136,62 @@ class PoliceServiceTest {
         assertTrue(registry.forceOf(town).keySet().stream()
                 .allMatch(m -> m instanceof de.etiennebader.civ.domain.actor.PersonRef));
     }
+
+    @Test
+    @DisplayName("Festnahme eröffnet ein Strafverfahren; rechtskräftig sitzt der Täter ab oder kommt frei, Verknüpfung endet")
+    void arrestLeadsToCourtCase() {
+        server.police().join(caller(alice, "Alice"));
+        server.police().appoint(caller(alice, "Alice"), "Bob", PoliceRank.OFFICER);
+        assertTrue(server.police().cells(caller(alice, "Alice"), 2).success());
+        assertTrue(server.police().report(caller(alice, "Alice"), "Carol", CrimeKind.THEFT).success());
+        assertTrue(server.police().arrest(caller(bob, "Bob"), "Carol").success());
+        assertEquals(1, server.police().registry().links().size(), "Strafverfahren aus der Festnahme");
+        assertEquals(1, server.justice().allCases(java.util.Optional.empty()).size());
+
+        for (long day = 1; day <= 12; day++) {
+            server.justice().endOfDay(Day.of(day));
+            server.police().endOfDay(Day.of(day));
+        }
+        assertTrue(server.police().registry().links().isEmpty(), "rechtskräftig, Verknüpfung beendet");
+    }
+
+    @Test
+    @DisplayName("Richter verhängt Haft per Urteil; Kadetten, Gefesselte und Fremde ändern nichts")
+    void judgeSetsJail() {
+        server.police().join(caller(alice, "Alice"));
+        server.police().appoint(caller(alice, "Alice"), "Bob", PoliceRank.OFFICER);
+        server.police().cells(caller(alice, "Alice"), 1);
+        server.police().report(caller(alice, "Alice"), "Carol", CrimeKind.THEFT);
+        server.police().arrest(caller(bob, "Bob"), "Carol");
+        var link = server.police().registry().links().getFirst();
+        assertEquals(0, link.sentenceDays());
+        assertTrue(server.police().registry().sentence(town, link.caseNumber(), 7));
+        assertEquals(7, server.police().registry().links().getFirst().effectiveDays());
+        assertFalse(server.police().registry().sentence(town, 999, 7), "unbekanntes Verfahren");
+    }
+
+    @Test
+    @DisplayName("Verfassung: automatische Besetzung stellt Richter und Staatsanwalt aus den Dorfbewohnern, Ernennen ist dann gesperrt")
+    void constitutionStaffing() {
+        for (int i = 0; i < 5; i++) {
+            server.villagers().seen(new de.etiennebader.civ.domain.actor.PersonRef(
+                    de.etiennebader.civ.domain.shared.PersonId.generate(ids)),
+                    new BlockPosition(DimensionId.OVERWORLD, 8, 64, 8), Day.of(1));
+        }
+        var reply = server.lawBooks().enactRights(caller(alice, "Alice"), town, "Gerichtswahl",
+                java.util.Map.of("court_staffing", "automatic"));
+        assertTrue(reply.success(), () -> reply.lines().toString());
+        server.justice().endOfDay(Day.of(2));
+        assertEquals(1, server.courtStaff(town).judges().size(), "ein Richter per Verfassung");
+        assertEquals(1, server.courtStaff(town).prosecutors().size(), "ein Staatsanwalt per Verfassung");
+        assertTrue(server.courtStaff(town).judges().stream()
+                .allMatch(j -> j instanceof de.etiennebader.civ.domain.actor.PersonRef));
+        server.justice().endOfDay(Day.of(3));
+        assertEquals(1, server.courtStaff(town).judges().size(), "keine Doppelbesetzung");
+        var court = server.justice().court(caller(alice, "Alice"), server.queries().polity(town).orElseThrow());
+        assertTrue(court.success());
+        assertFalse(server.justice().appoint(caller(alice, "Alice"), server.queries().polity(town).orElseThrow(),
+                de.etiennebader.civ.domain.justice.Role.JUDGE, "Bob", java.util.Optional.empty(), true).success(),
+                "bei automatischer Besetzung ernennt niemand");
+    }
 }

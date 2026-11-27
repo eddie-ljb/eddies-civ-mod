@@ -249,6 +249,34 @@ public final class WarRegistry extends AggregateRoot<WarEvent> implements WarVie
     }
 
     /**
+     * Setzt den Rang eines Dienenden (Beförderung oder Degradierung); Ausbildung und Ausrüstung bleiben.
+     * Es gibt nur einen General: ein neuer General degradiert den bisherigen zum Hauptmann.
+     *
+     * @throws NotEnlistedException wenn das Mitglied dort nicht dient
+     */
+    public void promote(PolityId polity, ActorRef member, MilitaryRank rank) {
+        Objects.requireNonNull(rank, "rank");
+        Map<ActorRef, Service> garrison = services.get(polity);
+        if (garrison == null || !garrison.containsKey(member)) {
+            throw new NotEnlistedException(polity, member);
+        }
+        if (rank == MilitaryRank.GENERAL) {
+            garrison.replaceAll((other, service) -> service.rank() == MilitaryRank.GENERAL && !other.equals(member)
+                    ? new Service(MilitaryRank.CAPTAIN, service.training(), service.equipment()) : service);
+        }
+        Service old = garrison.get(member);
+        garrison.put(member, new Service(rank, old.training(), old.equipment()));
+    }
+
+    /** Ob {@code superior} laut Befehlskette über {@code subordinate} steht. */
+    public boolean commands(PolityId polity, ActorRef superior, ActorRef subordinate) {
+        Map<ActorRef, MilitaryRank> garrison = garrisonOf(polity);
+        MilitaryRank a = garrison.get(superior);
+        MilitaryRank b = garrison.get(subordinate);
+        return a != null && b != null && a.outranks(b);
+    }
+
+    /**
      * Entlässt {@code member} aus der Garnison von {@code polity}.
      *
      * @throws NotEnlistedException wenn das Mitglied dort gar nicht dient
@@ -472,8 +500,7 @@ public final class WarRegistry extends AggregateRoot<WarEvent> implements WarVie
     private int casualties(PolityId polity, boolean lost, boolean draw, Day day) {
         List<Map.Entry<ActorRef, Service>> healthy = services.getOrDefault(polity, Map.of()).entrySet().stream()
                 .filter(entry -> !isWounded(polity, entry.getKey(), day))
-                .sorted(Comparator.comparingInt(entry -> entry.getValue().rank().ordinal() == 1 ? 2
-                        : entry.getValue().rank() == MilitaryRank.SCOUT ? 1 : 0))
+                .sorted(Comparator.comparingInt(entry -> entry.getValue().rank().casualtyOrder()))
                 .toList();
         int percent = lost && !draw ? LOSER_CASUALTY_PERCENT : WINNER_CASUALTY_PERCENT;
         int count = lost && !draw ? (healthy.size() * percent + 99) / 100 : healthy.size() * percent / 100;

@@ -1,6 +1,7 @@
 package de.etiennebader.civ.server.police;
 
 import de.etiennebader.civ.domain.actor.ActorRef;
+import de.etiennebader.civ.domain.police.CaseLink;
 import de.etiennebader.civ.domain.police.CrimeKind;
 import de.etiennebader.civ.domain.police.Detention;
 import de.etiennebader.civ.domain.police.Offense;
@@ -40,6 +41,7 @@ final class PoliceStore {
         Map<PolityId, Integer> cells = new LinkedHashMap<>();
         Map<PolityId, Map<ActorRef, Detention>> detained = new LinkedHashMap<>();
         Map<ActorRef, Day> cuffed = new LinkedHashMap<>();
+        List<CaseLink> links = new ArrayList<>();
         try {
             for (String line : Files.readAllLines(file.get(), StandardCharsets.UTF_8)) {
                 String[] f = line.split("\t", -1);
@@ -48,7 +50,10 @@ final class PoliceStore {
                             .put(ActorCodec.decode(f[2]), PoliceRank.valueOf(f[3]));
                     case "OFF" -> offenses.computeIfAbsent(pid(f[1]), k -> new ArrayList<>())
                             .add(new Offense(Integer.parseInt(f[2]), ActorCodec.decode(f[3]), CrimeKind.valueOf(f[4]),
-                                    Day.of(Long.parseLong(f[5])), Boolean.parseBoolean(f[6])));
+                                    Day.of(Long.parseLong(f[5])), Boolean.parseBoolean(f[6]),
+                                    f.length > 7 ? actors(f[7]) : List.of()));
+                    case "CASE" -> links.add(new CaseLink(Integer.parseInt(f[2]), pid(f[1]), ActorCodec.decode(f[3]),
+                            CrimeKind.valueOf(f[4]), Integer.parseInt(f[5]), actors(f[6]), Boolean.parseBoolean(f[7])));
                     case "CELLS" -> cells.put(pid(f[1]), Integer.parseInt(f[2]));
                     case "JAIL" -> {
                         ActorRef person = ActorCodec.decode(f[2]);
@@ -64,7 +69,8 @@ final class PoliceStore {
         } catch (IOException | RuntimeException e) {
             return PoliceRegistry.empty();
         }
-        return PoliceRegistry.restore(new PoliceRegistry.Snapshot(ranks, offenses, cells, detained, cuffed));
+        return PoliceRegistry.restore(new PoliceRegistry.Snapshot(ranks, offenses, cells, detained, cuffed,
+                links));
     }
 
     void save(PoliceRegistry registry) {
@@ -77,7 +83,10 @@ final class PoliceStore {
                 polity.value().toString(), ActorCodec.encode(m), rank.name()))));
         s.offenses().forEach((polity, list) -> list.forEach(o -> lines.add(String.join("\t", "OFF",
                 polity.value().toString(), Integer.toString(o.number()), ActorCodec.encode(o.suspect()),
-                o.kind().name(), Long.toString(o.on().value()), Boolean.toString(o.handled())))));
+                o.kind().name(), Long.toString(o.on().value()), Boolean.toString(o.handled()), join(o.witnesses())))));
+        s.cases().forEach(c -> lines.add(String.join("\t", "CASE", c.polity().value().toString(),
+                Integer.toString(c.caseNumber()), ActorCodec.encode(c.suspect()), c.kind().name(),
+                Integer.toString(c.sentenceDays()), join(c.witnesses()), Boolean.toString(c.prepared()))));
         s.cells().forEach((polity, n) -> lines.add("CELLS\t" + polity.value() + "\t" + n));
         s.detained().forEach((polity, map) -> map.values().forEach(d -> lines.add(String.join("\t", "JAIL",
                 polity.value().toString(), ActorCodec.encode(d.person()), Long.toString(d.since().value()),
@@ -92,6 +101,17 @@ final class PoliceStore {
         } catch (IOException e) {
             // best effort; beim nächsten Tagesende erneut
         }
+    }
+
+    private static String join(List<ActorRef> actors) {
+        return String.join(",", actors.stream().map(ActorCodec::encode).toList());
+    }
+
+    private static List<ActorRef> actors(String joined) {
+        if (joined.isEmpty()) {
+            return List.of();
+        }
+        return java.util.Arrays.stream(joined.split(",")).map(ActorCodec::decode).toList();
     }
 
     private static PolityId pid(String s) {

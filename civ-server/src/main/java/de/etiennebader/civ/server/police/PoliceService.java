@@ -9,6 +9,9 @@ import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.actor.PlayerRef;
 import de.etiennebader.civ.domain.economy.TransferReason;
 import de.etiennebader.civ.domain.law.StandardParameters;
+import de.etiennebader.civ.domain.justice.CaseKind;
+import de.etiennebader.civ.domain.justice.CourtCase;
+import de.etiennebader.civ.domain.police.CaseLink;
 import de.etiennebader.civ.domain.police.CrimeKind;
 import de.etiennebader.civ.domain.police.Criminality;
 import de.etiennebader.civ.domain.police.Offense;
@@ -30,6 +33,7 @@ import de.etiennebader.civ.server.command.Message;
 import de.etiennebader.civ.server.command.MessageKey;
 import de.etiennebader.civ.server.command.Reply;
 import de.etiennebader.civ.server.command.Texts;
+import de.etiennebader.civ.server.justice.CaseListener;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -54,7 +58,7 @@ import java.util.Random;
  *         ({@link #restrained}).</li>
  * </ul>
  */
-public final class PoliceService {
+public final class PoliceService implements CaseListener {
 
     static final int WITNESS_PERCENT = 60;
     static final int STALE_DAYS = 7;
@@ -260,6 +264,8 @@ public final class PoliceService {
         }
         CrimeKind kind = offense.map(Offense::kind).orElse(CrimeKind.TRESPASS);
         offense.ifPresent(o -> registry.handle(t.id(), o.number()));
+        Offense charged = offense.orElseGet(() -> new Offense(0, target.get(), kind, today, true, List.of()));
+        fileCase(t, charged, today);
         if (!registry.detain(t.id(), target.get(), today, kind.detentionDays(), true)) {
             registry.cuff(target.get(), today);
             save();
@@ -291,6 +297,37 @@ public final class PoliceService {
         registry.cuff(target.get(), calendar.today());
         save();
         return Reply.success(Message.of(MessageKey.POLICE_CUFFED, texts.actor(target.get())));
+    }
+
+    /**
+     * Handschellen als Gegenstand: Rechtsklick auf einen Spieler oder Dorfbewohner fesselt ihn, bei bereits Gefesselten
+     * löst derselbe Griff die Handschellen. Es gelten dieselben Rang- und Befehlskettenregeln wie bei den Befehlen.
+     */
+    public synchronized Reply handcuff(Caller caller, ActorRef target) {
+        Optional<PolityView> town = ownTown(caller);
+        if (town.isEmpty()) {
+            return fail(MessageKey.POLICE_NO_TOWN);
+        }
+        PolityView t = town.get();
+        Optional<PoliceRank> own = registry.rankOf(t.id(), caller.player());
+        if (own.isEmpty() || !own.get().mayArrest()) {
+            return fail(MessageKey.POLICE_RANK_TOO_LOW);
+        }
+        Optional<Reply> refusal = arrestRefusal(t, caller.player(), own.get(), target);
+        if (refusal.isPresent()) {
+            return refusal.get();
+        }
+        Day today = calendar.today();
+        if (registry.restrained(target, today)) {
+            if (registry.jailOf(target).isPresent() || !registry.uncuff(target)) {
+                return fail(MessageKey.POLICE_NOT_CUFFED);
+            }
+            save();
+            return Reply.success(Message.of(MessageKey.POLICE_UNCUFFED, texts.actor(target)));
+        }
+        registry.cuff(target, today);
+        save();
+        return Reply.success(Message.of(MessageKey.POLICE_CUFFED, texts.actor(target)));
     }
 
     public synchronized Reply uncuff(Caller caller, String name) {
@@ -451,10 +488,25 @@ public final class PoliceService {
                 continue;
             }
             CrimeKind kind = Criminality.kindFor(value, dice.nextInt(100));
-            if (patrolled || dice.nextInt(100) < WITNESS_PERCENT) {
-                registry.report(town.id(), person, kind, day);
+            List<ActorRef> witnesses = witnessesOf(town, person, dice);
+            if (patrolled || !witnesses.isEmpty()) {
+                registry.report(town.id(), person, kind, day, witnesses);
             }
         }
+    }
+
+    /** Mitbewohner, die die Tat sehen (je 60 %, höchstens {@value Offense#MAX_WITNESSES}) und sie anzeigen. */
+    private List<ActorRef> witnessesOf(PolityView town, PersonRef culprit, Random dice) {
+        List<ActorRef> seen = new ArrayList<>();
+        List<ActorRef> neighbours = town.members().stream().map(Membership::member)
+                .filter(m -> m instanceof PersonRef && !m.equals(culprit)).toList();
+        for (int i = 0; i < Offense.MAX_WITNESSES && !neighbours.isEmpty(); i++) {
+            ActorRef candidate = neighbours.get(dice.nextInt(neighbours.size()));
+            if (dice.nextInt(100) < WITNESS_PERCENT && !seen.contains(candidate)) {
+                seen.add(candidate);
+            }
+        }
+        return seen;
     }
 
     private boolean patrolling(PolityView town) {
@@ -478,6 +530,7 @@ public final class PoliceService {
             }
             if (registry.detain(town.id(), offense.suspect(), day, offense.kind().detentionDays(), false)) {
                 registry.handle(town.id(), offense.number());
+                fileCase(town, offense, day);
                 capacity--;
                 announcements.add(Announcement.toAll(Message.of(MessageKey.POLICE_VILLAGER_ARRESTED,
                         texts.actor(offense.suspect()), town.name().toString(), crimeName(offense.kind()))));
@@ -502,9 +555,87 @@ public final class PoliceService {
         }
     }
 
+    // ------------------------------------------------------------------ Gericht (Issue #84)
+
+    /**
+     * Die Gemeinde klagt als Staatsanwaltschaft den Festgenommenen an (Strafverfahren) und legt den Polizeibericht
+     * als Beweis bei; die Zeugen werden nach Eröffnung geladen. Scheitert das (z. B. kein Gerichtsbezirk, Gebühr
+     * nicht zahlbar), bleibt es bei der Untersuchungshaft.
+     */
+    private void fileCase(PolityView town, Offense offense, Day day) {
+        try {
+            CourtCase filed = app.justice().file(town.asActor(), town.id(), CaseKind.CRIMINAL, offense.suspect(),
+                    chargeOf(offense.kind()), "", day);
+            registry.link(new CaseLink(filed.number(), town.id(), offense.suspect(), offense.kind(), 0,
+                    offense.witnesses(), false));
+            app.justice().submit(town.asActor(), filed.id(), "police_report", "Polizeibericht",
+                    "Festnahme wegen " + chargeOf(offense.kind()) + " am Tag " + offense.on().value() + "; "
+                            + offense.witnesses().size() + " Zeugen.", 2, day);
+        } catch (RuntimeException e) {
+            // Haft ohne Verfahren; der Täter kommt nach der Untersuchungshaft frei
+        }
+    }
+
+    private static String chargeOf(CrimeKind kind) {
+        return switch (kind) {
+            case THEFT -> "Diebstahl";
+            case TRESPASS -> "Hausfriedensbruch";
+            case ASSAULT -> "Körperverletzung";
+            case MURDER -> "Mord";
+        };
+    }
+
+    /** Das Verfahren ist eröffnet: Zeugen werden geladen; Dorfbewohner sagen sofort aus. */
+    @Override
+    public synchronized void opened(CourtCase courtCase) {
+        registry.linkOf(courtCase.court(), courtCase.number()).filter(link -> !link.prepared()).ifPresent(link -> {
+            PolityView town = queries.polity(courtCase.court()).orElse(null);
+            if (town != null) {
+                for (ActorRef witness : link.witnesses()) {
+                    try {
+                        app.justice().summon(town.asActor(), courtCase.id(), witness, calendar.today());
+                    } catch (RuntimeException e) {
+                        // schon beteiligt oder zu viele Zeugen
+                    }
+                }
+            }
+            registry.prepared(courtCase.court(), courtCase.number());
+            save();
+        });
+    }
+
+    /** Der Richter hat Haft verhängt. */
+    @Override
+    public synchronized void sentenced(CourtCase courtCase, int days) {
+        if (registry.sentence(courtCase.court(), courtCase.number(), days)) {
+            save();
+        }
+    }
+
+    /** Rechtskräftig: bei Schuldspruch sitzt der Täter die Haft ab, sonst wird er freigelassen. */
+    @Override
+    public synchronized void finalised(CourtCase courtCase) {
+        Optional<CaseLink> link = registry.unlink(courtCase.court(), courtCase.number());
+        if (link.isEmpty()) {
+            return;
+        }
+        ActorRef suspect = link.get().suspect();
+        Day today = calendar.today();
+        registry.release(courtCase.court(), suspect);
+        registry.uncuff(suspect);
+        boolean guilty = courtCase.verdict().filter(v -> v.upheld()).isPresent();
+        if (guilty && registry.detain(courtCase.court(), suspect, today, link.get().effectiveDays(), false)) {
+            announcements.add(Announcement.toTown(courtCase.court(), Message.of(MessageKey.POLICE_SENTENCE_SERVED,
+                    texts.actor(suspect), link.get().effectiveDays())));
+        } else if (guilty) {
+            registry.cuff(suspect, today); // keine freie Zelle: nur gefesselt
+        }
+        save();
+    }
+
     // ------------------------------------------------------------------ Hilfen
 
-    private Optional<Reply> arrestRefusal(PolityView town, PlayerRef actor, PoliceRank own, PlayerRef target) {
+    private Optional<Reply> arrestRefusal(PolityView town, PlayerRef actor, PoliceRank own, ActorRef target) {
         if (target.equals(actor)) {
             return Optional.of(fail(MessageKey.POLICE_SELF));
         }

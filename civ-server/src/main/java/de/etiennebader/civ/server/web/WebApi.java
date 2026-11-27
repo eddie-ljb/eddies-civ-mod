@@ -305,6 +305,8 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                 case "POST /api/exchange" -> withLogin(request, login -> action(request, body -> game.call(() ->
                         exchangeAction(login, body)), texts));
                 case "GET /api/war" -> HttpResponse.json(200, game.call(this::war));
+                case "POST /api/war/campaign" -> withLogin(request, login -> action(request, body -> game.call(() ->
+                        warCampaign(login, body)), texts));
                 case "GET /api/families" -> HttpResponse.json(200, game.call(this::families));
                 case "GET /api/press" -> HttpResponse.json(200, game.call(this::press));
                 case "POST /api/press" -> withLogin(request, login -> action(request, body -> game.call(() ->
@@ -817,8 +819,44 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
     }
 
     /** Zeitungen und neueste Artikel; ohne Anmeldung. */
+    /** Feldzugplaner im Web: {@code number} (Nr. des Krieges), {@code kind} (angriff|hinterhalt|verteidigung), {@code days}. */
+    private Reply warCampaign(WebSessions.Login login, Map<String, String> body) {
+        de.etiennebader.civ.domain.war.BattleKind kind = switch (body.getOrDefault("kind", "").toLowerCase()) {
+            case "angriff", "assault" -> de.etiennebader.civ.domain.war.BattleKind.ASSAULT;
+            case "hinterhalt", "ambush" -> de.etiennebader.civ.domain.war.BattleKind.AMBUSH;
+            case "verteidigung", "defensive" -> de.etiennebader.civ.domain.war.BattleKind.DEFENSIVE;
+            default -> null;
+        };
+        if (kind == null) {
+            return Reply.failure(Message.of(MessageKey.WAR_CAMPAIGN_KIND));
+        }
+        int number;
+        int days;
+        try {
+            number = Integer.parseInt(body.getOrDefault("number", "0"));
+            days = Integer.parseInt(body.getOrDefault("days", "1"));
+        } catch (NumberFormatException e) {
+            return Reply.failure(Message.of(MessageKey.WAR_CAMPAIGN_KIND));
+        }
+        return civ.war().campaign(caller(login), number, kind, days);
+    }
+
+    private static String chunks(java.util.Collection<de.etiennebader.civ.domain.territory.ChunkCoord> chunks) {
+        StringBuilder out = new StringBuilder("[");
+        for (var chunk : chunks) {
+            if (chunk.dimension().equals(de.etiennebader.civ.domain.territory.DimensionId.OVERWORLD)) {
+                out.append(out.length() > 1 ? "," : "").append('[').append(chunk.x()).append(',').append(chunk.z())
+                        .append(']');
+            }
+        }
+        return out.append(']').toString();
+    }
+
     private String war() {
         var registry = civ.war().registry();
+        var territory = civ.queries().territory();
+        var wars = registry.wars();
+        var log = civ.war().battleLog();
         var queries = civ.queries();
         java.util.function.Function<de.etiennebader.civ.domain.shared.PolityId, String> name = id -> queries.polity(id)
                 .map(polity -> polity.name().toString()).orElse("?");
@@ -836,7 +874,9 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
             }
         }));
         return Json.object()
-                .raw("wars", Json.array(registry.wars(), war -> Json.object()
+                .put("day", civ.calendar().today().value())
+                .raw("wars", Json.array(wars, war -> Json.object()
+                        .put("number", wars.indexOf(war) + 1)
                         .put("aggressor", name.apply(war.aggressor()))
                         .put("defender", name.apply(war.defender()))
                         .put("ongoing", war.ongoing())
@@ -849,6 +889,13 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                         .put("defenderWounded", wounded.apply(war.defender()))
                         .put("winner", war.outcome().map(terms -> name.apply(terms.winner())).orElse(""))
                         .put("reparations", war.outcome().map(terms -> terms.reparations()).orElse(0L))
+                        .raw("aggressorChunks", war.ongoing() ? chunks(territory.territoryOf(war.aggressor())) : "[]")
+                        .raw("defenderChunks", war.ongoing() ? chunks(territory.territoryOf(war.defender())) : "[]")
+                        .raw("battles", Json.array(log.stream().filter(entry -> entry.war().equals(war.id())).toList(),
+                                entry -> Json.object().put("day", entry.day()).put("kind", entry.kind().name())
+                                        .put("front", entry.front()).put("shift", entry.shift())
+                                        .put("woundedAggressor", entry.woundedAggressor())
+                                        .put("woundedDefender", entry.woundedDefender()).build()))
                         .raw("campaigns", Json.array(registry.campaigns().stream()
                                 .filter(campaign -> campaign.war().equals(war.id())).toList(), campaign -> Json.object()
                                 .put("kind", campaign.kind().name())

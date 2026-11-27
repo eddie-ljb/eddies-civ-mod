@@ -191,7 +191,7 @@ public final class CivServer {
                 settings.ticksPerDay(), new de.etiennebader.civ.server.construction.BlueprintLibrary(
                 dataDirectory.map(dir -> dir.resolve("blueprints"))), dataDirectory.map(dir -> dir.resolve("construction.tsv")), announcements);
         this.war = new de.etiennebader.civ.server.war.WarService(app, calendar, texts, announcements, ids,
-                settings, dataDirectory.map(dir -> dir.resolve("war.tsv")));
+                settings, dataDirectory.map(dir -> dir.resolve("war.tsv")), players);
         this.police = new de.etiennebader.civ.server.police.PoliceService(app, calendar, players, texts,
                 announcements, settings, dataDirectory.map(dir -> dir.resolve("police.tsv")));
         this.villagerFederations = new VillagerFederations(app, federations, announcements);
@@ -230,6 +230,8 @@ public final class CivServer {
         this.civic = new CivicService(app, calendar, texts, announcements, plots);
         this.homePorts = new HomePortService(app, calendar, texts, war::registry, settings.warPortLock());
         this.justice = new JusticeService(app, calendar, players, texts, announcements);
+        this.justice.addListener(police);
+        this.war.onNews(this::warNews);
         this.liveCount = new LiveCountService(announcements, settings.show().liveCount(),
                 settings.show().liveCountSeconds(), settings.show().projections());
         this.debates = new DebateService(app, calendar, texts, announcements, settings.show().debateMinutes());
@@ -453,6 +455,16 @@ public final class CivServer {
 
     public TownService towns() {
         return towns;
+    }
+
+    /** Kriegsberichte erscheinen in jeder Zeitung, die einen Dorfbewohner als Redakteur hat. */
+    private void warNews(String title, String body) {
+        for (de.etiennebader.civ.domain.polity.PolityView paper : app.queries().newspapers()) {
+            paper.members().stream().map(de.etiennebader.civ.domain.polity.Membership::member)
+                    .filter(de.etiennebader.civ.domain.actor.PersonRef.class::isInstance)
+                    .sorted(java.util.Comparator.comparing(de.etiennebader.civ.domain.actor.ActorRef::uuid)).findFirst()
+                    .ifPresent(editor -> press.publish(editor, paper.name().toString(), title, body));
+        }
     }
 
     public de.etiennebader.civ.server.police.PoliceService police() {

@@ -1651,6 +1651,12 @@ public final class CivCommandTree {
                         StringArgumentType.getString(context, COMPANY)))));
     }
 
+    private LiteralArgumentBuilder<CommandSourceStack> warRank(String literal,
+            de.etiennebader.civ.domain.war.MilitaryRank rank) {
+        return Commands.literal(literal).executes(context -> withCiv(context, (civ, player) -> civ.war().promote(
+                Players.caller(player), StringArgumentType.getString(context, COMPANY), rank)));
+    }
+
     private LiteralArgumentBuilder<CommandSourceStack> warCommands() {
         return Commands.literal("krieg")
                 .then(Commands.literal("liste")
@@ -1669,6 +1675,13 @@ public final class CivCommandTree {
                         .then(Commands.literal("ausspaeher")
                                 .executes(context -> withCiv(context, (civ, player) -> civ.war().enlist(
                                         Players.caller(player), de.etiennebader.civ.domain.war.MilitaryRank.SCOUT)))))
+                .then(Commands.literal("befoerdern")
+                        .then(Commands.argument(COMPANY, StringArgumentType.string())
+                                .then(warRank("soldat", de.etiennebader.civ.domain.war.MilitaryRank.SOLDIER))
+                                .then(warRank("unteroffizier", de.etiennebader.civ.domain.war.MilitaryRank.SERGEANT))
+                                .then(warRank("offizier", de.etiennebader.civ.domain.war.MilitaryRank.OFFICER))
+                                .then(warRank("hauptmann", de.etiennebader.civ.domain.war.MilitaryRank.CAPTAIN))
+                                .then(warRank("general", de.etiennebader.civ.domain.war.MilitaryRank.GENERAL))))
                 .then(Commands.literal("entlassen")
                         .executes(context -> withCiv(context, (civ, player) -> civ.war().discharge(Players.caller(player)))))
                 .then(Commands.literal("wille")

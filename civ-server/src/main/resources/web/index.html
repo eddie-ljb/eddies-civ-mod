@@ -552,6 +552,19 @@ footer div { max-width: 1240px; margin: 0 auto; padding: 18px 20px; display: fle
   <section data-page="krieg">
     <div class="pagehead"><div><h2>Krieg</h2><p>Live-Frontverlauf aller Kriege: –100 heißt Sieg des Verteidigers, +100 Sieg des Angreifers. Die genaue Truppenstärke kennen nur Ausspäher, hier ist nur die grobe Größe sichtbar.</p></div></div>
     <div class="register" id="wars"></div>
+    <div id="warplanner" class="card" hidden>
+      <h3>Feldzugplaner</h3>
+      <p>Der Bürgermeister, ein Hauptmann oder der General plant einen Feldzug für die eigene Gemeinde (Tage ab heute, höchstens 30).</p>
+      <div class="row">
+        <select id="plannerwar" aria-label="Krieg"></select>
+        <select id="plannerkind" aria-label="Feldzugart"><option value="angriff">Angriff</option><option value="hinterhalt">Hinterhalt (mit Ausspähern)</option><option value="verteidigung">Verteidigung</option></select>
+        <input id="plannerdays" type="number" min="0" max="30" value="1" aria-label="In wie vielen Tagen">
+        <button id="plannergo" type="button">Feldzug planen</button>
+      </div>
+      <div id="plannermsg" class="msg"></div>
+    </div>
+    <h3 style="margin:32px 0 12px">Live: Feldzüge und Schlachten</h3>
+    <div class="register" id="warlive"></div>
     <h3 style="margin:32px 0 12px">Bündnisse</h3>
     <div class="register" id="alliances"></div>
   </section>
@@ -816,6 +829,7 @@ function route() {
   loaders[page]();
   if (page !== "chat") stopChat();
   if (page !== "staat") clearTimeout(stateTimer);
+  if (page !== "krieg") clearInterval(warTimer);
 }
 window.addEventListener("hashchange", () => { route(); window.scrollTo(0, 0); });
 
@@ -1457,25 +1471,70 @@ async function renderStock(l) {
 
 /* Presse */
 let openArticle = null, writing = false;
+let warTimer = null;
+function drawWarMap(canvas, w) {
+  const a = w.aggressorChunks, d = w.defenderChunks;
+  if (!a.length && !d.length) { canvas.hidden = true; return; }
+  const all = a.concat(d);
+  const minX = Math.min(...all.map(c => c[0])), maxX = Math.max(...all.map(c => c[0]));
+  const minZ = Math.min(...all.map(c => c[1])), maxZ = Math.max(...all.map(c => c[1]));
+  const cols = maxX - minX + 1, rows = maxZ - minZ + 1;
+  const cell = Math.max(3, Math.min(18, Math.floor(560 / Math.max(cols, rows))));
+  canvas.width = cols * cell; canvas.height = rows * cell;
+  const g = canvas.getContext("2d");
+  const key = c => c[0] + "," + c[1];
+  const setA = new Set(a.map(key)), setD = new Set(d.map(key));
+  const near = (c, set) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => set.has((c[0] + dx) + "," + (c[1] + dz)));
+  const paint = (list, color, other) => list.forEach(c => {
+    const x = (c[0] - minX) * cell, y = (c[1] - minZ) * cell;
+    g.fillStyle = color; g.fillRect(x, y, cell, cell);
+    if (near(c, other)) { g.strokeStyle = "#d62828"; g.lineWidth = 2; g.strokeRect(x + 1, y + 1, cell - 2, cell - 2); }
+  });
+  paint(a, palette[hash(w.aggressor) % palette.length], setD);
+  paint(d, palette[hash(w.defender) % palette.length], setA);
+}
 async function loadWar() {
+  clearInterval(warTimer);
+  warTimer = setInterval(() => { if (page === "krieg") loadWar(); }, 10000);
   const r = await api("/api/war");
   if (!r.ok) return;
+  const today = r.data.day;
   $("wars").replaceChildren(...(r.data.wars.length ? r.data.wars.map(w => {
     const bar = el("div", { style: "position:relative;height:14px;background:var(--line);border-radius:7px;overflow:hidden;margin:8px 0" });
     const fill = el("div", { style: "position:absolute;top:0;bottom:0;background:" + (w.front >= 0 ? "var(--emerald)" : "var(--red)") +
       ";left:" + (w.front >= 0 ? 50 : 50 + w.front / 2) + "%;width:" + Math.abs(w.front) / 2 + "%" });
     bar.append(fill, el("div", { style: "position:absolute;left:50%;top:0;bottom:0;width:2px;background:var(--text)" }));
+    const map = el("canvas", { style: "max-width:100%;border:1px solid var(--line);border-radius:6px", "aria-label": "Karte der Front" });
+    if (w.ongoing) drawWarMap(map, w); else map.hidden = true;
     return el("div", { className: "card" },
-      el("h3", { textContent: w.aggressor + " gegen " + w.defender }),
+      el("h3", { textContent: "Krieg " + w.number + ": " + w.aggressor + " gegen " + w.defender }),
       el("p", { textContent: (w.ongoing ? "läuft seit Tag " : "beendet an Tag ") + (w.ongoing ? w.declared : w.ended) + " · Front " + w.front +
         " · Truppen " + w.aggressorTroops + " : " + w.defenderTroops + " · Verwundete " + w.aggressorWounded + " : " + w.defenderWounded }),
-      bar,
+      bar, map,
+      w.ongoing ? el("p", { className: "muted", textContent: "Rot umrandet: Frontabschnitt, an dem beide Gebiete aneinandergrenzen." }) : el("span"),
       w.winner ? el("p", { textContent: "Sieger: " + w.winner + (w.reparations ? " · Reparationen " + w.reparations : "") }) : el("span"),
-      ...w.campaigns.map(c => el("p", { textContent: "Geplant: " + c.kind + " von " + c.initiator + " am Tag " + c.on })));
+      ...w.battles.slice(-5).map(b => el("p", { textContent: "Tag " + b.day + " · " + b.kind + " · Front " + b.front + " (" + (b.shift >= 0 ? "+" : "") + b.shift + ") · Verwundet " + b.woundedAggressor + ":" + b.woundedDefender })));
   }) : [el("div", { className: "empty", style: "border:none", textContent: "Es herrscht Frieden." })]));
+  const live = [];
+  r.data.wars.filter(w => w.ongoing).forEach(w => w.campaigns.forEach(c => live.push({ w, c })));
+  live.sort((x, y) => x.c.on - y.c.on);
+  $("warlive").replaceChildren(...(live.length ? live.map(({ w, c }) => el("div", { className: "card" },
+    el("h3", { textContent: w.aggressor + " – " + w.defender + " · " + c.kind }),
+    el("p", { textContent: c.initiator + " plant den Zug für Tag " + c.on + (c.on <= today ? " – heute!" : " (in " + (c.on - today) + " Tagen)") })))
+    : [el("div", { className: "empty", style: "border:none", textContent: "Keine Feldzüge geplant." })]));
+  const mine = r.data.wars.filter(w => w.ongoing);
+  const sel = $("plannerwar"), prev = sel.value;
+  sel.replaceChildren(...mine.map(w => el("option", { value: w.number, textContent: "Krieg " + w.number + ": " + w.aggressor + " – " + w.defender })));
+  if (mine.some(w => String(w.number) === prev)) sel.value = prev;
+  $("warplanner").hidden = !(me && mine.length);
   $("alliances").replaceChildren(...(r.data.alliances.length ? r.data.alliances.map(a => el("div", { className: "card" }, el("p", { textContent: a.first + " ↔ " + a.second })))
     : [el("div", { className: "empty", style: "border:none", textContent: "Keine Bündnisse." })]));
 }
+$("plannergo").addEventListener("click", async () => {
+  const x = await api("/api/war/campaign", { number: $("plannerwar").value, kind: $("plannerkind").value, days: $("plannerdays").value });
+  say("plannermsg", x.data.message || x.data.error, x.ok);
+  loadWar();
+});
 async function loadFamilies() {
   const r = await api("/api/families");
   if (!r.ok) return;

@@ -27,10 +27,11 @@ public final class PoliceRegistry {
     private final Map<PolityId, Integer> cells = new LinkedHashMap<>();
     private final Map<PolityId, Map<ActorRef, Detention>> detained = new LinkedHashMap<>();
     private final Map<ActorRef, Day> cuffed = new LinkedHashMap<>();
+    private final Map<Integer, CaseLink> cases = new LinkedHashMap<>();
 
     public record Snapshot(Map<PolityId, Map<ActorRef, PoliceRank>> ranks, Map<PolityId, List<Offense>> offenses,
                            Map<PolityId, Integer> cells, Map<PolityId, Map<ActorRef, Detention>> detained,
-                           Map<ActorRef, Day> cuffed) {
+                           Map<ActorRef, Day> cuffed, List<CaseLink> cases) {
     }
 
     public static PoliceRegistry empty() {
@@ -44,6 +45,7 @@ public final class PoliceRegistry {
         r.cells.putAll(s.cells());
         s.detained().forEach((p, m) -> r.detained.put(p, new LinkedHashMap<>(m)));
         r.cuffed.putAll(s.cuffed());
+        s.cases().forEach(link -> r.cases.put(link.caseNumber(), link));
         return r;
     }
 
@@ -54,7 +56,8 @@ public final class PoliceRegistry {
         offenses.forEach((p, l) -> of.put(p, List.copyOf(l)));
         Map<PolityId, Map<ActorRef, Detention>> dt = new LinkedHashMap<>();
         detained.forEach((p, m) -> dt.put(p, new LinkedHashMap<>(m)));
-        return new Snapshot(rk, of, new LinkedHashMap<>(cells), dt, new LinkedHashMap<>(cuffed));
+        return new Snapshot(rk, of, new LinkedHashMap<>(cells), dt, new LinkedHashMap<>(cuffed),
+                List.copyOf(cases.values()));
     }
 
     // ------------------------------------------------------------------ Dienstgrade
@@ -98,6 +101,11 @@ public final class PoliceRegistry {
 
     /** Nimmt eine Anzeige auf; die älteste bearbeitete wird verdrängt, wenn die Liste voll ist. */
     public Offense report(PolityId polity, ActorRef suspect, CrimeKind kind, Day on) {
+        return report(polity, suspect, kind, on, List.of());
+    }
+
+    /** Wie {@link #report(PolityId, ActorRef, CrimeKind, Day)}, mit Zeugen (höchstens {@value Offense#MAX_WITNESSES}). */
+    public Offense report(PolityId polity, ActorRef suspect, CrimeKind kind, Day on, List<ActorRef> witnesses) {
         List<Offense> list = offenses.computeIfAbsent(polity, k -> new ArrayList<>());
         int number = list.stream().mapToInt(Offense::number).max().orElse(0) + 1;
         if (list.size() >= MAX_OFFENSES) {
@@ -106,7 +114,8 @@ public final class PoliceRegistry {
                 list.remove(0);
             }
         }
-        Offense offense = new Offense(number, suspect, kind, on, false);
+        Offense offense = new Offense(number, suspect, kind, on, false,
+                witnesses.size() > Offense.MAX_WITNESSES ? witnesses.subList(0, Offense.MAX_WITNESSES) : witnesses);
         list.add(offense);
         return offense;
     }
@@ -128,6 +137,38 @@ public final class PoliceRegistry {
         if (list != null) {
             list.replaceAll(o -> o.number() == number ? o.markHandled() : o);
         }
+    }
+
+    // ------------------------------------------------------------------ Verfahren
+
+    public void link(CaseLink link) {
+        cases.put(link.caseNumber(), Objects.requireNonNull(link, "link"));
+    }
+
+    public Optional<CaseLink> linkOf(PolityId polity, int caseNumber) {
+        return Optional.ofNullable(cases.get(caseNumber)).filter(l -> l.polity().equals(polity));
+    }
+
+    public List<CaseLink> links() {
+        return List.copyOf(cases.values());
+    }
+
+    /** Legt die Haftdauer des Urteils fest; false, wenn das Verfahren nicht aus einer Festnahme stammt. */
+    public boolean sentence(PolityId polity, int caseNumber, int days) {
+        Optional<CaseLink> link = linkOf(polity, caseNumber);
+        link.ifPresent(l -> cases.put(caseNumber, l.withSentence(days)));
+        return link.isPresent();
+    }
+
+    public void prepared(PolityId polity, int caseNumber) {
+        linkOf(polity, caseNumber).ifPresent(l -> cases.put(caseNumber, l.markPrepared()));
+    }
+
+    /** Beendet die Verknüpfung (Verfahren rechtskräftig). */
+    public Optional<CaseLink> unlink(PolityId polity, int caseNumber) {
+        Optional<CaseLink> link = linkOf(polity, caseNumber);
+        link.ifPresent(l -> cases.remove(caseNumber));
+        return link;
     }
 
     // ------------------------------------------------------------------ Zellen

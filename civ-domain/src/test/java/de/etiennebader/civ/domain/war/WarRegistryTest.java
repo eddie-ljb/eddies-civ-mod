@@ -167,4 +167,27 @@ class WarRegistryTest {
         assertTrue(events.get(4) instanceof WarEvent.WarEnded);
         assertTrue(registry.pullEvents().isEmpty(), "pullEvents leert die Liste");
     }
+
+    @Test
+    @DisplayName("Befehlskette: höhere Ränge befehligen, nur ein General, Beförderung behält Ausbildung")
+    void chainOfCommand() {
+        WarRegistry registry = WarRegistry.empty();
+        ActorRef general = person();
+        ActorRef rival = person();
+        registry.enlist(nation, soldier, MilitaryRank.SOLDIER, Day.ZERO);
+        registry.enlist(nation, general, MilitaryRank.SOLDIER, Day.ZERO);
+        registry.enlist(nation, rival, MilitaryRank.SOLDIER, Day.ZERO);
+        registry.promote(nation, general, MilitaryRank.GENERAL);
+        assertTrue(registry.commands(nation, general, soldier));
+        assertFalse(registry.commands(nation, soldier, general));
+        assertFalse(registry.commands(nation, soldier, rival), "Gleiche befehligen sich nicht");
+        assertFalse(registry.commands(nation, general, person()), "Zivilisten stehen außerhalb der Kette");
+        registry.promote(nation, rival, MilitaryRank.GENERAL);
+        assertEquals(MilitaryRank.GENERAL, registry.garrisonOf(nation).get(rival));
+        assertEquals(MilitaryRank.CAPTAIN, registry.garrisonOf(nation).get(general), "es gibt nur einen General");
+        assertTrue(MilitaryRank.CAPTAIN.commandsCampaigns());
+        assertFalse(MilitaryRank.OFFICER.commandsCampaigns());
+        assertThrows(NotEnlistedException.class, () -> registry.promote(nation, person(), MilitaryRank.OFFICER));
+        assertTrue(MilitaryRank.GENERAL.power() > MilitaryRank.OFFICER.power());
+    }
 }

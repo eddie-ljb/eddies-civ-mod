@@ -20,14 +20,36 @@
   (`ProtectionListener`, Spieler). Villager-Polizei setzt dieselben Regeln über die Haft durch.
 - **Befehle:** `/civ polizei status|dienen|kuendigen|ernennen <Name> kadett|polizist|wachtmeister|kommissar|entlassen <Name>|zellen <n>|anzeigen [<Name> diebstahl|hausfriedensbruch|koerperverletzung|mord]|festnehmen|fesseln|loesen|freilassen <Name>`.
 
-## Noch offen (aus dem Issue, nicht Teil dieses Schritts)
-- Handschellen als Gegenstand (aktuell per Befehl), Haft per Gerichtsurteil (Anbindung an `justice`), Staatsanwälte/Richter
-  aus Villagern per Verfassung, Beweise/Zeugen durch Dorfbewohner, Gefängnis-/Streifen-Darstellung im Spiel.
-- Web: Kriegskarte mit Fronten, Feldzugplaner, Live-Stände und Zeitungsberichte; Militärhierarchie über Soldat/Offizier/Ausspäher hinaus.
+- **Handschellen als Gegenstand:** Item „Handschellen“ (Rezept: 3 Eisenbarren-/Nuggets-Muster `NIN`/`N N`). Rechtsklick mit
+  Polizeirang ab Polizist fesselt Spieler und Dorfbewohner, ein zweiter Rechtsklick löst sie. Dieselben Rang- und
+  Befehlskettenregeln wie bei den Befehlen (`ProtectionListener`, `PoliceService.handcuff`).
+- **Haft per Gerichtsurteil:** Jede Festnahme eröffnet ein Strafverfahren (die Gemeinde klagt, gebührenfrei) mit
+  Polizeibericht als Beweis (`CaseLink`, `CaseListener`). Der Richter legt Haft mit `urteil <Nr> schuldig haft <Tage> | …`
+  fest (höchstens 60), sonst gilt die Regelhaft der Tat. Rechtskräftig: Schuldspruch → Zelle (oder gefesselt, wenn keine frei),
+  Freispruch → frei.
+- **Richter/Staatsanwälte per Verfassung:** Gesetz `court_staffing` = `head` (Standard, Oberhaupt), `government` (jeder
+  Amtsträger ernennt), `automatic` (Gemeinde bestimmt den gebildetsten Dorfbewohner) oder `election` (Dorfbewohner wählen
+  nach Eignung). Bei `automatic`/`election` ist Ernennen gesperrt; Vakanzen füllt `CourtStaffing` täglich (1 Stelle, ab 24
+  Mitgliedern 2). Villager waren bereits Richter, Geschworene und Zeugen; neu ist die Besetzung per Verfassung.
+- **Zeugen und Beweise durch Dorfbewohner:** Dorfbewohner sehen Taten (je 60 %, bis 3 Zeugen), zeigen sie an und werden nach
+  Eröffnung automatisch als Zeugen geladen (sie sagen sofort aus). Das Verfahren erhält den Polizeibericht als Beweis.
+- **Militärhierarchie:** Soldat/Ausspäher < Unteroffizier < Offizier < Hauptmann < General (`MilitaryRank.level`). Höhere Ränge
+  befördern nur Untergebene und nur unter ihren eigenen Rang; nur ein General je Garnison. Hauptmann und General planen
+  Feldzüge, Dorfbewohner werden automatisch befördert (ab 10 Mann ein General, je 8 ein Hauptmann …). `/civ krieg befoerdern <Name> soldat|unteroffizier|offizier|hauptmann|general`.
+- **Web (Seite „Krieg“):** Karte mit beiden Gebieten und rot umrandetem Frontabschnitt, Feldzugplaner (`POST /api/war/campaign`),
+  Live-Stände der Feldzüge (Aktualisierung alle 10 s), Schlachtenbuch je Krieg (`war.tsv`, `LOG`).
+- **Zeitungen:** Kriegserklärung, Schlachten, Frieden und Sieg erscheinen in jeder Zeitung mit Dorfbewohner-Redakteur.
+
+## Noch offen
+- Spieler als Kandidaten bei `election`, Berufungs-Haft (Berufungsverfahren sind nicht mit der Festnahme verknüpft).
+- Gefesselte Dorfbewohner bleiben im Spiel beweglich (nur das Register hält sie fest).
 
 ## Testen
 1. Gemeinde gründen, zweiten Spieler beitreten lassen. `/civ polizei dienen`, `/civ polizei zellen 2`.
 2. `/civ polizei ernennen <Spieler> polizist`; `/civ polizei anzeigen <Name> diebstahl`; als Polizist `/civ polizei festnehmen <Name>`.
    Der Festgenommene kann nichts abbauen/schlagen; `/civ polizei freilassen <Name>` als Wachtmeister/Bürgermeister.
-3. Mit Dorfbewohnern: Tage vergehen lassen, `/civ polizei status` zeigt eingestellte Beamte und Zellen.
+3. Handschellen craften (`/give @s eddies-civ-mod:handcuffs`), mit Polizeirang einen Spieler anklicken. `/civ gericht fall <Nr>` zeigt das Verfahren; `urteil <Nr> schuldig haft 5 | …`.
+4. Verfassung: Gesetz `court_staffing` auf `automatic` oder `election` setzen, Tage vergehen lassen, `/civ gericht` zeigt Richter und Staatsanwalt.
+5. Krieg: `/civ krieg befoerdern <Name> hauptmann`; Webseite „Krieg“ öffnen (Karte, Planer, Live).
+6. Mit Dorfbewohnern: Tage vergehen lassen, `/civ polizei status` zeigt eingestellte Beamte und Zellen.
 Automatisch: `./gradlew :civ-domain:test :civ-server:test` (`PoliceRegistryTest`, `PoliceServiceTest`).
