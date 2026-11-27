@@ -96,6 +96,10 @@ public final class CivServerFixture {
         return server.culture();
     }
 
+    public de.etiennebader.civ.server.government.GovernmentService government() {
+        return server.government();
+    }
+
     public de.etiennebader.civ.server.war.WarService war() {
         return server.war();
     }

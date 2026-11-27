@@ -18,6 +18,17 @@ final class EnglishCommands {
 
     /** Deutsches Wort → englisches Wort; mit {@code eltern.wort} für Wörter, die je nach Befehl anders heißen. */
     static final Map<String, String> WORDS = Map.ofEntries(
+            Map.entry("regierung", "government"), Map.entry("oberhaupt", "head"), Map.entry("ministerium", "ministry"),
+            Map.entry("haushalt", "budget"), Map.entry("entwurf", "draft"),
+            Map.entry("titel", "title"), Map.entry("form", "form"), Map.entry("modus", "mode"),
+            Map.entry("gehalt", "salary"), Map.entry("befugnisse", "powers"), Map.entry("regeln", "rules"),
+            Map.entry("vorbereiter", "preparer"), Map.entry("zustaendigkeit", "mandate"), Map.entry("lohn", "wage"),
+            Map.entry("abberufen", "recall"),
+            Map.entry("koalition", "coalition"), Map.entry("bilden", "form"), Map.entry("neuwahl", "new-election"),
+            Map.entry("vorhaben", "agreement"), Map.entry("bereich", "portfolio"), Map.entry("verordnung", "decree"),
+            Map.entry("vorschlag", "proposal"), Map.entry("foerderung", "subsidy"), Map.entry("beenden", "end"),
+            Map.entry("waehlen", "ballot"), Map.entry("regelung", "rule"), Map.entry("abstand", "distance"),
+            Map.entry("unterzeichnen", "sign"), Map.entry("vetofrist", "veto-period"), Map.entry("veto", "veto"),
             Map.entry("abheben", "withdraw"), Map.entry("abholen", "collect"), Map.entry("abbrechen", "cancel"), Map.entry("ablehnen", "decline"),
             Map.entry("abmelden", "logout"), Map.entry("abstimmen", "vote"), Map.entry("abstimmungen", "votes"),
             Map.entry("adresse", "address"), Map.entry("adressen", "addresses"), Map.entry("aemter", "offices"),

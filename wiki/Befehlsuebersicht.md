@@ -115,3 +115,30 @@ Alle Befehle schlagen beim Tippen (Tabulator) passende Werte vor, mit einer kurz
 | `/civ admin sicherung` | sofortige Datenbanksicherung |
 
 Benötigt den Rechte-Knoten `eddies-civ-mod:admin`, siehe [Installation und Konfiguration](Admin-Installation-und-Konfiguration.md#rechte).
+
+## Regierung (Ministerien, Haushalt, Oberhaupt)
+
+| Befehl | Wirkung |
+|---|---|
+| `/civ regierung` | Oberhaupt, Regeln, Ministerien und Haushalt anzeigen |
+| `/civ regierung oberhaupt titel\|form\|modus\|gehalt\|befugnisse ...` | Oberhaupt konfigurieren (nur Bürgermeister) |
+| `/civ regierung regeln <höchstzahl> <tage> <prozent>` | Zahl der Ministerien, Haushaltsrhythmus, nötige Mehrheit |
+| `/civ regierung vorbereiter "<Ministerium>"` | Ministerium, das den Haushalt vorbereitet |
+| `/civ regierung ministerium anlegen "<Name>" <wahl\|ernennung> [Zuständigkeit]` | Ministerium anlegen (auflösen: `aufloesen`) |
+| `/civ regierung ministerium ernennen\|abberufen\|einstellen\|kuendigen "<Name>" [Spieler]` | Minister und Angestellte |
+| `/civ regierung ministerium lohn "<Name>" <Minister> <Angestellte>` | Tageslöhne |
+| `/civ regierung haushalt entwurf "<Name>" <Betrag>` | Etat im Entwurf setzen |
+| `/civ regierung haushalt abstimmen <true\|false>` / `schliessen` | Abstimmung und Beschluss |
+| `/civ regierung koalition bilden` / `entlassen` / `neuwahl` | Regierung bilden, entlassen, Neuwahlen anordnen (Oberhaupt) |
+| `/civ regierung koalition regeln <abstand> <minderheit>` | wie weit Koalitionspartner auseinanderliegen dürfen, Minderheitsregierung erlaubt |
+| `/civ regierung koalition vorhaben <Regelung> <Wert>` | Vorhaben im Koalitionsvertrag |
+| `/civ regierung ministerium bereich "<Name>" <finanzen\|inneres\|verteidigung\|wirtschaft\|kanzleramt\|frei>` | Handlungsbereich |
+| `/civ regierung ministerium vorschlag "<Name>" <Regelung> <Wert>` | Gesetzesvorschlag bzw. Verordnung des Ministers |
+| `/civ regierung ministerium verordnung "<Name>" <true\|false>` | Verordnungsrecht erlauben |
+| `/civ regierung foerderung anlegen "<Name>" "<Ministerium>" <Betrag> <alle\|Name> <Tage> [<voll bis> <Auslauf>]` | Förderung; auch `liste`, `beenden`, `abstimmen` |
+| `/civ regierung wahl ausrufen\|kandidieren\|waehlen "<Ministerium>" [Spieler]` | Volkswahl der Minister |
+| `/civ regierung gesetze` | beschlossene Gesetze, die auf die Unterschrift warten |
+| `/civ regierung gesetze unterzeichnen <Nr>` / `veto <Nr>` | Oberhaupt: sofort in Kraft setzen oder verwerfen |
+| `/civ regierung gesetze vetofrist <Tage>` | Wartezeit (0 = kein Veto) |
+
+Englisch: `/civ government ...`

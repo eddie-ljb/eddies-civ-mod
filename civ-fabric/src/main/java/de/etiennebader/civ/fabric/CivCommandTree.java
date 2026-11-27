@@ -268,6 +268,7 @@ public final class CivCommandTree {
                 .then(logoCommands())
                 .then(emblemCommands())
                 .then(warCommands())
+                .then(governmentCommands())
                 .then(familyCommands())
                 .then(religionCommands())
                 .then(Commands.literal("laden")
@@ -1807,6 +1808,255 @@ public final class CivCommandTree {
                         .executes(context -> withCiv(context, (civ, player) -> civ.family().couples(Players.caller(player)))))
                 .then(Commands.literal("kinder")
                         .executes(context -> withCiv(context, (civ, player) -> civ.family().kids(Players.caller(player)))));
+    }
+
+    private static final String MINISTRY = "ministerium";
+    private static final String MODE = "auswahl";
+
+    private static de.etiennebader.civ.domain.government.Selection selection(String word) {
+        return switch (word.toLowerCase(java.util.Locale.ROOT)) {
+            case "wahl", "election" -> de.etiennebader.civ.domain.government.Selection.ELECTION;
+            default -> de.etiennebader.civ.domain.government.Selection.APPOINTMENT;
+        };
+    }
+
+    private static de.etiennebader.civ.domain.government.StateForm stateForm(String word) {
+        return switch (word.toLowerCase(java.util.Locale.ROOT)) {
+            case "republik", "republic" -> de.etiennebader.civ.domain.government.StateForm.REPUBLIC;
+            case "monarchie", "monarchy" -> de.etiennebader.civ.domain.government.StateForm.MONARCHY;
+            case "kaiserreich", "empire" -> de.etiennebader.civ.domain.government.StateForm.EMPIRE;
+            case "fuerstentum", "principality" -> de.etiennebader.civ.domain.government.StateForm.PRINCIPALITY;
+            default -> de.etiennebader.civ.domain.government.StateForm.CUSTOM;
+        };
+    }
+
+    /** {@code /civ regierung ...}: Oberhaupt, Ministerien und Haushalt (Issue #79). */
+    private LiteralArgumentBuilder<CommandSourceStack> governmentCommands() {
+        com.mojang.brigadier.arguments.LongArgumentType money = com.mojang.brigadier.arguments.LongArgumentType.longArg(0);
+        return Commands.literal("regierung")
+                .executes(context -> withCiv(context, (civ, player) -> civ.government().overview(Players.caller(player))))
+                .then(Commands.literal("oberhaupt")
+                        .then(Commands.literal("titel").then(arg(TEXT, StringArgumentType.greedyString())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.government().setTitle(
+                                        Players.caller(player), StringArgumentType.getString(context, TEXT))))))
+                        .then(Commands.literal("form").then(arg(MODE, StringArgumentType.word())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.government().setForm(
+                                        Players.caller(player), stateForm(StringArgumentType.getString(context, MODE)))))))
+                        .then(Commands.literal("modus").then(arg(MODE, StringArgumentType.word())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.government().setHeadSelection(
+                                        Players.caller(player), selection(StringArgumentType.getString(context, MODE)))))))
+                        .then(Commands.literal("gehalt").then(arg(AMOUNT, money)
+                                .executes(context -> withCiv(context, (civ, player) -> civ.government().setHeadSalary(
+                                        Players.caller(player),
+                                        com.mojang.brigadier.arguments.LongArgumentType.getLong(context, AMOUNT))))))
+                        .then(Commands.literal("befugnisse")
+                                .then(arg("veto", com.mojang.brigadier.arguments.BoolArgumentType.bool())
+                                        .then(arg("regierung", com.mojang.brigadier.arguments.BoolArgumentType.bool())
+                                                .then(arg("neuwahl", com.mojang.brigadier.arguments.BoolArgumentType.bool())
+                                                        .executes(context -> withCiv(context, (civ, player) ->
+                                                                civ.government().setPowers(Players.caller(player),
+                                                                        com.mojang.brigadier.arguments.BoolArgumentType.getBool(context, "veto"),
+                                                                        com.mojang.brigadier.arguments.BoolArgumentType.getBool(context, "regierung"),
+                                                                        com.mojang.brigadier.arguments.BoolArgumentType.getBool(context, "neuwahl")))))))))
+                .then(Commands.literal("regeln")
+                        .then(arg("hoechstzahl", IntegerArgumentType.integer(1, 30))
+                                .then(arg("tage", IntegerArgumentType.integer(1, 60))
+                                        .then(arg("prozent", IntegerArgumentType.integer(1, 99))
+                                                .executes(context -> withCiv(context, (civ, player) -> civ.government().setRules(
+                                                        Players.caller(player),
+                                                        IntegerArgumentType.getInteger(context, "hoechstzahl"),
+                                                        IntegerArgumentType.getInteger(context, "tage"),
+                                                        IntegerArgumentType.getInteger(context, "prozent"))))))))
+                .then(Commands.literal("vorbereiter").then(arg(MINISTRY, StringArgumentType.string())
+                        .executes(context -> withCiv(context, (civ, player) -> civ.government().setPreparer(
+                                Players.caller(player), StringArgumentType.getString(context, MINISTRY))))))
+                .then(Commands.literal("ministerium")
+                        .then(Commands.literal("anlegen").then(arg(MINISTRY, StringArgumentType.string())
+                                .then(arg(MODE, StringArgumentType.word())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.government().createMinistry(
+                                                Players.caller(player), StringArgumentType.getString(context, MINISTRY), "",
+                                                selection(StringArgumentType.getString(context, MODE)))))
+                                        .then(arg(TEXT, StringArgumentType.greedyString())
+                                                .executes(context -> withCiv(context, (civ, player) -> civ.government().createMinistry(
+                                                        Players.caller(player), StringArgumentType.getString(context, MINISTRY),
+                                                        StringArgumentType.getString(context, TEXT),
+                                                        selection(StringArgumentType.getString(context, MODE)))))))))
+                        .then(Commands.literal("aufloesen").then(arg(MINISTRY, StringArgumentType.string())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.government().dissolveMinistry(
+                                        Players.caller(player), StringArgumentType.getString(context, MINISTRY))))))
+                        .then(Commands.literal("zustaendigkeit").then(arg(MINISTRY, StringArgumentType.string())
+                                .then(arg(TEXT, StringArgumentType.greedyString())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.government().setMandate(
+                                                Players.caller(player), StringArgumentType.getString(context, MINISTRY),
+                                                StringArgumentType.getString(context, TEXT)))))))
+                        .then(Commands.literal("modus").then(arg(MINISTRY, StringArgumentType.string())
+                                .then(arg(MODE, StringArgumentType.word())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.government().setMinistrySelection(
+                                                Players.caller(player), StringArgumentType.getString(context, MINISTRY),
+                                                selection(StringArgumentType.getString(context, MODE))))))))
+                        .then(Commands.literal("lohn").then(arg(MINISTRY, StringArgumentType.string())
+                                .then(arg("minister", money).then(arg("angestellte", money)
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.government().setWages(
+                                                Players.caller(player), StringArgumentType.getString(context, MINISTRY),
+                                                com.mojang.brigadier.arguments.LongArgumentType.getLong(context, "minister"),
+                                                com.mojang.brigadier.arguments.LongArgumentType.getLong(context, "angestellte"))))))))
+                        .then(Commands.literal("ernennen").then(arg(MINISTRY, StringArgumentType.string())
+                                .then(arg(PLAYER, StringArgumentType.word())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.government().appoint(
+                                                Players.caller(player), StringArgumentType.getString(context, MINISTRY),
+                                                StringArgumentType.getString(context, PLAYER)))))))
+                        .then(Commands.literal("abberufen").then(arg(MINISTRY, StringArgumentType.string())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.government().dismiss(
+                                        Players.caller(player), StringArgumentType.getString(context, MINISTRY))))))
+                        .then(Commands.literal("einstellen").then(arg(MINISTRY, StringArgumentType.string())
+                                .then(arg(PLAYER, StringArgumentType.word())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.government().hire(
+                                                Players.caller(player), StringArgumentType.getString(context, MINISTRY),
+                                                StringArgumentType.getString(context, PLAYER)))))))
+                        .then(Commands.literal("kuendigen").then(arg(MINISTRY, StringArgumentType.string())
+                                .then(arg(PLAYER, StringArgumentType.word())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.government().fire(
+                                                Players.caller(player), StringArgumentType.getString(context, MINISTRY),
+                                                StringArgumentType.getString(context, PLAYER))))))))
+                .then(Commands.literal("haushalt")
+                        .then(Commands.literal("entwurf").then(arg(MINISTRY, StringArgumentType.string())
+                                .then(arg(AMOUNT, money)
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.government().draft(
+                                                Players.caller(player), StringArgumentType.getString(context, MINISTRY),
+                                                com.mojang.brigadier.arguments.LongArgumentType.getLong(context, AMOUNT)))))))
+                        .then(Commands.literal("abstimmen")
+                                .then(arg("zustimmung", com.mojang.brigadier.arguments.BoolArgumentType.bool())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.government().vote(
+                                                Players.caller(player),
+                                                com.mojang.brigadier.arguments.BoolArgumentType.getBool(context, "zustimmung"))))))
+                        .then(Commands.literal("schliessen")
+                                .executes(context -> withCiv(context, (civ, player) -> civ.government().closeBudget(Players.caller(player))))))
+                .then(governmentMinistryExtras())
+                .then(governmentCoalition())
+                .then(governmentSubsidies())
+                .then(governmentElections())
+                .then(governmentVeto());
+    }
+
+    /** Veto-Recht: wartende Gesetze ansehen, unterzeichnen, Veto einlegen, Frist setzen. */
+    private LiteralArgumentBuilder<CommandSourceStack> governmentVeto() {
+        return Commands.literal("gesetze")
+                .executes(context -> withCiv(context, (civ, player) -> civ.government().veto().list(Players.caller(player))))
+                .then(Commands.literal("unterzeichnen").then(arg(NUMBER, IntegerArgumentType.integer(1))
+                        .executes(context -> withCiv(context, (civ, player) -> civ.government().veto().sign(
+                                Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))))
+                .then(Commands.literal("veto").then(arg(NUMBER, IntegerArgumentType.integer(1))
+                        .executes(context -> withCiv(context, (civ, player) -> civ.government().veto().veto(
+                                Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))))
+                .then(Commands.literal("vetofrist").then(arg("tage", IntegerArgumentType.integer(0, 14))
+                        .executes(context -> withCiv(context, (civ, player) -> civ.government().veto().setVetoDays(
+                                Players.caller(player), IntegerArgumentType.getInteger(context, "tage"))))));
+    }
+
+    private static de.etiennebader.civ.domain.government.Portfolio portfolio(String word) {
+        return switch (word.toLowerCase(java.util.Locale.ROOT)) {
+            case "finanzen", "finance" -> de.etiennebader.civ.domain.government.Portfolio.FINANCE;
+            case "inneres", "interior" -> de.etiennebader.civ.domain.government.Portfolio.INTERIOR;
+            case "verteidigung", "defence" -> de.etiennebader.civ.domain.government.Portfolio.DEFENCE;
+            case "wirtschaft", "economy" -> de.etiennebader.civ.domain.government.Portfolio.ECONOMY;
+            case "kanzleramt", "chancellery" -> de.etiennebader.civ.domain.government.Portfolio.CHANCELLERY;
+            default -> de.etiennebader.civ.domain.government.Portfolio.FREE;
+        };
+    }
+
+    /** Bereich, Verordnungsrecht und Gesetzesvorschläge der Ministerien. */
+    private LiteralArgumentBuilder<CommandSourceStack> governmentMinistryExtras() {
+        return Commands.literal("ministerium")
+                .then(Commands.literal("bereich").then(arg(MINISTRY, StringArgumentType.string())
+                        .then(arg(MODE, StringArgumentType.word())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.government().politics().setPortfolio(
+                                        Players.caller(player), StringArgumentType.getString(context, MINISTRY),
+                                        portfolio(StringArgumentType.getString(context, MODE))))))))
+                .then(Commands.literal("verordnung").then(arg(MINISTRY, StringArgumentType.string())
+                        .then(arg("erlaubt", com.mojang.brigadier.arguments.BoolArgumentType.bool())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.government().politics().setDecrees(
+                                        Players.caller(player), StringArgumentType.getString(context, MINISTRY),
+                                        com.mojang.brigadier.arguments.BoolArgumentType.getBool(context, "erlaubt")))))))
+                .then(Commands.literal("vorschlag").then(arg(MINISTRY, StringArgumentType.string())
+                        .then(arg("regelung", StringArgumentType.word())
+                                .then(arg(TEXT, StringArgumentType.greedyString())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.government().politics().propose(
+                                                Players.caller(player), StringArgumentType.getString(context, MINISTRY),
+                                                StringArgumentType.getString(context, "regelung"),
+                                                StringArgumentType.getString(context, TEXT))))))));
+    }
+
+    /** Regierungsbildung und Koalitionsvertrag. */
+    private LiteralArgumentBuilder<CommandSourceStack> governmentCoalition() {
+        return Commands.literal("koalition")
+                .then(Commands.literal("bilden").executes(context -> withCiv(context, (civ, player) ->
+                        civ.government().politics().form(Players.caller(player)))))
+                .then(Commands.literal("entlassen").executes(context -> withCiv(context, (civ, player) ->
+                        civ.government().politics().dismissGovernment(Players.caller(player)))))
+                .then(Commands.literal("neuwahl").executes(context -> withCiv(context, (civ, player) ->
+                        civ.government().politics().newElection(Players.caller(player)))))
+                .then(Commands.literal("regeln").then(arg("abstand", IntegerArgumentType.integer(0, 200))
+                        .then(arg("minderheit", com.mojang.brigadier.arguments.BoolArgumentType.bool())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.government().politics().setCoalitionRules(
+                                        Players.caller(player), IntegerArgumentType.getInteger(context, "abstand"),
+                                        com.mojang.brigadier.arguments.BoolArgumentType.getBool(context, "minderheit")))))))
+                .then(Commands.literal("vorhaben").then(arg("regelung", StringArgumentType.word())
+                        .then(arg(TEXT, StringArgumentType.greedyString())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.government().politics().addAgreement(
+                                        Players.caller(player), StringArgumentType.getString(context, "regelung"),
+                                        StringArgumentType.getString(context, TEXT)))))));
+    }
+
+    /** Förderungen und Hilfen. */
+    private LiteralArgumentBuilder<CommandSourceStack> governmentSubsidies() {
+        com.mojang.brigadier.arguments.LongArgumentType money = com.mojang.brigadier.arguments.LongArgumentType.longArg(0);
+        return Commands.literal("foerderung")
+                .then(Commands.literal("liste").executes(context -> withCiv(context, (civ, player) ->
+                        civ.government().politics().listSubsidies(Players.caller(player)))))
+                .then(Commands.literal("anlegen").then(arg(NAME, StringArgumentType.string())
+                        .then(arg(MINISTRY, StringArgumentType.string())
+                                .then(arg(AMOUNT, money)
+                                        .then(arg("empfaenger", StringArgumentType.string())
+                                                .then(arg("tage", IntegerArgumentType.integer(0, 3650))
+                                                        .executes(context -> withCiv(context, (civ, player) -> civ.government().politics().createSubsidy(
+                                                                Players.caller(player), StringArgumentType.getString(context, NAME),
+                                                                StringArgumentType.getString(context, MINISTRY),
+                                                                com.mojang.brigadier.arguments.LongArgumentType.getLong(context, AMOUNT),
+                                                                StringArgumentType.getString(context, "empfaenger"),
+                                                                IntegerArgumentType.getInteger(context, "tage"), 0, 0)))
+                                                        .then(arg("volleBis", money).then(arg("auslaufBis", money)
+                                                                .executes(context -> withCiv(context, (civ, player) -> civ.government().politics().createSubsidy(
+                                                                        Players.caller(player), StringArgumentType.getString(context, NAME),
+                                                                        StringArgumentType.getString(context, MINISTRY),
+                                                                        com.mojang.brigadier.arguments.LongArgumentType.getLong(context, AMOUNT),
+                                                                        StringArgumentType.getString(context, "empfaenger"),
+                                                                        IntegerArgumentType.getInteger(context, "tage"),
+                                                                        com.mojang.brigadier.arguments.LongArgumentType.getLong(context, "volleBis"),
+                                                                        com.mojang.brigadier.arguments.LongArgumentType.getLong(context, "auslaufBis"))))))))))))
+                .then(Commands.literal("beenden").then(arg(NAME, StringArgumentType.string())
+                        .executes(context -> withCiv(context, (civ, player) -> civ.government().politics().cancelSubsidy(
+                                Players.caller(player), StringArgumentType.getString(context, NAME))))))
+                .then(Commands.literal("abstimmen").then(arg(NAME, StringArgumentType.string())
+                        .then(arg("zustimmung", com.mojang.brigadier.arguments.BoolArgumentType.bool())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.government().politics().voteSubsidy(
+                                        Players.caller(player), StringArgumentType.getString(context, NAME),
+                                        com.mojang.brigadier.arguments.BoolArgumentType.getBool(context, "zustimmung")))))));
+    }
+
+    /** Volkswahl der Minister. */
+    private LiteralArgumentBuilder<CommandSourceStack> governmentElections() {
+        return Commands.literal("wahl")
+                .then(Commands.literal("ausrufen").then(arg(MINISTRY, StringArgumentType.string())
+                        .executes(context -> withCiv(context, (civ, player) -> civ.government().politics().callElection(
+                                Players.caller(player), StringArgumentType.getString(context, MINISTRY))))))
+                .then(Commands.literal("kandidieren").then(arg(MINISTRY, StringArgumentType.string())
+                        .executes(context -> withCiv(context, (civ, player) -> civ.government().politics().stand(
+                                Players.caller(player), StringArgumentType.getString(context, MINISTRY))))))
+                .then(Commands.literal("waehlen").then(arg(MINISTRY, StringArgumentType.string())
+                        .then(arg(PLAYER, StringArgumentType.word())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.government().politics().castBallot(
+                                        Players.caller(player), StringArgumentType.getString(context, MINISTRY),
+                                        StringArgumentType.getString(context, PLAYER)))))));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> warCommands() {

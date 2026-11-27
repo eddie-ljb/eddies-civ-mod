@@ -1,5 +1,6 @@
 package de.etiennebader.civ.application.polity;
 
+import de.etiennebader.civ.application.support.MotionGate;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.law.ParameterKey;
@@ -104,13 +105,14 @@ final class Ballots {
     }
 
     /** Beendet die Abstimmung, falls entschieden, und setzt die Änderung bei Annahme in Kraft. */
-    static VoteOutcome settle(Polity polity, Proposal proposal, VoteOutcome outcome, IdGenerator ids, Day day) {
+    static VoteOutcome settle(Polity polity, Proposal proposal, VoteOutcome outcome, IdGenerator ids, Day day,
+                              MotionGate gate) {
         if (outcome == VoteOutcome.OPEN) {
             return outcome;
         }
         boolean accepted = outcome == VoteOutcome.ACCEPTED;
         polity.closeProposal(proposal.id(), accepted, day);
-        if (accepted) {
+        if (accepted && !gate.hold(polity, proposal, day)) {
             carryOut(polity, proposal.motion(), ids, day);
         }
         return outcome;

@@ -109,6 +109,7 @@ public final class CivServer {
     private final PlotService plots;
     private final de.etiennebader.civ.server.construction.ConstructionService construction;
     private final de.etiennebader.civ.server.war.WarService war;
+    private final de.etiennebader.civ.server.government.GovernmentService government;
     private final de.etiennebader.civ.server.road.RoadService roads;
     private final de.etiennebader.civ.server.road.StreetAccess streetAccess;
     private final de.etiennebader.civ.server.family.FamilyService family;
@@ -210,6 +211,8 @@ public final class CivServer {
         this.construction.playerLookup(players::findByName);
         this.war = new de.etiennebader.civ.server.war.WarService(app, calendar, texts, announcements, ids,
                 settings, dataDirectory.map(dir -> dir.resolve("war.tsv")));
+        this.government = new de.etiennebader.civ.server.government.GovernmentService(app, calendar, players, texts,
+                announcements, settings.villagerPolitics(), dataDirectory.map(dir -> dir.resolve("government.tsv")));
         this.villagerFederations = new VillagerFederations(app, federations, announcements);
         this.conjuncture = new de.etiennebader.civ.server.conjuncture.ConjunctureService(app.queries());
         this.villagers = new VillagerService(app, settings, texts, announcements, conjuncture, calendar);
@@ -332,6 +335,7 @@ public final class CivServer {
         federations.autoDecideInvitations(day, settings.villagerPolitics());
         campaigns.endOfDay(day);
         war.endOfDay(day);
+        government.endOfDay(day);
         civil.endOfDay(day);
         justice.endOfDay(day);
         companies.endOfDay(day);
@@ -484,6 +488,10 @@ public final class CivServer {
 
     public de.etiennebader.civ.server.culture.CultureService culture() {
         return culture;
+    }
+
+    public de.etiennebader.civ.server.government.GovernmentService government() {
+        return government;
     }
 
     public de.etiennebader.civ.server.war.WarService war() {

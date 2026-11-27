@@ -210,6 +210,55 @@ public enum ErrorCode {
     OUT_OF_STOCK,
     WORTHLESS_GOODS,
 
+    // Regierung (#79)
+    /** Argumente: Name oder Schlüssel. */
+    UNKNOWN_MINISTRY,
+    /** Argumente: Name. */
+    MINISTRY_EXISTS,
+    /** Argumente: Höchstzahl. */
+    TOO_MANY_MINISTRIES,
+    /** Der Akteur arbeitet schon im Ministerium. Argumente: Ministerium. */
+    ALREADY_EMPLOYED,
+    /** Der Akteur arbeitet nicht im Ministerium bzw. es gibt keinen Minister. Argumente: Ministerium. */
+    NOT_EMPLOYED,
+    /** Ungültiger Wert (Name, Betrag, Prozent ...). Argumente: der Wert. */
+    INVALID_GOVERNMENT_VALUE,
+    /** Es gibt keinen Haushaltsentwurf. Argumente: keine. */
+    NO_BUDGET_DRAFT,
+    /** Der Haushalt übersteigt die Kasse. Argumente: Summe, verfügbar. */
+    BUDGET_EXCEEDS_FUNDS,
+    /** Der Etat reicht nicht. Argumente: Ministerium. */
+    ETAT_EXHAUSTED,
+
+    /** Das Ministerium hat dafür keinen Handlungsbereich. Argumente: Ministerium. */
+    NOT_IN_PORTFOLIO,
+    /** Es gibt keine Regierung. Argumente: keine. */
+    NO_COALITION,
+    /** Argumente: Name. */
+    UNKNOWN_SUBSIDY,
+    /** Argumente: Name. */
+    SUBSIDY_EXISTS,
+    /** Die Förderung gilt schon. Argumente: Name. */
+    SUBSIDY_ALREADY_ACTIVE,
+    /** Das Amt wird nicht gewählt. Argumente: Ministerium. */
+    NOT_ELECTED_OFFICE,
+    /** Es läuft schon eine Wahl. Argumente: Ministerium. */
+    ELECTION_OPEN,
+    /** Es läuft keine Wahl. Argumente: Ministerium. */
+    NO_MINISTRY_ELECTION,
+    /** Ein Parlament ist nötig. Argumente: keine. */
+    PARLIAMENT_REQUIRED,
+    /** Unbekannte Regelung. Argumente: Schlüssel. */
+    UNKNOWN_PARAMETER,
+    /** Der Minister darf das nicht per Verordnung ändern. Argumente: Schlüssel. */
+    NO_DECREE,
+    /** Kein Spieler, keine Firma und keine Gemeinde mit diesem Namen. Argumente: Name. */
+    UNKNOWN_RECIPIENT,
+    /** Kein wartendes Gesetz mit dieser Nummer. Argumente: Nummer. */
+    UNKNOWN_PENDING_LAW,
+    /** Das Oberhaupt hat kein Veto-Recht. Argumente: keine. */
+    NO_VETO_POWER,
+
     // Krieg
     /** Argumente: Angreifer, Verteidiger. */
     WAR_ALREADY_ONGOING,

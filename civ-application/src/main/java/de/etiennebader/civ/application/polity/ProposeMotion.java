@@ -53,7 +53,8 @@ public final class ProposeMotion {
             polity.vote(id, command.citizen(), true, command.day());
         }
         Proposal proposal = polity.proposals().stream().filter(open -> open.id().equals(id)).findFirst().orElseThrow();
-        VoteOutcome outcome = Ballots.settle(polity, proposal, Ballots.evaluate(polity, proposal), ids, command.day());
+        VoteOutcome outcome = Ballots.settle(polity, proposal, Ballots.evaluate(polity, proposal), ids, command.day(),
+                aggregates.motionGate());
         aggregates.commit(polity);
         return new Result(id, outcome);
     }

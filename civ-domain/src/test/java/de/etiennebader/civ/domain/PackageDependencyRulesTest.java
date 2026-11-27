@@ -56,6 +56,7 @@ class PackageDependencyRulesTest {
             Map.entry("credit", Set.of("shared", "actor")),
             Map.entry("conjuncture", Set.of("shared")),
             Map.entry("war", Set.of("shared", "actor")),
+            Map.entry("government", Set.of("shared", "actor")),
             Map.entry("family", Set.of("shared", "actor", "population")),
             Map.entry("religion", Set.of("shared", "actor")));
 
