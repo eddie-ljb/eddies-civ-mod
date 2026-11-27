@@ -126,7 +126,7 @@ public final class LawBookScreen extends MenuScreen {
 
     private ItemStack icon(ParagraphView paragraph) {
         Icon icon = Icon.of(paragraph.effects().isEmpty() ? Items.BOOK : Items.WRITTEN_BOOK)
-                .name(GuiKeys.PARAGRAPH_NAME.text(paragraph.number(), paragraph.title()), Icon.TITLE)
+                .name(GuiKeys.PARAGRAPH_NAME.text(paragraph.number(), paragraph.qualifiedTitle()), Icon.TITLE)
                 .line(GuiKeys.PARAGRAPH_ENACTED_ON.text(paragraph.enactedOn()), Icon.HINT);
         for (LawSetting effect : paragraph.effects()) {
             icon.line(GuiKeys.PARAGRAPH_EFFECT.text(effect.name(), civ.texts().lawValue(effect.value())), Icon.GOOD);

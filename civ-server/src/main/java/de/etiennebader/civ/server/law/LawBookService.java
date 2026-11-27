@@ -11,7 +11,9 @@ import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PlayerRef;
 import de.etiennebader.civ.domain.shared.PlayerId;
 import de.etiennebader.civ.domain.law.EnactedStatute;
+import de.etiennebader.civ.domain.law.LawPath;
 import de.etiennebader.civ.domain.law.LawRecognizer;
+import de.etiennebader.civ.domain.law.LawText;
 import de.etiennebader.civ.domain.law.ParameterCatalog;
 import de.etiennebader.civ.domain.law.ParameterKey;
 import de.etiennebader.civ.domain.law.ParameterValue;
@@ -113,8 +115,9 @@ public final class LawBookService {
                     .toList();
             List<String> unrecognized = enacted.statute().text().isEmpty() ? List.of()
                     : LawRecognizer.recognize(enacted.statute().text()).unrecognized();
-            paragraphs.add(new ParagraphView(number++, enacted.statute().id(), enacted.statute().title(),
-                    enacted.statute().text(), enacted.enactedOn().value(), effects, unrecognized));
+            paragraphs.add(new ParagraphView(number++, enacted.statute().id(), enacted.statute().lawName(),
+                    enacted.statute().partName(), enacted.statute().title(), enacted.statute().text(),
+                    enacted.enactedOn().value(), effects, unrecognized, LawText.sections(enacted.statute().text())));
         }
         return paragraphs;
     }
@@ -133,7 +136,7 @@ public final class LawBookService {
         List<Message> lines = new ArrayList<>();
         lines.add(Message.of(MessageKey.LAW_BOOK_HEADER, polity.get().name().value(), paragraphs.size()));
         for (ParagraphView paragraph : paragraphs) {
-            lines.add(Message.of(MessageKey.PARAGRAPH_ENTRY, paragraph.number(), paragraph.title(),
+            lines.add(Message.of(MessageKey.PARAGRAPH_ENTRY, paragraph.number(), paragraph.qualifiedTitle(),
                     paragraph.enactedOn(), paragraph.effects().size()));
         }
         queries.ancestorsOf(polity.get().id()).stream()
@@ -155,7 +158,8 @@ public final class LawBookService {
     /** Chatform eines Paragraphen. */
     public List<Message> describe(ParagraphView paragraph) {
         List<Message> lines = new ArrayList<>();
-        lines.add(Message.of(MessageKey.PARAGRAPH_HEADER, paragraph.number(), paragraph.title(), paragraph.enactedOn()));
+        lines.add(Message.of(MessageKey.PARAGRAPH_HEADER, paragraph.number(), paragraph.qualifiedTitle(),
+                paragraph.enactedOn()));
         if (!paragraph.text().isEmpty()) {
             lines.add(Message.of(MessageKey.PARAGRAPH_TEXT, paragraph.text()));
         }
@@ -194,11 +198,25 @@ public final class LawBookService {
         return enact(caller, polityId, title, text, List.of());
     }
 
+    /** Mit eigenen Feldern für Gesetz und Teil, z. B. aus dem Web-Editor; leere Felder bleiben bei der Titelangabe. */
+    public Reply enact(Caller caller, PolityId polityId, String lawName, String partName, String title, String text) {
+        LawPath path = LawPath.parse(title);
+        return enact(caller, polityId, lawName.isBlank() ? path.lawName() : lawName,
+                partName.isBlank() ? path.partName() : partName, path.title(), text, List.of());
+    }
+
     private Reply enact(Caller caller, PolityId polityId, String title, String text,
+                        List<ParameterValue<?>> explicitValues) {
+        LawPath path = LawPath.parse(title);
+        return enact(caller, polityId, path.lawName(), path.partName(), path.title(), text, explicitValues);
+    }
+
+    private Reply enact(Caller caller, PolityId polityId, String lawName, String partName, String title, String text,
                         List<ParameterValue<?>> explicitValues) {
         return attempt(() -> {
             EnactParagraph.Result result = app.enactParagraph().execute(new EnactParagraph.Command(polityId,
-                    caller.player(), title, text, explicitValues, calendar.today()));
+                    caller.player(), lawName.strip(), partName.strip(), title, text, explicitValues,
+                    calendar.today()));
             PolityView polity = queries.polity(polityId).orElseThrow();
             List<Message> lines = new ArrayList<>();
             if (result.statute().isPresent() || accepted(result.proposal())) {
