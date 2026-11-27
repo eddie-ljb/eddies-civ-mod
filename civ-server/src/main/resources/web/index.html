@@ -1827,11 +1827,35 @@ function renderShow(d) {
     return c;
   }) : [el("div", { className: "empty", textContent: "Keine Debatte. Am letzten Wahltag starten sie von selbst, sonst mit /civ <Ebene> debatte starten." })]));
 }
+/* Hymnen-Aufnahme: OGG oder MP3 hochladen (Spitze der Einheit), anhören, entfernen */
+function anthemAudioControls(p) {
+  const box = el("div", { className: "muted small", style: "margin-top:8px" });
+  const msg = el("div", { className: "msg" });
+  const tell = (text, ok) => { msg.textContent = text || ""; msg.className = "msg " + (ok ? "ok" : "err"); };
+  if (p.anthem.audio) {
+    const player = el("audio", { controls: true, preload: "none", src: "/api/anthem-audio?hash=" + encodeURIComponent(p.anthem.audio), style: "max-width:100%" });
+    box.append(player, el("button", { className: "btn small", textContent: "Aufnahme entfernen", onclick: async () => {
+      const x = await api("/api/anthem-audio/remove", { polity: p.name }); tell(x.data.message || x.data.error, x.ok); if (x.ok) loadState(); } }));
+  }
+  const file = el("input", { type: "file", accept: ".ogg,.mp3,audio/ogg,audio/mpeg" });
+  const send = el("button", { className: "btn small", textContent: p.anthem.audio ? "Aufnahme ersetzen" : "Aufnahme hochladen (OGG/MP3, max. 4 MB)", onclick: async () => {
+    const f = file.files[0];
+    if (!f) return;
+    if (f.size > 4 * 1024 * 1024) { tell("Die Datei ist größer als 4 MB.", false); return; }
+    const bytes = new Uint8Array(await f.arrayBuffer());
+    let binary = ""; for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    const x = await api("/api/anthem-audio", { polity: p.name, data: btoa(binary) });
+    tell(x.data.message || x.data.error || (x.ok ? "Gespeichert." : "Fehlgeschlagen."), x.ok); if (x.ok) loadState();
+  } });
+  box.append(el("div", {}, file, send), msg);
+  return box;
+}
 function renderSymbols(d) {
   $("symbols").replaceChildren(...(d.polities.length ? d.polities.map(p => el("div", { className: "entry" },
     p.flag ? flagSvg(p.flag, p.name) : crest(p.id, p.name, p.level === "Gemeinde" ? "town" : "federation"),
     el("div", {}, el("h3", { textContent: p.name }), el("div", { className: "sub", textContent: p.level }),
-      p.anthem ? el("button", { className: "btn small", style: "margin-top:8px", textContent: "▶ " + p.anthem.title, onclick: () => playAnthem(p.anthem) }) : el("div", { className: "muted small", textContent: "Keine Hymne" })),
+      p.anthem ? el("button", { className: "btn small", style: "margin-top:8px", textContent: "▶ " + p.anthem.title, onclick: () => playAnthem(p.anthem) }) : el("div", { className: "muted small", textContent: "Keine Hymne" }),
+      p.anthem ? anthemAudioControls(p) : ""),
     facts([["Flagge", p.flag ? p.flag.layers.length + " Muster auf " + p.flag.base : "keine (Banner in die Hand, /civ <Ebene> flagge setzen)"],
       ["Wahlkreise", p.constituencies.length ? p.constituencies.map(c => c.name + (c.towns.length ? " (" + c.towns.join(", ") + ")" : "") + (c.areas.length ? " – " + c.areas.length + " Gebiet(e)" : "")).join("; ") : "keine eigenen, es gelten Gemeinden"]])))
     : [el("div", { className: "empty", textContent: "Noch keine Gemeinde." })]));
@@ -1870,20 +1894,43 @@ function renderLawBook() {
     el("h3", { style: "margin:20px 0 8px", textContent: "Verfassung" }),
     el("p", { className: "muted", textContent: p.constitution ? (p.preamble || "Ohne Präambel.") + " (ausgerufen an Tag " + p.constitution + ")" : "Noch keine Verfassung ausgerufen." }),
     el("h3", { style: "margin:20px 0 8px", textContent: "Gesetze und Paragraphen (" + p.paragraphs.length + ")" }),
-    ...(p.paragraphs.length ? p.paragraphs.map(g => el("details", { className: "article" },
+    ...(p.paragraphs.length ? lawGroups(p.paragraphs).flatMap(group => [
+      group.law ? el("h4", { style: "margin:16px 0 4px", textContent: group.law }) : null,
+      ...group.parts.flatMap(part => [
+        part.name ? el("h5", { style: "margin:8px 0 4px", textContent: part.name }) : null,
+        ...part.paragraphs.map(g => lawParagraph(g, p, canEdit, msg))])]) : [el("div", { className: "empty", style: "border:none", textContent: "Noch keine Paragraphen." })]),
+    el("h3", { style: "margin:20px 0 8px", textContent: "Rechte (ausdrücklich gesetzt)" }),
+    rights.length ? facts(rights) : el("p", { className: "muted", textContent: "Es gelten die Standardwerte." }),
+    msg);
+}
+/* Gesetz → Teil → Paragraph, in der Reihenfolge des ersten Auftretens; Paragraphen ohne Gesetz oder Teil bilden eine unbenannte Gruppe. */
+function lawGroups(paragraphs) {
+  const laws = new Map();
+  for (const g of paragraphs) {
+    if (!laws.has(g.law)) laws.set(g.law, new Map());
+    const parts = laws.get(g.law);
+    if (!parts.has(g.part)) parts.set(g.part, []);
+    parts.get(g.part).push(g);
+  }
+  return [...laws].map(([law, parts]) => ({ law, parts: [...parts].map(([name, list]) => ({ name, paragraphs: list })) }));
+}
+function lawSections(sections) {
+  return sections.map(a => el("div", { className: "small", style: "margin:4px 0" },
+    el("span", { className: "muted", textContent: "(" + a.number + ") " }), a.sentences.map((t, i) => (i ? " " : "") + t).join(""),
+    a.enumeration.length ? el("ol", { style: "margin:4px 0 0 20px" }, ...a.enumeration.map(t => el("li", { textContent: t }))) : null));
+}
+function lawParagraph(g, p, canEdit, msg) {
+  return el("details", { className: "article" },
       el("summary", { textContent: "§" + g.number + " " + g.title + " (Tag " + g.enactedOn + ")" }),
-      g.text ? el("p", { textContent: g.text }) : null,
+      ...lawSections(g.sections),
       lawEffects(g.effects),
       g.unrecognized.length ? el("p", { className: "muted small", textContent: "Nicht automatisch durchgesetzt: " + g.unrecognized.join(" / ") }) : null,
       canEdit ? el("button", { className: "btn small", textContent: "Aufheben", onclick: async () => {
         if (!confirm("§" + g.number + " " + g.title + " aufheben?")) return;
-        const r = await api("/api/laws", { action: "repeal", polity: p.id, number: String(g.number) });
+        const r = await api("/api/laws", { action: "repeal", polity: p.id, id: g.id });
         msg.textContent = r.data.message || r.data.error; msg.className = "msg " + (r.ok ? "ok" : "err");
         if (r.ok) loadLaws();
-      } }) : null)) : [el("div", { className: "empty", style: "border:none", textContent: "Noch keine Paragraphen." })]),
-    el("h3", { style: "margin:20px 0 8px", textContent: "Rechte (ausdrücklich gesetzt)" }),
-    rights.length ? facts(rights) : el("p", { className: "muted", textContent: "Es gelten die Standardwerte." }),
-    msg);
+      } }) : null);
 }
 function lawField(k, current) {
   const aria = k.name;
@@ -1897,14 +1944,23 @@ function renderLawEditor() {
   const draft = lawData.drafts.find(d => d.id === lawDraftId);
   const msg = el("div", { className: "msg" });
   const show = r => { msg.textContent = r.data.message || r.data.error; msg.className = "msg " + (r.ok ? "ok" : "err"); };
-  const title = el("input", { required: true, maxLength: lawData.maxTitle, ariaLabel: "Titel", value: draft ? draft.title : "" });
+  const known = key => [...new Set(polity.paragraphs.map(g => g[key]).filter(Boolean))];
+  const lists = el("span", {}, el("datalist", { id: "lawnames" }, ...known("law").map(v => el("option", { value: v }))),
+    el("datalist", { id: "partnames" }, ...known("part").map(v => el("option", { value: v }))));
+  const lawName = el("input", { maxLength: lawData.maxTitle, ariaLabel: "Gesetz", placeholder: "z. B. Baugesetz (leer = ohne Gesetz)" });
+  lawName.setAttribute("list", "lawnames");
+  const partName = el("input", { maxLength: lawData.maxTitle, ariaLabel: "Teil", placeholder: "z. B. Teil 1: Grundstücke (leer = ohne Teil)" });
+  partName.setAttribute("list", "partnames");
+  const title = el("input", { required: true, maxLength: lawData.maxTitle, ariaLabel: "Titel", placeholder: "Name des Paragraphen", value: draft ? draft.title : "" });
   const text = el("textarea", { rows: 6, maxLength: lawData.maxText, ariaLabel: "Text", value: draft ? draft.text : "" });
   const counter = el("div", { className: "muted small" });
   const count = () => { counter.textContent = text.value.length + " / " + lawData.maxText + " Zeichen"; };
   text.addEventListener("input", count); count();
   const check = el("div", { className: "muted small" });
   const law = el("form", { className: "article compose" }, el("h3", { textContent: "Gesetz verfassen für " + polity.name }),
-    el("label", { className: "field" }, "Titel", title), el("label", { className: "field" }, "Text", text), counter,
+    el("label", { className: "field" }, "Gesetz", lawName), el("label", { className: "field" }, "Teil", partName),
+    el("label", { className: "field" }, "Paragraph (Titel)", title),
+    el("label", { className: "field" }, "Text – Absätze durch Leerzeile trennen, Aufzählungspunkte mit „- “ oder „1.“ beginnen", text), counter, lists,
     el("div", { className: "row" },
       el("button", { className: "btn primary", textContent: "Erlassen oder beantragen" }),
       el("button", { type: "button", className: "btn", textContent: "Prüfen", onclick: async () => { const r = await api("/api/laws", { action: "check", text: text.value }); show(r); } }),
@@ -1914,7 +1970,7 @@ function renderLawEditor() {
       } })), check, msg);
   law.addEventListener("submit", async e => {
     e.preventDefault();
-    const r = await api("/api/laws", { action: "enact", polity: polity.id, title: title.value, text: text.value });
+    const r = await api("/api/laws", { action: "enact", polity: polity.id, law: lawName.value, part: partName.value, title: title.value, text: text.value });
     show(r); if (r.ok) { lawDraftId = ""; title.value = text.value = ""; count(); loadLaws(); }
   });
   const rtitle = el("input", { required: true, maxLength: lawData.maxTitle, ariaLabel: "Titel", placeholder: "z. B. Steuerreform" });
@@ -1939,7 +1995,7 @@ function renderLawEditor() {
     el("p", { className: "muted small", textContent: "Eigene Entwürfe und die deiner Partei. Ob sie einen Serverneustart überstehen, entscheidet der Server-Admin." }),
     ...(lawData.drafts.length ? lawData.drafts.map(d => el("div", { className: "row" },
       el("span", { textContent: d.title + " – " + d.author + (d.target ? " (für " + lawName(d.target) + ")" : "") + ", Tag " + d.savedOn }),
-      el("button", { className: "btn small", textContent: "Laden", onclick: () => { lawDraftId = d.mine ? d.id : ""; renderLawEditor(); const f = $("laweditor").querySelector("input"); f.value = d.title; $("laweditor").querySelector("textarea").value = d.text; $("laweditor").querySelector("textarea").dispatchEvent(new Event("input")); } }),
+      el("button", { className: "btn small", textContent: "Laden", onclick: () => { lawDraftId = d.mine ? d.id : ""; renderLawEditor(); const f = $("laweditor").querySelector("[aria-label=Titel], [aria-label='Paragraph (Titel)']"); f.value = d.title; $("laweditor").querySelector("textarea").value = d.text; $("laweditor").querySelector("textarea").dispatchEvent(new Event("input")); } }),
       d.mine ? el("button", { className: "btn small", textContent: "Löschen", onclick: async () => { const r = await api("/api/laws", { action: "draftDelete", id: d.id }); if (r.ok) { if (lawDraftId === d.id) lawDraftId = ""; loadLaws(); } } }) : null))
       : [el("div", { className: "muted", textContent: "Keine Entwürfe." })]));
   $("laweditor").replaceChildren(law, rights, drafts);

@@ -67,6 +67,7 @@ public final class CivContent {
     private final Item constitutionCopy;
     private final Block ballotBox;
     private final Block electionPoster;
+    private final EmblemContent emblems;
     private final Block mailbox;
     private final Block newsstand;
     private final Block stockExchange;
@@ -81,7 +82,8 @@ public final class CivContent {
     private CivContent(Block townHall, Item townHallItem, Block bank, Block market, Item plotWand, Block constitution,
                        Item constitutionCopy, Block ballotBox, Block electionPoster, Block mailbox, Block newsstand,
                        Block stockExchange, Block courtBench, Block streetSign, Block houseNumber, Block townSign,
-                       Block countrySign, Block nationSign, Block constructionBarrier) {
+                       Block countrySign, Block nationSign, Block constructionBarrier, EmblemContent emblems) {
+        this.emblems = emblems;
         this.constructionBarrier = constructionBarrier;
         this.courtBench = courtBench;
         this.mailbox = mailbox;
@@ -146,7 +148,12 @@ public final class CivContent {
 
         Block ballotBox = simpleBlock(BALLOT_BOX_ID, MapColor.WOOD, SoundType.WOOD, 2.0F);
         Item ballotBoxItem = blockItem(BALLOT_BOX_ID, ballotBox);
-        Block electionPoster = simpleBlock(ELECTION_POSTER_ID, MapColor.COLOR_GREEN, SoundType.WOOD, 1.0F);
+        ResourceKey<Block> electionPosterKey = ResourceKey.create(Registries.BLOCK, ELECTION_POSTER_ID);
+        Block electionPoster = Registry.register(BuiltInRegistries.BLOCK, electionPosterKey, new EmblemBlock(
+                BlockBehaviour.Properties.of().setId(electionPosterKey).mapColor(MapColor.COLOR_GREEN)
+                        .strength(1.0F, 6.0F).sound(SoundType.WOOD),
+                EmblemBlock.Kind.COLUMN, net.minecraft.world.phys.shapes.Shapes.block()));
+        EmblemContent emblems = EmblemContent.register();
         Item electionPosterItem = blockItem(ELECTION_POSTER_ID, electionPoster);
         Block mailbox = simpleBlock(MAILBOX_ID, MapColor.COLOR_YELLOW, SoundType.METAL, 2.0F);
         Item mailboxItem = blockItem(MAILBOX_ID, mailbox);
@@ -187,12 +194,12 @@ public final class CivContent {
                 new BlockEntityType<>((pos, state) -> new LabelBlockEntity(labelTypeHolder[0], pos, state),
                         java.util.Set.of(streetSign, houseNumber, townSign, countrySign, nationSign)));
 
-        registerTab(machines.items(), townHallItem, bankItem, marketItem, constitutionItem, lawBook, plotWand, ballotBoxItem,
+        registerTab(java.util.stream.Stream.concat(machines.items().stream(), emblems.items().stream()).toList(), townHallItem, bankItem, marketItem, constitutionItem, lawBook, plotWand, ballotBoxItem,
                 electionPosterItem, mailboxItem, newsstandItem, stockExchangeItem, courtBenchItem, streetSignItem,
                 houseNumberItem, townSignItem, countrySignItem, nationSignItem, constructionBarrierItem);
         return new CivContent(townHall, townHallItem, bank, market, plotWand, constitution, constitutionCopy, ballotBox,
                 electionPoster, mailbox, newsstand, stockExchange, courtBench, streetSign, houseNumber, townSign,
-                countrySign, nationSign, constructionBarrier);
+                countrySign, nationSign, constructionBarrier, emblems);
     }
 
     /**
@@ -308,6 +315,11 @@ public final class CivContent {
     /** Wahlplakat (Litfaßsäule): wirbt für den Aufsteller oder seine Partei. */
     public Block electionPoster() {
         return electionPoster;
+    }
+
+    /** Flagge, Wappen und Wahlplakat als Blöcke mit Bild (Issue #82). */
+    public EmblemContent emblems() {
+        return emblems;
     }
 
     public Block mailbox() {

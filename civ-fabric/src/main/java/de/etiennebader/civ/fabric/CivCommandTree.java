@@ -266,6 +266,7 @@ public final class CivCommandTree {
                 .then(plotCommands())
                 .then(constructionCommands())
                 .then(logoCommands())
+                .then(emblemCommands())
                 .then(warCommands())
                 .then(governmentCommands())
                 .then(familyCommands())
@@ -756,7 +757,12 @@ public final class CivCommandTree {
                 .then(Commands.literal("zeigen")
                         .then(arg(COUNT, IntegerArgumentType.integer(1))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.lawBooks().show(
-                                        Players.caller(player), IntegerArgumentType.getInteger(context, COUNT))))))
+                                        Players.caller(player), IntegerArgumentType.getInteger(context, COUNT),
+                                        Optional.empty())))
+                                .then(arg(NAME, StringArgumentType.greedyString())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.lawBooks().show(
+                                                Players.caller(player), IntegerArgumentType.getInteger(context, COUNT),
+                                                Optional.of(name(context))))))))
                 .then(Commands.literal("pruefen")
                         .then(arg(TEXT, StringArgumentType.greedyString())
                                 .executes(context -> withCiv(context, (civ, player) -> civ.lawBooks().check(
@@ -768,7 +774,12 @@ public final class CivCommandTree {
                 .then(Commands.literal("aufheben")
                         .then(arg(COUNT, IntegerArgumentType.integer(1))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.lawBooks().repeal(
-                                        Players.caller(player), IntegerArgumentType.getInteger(context, COUNT))))));
+                                        Players.caller(player), IntegerArgumentType.getInteger(context, COUNT),
+                                        Optional.empty())))
+                                .then(arg(NAME, StringArgumentType.greedyString())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.lawBooks().repeal(
+                                                Players.caller(player), IntegerArgumentType.getInteger(context, COUNT),
+                                                Optional.of(name(context))))))));
     }
 
     /** {@code <Titel> | <Text>}; ohne Trennstrich kommt der Text aus dem Buch mit Feder in der Hand. */
@@ -1107,6 +1118,15 @@ public final class CivCommandTree {
                 .then(Commands.literal("flagge")
                         .executes(context -> withCiv(context, (civ, player) -> giveFlag(civ, player,
                                 level.apply(context))))
+                        .then(Commands.literal("editor")
+                                .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(
+                                        Players.caller(player), level.apply(context), polity -> {
+                                            de.etiennebader.civ.fabric.screen.FlagEditorScreen.open(civ, player,
+                                                    polity, Optional.empty());
+                                            return Reply.success(Message.of(
+                                                    de.etiennebader.civ.server.command.GuiKeys.FLAG_EDITOR_TITLE.key(),
+                                                    polity.name().value()));
+                                        }))))
                         .then(Commands.literal("setzen")
                                 .executes(context -> withCiv(context, (civ, player) -> {
                                     Optional<de.etiennebader.civ.domain.civic.Flag> flag = Flags.of(player.getMainHandItem());
@@ -1158,6 +1178,12 @@ public final class CivCommandTree {
                                 level.apply(context))))
                         .then(Commands.literal("spielen")
                                 .executes(context -> withCiv(context, (civ, player) -> playAnthem(civ, player,
+                                        level.apply(context)))))
+                        .then(Commands.literal("noten")
+                                .executes(context -> withCiv(context, (civ, player) -> playAnthemNotes(civ, player,
+                                        level.apply(context)))))
+                        .then(Commands.literal("platte")
+                                .executes(context -> withCiv(context, (civ, player) -> giveAnthemRecord(civ, player,
                                         level.apply(context)))))
                         .then(Commands.literal("setzen")
                                 .then(arg(TEXT, StringArgumentType.greedyString())
@@ -1478,6 +1504,28 @@ public final class CivCommandTree {
                 .map(anthem -> {
                     Ambience.play(player, anthem);
                     return Reply.success(Message.of(MessageKey.ANTHEM_PLAYING, polity.name().value(), anthem.title()));
+                })
+                .orElseGet(() -> Reply.failure(Message.of(MessageKey.ANTHEM_NONE, polity.name().value()))));
+    }
+
+    /** Spielt nur die Notenblock-Melodie, auch wenn eine Aufnahme hochgeladen ist (Spieler ohne Ressourcenpaket). */
+    private static Reply playAnthemNotes(CivServer civ, ServerPlayer player, String levelId) {
+        return civ.levels().with(Players.caller(player), levelId, polity -> civ.civic().anthemOf(polity.id())
+                .map(anthem -> {
+                    Ambience.play(player, anthem, false);
+                    return Reply.success(Message.of(MessageKey.ANTHEM_PLAYING, polity.name().value(), anthem.title()));
+                })
+                .orElseGet(() -> Reply.failure(Message.of(MessageKey.ANTHEM_NONE, polity.name().value()))));
+    }
+
+    /** Gibt dem Spieler eine Hymnen-Schallplatte der Ebene. */
+    private static Reply giveAnthemRecord(CivServer civ, ServerPlayer player, String levelId) {
+        return civ.levels().with(Players.caller(player), levelId, polity -> civ.civic().anthemOf(polity.id())
+                .map(anthem -> {
+                    player.getInventory().placeItemBackInInventory(
+                            de.etiennebader.civ.fabric.content.AnthemRecords.create(polity.id(),
+                                    polity.name().value(), anthem), Prediction.SERVER_ONLY);
+                    return Reply.success(Message.of(MessageKey.ANTHEM_RECORD_GIVEN, polity.name().value()));
                 })
                 .orElseGet(() -> Reply.failure(Message.of(MessageKey.ANTHEM_NONE, polity.name().value()))));
     }
@@ -2114,6 +2162,62 @@ public final class CivCommandTree {
                         .then(Commands.literal("reklame").executes(context -> withCiv(context, (civ, player) -> giveLogo(
                                 civ, player, StringArgumentType.getString(context, NAME),
                                 de.etiennebader.civ.domain.civic.ImageKind.LEUCHTREKLAME)))));
+    }
+
+    /**
+     * {@code /civ zeichen <flagge|wappen|plakat> [leer | farbe <Farbe> | bild <Einheit>]}: gibt eine Flagge, ein Wappen
+     * oder ein Wahlplakat als Block-Item (Issue #82): leer, einfarbig oder mit dem hochgeladenen Bild der Einheit.
+     */
+    private LiteralArgumentBuilder<CommandSourceStack> emblemCommands() {
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("zeichen");
+        for (var entry : java.util.Map.of("flagge", de.etiennebader.civ.fabric.content.EmblemBlock.Kind.FLAG,
+                "wappen", de.etiennebader.civ.fabric.content.EmblemBlock.Kind.COAT_OF_ARMS,
+                "plakat", de.etiennebader.civ.fabric.content.EmblemBlock.Kind.POSTER).entrySet()) {
+            var kind = entry.getValue();
+            root.then(Commands.literal(entry.getKey())
+                    .executes(context -> withCiv(context, (civ, player) -> giveEmblem(player, kind, "blank", "")))
+                    .then(Commands.literal("leer").executes(context -> withCiv(context,
+                            (civ, player) -> giveEmblem(player, kind, "blank", ""))))
+                    .then(Commands.literal("farbe").then(arg("farbe", StringArgumentType.word())
+                            .suggests((context, builder) -> net.minecraft.commands.SharedSuggestionProvider.suggest(
+                                    java.util.Arrays.stream(net.minecraft.world.item.DyeColor.values())
+                                            .map(net.minecraft.world.item.DyeColor::getSerializedName), builder))
+                            .executes(context -> withCiv(context, (civ, player) -> {
+                                String color = StringArgumentType.getString(context, "farbe");
+                                if (net.minecraft.world.item.DyeColor.byName(color, null) == null) {
+                                    return Reply.failure(Message.of(MessageKey.EMBLEM_NO_IMAGE, color));
+                                }
+                                return giveEmblem(player, kind, "color:" + color, "");
+                            }))))
+                    .then(Commands.literal("bild").then(arg(NAME, StringArgumentType.string())
+                            .suggests(this::suggestPolityNames)
+                            .executes(context -> withCiv(context, (civ, player) -> {
+                                String name = StringArgumentType.getString(context, NAME);
+                                Optional<PolityView> polity = civ.queries().polityNamed(name);
+                                if (polity.isEmpty()) {
+                                    return Reply.failure(Message.of(MessageKey.LOGO_UNKNOWN_POLITY, name));
+                                }
+                                Optional<de.etiennebader.civ.domain.civic.CustomImage> image = civ.civic()
+                                        .imagesOf(polity.get().id(), Emblems.imageKind(kind)).stream().findFirst();
+                                if (image.isEmpty()) {
+                                    return Reply.failure(Message.of(MessageKey.EMBLEM_NO_IMAGE,
+                                            polity.get().name().value()));
+                                }
+                                return giveEmblem(player, kind, "image:" + image.get().hash(),
+                                        polity.get().name().value());
+                            })))));
+        }
+        return root;
+    }
+
+    private Reply giveEmblem(ServerPlayer player, de.etiennebader.civ.fabric.content.EmblemBlock.Kind kind,
+                             String style, String label) {
+        net.minecraft.world.item.ItemStack stack = Emblems.instance().stack(kind, style);
+        if (!label.isEmpty()) {
+            stack.set(DataComponents.CUSTOM_NAME, Component.literal(label));
+        }
+        player.getInventory().placeItemBackInInventory(stack, Prediction.SERVER_ONLY);
+        return Reply.success(Message.of(MessageKey.EMBLEM_GIVEN, style));
     }
 
     private Reply giveLogo(CivServer civ, ServerPlayer player, String polityName,

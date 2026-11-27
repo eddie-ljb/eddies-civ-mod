@@ -11,7 +11,10 @@ import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PlayerRef;
 import de.etiennebader.civ.domain.shared.PlayerId;
 import de.etiennebader.civ.domain.law.EnactedStatute;
+import de.etiennebader.civ.domain.law.LawPath;
+import de.etiennebader.civ.domain.shared.StatuteId;
 import de.etiennebader.civ.domain.law.LawRecognizer;
+import de.etiennebader.civ.domain.law.LawText;
 import de.etiennebader.civ.domain.law.ParameterCatalog;
 import de.etiennebader.civ.domain.law.ParameterKey;
 import de.etiennebader.civ.domain.law.ParameterValue;
@@ -38,6 +41,8 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.HashMap;
+import java.util.Locale;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -102,10 +107,13 @@ public final class LawBookService {
         return federations.actingPolity(caller.player()).or(() -> queries.municipalityOf(caller.player()));
     }
 
-    /** Alle Paragraphen einer Polity in der Reihenfolge ihres Erlasses. */
+    /**
+     * Alle Paragraphen einer Polity in der Reihenfolge ihres Erlasses. Die Nummer zählt je Gesetz ab 1; Paragraphen
+     * ohne Gesetz bilden eine eigene Zählung.
+     */
     public List<ParagraphView> paragraphsOf(PolityView polity) {
         List<ParagraphView> paragraphs = new ArrayList<>();
-        int number = 1;
+        Map<String, Integer> counters = new HashMap<>();
         for (EnactedStatute enacted : polity.laws().inForce()) {
             List<LawSetting> effects = enacted.statute().values().stream()
                     .map(value -> new LawSetting(value.key().id(), Message.of(TranslationKeys.law(value.key())),
@@ -113,8 +121,9 @@ public final class LawBookService {
                     .toList();
             List<String> unrecognized = enacted.statute().text().isEmpty() ? List.of()
                     : LawRecognizer.recognize(enacted.statute().text()).unrecognized();
-            paragraphs.add(new ParagraphView(number++, enacted.statute().id(), enacted.statute().title(),
-                    enacted.statute().text(), enacted.enactedOn().value(), effects, unrecognized));
+            paragraphs.add(new ParagraphView(counters.merge(enacted.statute().lawName().toLowerCase(Locale.ROOT), 1, Integer::sum), enacted.statute().id(), enacted.statute().lawName(),
+                    enacted.statute().partName(), enacted.statute().title(), enacted.statute().text(),
+                    enacted.enactedOn().value(), effects, unrecognized, LawText.sections(enacted.statute().text())));
         }
         return paragraphs;
     }
@@ -133,7 +142,7 @@ public final class LawBookService {
         List<Message> lines = new ArrayList<>();
         lines.add(Message.of(MessageKey.LAW_BOOK_HEADER, polity.get().name().value(), paragraphs.size()));
         for (ParagraphView paragraph : paragraphs) {
-            lines.add(Message.of(MessageKey.PARAGRAPH_ENTRY, paragraph.number(), paragraph.title(),
+            lines.add(Message.of(MessageKey.PARAGRAPH_ENTRY, paragraph.number(), paragraph.qualifiedTitle(),
                     paragraph.enactedOn(), paragraph.effects().size()));
         }
         queries.ancestorsOf(polity.get().id()).stream()
@@ -142,20 +151,30 @@ public final class LawBookService {
         return Reply.success(lines);
     }
 
-    /** {@code /civ gesetz zeigen <Nr>} */
     public Reply show(Caller caller, int number) {
+        return show(caller, number, Optional.empty());
+    }
+
+    public Reply repeal(Caller caller, int number) {
+        return repeal(caller, number, Optional.empty());
+    }
+
+    /** {@code /civ gesetz zeigen <Nr> [Gesetz]} */
+    public Reply show(Caller caller, int number, Optional<String> law) {
         Optional<PolityView> polity = queries.municipalityOf(caller.player());
         if (polity.isEmpty()) {
             return Reply.failure(Message.of(MessageKey.NOT_IN_MUNICIPALITY));
         }
-        return paragraph(polity.get(), number).map(paragraph -> Reply.success(describe(paragraph)))
-                .orElseGet(() -> Reply.failure(Message.of(MessageKey.UNKNOWN_PARAGRAPH, number)));
+        Lookup lookup = lookup(polity.get(), number, law);
+        return lookup.paragraph().map(paragraph -> Reply.success(describe(paragraph)))
+                .orElseGet(() -> Reply.failure(lookup.failure(number)));
     }
 
     /** Chatform eines Paragraphen. */
     public List<Message> describe(ParagraphView paragraph) {
         List<Message> lines = new ArrayList<>();
-        lines.add(Message.of(MessageKey.PARAGRAPH_HEADER, paragraph.number(), paragraph.title(), paragraph.enactedOn()));
+        lines.add(Message.of(MessageKey.PARAGRAPH_HEADER, paragraph.number(), paragraph.qualifiedTitle(),
+                paragraph.enactedOn()));
         if (!paragraph.text().isEmpty()) {
             lines.add(Message.of(MessageKey.PARAGRAPH_TEXT, paragraph.text()));
         }
@@ -194,11 +213,25 @@ public final class LawBookService {
         return enact(caller, polityId, title, text, List.of());
     }
 
+    /** Mit eigenen Feldern für Gesetz und Teil, z. B. aus dem Web-Editor; leere Felder bleiben bei der Titelangabe. */
+    public Reply enact(Caller caller, PolityId polityId, String lawName, String partName, String title, String text) {
+        LawPath path = LawPath.parse(title);
+        return enact(caller, polityId, lawName.isBlank() ? path.lawName() : lawName,
+                partName.isBlank() ? path.partName() : partName, path.title(), text, List.of());
+    }
+
     private Reply enact(Caller caller, PolityId polityId, String title, String text,
+                        List<ParameterValue<?>> explicitValues) {
+        LawPath path = LawPath.parse(title);
+        return enact(caller, polityId, path.lawName(), path.partName(), path.title(), text, explicitValues);
+    }
+
+    private Reply enact(Caller caller, PolityId polityId, String lawName, String partName, String title, String text,
                         List<ParameterValue<?>> explicitValues) {
         return attempt(() -> {
             EnactParagraph.Result result = app.enactParagraph().execute(new EnactParagraph.Command(polityId,
-                    caller.player(), title, text, explicitValues, calendar.today()));
+                    caller.player(), lawName.strip(), partName.strip(), title, text, explicitValues,
+                    calendar.today()));
             PolityView polity = queries.polity(polityId).orElseThrow();
             List<Message> lines = new ArrayList<>();
             if (result.statute().isPresent() || accepted(result.proposal())) {
@@ -222,21 +255,24 @@ public final class LawBookService {
         });
     }
 
-    /** {@code /civ gesetz aufheben <Nr>} */
-    public Reply repeal(Caller caller, int number) {
+    /** {@code /civ gesetz aufheben <Nr> [Gesetz]} */
+    public Reply repeal(Caller caller, int number, Optional<String> law) {
         Optional<PolityView> polity = legislature(caller);
         if (polity.isEmpty()) {
             return Reply.failure(Message.of(MessageKey.NOT_IN_MUNICIPALITY));
         }
-        return repeal(caller, polity.get().id(), number);
+        Lookup lookup = lookup(polity.get(), number, law);
+        return lookup.paragraph().map(found -> repeal(caller, polity.get().id(), found.id()))
+                .orElseGet(() -> Reply.failure(lookup.failure(number)));
     }
 
-    /** Aufhebung in einer bestimmten Gemeinde oder einem Bund. */
-    public Reply repeal(Caller caller, PolityId polityId, int number) {
+    /** Aufhebung eines bestimmten Paragraphen in einer Gemeinde oder einem Bund, z. B. aus Menü und Web. */
+    public Reply repeal(Caller caller, PolityId polityId, StatuteId statuteId) {
         Optional<PolityView> polity = queries.polity(polityId);
-        Optional<ParagraphView> paragraph = polity.flatMap(found -> paragraph(found, number));
+        Optional<ParagraphView> paragraph = polity.flatMap(found -> paragraphsOf(found).stream()
+                .filter(candidate -> candidate.id().equals(statuteId)).findFirst());
         if (paragraph.isEmpty()) {
-            return Reply.failure(Message.of(MessageKey.UNKNOWN_PARAGRAPH, number));
+            return Reply.failure(Message.of(MessageKey.UNKNOWN_PARAGRAPH, "?"));
         }
         return attempt(() -> {
             Optional<ProposeMotion.Result> proposal = app.repealParagraph().execute(new RepealParagraph.Command(
@@ -443,9 +479,21 @@ public final class LawBookService {
         }
     }
 
-    private Optional<ParagraphView> paragraph(PolityView polity, int number) {
-        List<ParagraphView> paragraphs = paragraphsOf(polity);
-        return number >= 1 && number <= paragraphs.size() ? Optional.of(paragraphs.get(number - 1)) : Optional.empty();
+    /** Treffer einer Suche nach Nummer und optional Gesetz; mehrdeutig, wenn mehrere Gesetze diese Nummer haben. */
+    private record Lookup(Optional<ParagraphView> paragraph, boolean ambiguous) {
+
+        Message failure(int number) {
+            return Message.of(ambiguous ? MessageKey.AMBIGUOUS_PARAGRAPH : MessageKey.UNKNOWN_PARAGRAPH, number);
+        }
+    }
+
+    private Lookup lookup(PolityView polity, int number, Optional<String> law) {
+        String wanted = law.map(String::strip).filter(name -> !name.isEmpty()).orElse(null);
+        List<ParagraphView> matches = paragraphsOf(polity).stream()
+                .filter(paragraph -> paragraph.number() == number)
+                .filter(paragraph -> wanted == null || paragraph.lawName().equalsIgnoreCase(wanted))
+                .toList();
+        return new Lookup(matches.size() == 1 ? Optional.of(matches.get(0)) : Optional.empty(), matches.size() > 1);
     }
 
     private List<Message> effects(List<ParameterValue<?>> values) {

@@ -40,12 +40,20 @@ public sealed interface Motion permits Motion.Change, Motion.Enact, Motion.Repea
     }
 
     /** Einen Paragraphen erlassen: Titel, Freitext und die daraus erkannten Regelungen. */
-    record Enact(String title, String text, List<ParameterValue<?>> values) implements Motion {
+    record Enact(String lawName, String partName, String title, String text, List<ParameterValue<?>> values)
+            implements Motion {
 
         private static final StatuteId CHECK = new StatuteId(new UUID(0, 0));
 
+        /** Ohne Gesetz und Teil. */
+        public Enact(String title, String text, List<ParameterValue<?>> values) {
+            this("", "", title, text, values);
+        }
+
         public Enact {
-            Statute checked = new Statute(CHECK, title, text, values);
+            Statute checked = new Statute(CHECK, lawName, partName, title, text, values);
+            lawName = checked.lawName();
+            partName = checked.partName();
             title = checked.title();
             text = checked.text();
             values = checked.values();
@@ -53,7 +61,8 @@ public sealed interface Motion permits Motion.Change, Motion.Enact, Motion.Repea
 
         @Override
         public String subject() {
-            return "§" + title.toLowerCase(Locale.ROOT);
+            return "§" + lawName.toLowerCase(Locale.ROOT) + ">" + partName.toLowerCase(Locale.ROOT) + ">"
+                    + title.toLowerCase(Locale.ROOT);
         }
     }
 

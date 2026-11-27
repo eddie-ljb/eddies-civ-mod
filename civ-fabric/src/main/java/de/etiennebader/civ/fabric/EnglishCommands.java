@@ -55,7 +55,7 @@ final class EnglishCommands {
             Map.entry("gemeinde-entfernen", "town-remove"),
             Map.entry("gericht", "court"), Map.entry("gesetz", "statute"), Map.entry("gesetze", "statutes"),
             Map.entry("grenzen", "borders"), Map.entry("gruenden", "found"), Map.entry("grundstueck", "plot"),
-            Map.entry("heim", "home"), Map.entry("hilfe", "help"), Map.entry("handbuch", "handbook"), Map.entry("holen", "get"), Map.entry("hymne", "anthem"),
+            Map.entry("heim", "home"), Map.entry("hilfe", "help"), Map.entry("handbuch", "handbook"), Map.entry("holen", "get"), Map.entry("hymne", "anthem"), Map.entry("platte", "record"), Map.entry("noten", "notes"),
             Map.entry("investieren", "invest"), Map.entry("ja", "yes"), Map.entry("kandidieren", "run"),
             Map.entry("karte", "map"), Map.entry("kasse", "treasury"), Map.entry("kaufen", "buy"),
             Map.entry("klage", "sue"), Map.entry("konjunktur", "conjuncture"), Map.entry("konto", "account"),

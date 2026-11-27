@@ -34,8 +34,13 @@ public final class EnactParagraph {
      * @param explicitValues Regelungen, die zusätzlich zu den im Text erkannten gesetzt werden (Rechte-Editor im
      *                       Web); der Text darf dann leer sein
      */
-    public record Command(PolityId polity, ActorRef author, String title, String text,
-                          List<ParameterValue<?>> explicitValues, Day day) {
+    public record Command(PolityId polity, ActorRef author, String lawName, String partName, String title,
+                          String text, List<ParameterValue<?>> explicitValues, Day day) {
+
+        public Command(PolityId polity, ActorRef author, String title, String text,
+                       List<ParameterValue<?>> explicitValues, Day day) {
+            this(polity, author, "", "", title, text, explicitValues, day);
+        }
 
         public Command(PolityId polity, ActorRef author, String title, String text, Day day) {
             this(polity, author, title, text, List.of(), day);
@@ -46,6 +51,8 @@ public final class EnactParagraph {
             explicitValues = List.copyOf(explicitValues);
             Objects.requireNonNull(polity, "polity");
             Objects.requireNonNull(author, "author");
+            Objects.requireNonNull(lawName, "lawName");
+            Objects.requireNonNull(partName, "partName");
             Objects.requireNonNull(title, "title");
             Objects.requireNonNull(text, "text");
             Objects.requireNonNull(day, "day");
@@ -79,7 +86,8 @@ public final class EnactParagraph {
         Map<ParameterKey<?>, ParameterValue<?>> merged = new LinkedHashMap<>();
         recognition.values().forEach(value -> merged.put(value.key(), value));
         command.explicitValues().forEach(value -> merged.put(value.key(), value));
-        Motion.Enact motion = new Motion.Enact(command.title(), command.text(), List.copyOf(merged.values()));
+        Motion.Enact motion = new Motion.Enact(command.lawName(), command.partName(), command.title(),
+                command.text(), List.copyOf(merged.values()));
         Polity polity = aggregates.polity(command.polity());
         if (Majorities.voteRequired(polity, motion)) {
             ProposeMotion.Result proposed = proposeMotion.execute(new ProposeMotion.Command(command.polity(),
@@ -89,7 +97,8 @@ public final class EnactParagraph {
         if (!polity.holds(command.author(), Office.MAYOR)) {
             throw new NotOfficeHolderException(command.author(), Office.MAYOR);
         }
-        Statute statute = new Statute(StatuteId.generate(ids), motion.title(), motion.text(), motion.values());
+        Statute statute = new Statute(StatuteId.generate(ids), motion.lawName(), motion.partName(), motion.title(),
+                motion.text(), motion.values());
         polity.enact(statute, command.day());
         aggregates.commit(polity);
         return new Result(Optional.of(statute.id()), Optional.empty(), recognition);

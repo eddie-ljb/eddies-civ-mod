@@ -93,8 +93,8 @@ final class Ballots {
     static void carryOut(Polity polity, Motion motion, IdGenerator ids, Day day) {
         switch (motion) {
             case Motion.Change change -> AmendLaw.apply(polity, change.change(), ids, day);
-            case Motion.Enact enact -> polity.enact(new Statute(StatuteId.generate(ids), enact.title(), enact.text(),
-                    enact.values()), day);
+            case Motion.Enact enact -> polity.enact(new Statute(StatuteId.generate(ids), enact.lawName(), enact.partName(),
+                    enact.title(), enact.text(), enact.values()), day);
             case Motion.Repeal repeal -> {
                 if (polity.laws().inForce().stream().anyMatch(law -> law.statute().id().equals(repeal.statute()))) {
                     polity.repeal(repeal.statute(), day);

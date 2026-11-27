@@ -60,6 +60,7 @@ public final class Campaign implements CampaignInfluence {
     private final Function<PolityView, LawView> lawsOf;
     private final Map<PersonRef, List<Heard>> heard = new HashMap<>();
     private final Map<ActorRef, Day> lastSpeech = new HashMap<>();
+    private final Map<PersonRef, Day> lastPosterRead = new HashMap<>();
 
     /** Ohne Parteien und Wohnorte, z. B. für Tests. */
     public Campaign() {
@@ -135,6 +136,29 @@ public final class Campaign implements CampaignInfluence {
         return new Reception(listeners.size(), convinced, repelled, topic);
     }
 
+    /**
+     * Ein Dorfbewohner liest ein Plakat, an dem er vorbeikommt: wirkt wie ein Fünftel einer Rede, höchstens einmal am
+     * Tag je Dorfbewohner (egal an welchem Plakat), und zählt wie Reden zur selben Obergrenze von ±{@value #SPEECH_CAP}.
+     * Damit nutzen Villager die Litfaßsäulen, aber nicht zu viel.
+     *
+     * @return ob er es heute gelesen hat; nicht, wenn er heute schon ein Plakat gelesen hatte
+     */
+    public synchronized boolean readPoster(PersonRef villager, ActorRef subject, Platform topic, Day day) {
+        Objects.requireNonNull(villager, "villager");
+        Objects.requireNonNull(subject, "subject");
+        Objects.requireNonNull(topic, "topic");
+        Objects.requireNonNull(day, "day");
+        if (day.equals(lastPosterRead.get(villager))) {
+            return false;
+        }
+        lastPosterRead.put(villager, day);
+        double strength = topic == Platform.NONE ? NEUTRAL_SPEECH / 5
+                : SPEECH / 5 * agreement(Personality.of(villager), topic);
+        heard.computeIfAbsent(villager, ignored -> new ArrayList<>())
+                .add(new Heard(subject, strength, day.plus(SPEECH_DAYS)));
+        return true;
+    }
+
     /** Wie sehr ein Thema einer Persönlichkeit zusagt: -1 bis 1. */
     static double agreement(Personality personality, Platform topic) {
         return PlatformAffinity.of(topic, personality);
@@ -150,6 +174,7 @@ public final class Campaign implements CampaignInfluence {
         Objects.requireNonNull(day, "day");
         heard.values().forEach(list -> list.removeIf(entry -> !entry.until().isAfter(day)));
         heard.values().removeIf(List::isEmpty);
+        lastPosterRead.values().removeIf(read -> read.isBefore(day));
     }
 
     @Override

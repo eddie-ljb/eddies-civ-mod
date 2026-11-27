@@ -26,6 +26,7 @@ public final class CivicRegistry extends AggregateRoot<CivicEvent> implements Ci
     private final Map<String, CustomImage> images = new LinkedHashMap<>();
     private final Map<PolityId, PortSettings> portSettings = new LinkedHashMap<>();
     private final List<HomePort> ports = new ArrayList<>();
+    private final Map<BlockPosition, Emblem> emblems = new LinkedHashMap<>();
 
     private CivicRegistry() {
     }
@@ -47,7 +48,15 @@ public final class CivicRegistry extends AggregateRoot<CivicEvent> implements Ci
     public static CivicRegistry restore(Collection<Constituency> constituencies, Map<PolityId, Flag> flags,
                                         Map<PolityId, Anthem> anthems, Map<String, CustomImage> images,
                                         Map<PolityId, PortSettings> portSettings, Collection<HomePort> ports) {
+        return restore(constituencies, flags, anthems, images, portSettings, ports, List.of());
+    }
+
+    public static CivicRegistry restore(Collection<Constituency> constituencies, Map<PolityId, Flag> flags,
+                                        Map<PolityId, Anthem> anthems, Map<String, CustomImage> images,
+                                        Map<PolityId, PortSettings> portSettings, Collection<HomePort> ports,
+                                        Collection<Emblem> emblems) {
         CivicRegistry registry = new CivicRegistry();
+        emblems.forEach(emblem -> registry.emblems.put(emblem.position(), emblem));
         registry.portSettings.putAll(portSettings);
         registry.ports.addAll(ports);
         registry.constituencies.addAll(constituencies);
@@ -276,5 +285,32 @@ public final class CivicRegistry extends AggregateRoot<CivicEvent> implements Ci
     @Override
     public Map<String, CustomImage> images() {
         return Map.copyOf(images);
+    }
+
+    // ---- Hoheitszeichen (Flaggen, Wappen als Blöcke) ----
+
+    /**
+     * Stellt ein Hoheitszeichen auf; eines am selben Ort wird ersetzt.
+     *
+     * @return ob es aufgestellt wurde; nicht, wenn die Polity schon {@link Emblem#MAX_PER_POLITY} hat
+     */
+    public boolean placeEmblem(Emblem emblem) {
+        Objects.requireNonNull(emblem, "emblem");
+        boolean replaces = emblems.containsKey(emblem.position());
+        if (!replaces && emblemsOf(emblem.polity()).size() >= Emblem.MAX_PER_POLITY) {
+            return false;
+        }
+        emblems.put(emblem.position(), emblem);
+        return true;
+    }
+
+    /** Entfernt das Hoheitszeichen an dieser Stelle. @return ob dort eines stand */
+    public boolean removeEmblem(BlockPosition position) {
+        return emblems.remove(Objects.requireNonNull(position, "position")) != null;
+    }
+
+    @Override
+    public List<Emblem> emblems() {
+        return List.copyOf(emblems.values());
     }
 }
