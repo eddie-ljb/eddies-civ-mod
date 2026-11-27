@@ -47,5 +47,29 @@ Schleichen + Rechtsklick mit leerer Hand auf einen Dorfbewohner öffnet sein **M
 - Dorfbewohner tauschen sich auch untereinander täglich aus und heben sich dabei gegenseitig etwas in der Stimmung.
 - Sehr unzufriedene, freiheitsliebende Dorfbewohner fallen gelegentlich mit dem Verdacht auf eine Straftat auf (Ankündigung an die Gemeinde); angeklagt wird er wie gewohnt über `/civ gericht …` mit ihm als Beschuldigtem.
 
+
+### Berufe und Kleidung
+Mit dem Mod auf dem Client tragen Dorfbewohner die Kleidung ihres Berufs. Der Beruf folgt aus ihrer Rolle in der Zivilisation; wer mehrere Rollen hat, trägt die oberste dieser Tabelle. Kinder und Dorfbewohner ohne Rolle bleiben im Vanilla-Gewand.
+
+| Beruf | Wer das ist | Kleidung |
+|---|---|---|
+| Politiker | Bürgermeister, Schatzmeister, Bauamt und andere Amtsträger, Abgeordnete, Parteivorsitzende | dunkelblauer Anzug, rote Krawatte |
+| Richter | Richter und Staatsanwälte eines Gerichts | schwarze Robe, weißer Kragen |
+| Offizier | Unteroffizier, Offizier, Hauptmann, General der Garnison | grüne Uniform, Schirmmütze mit Goldband, Schulterstücke |
+| Soldat | Soldaten und Ausspäher der Garnison | Tarnuniform, Feldmütze |
+| Polizist | alle Dienstgrade der Polizei | blaue Uniform, Schirmmütze, goldenes Abzeichen |
+| Banker | Betreiber einer Bank, auch der Chef einer Bankfirma | Nadelstreifenanzug, Zylinder, goldene Krawatte |
+| Unternehmer | Chef einer Firma | brauner Anzug, Hut, grüne Krawatte |
+| Journalist | Leiter einer Zeitung | Trenchcoat, Hut, Presseausweis |
+| Bauarbeiter | Angestellte einer Baufirma (Branche `bau`) | Warnweste, gelber Schutzhelm |
+| Mechaniker | Angestellte einer Wartungsfirma (`wartung`) | blauer Overall, Kappe |
+| Bergmann | Angestellte eines Bergwerks (`bergwerk`) | dunkle Kleidung, Schutzhelm mit Lampe |
+| Holzfäller | Angestellte einer Forstfirma (`forst`) | rot-schwarz kariert, grüne Mütze |
+| Bauer | Angestellte in `acker`, `obstbau`, `schaeferei`, `viehzucht` | Strohhut, grüne Weste |
+| Fischer | Angestellte einer Fischerei (`fischerei`) | gelbe Ölzeugjacke, blaue Mütze |
+| Arbeiter | alle übrigen Angestellten, etwa einer Ziegelei | blaugraue Arbeitskleidung |
+
+Der Server schickt die Berufe alle 10 Sekunden an Spieler mit dem Mod; eine neue Rolle (Wahl, Einstellung, Beförderung) sieht man deshalb nach höchstens 10 Sekunden. Spieler ohne den Mod sehen weiter das Vanilla-Gewand und werden nicht abgewiesen. Hautton, Haarfarbe und Rasse bleiben erhalten, die Kultur bestimmt weiter das Vanilla-Gewand der übrigen Dorfbewohner. Die Texturen entstehen auf dem Client aus der Vanilla-Textur, der Mod bringt keine fremden Bilder mit.
+
 ## Englische Befehle und Handbuch
 Jeder Befehl gibt es auch auf Englisch, z. B. `/civ court case 3`, `/civ company invest …` (siehe [Befehlsübersicht](Befehlsuebersicht.md)). Neue Spieler bekommen beim ersten Betreten das **Civ-Handbuch** in ihrer Spielsprache; Nachschlag mit `/civ handbuch`.

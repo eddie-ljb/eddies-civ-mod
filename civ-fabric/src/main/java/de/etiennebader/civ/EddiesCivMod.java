@@ -29,6 +29,9 @@ public class EddiesCivMod implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry.clientboundPlay().register(
+                de.etiennebader.civ.fabric.look.VillagerOccupationsPayload.TYPE,
+                de.etiennebader.civ.fabric.look.VillagerOccupationsPayload.CODEC);
         CivServerHost host = new CivServerHost();
         CivApi.bind(host);
         CivApi.collectRegistrations();

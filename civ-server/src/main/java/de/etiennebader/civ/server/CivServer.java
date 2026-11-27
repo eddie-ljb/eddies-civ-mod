@@ -554,6 +554,13 @@ public final class CivServer {
         return villagers;
     }
 
+    /** Berufe aller Dorfbewohner, die einen haben; daran richtet der Client ihre Kleidung aus. */
+    public java.util.Map<de.etiennebader.civ.domain.actor.PersonRef, de.etiennebader.civ.domain.population.Occupation>
+            villagerOccupations() {
+        return de.etiennebader.civ.server.villager.VillagerOccupations.of(app.queries(), police.registry(),
+                war.registry());
+    }
+
     public de.etiennebader.civ.server.conjuncture.ConjunctureService conjuncture() {
         return conjuncture;
     }
