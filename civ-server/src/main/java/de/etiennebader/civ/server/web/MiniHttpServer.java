@@ -131,7 +131,8 @@ public final class MiniHttpServer implements AutoCloseable {
             }
         }
         boolean upload = requestLine[0].equalsIgnoreCase("POST")
-                && (requestLine[1].equals(UPLOAD_PATH) || requestLine[1].startsWith(UPLOAD_PATH + "?"));
+                && (requestLine[1].equals(UPLOAD_PATH) || requestLine[1].startsWith(UPLOAD_PATH + "?")
+                || requestLine[1].equals("/api/anthem-audio"));
         if (length < 0 || length > (upload ? MAX_UPLOAD_BODY : MAX_BODY)) {
             throw new BadRequestException(413, "Anfrage zu groß");
         }

@@ -195,7 +195,9 @@ public final class CivicService {
         String notes = parts[parts.length - 1].strip();
         Anthem anthem;
         try {
-            anthem = new Anthem(title, instrument, notes);
+            // Eine neue Notenfassung behält die hochgeladene Aufnahme.
+            anthem = new Anthem(title, instrument, notes,
+                    queries.civic().anthemOf(polity.id()).map(Anthem::audio).orElse(""));
         } catch (IllegalArgumentException e) {
             return Reply.failure(Message.of(MessageKey.ANTHEM_INVALID, e.getMessage()));
         }
@@ -212,6 +214,50 @@ public final class CivicService {
             app.civic().setAnthem(caller.player(), polity.id(), Optional.empty(), calendar.today());
             return Reply.success(Message.of(MessageKey.ANTHEM_REMOVED, polity.name().value()));
         });
+    }
+
+    /**
+     * Hängt eine bereits gespeicherte Aufnahme (OGG, Hash) an die Hymne. Nur die Spitze darf das; die Hymne muss
+     * schon bestehen, ihre Noten dienen als Ersatz für Spieler ohne Ressourcenpaket.
+     *
+     * @return der Hash der verdrängten Aufnahme, falls es eine gab
+     */
+    public Reply setAnthemAudio(Caller caller, PolityView polity, String hash, java.util.function.Consumer<String> onDisplaced) {
+        Optional<Anthem> current = queries.civic().anthemOf(polity.id());
+        if (current.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.ANTHEM_AUDIO_NEEDS_ANTHEM));
+        }
+        Anthem updated;
+        try {
+            updated = current.get().withAudio(hash);
+        } catch (IllegalArgumentException e) {
+            return Reply.failure(Message.of(MessageKey.ANTHEM_AUDIO_INVALID, e.getMessage()));
+        }
+        return attempt(() -> {
+            app.civic().setAnthem(caller.player(), polity.id(), Optional.of(updated), calendar.today());
+            if (current.get().hasAudio() && !current.get().audio().equals(hash)) {
+                onDisplaced.accept(current.get().audio());
+            }
+            return Reply.success(Message.of(MessageKey.ANTHEM_AUDIO_SET, polity.name().value()));
+        });
+    }
+
+    public Reply removeAnthemAudio(Caller caller, PolityView polity, java.util.function.Consumer<String> onRemoved) {
+        Optional<Anthem> current = queries.civic().anthemOf(polity.id());
+        if (current.isEmpty() || !current.get().hasAudio()) {
+            return Reply.failure(Message.of(MessageKey.ANTHEM_NONE, polity.name().value()));
+        }
+        return attempt(() -> {
+            app.civic().setAnthem(caller.player(), polity.id(), Optional.of(current.get().withAudio("")),
+                    calendar.today());
+            onRemoved.accept(current.get().audio());
+            return Reply.success(Message.of(MessageKey.ANTHEM_AUDIO_REMOVED, polity.name().value()));
+        });
+    }
+
+    /** Ob irgendeine Hymne diese Aufnahme noch verwendet (dann bleibt die Datei liegen). */
+    public boolean audioInUse(String hash) {
+        return queries.civic().anthems().values().stream().anyMatch(anthem -> anthem.audio().equals(hash));
     }
 
     public Optional<Flag> flagOf(PolityId polity) {
