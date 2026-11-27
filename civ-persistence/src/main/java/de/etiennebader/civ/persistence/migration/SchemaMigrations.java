@@ -32,7 +32,8 @@ public final class SchemaMigrations {
             "V024__candidate_district.sql",
             "V025__player_gender.sql",
             "V026__currencies_and_credit.sql",
-            "V027__loan_offers.sql");
+            "V027__loan_offers.sql",
+            "V028__law_structure.sql");
 
     private SchemaMigrations() {
     }

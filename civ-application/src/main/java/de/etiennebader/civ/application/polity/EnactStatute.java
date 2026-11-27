@@ -17,9 +17,17 @@ import java.util.Objects;
  */
 public final class EnactStatute {
 
-    public record Command(PolityId polity, String title, List<ParameterValue<?>> values, Day day) {
+    public record Command(PolityId polity, String lawName, String partName, String title,
+                          List<ParameterValue<?>> values, Day day) {
+
+        /** Ohne Gesetz und Teil. */
+        public Command(PolityId polity, String title, List<ParameterValue<?>> values, Day day) {
+            this(polity, "", "", title, values, day);
+        }
 
         public Command {
+            Objects.requireNonNull(lawName, "lawName");
+            Objects.requireNonNull(partName, "partName");
             Objects.requireNonNull(polity, "polity");
             Objects.requireNonNull(title, "title");
             values = List.copyOf(Objects.requireNonNull(values, "values"));
@@ -40,7 +48,8 @@ public final class EnactStatute {
      */
     public StatuteId execute(Command command) {
         Polity polity = aggregates.polity(command.polity());
-        Statute statute = new Statute(StatuteId.generate(ids), command.title(), command.values());
+        Statute statute = new Statute(StatuteId.generate(ids), command.lawName(), command.partName(), command.title(),
+                "", command.values());
         polity.enact(statute, command.day());
         aggregates.commit(polity);
         return statute.id();

@@ -166,7 +166,7 @@ class SqliteStateStoreTest {
             assertTrue(saved.contains("constitution|d1|Wir, die Bürger von Nordhain."), saved);
             assertTrue(saved.contains("constitution|draft|Entwurf des Landes."), saved);
             assertTrue(saved.contains("|text=Feuer ist verboten. Wer stiehlt, wird verbannt."), saved);
-            assertTrue(saved.contains("enact:Fristen:Abstimmungen dauern 4 Tage.:vote_days=4"), saved);
+            assertTrue(saved.contains("enact:Gemeinderecht>Teil 2>Fristen:Abstimmungen dauern 4 Tage.:vote_days=4"), saved);
             assertTrue(saved.contains("repeal:"), saved);
             assertTrue(saved.contains("party|60|-10|minecraft:blue_banner"), saved);
             assertEquals(5, count("SELECT COUNT(*) FROM polity"),
@@ -415,10 +415,10 @@ class SqliteStateStoreTest {
             app.changePreamble().execute(new ChangePreamble.Command(nordhain, alice, "Wir, die Bürger von Nordhain.", DAY));
             app.proclaimConstitution().execute(new ProclaimConstitution.Command(nordhain, alice, DAY));
             app.changePreamble().execute(new ChangePreamble.Command(westmark, alice, "Entwurf des Landes.", DAY));
-            var house = app.enactParagraph().execute(new EnactParagraph.Command(nordhain, alice, "Hausordnung",
-                    "Feuer ist verboten. Wer stiehlt, wird verbannt.", DAY)).statute().orElseThrow();
-            app.enactParagraph().execute(new EnactParagraph.Command(nordhain, alice, "Fristen",
-                    "Abstimmungen dauern 4 Tage.", DAY));
+            var house = app.enactParagraph().execute(new EnactParagraph.Command(nordhain, alice, "Gemeinderecht",
+                    "Teil 1", "Hausordnung", "Feuer ist verboten. Wer stiehlt, wird verbannt.", List.of(), DAY)).statute().orElseThrow();
+            app.enactParagraph().execute(new EnactParagraph.Command(nordhain, alice, "Gemeinderecht",
+                    "Teil 2", "Fristen", "Abstimmungen dauern 4 Tage.", List.of(), DAY));
             var areaProfile = new PartyProfile(60, -10, "minecraft:blue_banner").withArea(Optional.of(westmark));
             var party = app.foundParty().execute(new FoundParty.Command(PolityName.of("Ordnungspartei"), dora,
                     areaProfile, EMERALD, List.of(bertram), DAY));
