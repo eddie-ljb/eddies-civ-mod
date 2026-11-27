@@ -1156,7 +1156,15 @@ public final class CivCommandTree {
                                                         StringArgumentType.getString(context, TYPE),
                                                         StringArgumentType.getString(context, TEXT))))))))
                 .then(courtStaff("richter", Role.JUDGE, level))
-                .then(courtStaff("staatsanwalt", Role.PROSECUTOR, level));
+                .then(courtStaff("staatsanwalt", Role.PROSECUTOR, level))
+                .then(Commands.literal("kandidieren")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(Players.caller(player),
+                                level.apply(context), polity -> civ.justice().candidacy(Players.caller(player), polity,
+                                        true)))))
+                .then(Commands.literal("zurueckziehen")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(Players.caller(player),
+                                level.apply(context), polity -> civ.justice().candidacy(Players.caller(player), polity,
+                                        false)))));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> courtStaff(

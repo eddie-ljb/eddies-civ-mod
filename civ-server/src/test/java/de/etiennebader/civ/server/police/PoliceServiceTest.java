@@ -165,9 +165,9 @@ class PoliceServiceTest {
         server.police().arrest(caller(bob, "Bob"), "Carol");
         var link = server.police().registry().links().getFirst();
         assertEquals(0, link.sentenceDays());
-        assertTrue(server.police().registry().sentence(town, link.caseNumber(), 7));
+        assertTrue(server.police().registry().sentence(link.caseNumber(), 7));
         assertEquals(7, server.police().registry().links().getFirst().effectiveDays());
-        assertFalse(server.police().registry().sentence(town, 999, 7), "unbekanntes Verfahren");
+        assertFalse(server.police().registry().sentence(999, 7), "unbekanntes Verfahren");
     }
 
     @Test
@@ -193,5 +193,27 @@ class PoliceServiceTest {
         assertFalse(server.justice().appoint(caller(alice, "Alice"), server.queries().polity(town).orElseThrow(),
                 de.etiennebader.civ.domain.justice.Role.JUDGE, "Bob", java.util.Optional.empty(), true).success(),
                 "bei automatischer Besetzung ernennt niemand");
+    }
+
+    @Test
+    @DisplayName("Wahl: Spieler kandidieren freiwillig, nur bei election und nur als Mitglied; Gewählte nehmen den Sitz ein")
+    void playersRunInElections() {
+        for (int i = 0; i < 4; i++) {
+            server.villagers().seen(new de.etiennebader.civ.domain.actor.PersonRef(
+                    de.etiennebader.civ.domain.shared.PersonId.generate(ids)),
+                    new BlockPosition(DimensionId.OVERWORLD, 8, 64, 8), Day.of(1));
+        }
+        var nordhain = server.queries().polity(town).orElseThrow();
+        assertFalse(server.justice().candidacy(caller(bob, "Bob"), nordhain, true).success(), "keine Wahl vorgesehen");
+        assertTrue(server.lawBooks().enactRights(caller(alice, "Alice"), town, "Wahl",
+                java.util.Map.of("court_staffing", "election")).success());
+        assertFalse(server.justice().candidacy(caller(dave, "Dave"), nordhain, true).success(), "kein Mitglied");
+        assertTrue(server.justice().candidacy(caller(bob, "Bob"), nordhain, true).success());
+        assertFalse(server.justice().candidacy(caller(bob, "Bob"), nordhain, true).success(), "doppelt");
+        assertTrue(server.justice().candidacy(caller(bob, "Bob"), nordhain, false).success());
+        assertTrue(server.justice().candidacy(caller(bob, "Bob"), nordhain, true).success());
+        server.justice().endOfDay(Day.of(2));
+        assertEquals(1, server.courtStaff(town).judges().size());
+        assertEquals(1, server.courtStaff(town).prosecutors().size());
     }
 }

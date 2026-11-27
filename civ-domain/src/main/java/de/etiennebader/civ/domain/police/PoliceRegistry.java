@@ -145,8 +145,9 @@ public final class PoliceRegistry {
         cases.put(link.caseNumber(), Objects.requireNonNull(link, "link"));
     }
 
-    public Optional<CaseLink> linkOf(PolityId polity, int caseNumber) {
-        return Optional.ofNullable(cases.get(caseNumber)).filter(l -> l.polity().equals(polity));
+    /** Das Verfahren zur Nummer (Nummern sind gerichtsübergreifend eindeutig, auch bei Berufung an ein höheres Gericht). */
+    public Optional<CaseLink> linkOf(int caseNumber) {
+        return Optional.ofNullable(cases.get(caseNumber));
     }
 
     public List<CaseLink> links() {
@@ -154,21 +155,29 @@ public final class PoliceRegistry {
     }
 
     /** Legt die Haftdauer des Urteils fest; false, wenn das Verfahren nicht aus einer Festnahme stammt. */
-    public boolean sentence(PolityId polity, int caseNumber, int days) {
-        Optional<CaseLink> link = linkOf(polity, caseNumber);
+    public boolean sentence(int caseNumber, int days) {
+        Optional<CaseLink> link = linkOf(caseNumber);
         link.ifPresent(l -> cases.put(caseNumber, l.withSentence(days)));
         return link.isPresent();
     }
 
-    public void prepared(PolityId polity, int caseNumber) {
-        linkOf(polity, caseNumber).ifPresent(l -> cases.put(caseNumber, l.markPrepared()));
+    public void prepared(int caseNumber) {
+        linkOf(caseNumber).ifPresent(l -> cases.put(caseNumber, l.markPrepared()));
     }
 
     /** Beendet die Verknüpfung (Verfahren rechtskräftig). */
-    public Optional<CaseLink> unlink(PolityId polity, int caseNumber) {
-        Optional<CaseLink> link = linkOf(polity, caseNumber);
+    public Optional<CaseLink> unlink(int caseNumber) {
+        Optional<CaseLink> link = linkOf(caseNumber);
         link.ifPresent(l -> cases.remove(caseNumber));
         return link;
+    }
+
+    /** Berufung: die Verknüpfung wandert auf das neue Verfahren; Zeugen werden dort erneut geladen. */
+    public boolean moveLink(int fromCase, int toCase) {
+        Optional<CaseLink> link = unlink(fromCase);
+        link.ifPresent(l -> cases.put(toCase, new CaseLink(toCase, l.polity(), l.suspect(), l.kind(), l.sentenceDays(),
+                l.witnesses(), false)));
+        return link.isPresent();
     }
 
     // ------------------------------------------------------------------ Zellen
@@ -246,6 +255,18 @@ public final class PoliceRegistry {
     public boolean restrained(ActorRef person, Day today) {
         Day until = cuffed.get(person);
         return (until != null && until.isAfter(today)) || jailOf(person).isPresent();
+    }
+
+    /** Alle derzeit Gefesselten und Inhaftierten. */
+    public java.util.Set<ActorRef> restrainedActors(Day today) {
+        java.util.Set<ActorRef> result = new java.util.LinkedHashSet<>();
+        cuffed.forEach((person, until) -> {
+            if (until.isAfter(today)) {
+                result.add(person);
+            }
+        });
+        detained.values().forEach(map -> result.addAll(map.keySet()));
+        return result;
     }
 
     public void expireCuffs(Day today) {

@@ -40,9 +40,14 @@
   Live-Stände der Feldzüge (Aktualisierung alle 10 s), Schlachtenbuch je Krieg (`war.tsv`, `LOG`).
 - **Zeitungen:** Kriegserklärung, Schlachten, Frieden und Sieg erscheinen in jeder Zeitung mit Dorfbewohner-Redakteur.
 
-## Noch offen
-- Spieler als Kandidaten bei `election`, Berufungs-Haft (Berufungsverfahren sind nicht mit der Festnahme verknüpft).
-- Gefesselte Dorfbewohner bleiben im Spiel beweglich (nur das Register hält sie fest).
+- **Spieler bei `election`:** Spieler kandidieren freiwillig mit `/civ gericht kandidieren` (Ebenen-Varianten wie bei `richter`),
+  `zurueckziehen` nimmt es zurück (`court_candidacies.tsv`). Die Dorfbewohner wählen unter allen Dorfbewohnern und den
+  kandidierenden Spielern (Spieler zählen mit neutraler Eignung 50); wer gewählt wird, nimmt den Sitz ein.
+- **Berufung:** Legt die unterlegene Seite Berufung ein (auch an ein höheres Gericht), wandert die Verknüpfung auf das neue
+  Verfahren (`PoliceRegistry.moveLink`); Zeugen werden dort neu geladen, das Urteil der Vorinstanz vollstreckt nichts mehr.
+  Urteil, Haft und Freilassung folgen dem Berufungsurteil.
+- **Gefesselte Dorfbewohner stehen still:** Solange sie gefesselt oder inhaftiert sind, ist ihre KI aus (`NoAI`, alle 2 s
+  abgeglichen; Markierung `eddies_civ_cuffed` überlebt Neustarts und wird beim Laden aufgehoben, wenn die Fessel verfallen ist).
 
 ## Testen
 1. Gemeinde gründen, zweiten Spieler beitreten lassen. `/civ polizei dienen`, `/civ polizei zellen 2`.

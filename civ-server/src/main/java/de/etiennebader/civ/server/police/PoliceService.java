@@ -18,6 +18,7 @@ import de.etiennebader.civ.domain.police.Offense;
 import de.etiennebader.civ.domain.police.PoliceRank;
 import de.etiennebader.civ.domain.police.PoliceRegistry;
 import de.etiennebader.civ.domain.polity.Membership;
+import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.polity.PolityView;
@@ -95,6 +96,13 @@ public final class PoliceService implements CaseListener {
     /** Ob die Person gefesselt oder inhaftiert ist und deshalb nicht schlagen, abbauen oder kämpfen darf. */
     public synchronized boolean restrained(ActorRef person) {
         return registry.restrained(person, calendar.today());
+    }
+
+    /** Kennungen der Dorfbewohner, die gerade gefesselt oder inhaftiert sind (das Spiel hält sie dann fest). */
+    public synchronized java.util.Set<java.util.UUID> restrainedVillagers() {
+        Day today = calendar.today();
+        return registry.restrainedActors(today).stream().filter(PersonRef.class::isInstance)
+                .map(ActorRef::uuid).collect(java.util.stream.Collectors.toSet());
     }
 
     // ------------------------------------------------------------------ Dienst
@@ -588,8 +596,8 @@ public final class PoliceService implements CaseListener {
     /** Das Verfahren ist eröffnet: Zeugen werden geladen; Dorfbewohner sagen sofort aus. */
     @Override
     public synchronized void opened(CourtCase courtCase) {
-        registry.linkOf(courtCase.court(), courtCase.number()).filter(link -> !link.prepared()).ifPresent(link -> {
-            PolityView town = queries.polity(courtCase.court()).orElse(null);
+        registry.linkOf(courtCase.number()).filter(link -> !link.prepared()).ifPresent(link -> {
+            PolityView town = queries.polity(link.polity()).orElse(null);
             if (town != null) {
                 for (ActorRef witness : link.witnesses()) {
                     try {
@@ -599,15 +607,23 @@ public final class PoliceService implements CaseListener {
                     }
                 }
             }
-            registry.prepared(courtCase.court(), courtCase.number());
+            registry.prepared(courtCase.number());
             save();
         });
+    }
+
+    /** Berufung: das neue Verfahren übernimmt die Verknüpfung; das Urteil der Vorinstanz vollstreckt dann nichts mehr. */
+    @Override
+    public synchronized void appealed(CourtCase original, CourtCase appeal) {
+        if (registry.moveLink(original.number(), appeal.number())) {
+            save();
+        }
     }
 
     /** Der Richter hat Haft verhängt. */
     @Override
     public synchronized void sentenced(CourtCase courtCase, int days) {
-        if (registry.sentence(courtCase.court(), courtCase.number(), days)) {
+        if (registry.sentence(courtCase.number(), days)) {
             save();
         }
     }
@@ -615,17 +631,18 @@ public final class PoliceService implements CaseListener {
     /** Rechtskräftig: bei Schuldspruch sitzt der Täter die Haft ab, sonst wird er freigelassen. */
     @Override
     public synchronized void finalised(CourtCase courtCase) {
-        Optional<CaseLink> link = registry.unlink(courtCase.court(), courtCase.number());
+        Optional<CaseLink> link = registry.unlink(courtCase.number());
         if (link.isEmpty()) {
             return;
         }
         ActorRef suspect = link.get().suspect();
         Day today = calendar.today();
-        registry.release(courtCase.court(), suspect);
+        PolityId jail = link.get().polity();
+        registry.release(jail, suspect);
         registry.uncuff(suspect);
         boolean guilty = courtCase.verdict().filter(v -> v.upheld()).isPresent();
-        if (guilty && registry.detain(courtCase.court(), suspect, today, link.get().effectiveDays(), false)) {
-            announcements.add(Announcement.toTown(courtCase.court(), Message.of(MessageKey.POLICE_SENTENCE_SERVED,
+        if (guilty && registry.detain(jail, suspect, today, link.get().effectiveDays(), false)) {
+            announcements.add(Announcement.toTown(jail, Message.of(MessageKey.POLICE_SENTENCE_SERVED,
                     texts.actor(suspect), link.get().effectiveDays())));
         } else if (guilty) {
             registry.cuff(suspect, today); // keine freie Zelle: nur gefesselt

@@ -97,4 +97,21 @@ class PoliceRegistryTest {
         assertEquals(CrimeKind.MURDER, Criminality.kindFor(high, 99));
         assertEquals(CrimeKind.THEFT, Criminality.kindFor(5, 99), "niedrige Kriminalität mordet nicht");
     }
+
+    @Test
+    @DisplayName("Berufung: Verknüpfung wandert aufs neue Verfahren, Zeugen werden neu geladen; Gefesselte werden aufgelistet")
+    void appealMovesLink() {
+        police.link(new CaseLink(5, town, thief, CrimeKind.ASSAULT, 4, java.util.List.of(chief), true));
+        assertTrue(police.moveLink(5, 9));
+        assertTrue(police.linkOf(5).isEmpty(), "die Vorinstanz vollstreckt nichts mehr");
+        CaseLink moved = police.linkOf(9).orElseThrow();
+        assertEquals(4, moved.sentenceDays());
+        assertFalse(moved.prepared());
+        assertFalse(police.moveLink(5, 10), "nur einmal");
+        police.cuff(cadet, Day.of(1));
+        police.setCells(town, 1);
+        police.detain(town, thief, Day.of(1), 3, true);
+        assertEquals(2, police.restrainedActors(Day.of(1)).size());
+        assertEquals(1, police.restrainedActors(Day.of(2)).size(), "Handschellen verfallen, Haft bleibt");
+    }
 }

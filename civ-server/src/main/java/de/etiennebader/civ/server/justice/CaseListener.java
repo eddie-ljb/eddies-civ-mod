@@ -13,6 +13,10 @@ public interface CaseListener {
     default void sentenced(CourtCase courtCase, int days) {
     }
 
+    /** Gegen {@code original} wurde Berufung eingelegt; {@code appeal} ist das neue Verfahren. */
+    default void appealed(CourtCase original, CourtCase appeal) {
+    }
+
     /** Das Urteil ist rechtskräftig. */
     default void finalised(CourtCase courtCase) {
     }

@@ -49,6 +49,7 @@ public final class JusticeService {
     private final java.util.List<CaseListener> listeners = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     private CourtStaffing staffing;
+    private final CourtCandidacies candidacies;
 
     public void addListener(CaseListener listener) {
         listeners.add(listener);
@@ -56,6 +57,12 @@ public final class JusticeService {
 
     public JusticeService(CivApplication app, Calendar calendar, PlayerDirectory players, Texts texts,
                           Announcements announcements) {
+        this(app, calendar, players, texts, announcements, java.util.Optional.empty());
+    }
+
+    public JusticeService(CivApplication app, Calendar calendar, PlayerDirectory players, Texts texts,
+                          Announcements announcements, java.util.Optional<java.nio.file.Path> candidacyFile) {
+        this.candidacies = new CourtCandidacies(candidacyFile);
         this.app = Objects.requireNonNull(app, "app");
         this.queries = app.queries();
         this.calendar = Objects.requireNonNull(calendar, "calendar");
@@ -297,11 +304,28 @@ public final class JusticeService {
     public Reply appeal(Caller caller, int number) {
         return withCase(number, found -> {
             CourtCase appeal = justice().appeal(caller.player(), found.id(), calendar.today());
+            listeners.forEach(listener -> listener.appealed(found, appeal));
             notifyParties(appeal, Message.of(MessageKey.CASE_APPEALED, number, appeal.number(),
                     texts.polityName(appeal.court())));
             return Reply.success(Message.of(MessageKey.CASE_APPEALED, number, appeal.number(),
                     texts.polityName(appeal.court())));
         });
+    }
+
+    /** {@code kandidieren|zurueckziehen}: ein Spieler bewirbt sich bei {@code court_staffing = election} um Richter-/Staatsanwaltsämter. */
+    public Reply candidacy(Caller caller, PolityView court, boolean run) {
+        if (!court.isMember(caller.player())) {
+            return Reply.failure(Message.of(MessageKey.COURT_CANDIDACY_NOT_MEMBER));
+        }
+        String mode = queries.effectiveLaws(court).valueOf(de.etiennebader.civ.domain.law.StandardParameters.COURT_STAFFING);
+        if (run && !mode.equals("election")) {
+            return Reply.failure(Message.of(MessageKey.COURT_CANDIDACY_NOT_ELECTION));
+        }
+        boolean changed = run ? candidacies.run(court.id(), caller.player())
+                : candidacies.withdraw(court.id(), caller.player());
+        return changed ? Reply.success(Message.of(run ? MessageKey.COURT_CANDIDACY_ON : MessageKey.COURT_CANDIDACY_OFF,
+                court.name().value()))
+                : Reply.failure(Message.of(MessageKey.COURT_CANDIDACY_UNCHANGED));
     }
 
     /** {@code richter|staatsanwalt ernennen|entlassen <Spieler|dorfbewohner>} (nur die Spitze). */
@@ -400,7 +424,7 @@ public final class JusticeService {
 
     public void endOfDay(de.etiennebader.civ.domain.shared.Day day) {
         if (staffing == null) {
-            staffing = new CourtStaffing(app, texts, announcements);
+            staffing = new CourtStaffing(app, texts, announcements, candidacies);
         }
         staffing.endOfDay(day);
         for (JusticeUseCases.Outcome outcome : justice().endOfDay(day)) {

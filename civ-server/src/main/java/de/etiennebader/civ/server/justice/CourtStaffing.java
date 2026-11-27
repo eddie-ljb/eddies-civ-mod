@@ -28,7 +28,7 @@ import java.util.Random;
  * Besetzt Richter- und Staatsanwaltsstellen, wie es die Verfassung ({@code court_staffing}) vorgibt (Issue #84):
  * <ul>
  *     <li>{@code automatic}: die Gemeinde ernennt den gebildetsten freien Dorfbewohner;</li>
- *     <li>{@code election}: alle Dorfbewohner stimmen ab, die Mehrheit entscheidet (Gebildete, Ordnungsliebende gewinnen
+ *     <li>{@code election}: alle Dorfbewohner stimmen ab (Kandidaten: Dorfbewohner und Spieler, die kandidieren), die Mehrheit entscheidet (Gebildete, Ordnungsliebende gewinnen
  *         eher; die Stimmabgabe ist deterministisch je Tag und Wähler);</li>
  *     <li>{@code head}/{@code government}: Spieler ernennen selbst (siehe {@code JusticeUseCases.appoint}).</li>
  * </ul>
@@ -36,12 +36,18 @@ import java.util.Random;
  */
 final class CourtStaffing {
 
+    /** Eignung eines Spielers ohne verfolgten Bildungsstand (wie bei Dorfbewohnern ohne Daten). */
+    private static final int NEUTRAL = 50;
+
     private final CivApplication app;
     private final WorldQueries queries;
     private final Texts texts;
     private final Announcements announcements;
 
-    CourtStaffing(CivApplication app, Texts texts, Announcements announcements) {
+    private final CourtCandidacies candidacies;
+
+    CourtStaffing(CivApplication app, Texts texts, Announcements announcements, CourtCandidacies candidacies) {
+        this.candidacies = candidacies;
         this.app = app;
         this.queries = app.queries();
         this.texts = texts;
@@ -70,17 +76,21 @@ final class CourtStaffing {
         if (held >= seats) {
             return;
         }
-        List<PersonRef> candidates = town.members().stream().map(Membership::member)
-                .filter(PersonRef.class::isInstance).map(PersonRef.class::cast)
-                .filter(c -> !staff.judges().contains(c) && !staff.prosecutors().contains(c)).toList();
+        List<ActorRef> candidates = new java.util.ArrayList<>(town.members().stream().map(Membership::member)
+                .filter(PersonRef.class::isInstance).toList());
+        if (election) {
+            // Spieler kandidieren freiwillig (/civ <Ebene> gericht kandidieren) und müssen noch Mitglied sein
+            candidacies.of(town.id()).stream().filter(town::isMember).forEach(candidates::add);
+        }
+        candidates.removeIf(c -> staff.judges().contains(c) || staff.prosecutors().contains(c));
         if (candidates.isEmpty()) {
             return;
         }
-        Optional<PersonRef> winner = election ? elect(town, candidates, role, day) : candidates.stream()
-                .max(Comparator.comparingInt((PersonRef c) -> app.villagerEducation().bonusOf(c))
-                        .thenComparing(c -> c.uuid().toString()));
+        Optional<ActorRef> winner = election ? elect(town, candidates, role, day) : candidates.stream()
+                .max(Comparator.comparingInt(this::suitability).thenComparing(c -> c.uuid().toString()));
         winner.ifPresent(person -> {
             app.justice().fillSeat(town.id(), role, person, day);
+            candidacies.withdraw(town.id(), person);
             announcements.add(Announcement.toTown(town.id(), Message.of(
                     election ? MessageKey.COURT_ELECTED : MessageKey.COURT_AUTO_APPOINTED, texts.actor(person),
                     JusticeService.roleName(role), town.name().toString())));
@@ -88,18 +98,22 @@ final class CourtStaffing {
     }
 
     /** Jeder Dorfbewohner wählt den Kandidaten mit der besten Eignung (Bildung plus Eindruck von 0 bis 40). */
-    private Optional<PersonRef> elect(PolityView town, List<PersonRef> candidates, Role role, Day day) {
-        Map<PersonRef, Integer> tally = new HashMap<>();
+    private int suitability(ActorRef candidate) {
+        return candidate instanceof PersonRef villager ? app.villagerEducation().bonusOf(villager) : NEUTRAL;
+    }
+
+    private Optional<ActorRef> elect(PolityView town, List<ActorRef> candidates, Role role, Day day) {
+        Map<ActorRef, Integer> tally = new HashMap<>();
         for (Membership membership : town.members()) {
             if (!(membership.member() instanceof PersonRef voter)) {
                 continue;
             }
             Random impression = new Random(day.value() * 104_729L + voter.uuid().getLeastSignificantBits()
                     + role.ordinal());
-            PersonRef best = null;
+            ActorRef best = null;
             int bestScore = Integer.MIN_VALUE;
-            for (PersonRef candidate : candidates) {
-                int score = app.villagerEducation().bonusOf(candidate) + impression.nextInt(41);
+            for (ActorRef candidate : candidates) {
+                int score = suitability(candidate) + impression.nextInt(41);
                 if (score > bestScore) {
                     bestScore = score;
                     best = candidate;
@@ -107,7 +121,7 @@ final class CourtStaffing {
             }
             tally.merge(best, 1, Integer::sum);
         }
-        return tally.entrySet().stream().max(Map.Entry.<PersonRef, Integer>comparingByValue()
+        return tally.entrySet().stream().max(Map.Entry.<ActorRef, Integer>comparingByValue()
                 .thenComparing(e -> e.getKey().uuid().toString())).map(Map.Entry::getKey);
     }
 }

@@ -229,7 +229,8 @@ public final class CivServer {
         this.press = new PressService(app, calendar, players, settings.currency(), texts, announcements);
         this.civic = new CivicService(app, calendar, texts, announcements, plots);
         this.homePorts = new HomePortService(app, calendar, texts, war::registry, settings.warPortLock());
-        this.justice = new JusticeService(app, calendar, players, texts, announcements);
+        this.justice = new JusticeService(app, calendar, players, texts, announcements,
+                dataDirectory.map(dir -> dir.resolve("court_candidacies.tsv")));
         this.justice.addListener(police);
         this.war.onNews(this::warNews);
         this.liveCount = new LiveCountService(announcements, settings.show().liveCount(),
