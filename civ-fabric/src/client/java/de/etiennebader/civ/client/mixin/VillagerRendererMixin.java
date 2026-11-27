@@ -1,8 +1,10 @@
 package de.etiennebader.civ.client.mixin;
 
+import de.etiennebader.civ.client.CivVillagerState;
 import de.etiennebader.civ.client.VillagerSkins;
 import net.minecraft.client.renderer.entity.VillagerRenderer;
 import net.minecraft.client.renderer.entity.state.VillagerRenderState;
+import de.etiennebader.civ.domain.population.Race;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.npc.villager.Villager;
 import org.spongepowered.asm.mixin.Mixin;
@@ -19,6 +21,7 @@ public abstract class VillagerRendererMixin {
             + "Lnet/minecraft/client/renderer/entity/state/VillagerRenderState;F)V", at = @At("TAIL"))
     private void civ$rememberUuid(Villager villager, VillagerRenderState state, float partialTick, CallbackInfo info) {
         ((CivVillagerState) state).civ$setUuid(villager.getUUID());
+        ((CivVillagerState) state).civ$setScale(villager.getScale());
     }
 
     @Inject(method = "getTextureLocation(Lnet/minecraft/client/renderer/entity/state/VillagerRenderState;)"
@@ -26,7 +29,8 @@ public abstract class VillagerRendererMixin {
     private void civ$individualSkin(VillagerRenderState state, CallbackInfoReturnable<Identifier> info) {
         var uuid = ((CivVillagerState) state).civ$uuid();
         if (uuid != null && !state.isBaby) {
-            VillagerSkins.textureOf(uuid).ifPresent(info::setReturnValue);
+            VillagerSkins.textureOf(uuid, Race.fromScale(((CivVillagerState) state).civ$scale()))
+                    .ifPresent(info::setReturnValue);
         }
     }
 }

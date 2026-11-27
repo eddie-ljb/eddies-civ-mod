@@ -43,7 +43,8 @@ public final class TallyProposals {
                 if (day.isBefore(proposal.openedOn().plus(voteDays))) {
                     continue;
                 }
-                VoteOutcome outcome = Ballots.settle(polity, proposal, Ballots.atDeadline(polity, proposal), ids, day);
+                VoteOutcome outcome = Ballots.settle(polity, proposal, Ballots.atDeadline(polity, proposal), ids, day,
+                        aggregates.motionGate());
                 tallied.add(new Tallied(polity.id(), proposal, outcome));
                 changed = true;
             }

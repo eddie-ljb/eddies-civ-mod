@@ -5,6 +5,7 @@ import de.etiennebader.civ.domain.protection.ProtectedAction;
 import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.fabric.content.CivContent;
+import de.etiennebader.civ.fabric.content.EmblemBlock;
 import de.etiennebader.civ.fabric.content.PosterDisplays;
 import de.etiennebader.civ.fabric.content.ConstitutionCopies;
 import de.etiennebader.civ.fabric.content.HandcuffItems;
@@ -140,11 +141,9 @@ public final class ProtectionListener {
         PlayerBlockBreakEvents.AFTER.register((level, player, pos, state, blockEntity) ->
                 host.current().ifPresent(civ -> civ.shops().removeAt(Players.position(level, pos))));
         PlayerBlockBreakEvents.AFTER.register((level, player, pos, state, blockEntity) -> {
-            if (state.is(content.electionPoster())) {
-                host.current().ifPresent(civ -> civ.campaigns().posterRemoved(Players.position(level, pos)));
-                if (level instanceof ServerLevel serverLevel) {
-                    PosterDisplays.remove(serverLevel, pos);
-                }
+            if (level instanceof ServerLevel serverLevel && state.getBlock() instanceof EmblemBlock) {
+                Emblems.instance().broken(serverLevel, pos, state.getBlock(), !player.getAbilities().instabuild
+                        && state.getBlock() != content.electionPoster());
             }
         });
         UseItemCallback.EVENT.register((player, level, hand) -> readCopy(player, hand));
@@ -218,9 +217,16 @@ public final class ProtectionListener {
             host.current().ifPresent(civ -> Screens.open(serverPlayer, new MailScreen(civ, serverPlayer)));
             return InteractionResult.SUCCESS;
         }
-        if (usesBlock && state.is(content.electionPoster())) {
-            host.current().ifPresent(civ -> Feedback.reply(serverPlayer,
-                    civ.campaigns().posterInfo(Players.position(level, pos))));
+        if (usesBlock && (state.is(content.electionPoster()) || state.is(content.emblems().poster()))) {
+            host.current().ifPresent(civ -> {
+                BlockPosition position = Players.position(level, pos);
+                if (civ.campaigns().posterLabel(position).isEmpty() && level instanceof ServerLevel serverLevel) {
+                    // Steht schon, ist aber nicht angemeldet (z. B. per Befehl oder Dispenser gesetzt): jetzt anmelden.
+                    Emblems.instance().registerPoster(civ, serverLevel, pos, serverPlayer);
+                } else {
+                    Feedback.reply(serverPlayer, civ.campaigns().posterInfo(position));
+                }
+            });
             return InteractionResult.SUCCESS;
         }
         if (usesBlock && state.is(content.bank())) {
@@ -241,23 +247,6 @@ public final class ProtectionListener {
             return result(allowed(serverPlayer, ProtectedAction.BUILD, level, pos));
         }
         Item item = stack.getItem();
-        if (stack.is(content.electionPoster().asItem())) {
-            BlockPos target = state.canBeReplaced() ? pos : pos.relative(hit.getDirection());
-            InteractionResult placement = result(allowed(serverPlayer, ProtectedAction.BUILD, level, target));
-            if (placement != InteractionResult.FAIL && level instanceof ServerLevel serverLevel) {
-                serverLevel.getServer().execute(() -> {
-                    if (serverLevel.getBlockState(target).is(content.electionPoster())) {
-                        host.current().ifPresent(civ -> {
-                            Feedback.reply(serverPlayer, civ.campaigns().posterPlaced(
-                                    Players.caller(serverPlayer), Players.position(level, target)));
-                            civ.campaigns().posterLabel(Players.position(level, target))
-                                    .ifPresent(label -> PosterDisplays.show(serverLevel, target, label));
-                        });
-                    }
-                });
-            }
-            return placement;
-        }
         if (item instanceof BlockItem || item instanceof BucketItem) {
             BlockPos target = state.canBeReplaced() ? pos : pos.relative(hit.getDirection());
             if (stack.is(Items.HOPPER) && underForeignShop(serverPlayer, level, target)) {

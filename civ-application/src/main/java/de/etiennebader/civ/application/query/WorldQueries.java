@@ -28,6 +28,9 @@ import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.protection.Denial;
 import de.etiennebader.civ.domain.protection.Hazard;
 import de.etiennebader.civ.domain.protection.ProtectedAction;
+import de.etiennebader.civ.domain.protection.PlotFlag;
+import de.etiennebader.civ.domain.protection.PlotRights;
+import de.etiennebader.civ.domain.protection.PlotRightsSource;
 import de.etiennebader.civ.domain.protection.ProtectionContext;
 import de.etiennebader.civ.domain.protection.ProtectionRules;
 import de.etiennebader.civ.domain.shared.Money;
@@ -49,6 +52,7 @@ public final class WorldQueries {
     private static final ProtectionRules PROTECTION_RULES = new ProtectionRules();
 
     private final Repositories repositories;
+    private volatile PlotRightsSource plotRights = PlotRightsSource.NONE;
     private final ProtectionContext protectionContext = new ProtectionContext() {
         @Override
         public TerritoryView territory() {
@@ -78,6 +82,11 @@ public final class WorldQueries {
         @Override
         public boolean isAlly(ActorRef actor, PolityView polity) {
             return WorldQueries.this.isAlly(actor, polity);
+        }
+
+        @Override
+        public Optional<PlotRights> plotRights(PolityId polity, PlotId plot) {
+            return plotRights.rightsOf(polity, plot);
         }
     };
 
@@ -312,6 +321,16 @@ public final class WorldQueries {
      */
     public Optional<Denial> access(ActorRef actor, ProtectedAction action, BlockPosition position) {
         return PROTECTION_RULES.check(actor, action, position, protectionContext);
+    }
+
+    /** Woher die Schutzregeln die Grundstücksrechte nehmen, die Inhaber eingestellt haben. */
+    public void plotRights(PlotRightsSource source) {
+        this.plotRights = Objects.requireNonNull(source, "source");
+    }
+
+    /** Ob eine Regel (PvP, Monster, Explosionen, Feuer, Tierschutz) an diesem Block gilt, auch auf Grundstücken. */
+    public boolean allows(PlotFlag flag, BlockPosition position) {
+        return PROTECTION_RULES.allows(flag, position, protectionContext);
     }
 
     /** Ob eine Naturgewalt wie eine Explosion an diesem Block wirken darf. */

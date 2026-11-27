@@ -42,6 +42,7 @@ import de.etiennebader.civ.fabric.screen.ParliamentScreen;
 import de.etiennebader.civ.fabric.screen.PartiesScreen;
 import de.etiennebader.civ.fabric.screen.PressScreen;
 import de.etiennebader.civ.server.CivServer;
+import de.etiennebader.civ.server.construction.ConstructionService;
 import de.etiennebader.civ.server.ServerConfig;
 import de.etiennebader.civ.server.campaign.CampaignService;
 import de.etiennebader.civ.server.command.Caller;
@@ -55,6 +56,7 @@ import de.etiennebader.civ.server.federation.Levels;
 import de.etiennebader.civ.server.office.OfficeService;
 import de.etiennebader.civ.server.office.OfficeView;
 import de.etiennebader.civ.server.party.PartyService;
+import de.etiennebader.civ.server.plot.PlotRightsService;
 import de.etiennebader.civ.server.plot.PlotService;
 import de.etiennebader.civ.server.town.TownHallService;
 import net.minecraft.commands.CommandSourceStack;
@@ -130,6 +132,11 @@ import java.util.function.Function;
  * /civ grundstueck kaufen           angebotenes Grundstück kaufen
  * /civ grundstueck vergeben &lt;Spieler&gt;  Gemeindeland verschenken (Bürger)
  * /civ grundstueck aufloesen        Gemeindeland-Grundstück auflösen (Bürger)
+ * /civ grundstueck rechte            Rechte des Grundstücks zeigen (Inhaber)
+ * /civ grundstueck rechte mitglieder|fremde &lt;bauen|benutzen|behaelter&gt; &lt;ja|nein&gt;
+ * /civ grundstueck rechte gast &lt;Spieler&gt; &lt;Handlung&gt; &lt;ja|nein&gt;, gastentfernen &lt;Spieler&gt;
+ * /civ grundstueck rechte regel &lt;pvp|monster|explosionen|feuer|tiere&gt; &lt;gesetz|erlauben|verbieten&gt;
+ * /civ grundstueck rechte zuruecksetzen
  * /civ firma gruenden &lt;Kapital&gt; &lt;Name&gt;  Firma mit Aktien an der Börse; info, liste, aufnehmen, entlassen,
  *                                   einstellen, dividende, ausgeben, aufloesen
  * /civ boerse [kaufen|verkaufen &lt;Firma&gt; &lt;Anzahl&gt; [Limit] | depot | buch | streichen | menue]
@@ -208,11 +215,11 @@ public final class CivCommandTree {
                 .then(Commands.literal("gruenden")
                         .requires(AdminPermission.require(AdminPermission.FOUND,
                                 net.minecraft.server.permissions.PermissionLevel.GAMEMASTERS))
-                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                        .then(arg(NAME, StringArgumentType.greedyString())
                                 .executes(context -> asPlayer(context,
                                         (commands, caller) -> commands.found(caller, name(context))))))
                 .then(Commands.literal("beitreten")
-                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                        .then(arg(NAME, StringArgumentType.greedyString())
                                 .suggests(this::suggestPolityNames)
                                 .executes(context -> asPlayer(context,
                                         (commands, caller) -> commands.join(caller, name(context))))))
@@ -229,18 +236,18 @@ public final class CivCommandTree {
                 .then(levelCommands(Commands.literal(Polity.MUNICIPAL_LEVEL), context -> Polity.MUNICIPAL_LEVEL)
                         .executes(context -> asPlayer(context,
                                 (commands, caller) -> commands.describe(caller, Optional.empty())))
-                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                        .then(arg(NAME, StringArgumentType.greedyString())
                                 .suggests(this::suggestPolityNames)
                                 .executes(context -> asPlayer(context,
                                         (commands, caller) -> commands.describe(caller, Optional.of(name(context)))))))
                 .then(Commands.literal("liste")
                         .executes(context -> run(context.getSource(), CivCommands::list)))
                 .then(Commands.literal("rangliste")
-                        .then(Commands.argument(NAME, StringArgumentType.word())
+                        .then(arg(NAME, StringArgumentType.word())
                                 .suggests((context, builder) -> SharedSuggestionProvider.suggest(RANKINGS, builder))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.rankings().show(
                                         StringArgumentType.getString(context, NAME), Optional.empty())))
-                                .then(Commands.argument(LEVEL, StringArgumentType.word())
+                                .then(arg(LEVEL, StringArgumentType.word())
                                         .suggests((context, builder) -> SharedSuggestionProvider.suggest(levelIds(), builder))
                                         .executes(context -> withCiv(context, (civ, player) -> civ.rankings().show(
                                                 StringArgumentType.getString(context, NAME),
@@ -249,25 +256,28 @@ public final class CivCommandTree {
                         .executes(context -> asPlayer(context,
                                 (commands, caller) -> commands.laws(caller, Optional.empty())))
                         .then(Commands.literal("setzen")
-                                .then(Commands.argument(LAW, StringArgumentType.word())
+                                .then(arg(LAW, StringArgumentType.word())
                                         .suggests(this::suggestLaws)
-                                        .then(Commands.argument(VALUE, StringArgumentType.word())
+                                        .then(arg(VALUE, StringArgumentType.word())
                                                 .suggests((context, builder) -> SharedSuggestionProvider.suggest(YES_NO, builder))
                                                 .executes(context -> asPlayer(context, (commands, caller) -> commands.amendLaw(
                                                         caller, StringArgumentType.getString(context, LAW),
                                                         StringArgumentType.getString(context, VALUE))))))))
                 .then(plotCommands())
                 .then(constructionCommands())
+                .then(logoCommands())
+                .then(emblemCommands())
                 .then(warCommands())
                 .then(policeCommands())
+                .then(governmentCommands())
                 .then(familyCommands())
                 .then(religionCommands())
                 .then(Commands.literal("laden")
                         .then(Commands.literal("eroeffnen")
-                                .then(Commands.argument(PRICE, StringArgumentType.word())
+                                .then(arg(PRICE, StringArgumentType.word())
                                         .executes(context -> withCiv(context, (civ, player) -> openShop(civ, player,
                                                 StringArgumentType.getString(context, PRICE), Optional.empty())))
-                                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                                        .then(arg(NAME, StringArgumentType.greedyString())
                                                 .suggests(this::suggestOwnCompanies)
                                                 .executes(context -> withCiv(context, (civ, player) -> openShop(civ,
                                                         player, StringArgumentType.getString(context, PRICE),
@@ -288,25 +298,55 @@ public final class CivCommandTree {
                 .then(Commands.literal("abstimmungen")
                         .executes(context -> withCiv(context, (civ, player) -> civ.voting().list(Players.caller(player)))))
                 .then(Commands.literal("abstimmen")
-                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(1))
+                        .then(arg(COUNT, IntegerArgumentType.integer(1))
                                 .then(Commands.literal("ja")
                                         .executes(context -> withCiv(context, (civ, player) -> civ.voting().vote(
                                                 Players.caller(player), IntegerArgumentType.getInteger(context, COUNT), true))))
                                 .then(Commands.literal("nein")
                                         .executes(context -> withCiv(context, (civ, player) -> civ.voting().vote(
                                                 Players.caller(player), IntegerArgumentType.getInteger(context, COUNT), false))))))
+                .then(Commands.literal("kultur")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.culture()
+                                .describe(Players.caller(player))))
+                        .then(Commands.literal("menue")
+                                .executes(context -> withCiv(context, (civ, player) -> {
+                                    MenuOpener.culture(civ, player);
+                                    return Reply.success(Message.of(MessageKey.VILLAGER_MENU_OPENED));
+                                })))
+                        .then(Commands.literal("setzen")
+                                .then(arg(TYPE, StringArgumentType.word())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                de.etiennebader.civ.domain.population.Culture.words(), builder))
+                                        .then(arg(NAME, StringArgumentType.word())
+                                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                        de.etiennebader.civ.domain.population.Race.words(), builder))
+                                                .executes(context -> withCiv(context, (civ, player) -> civ.culture()
+                                                        .set(Players.caller(player),
+                                                                StringArgumentType.getString(context, TYPE),
+                                                                StringArgumentType.getString(context, NAME))))))))
                 .then(Commands.literal("stimmung")
                         .executes(context -> withCiv(context, (civ, player) -> civ.villagers().mood(Players.caller(player)))))
                 .then(Commands.literal("dorfbewohner")
+                        .then(Commands.literal("info")
+                                .executes(context -> withCiv(context, (civ, player) -> villagerRef(player)
+                                        .map(villager -> civ.villagers().describe(villager))
+                                        .orElseGet(() -> Reply.failure(Message.of(MessageKey.VILLAGER_NONE_NEAR))))))
+                        .then(Commands.literal("menue")
+                                .executes(context -> withCiv(context, (civ, player) -> villagerRef(player)
+                                        .map(villager -> {
+                                            MenuOpener.villager(civ, player, villager);
+                                            return Reply.success(Message.of(MessageKey.VILLAGER_MENU_OPENED));
+                                        })
+                                        .orElseGet(() -> Reply.failure(Message.of(MessageKey.VILLAGER_NONE_NEAR))))))
                         .then(Commands.literal("register")
                                 .executes(context -> withCiv(context, (civ, player) -> civ.villagers()
                                         .residentRegister(Players.caller(player), 1)))
-                                .then(Commands.argument(COUNT, IntegerArgumentType.integer(1))
+                                .then(arg(COUNT, IntegerArgumentType.integer(1))
                                         .executes(context -> withCiv(context, (civ, player) -> civ.villagers()
                                                 .residentRegister(Players.caller(player),
                                                         IntegerArgumentType.getInteger(context, COUNT))))))
                         .then(Commands.literal("reden")
-                                .then(Commands.argument(TOPIC, StringArgumentType.word())
+                                .then(arg(TOPIC, StringArgumentType.word())
                                         .suggests((context, builder) -> SharedSuggestionProvider.suggest(
                                                 VillagerDialogue.Topic.words(), builder))
                                         .executes(context -> withCiv(context, (civ, player) -> talkToVillager(civ,
@@ -316,7 +356,7 @@ public final class CivCommandTree {
                                         .map(villager -> civ.villagers().influence(Players.caller(player), villager))
                                         .orElseGet(() -> Reply.failure(Message.of(MessageKey.VILLAGER_NONE_NEAR))))))
                         .then(Commands.literal("post")
-                                .then(Commands.argument(TOPIC, StringArgumentType.word())
+                                .then(arg(TOPIC, StringArgumentType.word())
                                         .suggests((context, builder) -> SharedSuggestionProvider.suggest(
                                                 VillagerDialogue.Topic.words(), builder))
                                         .executes(context -> withCiv(context, (civ, player) -> villagerRef(player)
@@ -329,45 +369,45 @@ public final class CivCommandTree {
                         .executes(context -> withCiv(context, (civ, player) -> civ.offices().list(Players.caller(player)))))
                 .then(Commands.literal("wahl")
                         .then(Commands.literal("ausrufen")
-                                .then(Commands.argument(OFFICE, StringArgumentType.word())
+                                .then(arg(OFFICE, StringArgumentType.word())
                                         .suggests(CivCommandTree::suggestOffices)
                                         .executes(context -> withCiv(context, (civ, player) -> civ.offices().callElection(
                                                 Players.caller(player), StringArgumentType.getString(context, OFFICE))))))
                         .then(Commands.literal("kandidieren")
-                                .then(Commands.argument(OFFICE, StringArgumentType.word())
+                                .then(arg(OFFICE, StringArgumentType.word())
                                         .suggests(CivCommandTree::suggestOffices)
                                         .executes(context -> withCiv(context, (civ, player) -> civ.offices().stand(
                                                 Players.caller(player), StringArgumentType.getString(context, OFFICE))))
-                                        .then(Commands.argument(PLATFORM, StringArgumentType.word())
+                                        .then(arg(PLATFORM, StringArgumentType.word())
                                                 .suggests((context, builder) -> SharedSuggestionProvider.suggest(
                                                         OfficeService.platformNames(), builder))
                                                 .executes(context -> withCiv(context, (civ, player) -> civ.offices().stand(
                                                         Players.caller(player), StringArgumentType.getString(context, OFFICE),
                                                         StringArgumentType.getString(context, PLATFORM))))
-                                                .then(Commands.argument("wahlkreis", StringArgumentType.string())
+                                                .then(arg("wahlkreis", StringArgumentType.string())
                                                         .executes(context -> withCiv(context, (civ, player) -> civ.offices().stand(
                                                                 Players.caller(player), StringArgumentType.getString(context, OFFICE),
                                                                 StringArgumentType.getString(context, PLATFORM),
                                                                 StringArgumentType.getString(context, "wahlkreis"))))))))
                         .then(Commands.literal("stimmen")
-                                .then(Commands.argument(OFFICE, StringArgumentType.word())
+                                .then(arg(OFFICE, StringArgumentType.word())
                                         .suggests(CivCommandTree::suggestOffices)
-                                        .then(Commands.argument(CANDIDATE, StringArgumentType.string())
+                                        .then(arg(CANDIDATE, StringArgumentType.string())
                                                 .suggests(this::suggestCandidates)
                                                 .executes(context -> withCiv(context, (civ, player) -> civ.offices().vote(
                                                         Players.caller(player), StringArgumentType.getString(context, OFFICE),
                                                         StringArgumentType.getString(context, CANDIDATE))))))))
                 .then(Commands.literal("amt")
                         .then(Commands.literal("ernennen")
-                                .then(Commands.argument(OFFICE, StringArgumentType.word())
+                                .then(arg(OFFICE, StringArgumentType.word())
                                         .suggests(CivCommandTree::suggestOffices)
-                                        .then(Commands.argument(RECIPIENT, StringArgumentType.string())
+                                        .then(arg(RECIPIENT, StringArgumentType.string())
                                                 .suggests(this::suggestRecipients)
                                                 .executes(context -> withCiv(context, (civ, player) -> civ.offices().appoint(
                                                         Players.caller(player), StringArgumentType.getString(context, OFFICE),
                                                         StringArgumentType.getString(context, RECIPIENT)))))))
                         .then(Commands.literal("entlassen")
-                                .then(Commands.argument(OFFICE, StringArgumentType.word())
+                                .then(arg(OFFICE, StringArgumentType.word())
                                         .suggests(CivCommandTree::suggestOffices)
                                         .executes(context -> withCiv(context, (civ, player) -> civ.offices().dismiss(
                                                 Players.caller(player), StringArgumentType.getString(context, OFFICE)))))))
@@ -403,9 +443,9 @@ public final class CivCommandTree {
                                     return null;
                                 }))))
                 .then(Commands.literal("nachricht")
-                        .then(Commands.argument(PLAYER, StringArgumentType.word())
+                        .then(arg(PLAYER, StringArgumentType.word())
                                 .suggests(this::suggestFriends)
-                                .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                                .then(arg(TEXT, StringArgumentType.greedyString())
                                         .executes(context -> withCiv(context, (civ, player) -> civ.community().direct(
                                                 Players.ref(player), Players.name(player),
                                                 StringArgumentType.getString(context, PLAYER),
@@ -434,36 +474,36 @@ public final class CivCommandTree {
                         .executes(context -> withCiv(context, (civ, player) -> civ.bank().balance(Players.caller(player)))))
                 .then(Commands.literal("einzahlen")
                         .executes(context -> withCiv(context, (civ, player) -> BankTransfers.deposit(civ, player, Integer.MAX_VALUE)))
-                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(1))
+                        .then(arg(COUNT, IntegerArgumentType.integer(1))
                                 .executes(context -> withCiv(context, (civ, player) ->
                                         BankTransfers.deposit(civ, player, IntegerArgumentType.getInteger(context, COUNT))))
-                                .then(Commands.argument(CURRENCY, StringArgumentType.word())
+                                .then(arg(CURRENCY, StringArgumentType.word())
                                         .suggests(this::suggestCurrencies)
                                         .executes(context -> withCiv(context, (civ, player) -> BankTransfers.depositIn(civ, player,
                                                 IntegerArgumentType.getInteger(context, COUNT),
                                                 StringArgumentType.getString(context, CURRENCY)))))))
                 .then(Commands.literal("abheben")
-                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(1, 2_304))
+                        .then(arg(COUNT, IntegerArgumentType.integer(1, 2_304))
                                 .executes(context -> withCiv(context, (civ, player) ->
                                         BankTransfers.withdraw(civ, player, IntegerArgumentType.getInteger(context, COUNT))))
-                                .then(Commands.argument(CURRENCY, StringArgumentType.word())
+                                .then(arg(CURRENCY, StringArgumentType.word())
                                         .suggests(this::suggestCurrencies)
                                         .executes(context -> withCiv(context, (civ, player) -> BankTransfers.withdrawIn(civ, player,
                                                 IntegerArgumentType.getInteger(context, COUNT),
                                                 StringArgumentType.getString(context, CURRENCY)))))))
                 .then(Commands.literal("ueberweisen")
-                        .then(Commands.argument(RECIPIENT, StringArgumentType.string())
+                        .then(arg(RECIPIENT, StringArgumentType.string())
                                 .suggests(this::suggestRecipients)
-                                .then(Commands.argument(AMOUNT, StringArgumentType.word())
+                                .then(arg(AMOUNT, StringArgumentType.word())
                                         .executes(context -> withCiv(context, (civ, player) -> civ.bank().transfer(
                                                 Players.caller(player), StringArgumentType.getString(context, RECIPIENT),
                                                 StringArgumentType.getString(context, AMOUNT)))))))
                 .then(Commands.literal("waehrung")
                         .then(Commands.literal("erstellen")
-                                .then(Commands.argument(CURRENCY, StringArgumentType.word())
-                                        .then(Commands.argument(SYMBOL, StringArgumentType.word())
-                                                .then(Commands.argument(RATE, StringArgumentType.word())
-                                                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                                .then(arg(CURRENCY, StringArgumentType.word())
+                                        .then(arg(SYMBOL, StringArgumentType.word())
+                                                .then(arg(RATE, StringArgumentType.word())
+                                                        .then(arg(NAME, StringArgumentType.greedyString())
                                                                 .executes(context -> withCiv(context, (civ, player) ->
                                                                         civ.currencies().create(Players.caller(player),
                                                                                 StringArgumentType.getString(context, CURRENCY),
@@ -471,34 +511,34 @@ public final class CivCommandTree {
                                                                                 StringArgumentType.getString(context, RATE),
                                                                                 StringArgumentType.getString(context, NAME)))))))))
                         .then(Commands.literal("kurs")
-                                .then(Commands.argument(CURRENCY, StringArgumentType.word())
+                                .then(arg(CURRENCY, StringArgumentType.word())
                                         .suggests(this::suggestCurrencies)
-                                        .then(Commands.argument(RATE, StringArgumentType.word())
+                                        .then(arg(RATE, StringArgumentType.word())
                                                 .executes(context -> withCiv(context, (civ, player) ->
                                                         civ.currencies().changeRate(Players.caller(player),
                                                                 StringArgumentType.getString(context, CURRENCY),
                                                                 StringArgumentType.getString(context, RATE)))))))
                         .then(Commands.literal("leitzins")
-                                .then(Commands.argument(CURRENCY, StringArgumentType.word())
+                                .then(arg(CURRENCY, StringArgumentType.word())
                                         .suggests(this::suggestCurrencies)
-                                        .then(Commands.argument(PERCENT, IntegerArgumentType.integer(0, 100))
+                                        .then(arg(PERCENT, IntegerArgumentType.integer(0, 100))
                                                 .executes(context -> withCiv(context, (civ, player) ->
                                                         civ.currencies().setBaseRate(Players.caller(player),
                                                                 StringArgumentType.getString(context, CURRENCY),
                                                                 IntegerArgumentType.getInteger(context, PERCENT)))))))
                         .then(Commands.literal("vorsitz")
-                                .then(Commands.argument(CURRENCY, StringArgumentType.word())
+                                .then(arg(CURRENCY, StringArgumentType.word())
                                         .suggests(this::suggestCurrencies)
-                                        .then(Commands.argument(RECIPIENT, StringArgumentType.string())
+                                        .then(arg(RECIPIENT, StringArgumentType.string())
                                                 .suggests(this::suggestRecipients)
                                                 .executes(context -> withCiv(context, (civ, player) ->
                                                         civ.currencies().appointChair(Players.caller(player),
                                                                 StringArgumentType.getString(context, CURRENCY),
                                                                 StringArgumentType.getString(context, RECIPIENT)))))))
                         .then(Commands.literal("item")
-                                .then(Commands.argument(CURRENCY, StringArgumentType.word())
+                                .then(arg(CURRENCY, StringArgumentType.word())
                                         .suggests(this::suggestCurrencies)
-                                        .then(Commands.argument(ITEM, StringArgumentType.greedyString())
+                                        .then(arg(ITEM, StringArgumentType.greedyString())
                                                 .executes(context -> withCiv(context, (civ, player) ->
                                                         setCurrencyItem(civ, player,
                                                                 StringArgumentType.getString(context, CURRENCY),
@@ -506,10 +546,10 @@ public final class CivCommandTree {
                         .then(Commands.literal("liste")
                                 .executes(context -> withCiv(context, (civ, player) -> civ.currencies().list())))
                         .then(Commands.literal("umrechnen")
-                                .then(Commands.argument(AMOUNT, StringArgumentType.word())
-                                        .then(Commands.argument(CURRENCY, StringArgumentType.word())
+                                .then(arg(AMOUNT, StringArgumentType.word())
+                                        .then(arg(CURRENCY, StringArgumentType.word())
                                                 .suggests(this::suggestCurrencies)
-                                                .then(Commands.argument(TARGET, StringArgumentType.word())
+                                                .then(arg(TARGET, StringArgumentType.word())
                                                         .suggests(this::suggestCurrencies)
                                                         .executes(context -> withCiv(context, (civ, player) ->
                                                                 civ.currencies().convert(
@@ -517,20 +557,20 @@ public final class CivCommandTree {
                                                                         StringArgumentType.getString(context, CURRENCY),
                                                                         StringArgumentType.getString(context, TARGET)))))))))
                 .then(attachBank(Commands.literal("bank"), context -> "").then(Commands.literal("als")
-                        .then(attachBank(Commands.argument(POLITY, StringArgumentType.string())
+                        .then(attachBank(arg(POLITY, StringArgumentType.string())
                                 .suggests(this::suggestRecipients),
                                 context -> StringArgumentType.getString(context, POLITY)))))
                 .then(attachCredit(Commands.literal("kredit"), context -> "").then(Commands.literal("als")
-                        .then(attachCredit(Commands.argument(POLITY, StringArgumentType.string())
+                        .then(attachCredit(arg(POLITY, StringArgumentType.string())
                                 .suggests(this::suggestRecipients),
                                 context -> StringArgumentType.getString(context, POLITY)))))
                 .then(Commands.literal("kasse")
                         .then(Commands.literal("einzahlen")
-                                .then(Commands.argument(AMOUNT, StringArgumentType.word())
+                                .then(arg(AMOUNT, StringArgumentType.word())
                                         .executes(context -> withCiv(context, (civ, player) -> civ.bank().payIntoTreasury(
                                                 Players.caller(player), StringArgumentType.getString(context, AMOUNT))))))
                         .then(Commands.literal("entnehmen")
-                                .then(Commands.argument(AMOUNT, StringArgumentType.word())
+                                .then(arg(AMOUNT, StringArgumentType.word())
                                         .executes(context -> withCiv(context, (civ, player) -> civ.bank().takeFromTreasury(
                                                 Players.caller(player), StringArgumentType.getString(context, AMOUNT)))))))
                 .then(Commands.literal("preis")
@@ -539,12 +579,12 @@ public final class CivCommandTree {
                                 .orElseGet(CivCommandTree::nothingInHand))))
                 .then(Commands.literal("verkaufen")
                         .executes(context -> withCiv(context, (civ, player) -> sellHeld(civ, player, Integer.MAX_VALUE)))
-                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(1))
+                        .then(arg(COUNT, IntegerArgumentType.integer(1))
                                 .executes(context -> withCiv(context, (civ, player) ->
                                         sellHeld(civ, player, IntegerArgumentType.getInteger(context, COUNT))))))
                 .then(Commands.literal("kaufen")
-                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(1, 2_304))
-                                .then(Commands.argument(ITEM, StringArgumentType.greedyString())
+                        .then(arg(COUNT, IntegerArgumentType.integer(1, 2_304))
+                                .then(arg(ITEM, StringArgumentType.greedyString())
                                         .suggests(this::suggestOffers)
                                         .executes(context -> withCiv(context, (civ, player) -> buy(civ, player,
                                                 StringArgumentType.getString(context, ITEM),
@@ -567,7 +607,7 @@ public final class CivCommandTree {
                 .then(Commands.literal("ebenen")
                                 .executes(context -> withCiv(context, (civ, player) -> civ.federations().listLevels())))
                         .then(Commands.literal("aufloesen")
-                                .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                                .then(arg(NAME, StringArgumentType.greedyString())
                                         .suggests(this::suggestPolityNames)
                                         .executes(context -> withCiv(context, (civ, player) -> {
                                             if (civ.federations().federationNames().contains(name(context).strip())) {
@@ -608,7 +648,7 @@ public final class CivCommandTree {
                                 .executes(context -> withCiv(context, (civ, player) -> civ.parties().partyList(
                                         Players.caller(player)))))
                         .then(Commands.literal("setzen")
-                                .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                                .then(arg(NAME, StringArgumentType.greedyString())
                                         .executes(context -> withCiv(context, (civ, player) -> civ.parties()
                                                 .setPartyList(Players.caller(player),
                                                         List.of(name(context).split("\\s+")))))))
@@ -628,20 +668,20 @@ public final class CivCommandTree {
                 .then(Commands.literal("info")
                         .executes(context -> withCiv(context, (civ, player) -> civ.parties().info(
                                 Players.caller(player), Optional.empty())))
-                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                        .then(arg(NAME, StringArgumentType.greedyString())
                                 .suggests(this::suggestPartyNames)
                                 .executes(context -> withCiv(context, (civ, player) -> civ.parties().info(
                                         Players.caller(player), Optional.of(name(context)))))))
                 .then(Commands.literal("gruenden")
-                        .then(Commands.argument(LEVEL, StringArgumentType.word())
+                        .then(arg(LEVEL, StringArgumentType.word())
                                 .suggests((context, builder) -> SharedSuggestionProvider.suggest(
                                         PartyService.directionNames(), builder))
-                                .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                                .then(arg(NAME, StringArgumentType.greedyString())
                                         .executes(context -> withCiv(context, (civ, player) -> civ.parties().found(
                                                 Players.caller(player), StringArgumentType.getString(context, LEVEL),
                                                 name(context)))))))
                 .then(Commands.literal("beitreten")
-                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                        .then(arg(NAME, StringArgumentType.greedyString())
                                 .suggests(this::suggestPartyNames)
                                 .executes(context -> withCiv(context, (civ, player) -> civ.parties().join(
                                         Players.caller(player), name(context))))))
@@ -655,7 +695,7 @@ public final class CivCommandTree {
                         .executes(context -> withCiv(context, (civ, player) -> civ.parties().area(
                                 Players.caller(player))))
                         .then(Commands.literal("setzen")
-                                .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                                .then(arg(NAME, StringArgumentType.greedyString())
                                         .suggests((context, builder) -> SharedSuggestionProvider.suggest(
                                                 host.current().map(civ -> civ.parties().areaNames())
                                                         .orElse(List.of()), builder))
@@ -670,8 +710,8 @@ public final class CivCommandTree {
                                 : civ.parties().setEmblem(Players.caller(player), BuiltInRegistries.ITEM
                                 .getKey(player.getMainHandItem().getItem()).toString()))))
                 .then(Commands.literal("richtung")
-                        .then(Commands.argument(ORDER_AXIS, IntegerArgumentType.integer(-100, 100))
-                                .then(Commands.argument(ECONOMY_AXIS, IntegerArgumentType.integer(-100, 100))
+                        .then(arg(ORDER_AXIS, IntegerArgumentType.integer(-100, 100))
+                                .then(arg(ECONOMY_AXIS, IntegerArgumentType.integer(-100, 100))
                                         .executes(context -> withCiv(context, (civ, player) -> civ.parties()
                                                 .setDirection(Players.caller(player),
                                                         IntegerArgumentType.getInteger(context, ORDER_AXIS),
@@ -679,7 +719,7 @@ public final class CivCommandTree {
                 .then(Commands.literal("programmodus")
                         .executes(context -> withCiv(context, (civ, player) -> civ.parties()
                                 .programMode(Players.caller(player), Optional.empty())))
-                        .then(Commands.argument(PROGRAM_MODE, StringArgumentType.word())
+                        .then(arg(PROGRAM_MODE, StringArgumentType.word())
                                 .suggests((context, builder) -> SharedSuggestionProvider.suggest(
                                         List.of("abstimmung", "vorsitz", "vote", "chair"), builder))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.parties()
@@ -706,7 +746,7 @@ public final class CivCommandTree {
                 .then(Commands.literal("liste")
                         .executes(context -> withCiv(context, (civ, player) -> civ.lawBooks().list(
                                 Players.caller(player), Optional.empty())))
-                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                        .then(arg(NAME, StringArgumentType.greedyString())
                                 .suggests(this::suggestPolityNames)
                                 .executes(context -> withCiv(context, (civ, player) -> civ.lawBooks().list(
                                         Players.caller(player), Optional.of(name(context)))))))
@@ -716,21 +756,31 @@ public final class CivCommandTree {
                             return null;
                         })))
                 .then(Commands.literal("zeigen")
-                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(1))
+                        .then(arg(COUNT, IntegerArgumentType.integer(1))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.lawBooks().show(
-                                        Players.caller(player), IntegerArgumentType.getInteger(context, COUNT))))))
+                                        Players.caller(player), IntegerArgumentType.getInteger(context, COUNT),
+                                        Optional.empty())))
+                                .then(arg(NAME, StringArgumentType.greedyString())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.lawBooks().show(
+                                                Players.caller(player), IntegerArgumentType.getInteger(context, COUNT),
+                                                Optional.of(name(context))))))))
                 .then(Commands.literal("pruefen")
-                        .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                        .then(arg(TEXT, StringArgumentType.greedyString())
                                 .executes(context -> withCiv(context, (civ, player) -> civ.lawBooks().check(
                                         StringArgumentType.getString(context, TEXT))))))
                 .then(Commands.literal("erlassen")
-                        .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                        .then(arg(TEXT, StringArgumentType.greedyString())
                                 .executes(context -> withCiv(context, (civ, player) -> enactParagraph(civ, player,
                                         StringArgumentType.getString(context, TEXT))))))
                 .then(Commands.literal("aufheben")
-                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(1))
+                        .then(arg(COUNT, IntegerArgumentType.integer(1))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.lawBooks().repeal(
-                                        Players.caller(player), IntegerArgumentType.getInteger(context, COUNT))))));
+                                        Players.caller(player), IntegerArgumentType.getInteger(context, COUNT),
+                                        Optional.empty())))
+                                .then(arg(NAME, StringArgumentType.greedyString())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.lawBooks().repeal(
+                                                Players.caller(player), IntegerArgumentType.getInteger(context, COUNT),
+                                                Optional.of(name(context))))))));
     }
 
     /** {@code <Titel> | <Text>}; ohne Trennstrich kommt der Text aus dem Buch mit Feder in der Hand. */
@@ -750,7 +800,7 @@ public final class CivCommandTree {
                 .executes(context -> withCiv(context, (civ, player) -> civ.parliaments().info(Players.caller(player),
                         Optional.empty())))
                 .then(Commands.literal("zeigen")
-                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                        .then(arg(NAME, StringArgumentType.greedyString())
                                 .suggests(this::suggestPolityNames)
                                 .executes(context -> withCiv(context, (civ, player) -> civ.parliaments().info(
                                         Players.caller(player), Optional.of(name(context)))))))
@@ -766,7 +816,7 @@ public final class CivCommandTree {
 
     private LiteralArgumentBuilder<CommandSourceStack> campaignCommands() {
         return Commands.literal("rede")
-                .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                .then(arg(TEXT, StringArgumentType.greedyString())
                         .executes(context -> withCiv(context, (civ, player) -> speak(civ, player,
                                 StringArgumentType.getString(context, TEXT)))));
     }
@@ -795,12 +845,12 @@ public final class CivCommandTree {
                 .then(Commands.literal("liste")
                         .executes(context -> withCiv(context, (civ, player) -> civ.campaigns().listPromises(
                                 Players.caller(player), Optional.empty())))
-                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                        .then(arg(NAME, StringArgumentType.greedyString())
                                 .suggests(this::suggestPolityNames)
                                 .executes(context -> withCiv(context, (civ, player) -> civ.campaigns().listPromises(
                                         Players.caller(player), Optional.of(name(context)))))))
                 .then(Commands.literal("geben")
-                        .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                        .then(arg(TEXT, StringArgumentType.greedyString())
                                 .executes(context -> withCiv(context, (civ, player) -> civ.campaigns().promise(
                                         Players.caller(player), StringArgumentType.getString(context, TEXT))))));
     }
@@ -809,7 +859,7 @@ public final class CivCommandTree {
         return Commands.literal("umfrage")
                 .executes(context -> withCiv(context, (civ, player) -> civ.campaigns().poll(Players.caller(player),
                         Optional.empty())))
-                .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                .then(arg(NAME, StringArgumentType.greedyString())
                         .suggests(this::suggestPolityNames)
                         .executes(context -> withCiv(context, (civ, player) -> civ.campaigns().poll(
                                 Players.caller(player), Optional.of(name(context))))));
@@ -826,7 +876,7 @@ public final class CivCommandTree {
                                     () -> Feedback.reply(player, Reply.failure(Message.of(MessageKey.NOT_IN_MUNICIPALITY))));
                             return null;
                         })))
-                .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                .then(arg(NAME, StringArgumentType.greedyString())
                         .suggests(this::suggestPolityNames)
                         .executes(context -> withCiv(context, (civ, player) -> civ.campaigns().lastResult(
                                 Players.caller(player), Optional.of(name(context))))));
@@ -837,7 +887,7 @@ public final class CivCommandTree {
                 .executes(context -> withCiv(context, (civ, player) -> civ.constitutions().show(Players.caller(player),
                         Optional.empty())))
                 .then(Commands.literal("zeigen")
-                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                        .then(arg(NAME, StringArgumentType.greedyString())
                                 .suggests(this::suggestPolityNames)
                                 .executes(context -> withCiv(context, (civ, player) -> civ.constitutions().show(
                                         Players.caller(player), Optional.of(name(context)))))))
@@ -849,21 +899,21 @@ public final class CivCommandTree {
                             return null;
                         })))
                 .then(Commands.literal("praeambel")
-                        .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                        .then(arg(TEXT, StringArgumentType.greedyString())
                                 .executes(context -> withCiv(context, (civ, player) -> civ.constitutions().setPreamble(
                                         Players.caller(player), StringArgumentType.getString(context, TEXT))))))
                 .then(Commands.literal("ausrufen")
                         .executes(context -> withCiv(context, (civ, player) -> civ.constitutions().proclaim(
                                 Players.caller(player), Optional.empty())))
-                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                        .then(arg(NAME, StringArgumentType.greedyString())
                                 .suggests(this::suggestPolityNames)
                                 .executes(context -> withCiv(context, (civ, player) -> civ.constitutions().proclaim(
                                         Players.caller(player), Optional.of(name(context)))))))
                 .then(Commands.literal("artikel")
-                        .then(Commands.argument(ARTICLE, StringArgumentType.word())
+                        .then(arg(ARTICLE, StringArgumentType.word())
                                 .suggests((context, builder) -> SharedSuggestionProvider.suggest(
                                         ConstitutionService.articleIds(), builder))
-                                .then(Commands.argument(VALUE, StringArgumentType.word())
+                                .then(arg(VALUE, StringArgumentType.word())
                                         .executes(context -> withCiv(context, (civ, player) -> civ.constitutions().amend(
                                                 Players.caller(player), StringArgumentType.getString(context, ARTICLE),
                                                 StringArgumentType.getString(context, VALUE)))))));
@@ -884,7 +934,7 @@ public final class CivCommandTree {
                 .then(Commands.literal("heim")
                         .executes(context -> withCiv(context, (civ, player) -> HomePorts.travel(civ, player,
                                 Optional.empty())))
-                        .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                        .then(arg(TEXT, StringArgumentType.greedyString())
                                 .suggests(this::suggestPolityNames)
                                 .executes(context -> withCiv(context, (civ, player) -> HomePorts.travel(civ, player,
                                         Optional.of(StringArgumentType.getString(context, TEXT)))))))
@@ -892,14 +942,14 @@ public final class CivCommandTree {
                         .executes(context -> withCiv(context, (civ, player) -> civ.levels().overview(
                                 Players.caller(player)))))
                 .then(Commands.literal("debatte")
-                        .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                        .then(arg(TEXT, StringArgumentType.greedyString())
                                 .executes(context -> withCiv(context, (civ, player) -> civ.debates().speak(
                                         Players.caller(player), StringArgumentType.getString(context, TEXT),
                                         System.currentTimeMillis())))))
                 .then(Commands.literal("ebene")
                         .executes(context -> withCiv(context, (civ, player) -> civ.levels().overview(
                                 Players.caller(player))))
-                        .then(levelCommands(Commands.argument(LEVEL, StringArgumentType.word())
+                        .then(levelCommands(arg(LEVEL, StringArgumentType.word())
                                         .suggests((context, builder) -> SharedSuggestionProvider.suggest(levelIds(), builder)),
                                 context -> StringArgumentType.getString(context, LEVEL)))));
     }
@@ -943,18 +993,18 @@ public final class CivCommandTree {
                                 Players.caller(player), level.apply(context)))))
                 .then(Commands.literal("wahl")
                         .then(Commands.literal("ausrufen")
-                                .then(Commands.argument(OFFICE, StringArgumentType.word())
+                                .then(arg(OFFICE, StringArgumentType.word())
                                         .suggests(CivCommandTree::suggestOffices)
                                         .executes(context -> withCiv(context, (civ, player) -> civ.levels().callElection(
                                                 Players.caller(player), level.apply(context),
                                                 StringArgumentType.getString(context, OFFICE))))))
                         .then(Commands.literal("kandidieren")
-                                .then(Commands.argument(OFFICE, StringArgumentType.word())
+                                .then(arg(OFFICE, StringArgumentType.word())
                                         .suggests(CivCommandTree::suggestOffices)
                                         .executes(context -> withCiv(context, (civ, player) -> civ.levels().stand(
                                                 Players.caller(player), level.apply(context),
                                                 StringArgumentType.getString(context, OFFICE), Optional.empty())))
-                                        .then(Commands.argument(PLATFORM, StringArgumentType.word())
+                                        .then(arg(PLATFORM, StringArgumentType.word())
                                                 .suggests((context, builder) -> SharedSuggestionProvider.suggest(
                                                         OfficeService.platformNames(), builder))
                                                 .executes(context -> withCiv(context, (civ, player) -> civ.levels().stand(
@@ -962,9 +1012,9 @@ public final class CivCommandTree {
                                                         StringArgumentType.getString(context, OFFICE),
                                                         Optional.of(StringArgumentType.getString(context, PLATFORM))))))))
                         .then(Commands.literal("stimmen")
-                                .then(Commands.argument(OFFICE, StringArgumentType.word())
+                                .then(arg(OFFICE, StringArgumentType.word())
                                         .suggests(CivCommandTree::suggestOffices)
-                                        .then(Commands.argument(CANDIDATE, StringArgumentType.string())
+                                        .then(arg(CANDIDATE, StringArgumentType.string())
                                                 .suggests((context, builder) -> suggestLevelCandidates(context, builder,
                                                         level.apply(context)))
                                                 .executes(context -> withCiv(context, (civ, player) -> civ.levels().vote(
@@ -973,16 +1023,16 @@ public final class CivCommandTree {
                                                         StringArgumentType.getString(context, CANDIDATE))))))))
                 .then(Commands.literal("amt")
                         .then(Commands.literal("ernennen")
-                                .then(Commands.argument(OFFICE, StringArgumentType.word())
+                                .then(arg(OFFICE, StringArgumentType.word())
                                         .suggests(CivCommandTree::suggestOffices)
-                                        .then(Commands.argument(RECIPIENT, StringArgumentType.string())
+                                        .then(arg(RECIPIENT, StringArgumentType.string())
                                                 .suggests(this::suggestRecipients)
                                                 .executes(context -> withCiv(context, (civ, player) -> civ.levels().appoint(
                                                         Players.caller(player), level.apply(context),
                                                         StringArgumentType.getString(context, OFFICE),
                                                         StringArgumentType.getString(context, RECIPIENT)))))))
                         .then(Commands.literal("entlassen")
-                                .then(Commands.argument(OFFICE, StringArgumentType.word())
+                                .then(arg(OFFICE, StringArgumentType.word())
                                         .suggests(CivCommandTree::suggestOffices)
                                         .executes(context -> withCiv(context, (civ, player) -> civ.levels().dismiss(
                                                 Players.caller(player), level.apply(context),
@@ -994,9 +1044,9 @@ public final class CivCommandTree {
                         .executes(context -> withCiv(context, (civ, player) -> civ.levels().laws(
                                 Players.caller(player), level.apply(context))))
                         .then(Commands.literal("setzen")
-                                .then(Commands.argument(LAW, StringArgumentType.word())
+                                .then(arg(LAW, StringArgumentType.word())
                                         .suggests(this::suggestLaws)
-                                        .then(Commands.argument(VALUE, StringArgumentType.word())
+                                        .then(arg(VALUE, StringArgumentType.word())
                                                 .suggests((context, builder) -> SharedSuggestionProvider.suggest(YES_NO, builder))
                                                 .executes(context -> withCiv(context, (civ, player) -> civ.levels().amendLaw(
                                                         Players.caller(player), level.apply(context),
@@ -1006,7 +1056,7 @@ public final class CivCommandTree {
                         .executes(context -> withCiv(context, (civ, player) -> civ.levels().proposals(
                                 Players.caller(player), level.apply(context)))))
                 .then(Commands.literal("abstimmen")
-                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(1))
+                        .then(arg(COUNT, IntegerArgumentType.integer(1))
                                 .then(Commands.literal("ja")
                                         .executes(context -> withCiv(context, (civ, player) -> civ.levels().voteOnProposal(
                                                 Players.caller(player), level.apply(context),
@@ -1042,16 +1092,16 @@ public final class CivCommandTree {
                         .then(constituencyAction("leeren", level))
                         .then(constituencyAction("aufloesen", level))
                         .then(Commands.literal("gemeinde")
-                                .then(Commands.argument(NAME, StringArgumentType.string())
-                                        .then(Commands.argument(TOWN, StringArgumentType.greedyString())
+                                .then(arg(NAME, StringArgumentType.string())
+                                        .then(arg(TOWN, StringArgumentType.greedyString())
                                                 .executes(context -> withCiv(context, (civ, player) ->
                                                         civ.levels().constituencyTown(Players.caller(player),
                                                                 level.apply(context),
                                                                 StringArgumentType.getString(context, NAME),
                                                                 StringArgumentType.getString(context, TOWN)))))))
                         .then(Commands.literal("gemeinde-entfernen")
-                                .then(Commands.argument(NAME, StringArgumentType.string())
-                                        .then(Commands.argument(TOWN, StringArgumentType.greedyString())
+                                .then(arg(NAME, StringArgumentType.string())
+                                        .then(arg(TOWN, StringArgumentType.greedyString())
                                                 .executes(context -> withCiv(context, (civ, player) ->
                                                         civ.levels().constituencyTownRemove(Players.caller(player),
                                                                 level.apply(context),
@@ -1061,7 +1111,7 @@ public final class CivCommandTree {
                         .then(Commands.literal("starten")
                                 .executes(context -> withCiv(context, (civ, player) -> civ.levels().startDebate(
                                         Players.caller(player), level.apply(context), Optional.empty())))
-                                .then(Commands.argument(OFFICE, StringArgumentType.word())
+                                .then(arg(OFFICE, StringArgumentType.word())
                                         .suggests(CivCommandTree::suggestOffices)
                                         .executes(context -> withCiv(context, (civ, player) -> civ.levels().startDebate(
                                                 Players.caller(player), level.apply(context),
@@ -1069,6 +1119,15 @@ public final class CivCommandTree {
                 .then(Commands.literal("flagge")
                         .executes(context -> withCiv(context, (civ, player) -> giveFlag(civ, player,
                                 level.apply(context))))
+                        .then(Commands.literal("editor")
+                                .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(
+                                        Players.caller(player), level.apply(context), polity -> {
+                                            de.etiennebader.civ.fabric.screen.FlagEditorScreen.open(civ, player,
+                                                    polity, Optional.empty());
+                                            return Reply.success(Message.of(
+                                                    de.etiennebader.civ.server.command.GuiKeys.FLAG_EDITOR_TITLE.key(),
+                                                    polity.name().value()));
+                                        }))))
                         .then(Commands.literal("setzen")
                                 .executes(context -> withCiv(context, (civ, player) -> {
                                     Optional<de.etiennebader.civ.domain.civic.Flag> flag = Flags.of(player.getMainHandItem());
@@ -1090,19 +1149,19 @@ public final class CivCommandTree {
                                 .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(
                                         Players.caller(player), level.apply(context), civ.homePorts()::list))))
                         .then(Commands.literal("setzen")
-                                .then(Commands.argument(COUNT, IntegerArgumentType.integer(2, 3))
+                                .then(arg(COUNT, IntegerArgumentType.integer(2, 3))
                                         .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(
                                                 Players.caller(player), level.apply(context),
                                                 polity -> civ.homePorts().set(Players.caller(player), polity,
                                                         IntegerArgumentType.getInteger(context, COUNT)))))))
                         .then(Commands.literal("entfernen")
-                                .then(Commands.argument(COUNT, IntegerArgumentType.integer(2, 3))
+                                .then(arg(COUNT, IntegerArgumentType.integer(2, 3))
                                         .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(
                                                 Players.caller(player), level.apply(context),
                                                 polity -> civ.homePorts().remove(Players.caller(player), polity,
                                                         IntegerArgumentType.getInteger(context, COUNT)))))))
                         .then(Commands.literal("zugang")
-                                .then(Commands.argument(TEXT, StringArgumentType.word())
+                                .then(arg(TEXT, StringArgumentType.word())
                                         .suggests((context, builder) -> SharedSuggestionProvider.suggest(
                                                 java.util.List.of("keiner", "buerger", "verbuendete", "alle"), builder))
                                         .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(
@@ -1110,7 +1169,7 @@ public final class CivCommandTree {
                                                 polity -> civ.homePorts().setAccess(Players.caller(player), polity,
                                                         StringArgumentType.getString(context, TEXT)))))))
                         .then(Commands.literal("preis")
-                                .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                                .then(arg(TEXT, StringArgumentType.greedyString())
                                         .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(
                                                 Players.caller(player), level.apply(context),
                                                 polity -> civ.homePorts().setFee(Players.caller(player), polity,
@@ -1121,8 +1180,14 @@ public final class CivCommandTree {
                         .then(Commands.literal("spielen")
                                 .executes(context -> withCiv(context, (civ, player) -> playAnthem(civ, player,
                                         level.apply(context)))))
+                        .then(Commands.literal("noten")
+                                .executes(context -> withCiv(context, (civ, player) -> playAnthemNotes(civ, player,
+                                        level.apply(context)))))
+                        .then(Commands.literal("platte")
+                                .executes(context -> withCiv(context, (civ, player) -> giveAnthemRecord(civ, player,
+                                        level.apply(context)))))
                         .then(Commands.literal("setzen")
-                                .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                                .then(arg(TEXT, StringArgumentType.greedyString())
                                         .executes(context -> withCiv(context, (civ, player) -> civ.levels().setAnthem(
                                                 Players.caller(player), level.apply(context),
                                                 StringArgumentType.getString(context, TEXT))))))
@@ -1146,10 +1211,10 @@ public final class CivCommandTree {
                                     return null;
                                 }))))
                 .then(Commands.literal("klage")
-                        .then(Commands.argument(TYPE, StringArgumentType.word())
+                        .then(arg(TYPE, StringArgumentType.word())
                                 .suggests((context, builder) -> SharedSuggestionProvider.suggest(
                                         List.of("straf", "zivil", "verfassung"), builder))
-                                .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                                .then(arg(TEXT, StringArgumentType.greedyString())
                                         .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(
                                                 Players.caller(player), level.apply(context), polity -> civ.justice().file(
                                                         Players.caller(player), polity,
@@ -1177,7 +1242,7 @@ public final class CivCommandTree {
     private LiteralArgumentBuilder<CommandSourceStack> courtStaffAction(
             String literal, boolean appointed, Role role, Function<CommandContext<CommandSourceStack>, String> level) {
         return Commands.literal(literal)
-                .then(Commands.argument(PLAYER, StringArgumentType.word())
+                .then(arg(PLAYER, StringArgumentType.word())
                         .suggests(CivCommandTree::suggestPeople)
                         .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(Players.caller(player),
                                 level.apply(context), polity -> civ.justice().appoint(Players.caller(player), polity,
@@ -1198,10 +1263,10 @@ public final class CivCommandTree {
                 .then(Commands.literal("faelle")
                         .executes(context -> withCiv(context, (civ, player) -> civ.justice().mine(Players.caller(player)))))
                 .then(Commands.literal("klage")
-                        .then(Commands.argument(TYPE, StringArgumentType.word())
+                        .then(arg(TYPE, StringArgumentType.word())
                                 .suggests((context, builder) -> SharedSuggestionProvider.suggest(
                                         List.of("straf", "zivil", "verfassung"), builder))
-                                .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                                .then(arg(TEXT, StringArgumentType.greedyString())
                                         .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(
                                                 Players.caller(player), Polity.MUNICIPAL_LEVEL, polity -> civ.justice()
                                                         .file(Players.caller(player), polity,
@@ -1220,21 +1285,21 @@ public final class CivCommandTree {
                 .then(caseCommand("berufung", (civ, player, number, context) -> civ.justice().appeal(
                         Players.caller(player), number)))
                 .then(caseCommand("beweis", (civ, player, number, context) -> handEvidence(civ, player, number))
-                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                        .then(arg(NUMBER, IntegerArgumentType.integer(1))
                                 .then(Commands.literal("vertrag")
-                                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(1))
+                                        .then(arg(COUNT, IntegerArgumentType.integer(1))
                                                 .executes(context -> withCiv(context, (civ, player) -> civ.justice()
                                                         .contractEvidence(Players.caller(player),
                                                                 IntegerArgumentType.getInteger(context, NUMBER),
                                                                 IntegerArgumentType.getInteger(context, COUNT))))))
                                 .then(Commands.literal("artikel")
-                                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(1))
+                                        .then(arg(COUNT, IntegerArgumentType.integer(1))
                                                 .executes(context -> withCiv(context, (civ, player) -> civ.justice()
                                                         .articleEvidence(Players.caller(player),
                                                                 IntegerArgumentType.getInteger(context, NUMBER),
                                                                 IntegerArgumentType.getInteger(context, COUNT))))))
                                 .then(Commands.literal("text")
-                                        .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                                        .then(arg(TEXT, StringArgumentType.greedyString())
                                                 .executes(context -> withCiv(context, (civ, player) -> civ.justice()
                                                         .evidence(Players.caller(player),
                                                                 IntegerArgumentType.getInteger(context, NUMBER), "text",
@@ -1253,7 +1318,7 @@ public final class CivCommandTree {
                 .then(caseTextCommand("zeuge", (civ, player, number, text) -> civ.justice().summon(
                         Players.caller(player), number, text, villagerRef(player)), false))
                 .then(Commands.literal("stimme")
-                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                        .then(arg(NUMBER, IntegerArgumentType.integer(1))
                                 .then(Commands.literal("schuldig")
                                         .executes(context -> withCiv(context, (civ, player) -> civ.justice().vote(
                                                 Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER),
@@ -1278,15 +1343,15 @@ public final class CivCommandTree {
 
     private LiteralArgumentBuilder<CommandSourceStack> caseCommand(String literal, CaseAction action) {
         return Commands.literal(literal)
-                .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                .then(arg(NUMBER, IntegerArgumentType.integer(1))
                         .executes(context -> withCiv(context, (civ, player) -> action.execute(civ, player,
                                 IntegerArgumentType.getInteger(context, NUMBER), context))));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> caseTextCommand(String literal, CaseTextAction action,
                                                                        boolean optional) {
-        var number = Commands.argument(NUMBER, IntegerArgumentType.integer(1))
-                .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+        var number = arg(NUMBER, IntegerArgumentType.integer(1))
+                .then(arg(TEXT, StringArgumentType.greedyString())
                         .executes(context -> withCiv(context, (civ, player) -> action.execute(civ, player,
                                 IntegerArgumentType.getInteger(context, NUMBER),
                                 StringArgumentType.getString(context, TEXT)))));
@@ -1315,20 +1380,20 @@ public final class CivCommandTree {
     /** {@code /civ firma maschine ...}: Maschinen ansehen, kaufen, ausbauen und warten. */
     private LiteralArgumentBuilder<CommandSourceStack> machineCommands() {
         return Commands.literal("maschine")
-                .then(Commands.literal("liste").then(Commands.argument(COMPANY, StringArgumentType.string())
+                .then(Commands.literal("liste").then(arg(COMPANY, StringArgumentType.string())
                         .suggests(this::suggestOwnCompanies)
                         .executes(context -> withCiv(context, (civ, player) -> civ.machines().list(
                                 StringArgumentType.getString(context, COMPANY))))))
-                .then(Commands.literal("menue").then(Commands.argument(COMPANY, StringArgumentType.string())
+                .then(Commands.literal("menue").then(arg(COMPANY, StringArgumentType.string())
                         .suggests(this::suggestOwnCompanies)
                         .executes(context -> withCiv(context, (civ, player) -> {
                             Screens.open(player, new de.etiennebader.civ.fabric.screen.MachinesScreen(civ, player,
                                     StringArgumentType.getString(context, COMPANY), Optional.empty()));
                             return null;
                         }))))
-                .then(Commands.literal("kaufen").then(Commands.argument(COMPANY, StringArgumentType.string())
+                .then(Commands.literal("kaufen").then(arg(COMPANY, StringArgumentType.string())
                         .suggests(this::suggestOwnCompanies)
-                        .then(Commands.argument(ITEM, StringArgumentType.word())
+                        .then(arg(ITEM, StringArgumentType.word())
                                 .suggests((context, builder) -> SharedSuggestionProvider.suggest(
                                         java.util.Arrays.stream(de.etiennebader.civ.domain.production.MachineType.values())
                                                 .map(de.etiennebader.civ.domain.production.MachineType::id).toList(), builder))
@@ -1343,15 +1408,15 @@ public final class CivCommandTree {
                                                     new ItemStack(item), net.minecraft.util.Prediction.SERVER_ONLY));
                                     return purchase.reply();
                                 })))))
-                .then(Commands.literal("ausbauen").then(Commands.argument(COMPANY, StringArgumentType.string())
+                .then(Commands.literal("ausbauen").then(arg(COMPANY, StringArgumentType.string())
                         .suggests(this::suggestOwnCompanies)
-                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1, 64))
+                        .then(arg(NUMBER, IntegerArgumentType.integer(1, 64))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.machines().upgrade(
                                         Players.caller(player), StringArgumentType.getString(context, COMPANY),
                                         IntegerArgumentType.getInteger(context, NUMBER)))))))
-                .then(Commands.literal("warten").then(Commands.argument(COMPANY, StringArgumentType.string())
+                .then(Commands.literal("warten").then(arg(COMPANY, StringArgumentType.string())
                         .suggests(this::suggestOwnCompanies)
-                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1, 64))
+                        .then(arg(NUMBER, IntegerArgumentType.integer(1, 64))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.machines().maintain(
                                         Players.caller(player), StringArgumentType.getString(context, COMPANY),
                                         IntegerArgumentType.getInteger(context, NUMBER), false)))
@@ -1425,7 +1490,7 @@ public final class CivCommandTree {
     private LiteralArgumentBuilder<CommandSourceStack> constituencyAction(
             String action, Function<CommandContext<CommandSourceStack>, String> level) {
         return Commands.literal(action)
-                .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                .then(arg(NAME, StringArgumentType.greedyString())
                         .executes(context -> withCiv(context, (civ, player) -> civ.levels().constituency(
                                 Players.caller(player), level.apply(context), action,
                                 StringArgumentType.getString(context, NAME)))));
@@ -1448,6 +1513,28 @@ public final class CivCommandTree {
                 .map(anthem -> {
                     Ambience.play(player, anthem);
                     return Reply.success(Message.of(MessageKey.ANTHEM_PLAYING, polity.name().value(), anthem.title()));
+                })
+                .orElseGet(() -> Reply.failure(Message.of(MessageKey.ANTHEM_NONE, polity.name().value()))));
+    }
+
+    /** Spielt nur die Notenblock-Melodie, auch wenn eine Aufnahme hochgeladen ist (Spieler ohne Ressourcenpaket). */
+    private static Reply playAnthemNotes(CivServer civ, ServerPlayer player, String levelId) {
+        return civ.levels().with(Players.caller(player), levelId, polity -> civ.civic().anthemOf(polity.id())
+                .map(anthem -> {
+                    Ambience.play(player, anthem, false);
+                    return Reply.success(Message.of(MessageKey.ANTHEM_PLAYING, polity.name().value(), anthem.title()));
+                })
+                .orElseGet(() -> Reply.failure(Message.of(MessageKey.ANTHEM_NONE, polity.name().value()))));
+    }
+
+    /** Gibt dem Spieler eine Hymnen-Schallplatte der Ebene. */
+    private static Reply giveAnthemRecord(CivServer civ, ServerPlayer player, String levelId) {
+        return civ.levels().with(Players.caller(player), levelId, polity -> civ.civic().anthemOf(polity.id())
+                .map(anthem -> {
+                    player.getInventory().placeItemBackInInventory(
+                            de.etiennebader.civ.fabric.content.AnthemRecords.create(polity.id(),
+                                    polity.name().value(), anthem), Prediction.SERVER_ONLY);
+                    return Reply.success(Message.of(MessageKey.ANTHEM_RECORD_GIVEN, polity.name().value()));
                 })
                 .orElseGet(() -> Reply.failure(Message.of(MessageKey.ANTHEM_NONE, polity.name().value()))));
     }
@@ -1482,20 +1569,20 @@ public final class CivCommandTree {
                 .executes(context -> withCiv(context, (civ, player) -> civ.federations().info(Players.caller(player),
                         Optional.empty())))
                 .then(Commands.literal("gruenden")
-                        .then(Commands.argument(LEVEL, StringArgumentType.word())
+                        .then(arg(LEVEL, StringArgumentType.word())
                                 .suggests((context, builder) -> SharedSuggestionProvider.suggest(host.current()
                                         .map(civ -> civ.federations().levelIds()).orElse(List.of()), builder))
-                                .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                                .then(arg(NAME, StringArgumentType.greedyString())
                                         .executes(context -> withCiv(context, (civ, player) -> civ.federations().found(
                                                 Players.caller(player), StringArgumentType.getString(context, LEVEL),
                                                 name(context)))))))
                 .then(Commands.literal("einladen")
-                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                        .then(arg(NAME, StringArgumentType.greedyString())
                                 .suggests(this::suggestPolityNames)
                                 .executes(context -> withCiv(context, (civ, player) -> civ.federations().invite(
                                         Players.caller(player), name(context))))))
                 .then(Commands.literal("beitreten")
-                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                        .then(arg(NAME, StringArgumentType.greedyString())
                                 .suggests(this::suggestFederationNames)
                                 .executes(context -> withCiv(context, (civ, player) -> civ.federations().join(
                                         Players.caller(player), name(context))))))
@@ -1508,7 +1595,7 @@ public final class CivCommandTree {
                 .then(Commands.literal("info")
                         .executes(context -> withCiv(context, (civ, player) -> civ.federations().info(
                                 Players.caller(player), Optional.empty())))
-                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                        .then(arg(NAME, StringArgumentType.greedyString())
                                 .suggests(this::suggestPolityNames)
                                 .executes(context -> withCiv(context, (civ, player) -> civ.federations().info(
                                         Players.caller(player), Optional.of(name(context)))))));
@@ -1524,7 +1611,7 @@ public final class CivCommandTree {
     private LiteralArgumentBuilder<CommandSourceStack> campaignKind(String word,
             de.etiennebader.civ.domain.war.BattleKind kind) {
         return Commands.literal(word)
-                .then(Commands.argument(COUNT, IntegerArgumentType.integer(0, 30))
+                .then(arg(COUNT, IntegerArgumentType.integer(0, 30))
                         .executes(context -> withCiv(context, (civ, player) -> civ.war().campaign(
                                 Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER), kind,
                                 IntegerArgumentType.getInteger(context, COUNT)))));
@@ -1535,14 +1622,14 @@ public final class CivCommandTree {
         return Commands.literal("religion")
                 .then(Commands.literal("liste")
                         .executes(context -> withCiv(context, (civ, player) -> civ.religion().list())))
-                .then(Commands.literal("info").then(Commands.argument(NAME, StringArgumentType.string())
+                .then(Commands.literal("info").then(arg(NAME, StringArgumentType.string())
                         .executes(context -> withCiv(context, (civ, player) -> civ.religion().info(
                                 StringArgumentType.getString(context, NAME))))))
-                .then(Commands.literal("gruenden").then(Commands.argument(NAME, StringArgumentType.string())
-                        .then(Commands.argument("glaube", StringArgumentType.word())
-                        .then(Commands.argument("schrift", StringArgumentType.string())
-                        .then(Commands.argument("gotteshaus", StringArgumentType.string())
-                        .then(Commands.argument("sprache", StringArgumentType.string())
+                .then(Commands.literal("gruenden").then(arg(NAME, StringArgumentType.string())
+                        .then(arg("glaube", StringArgumentType.word())
+                        .then(arg("schrift", StringArgumentType.string())
+                        .then(arg("gotteshaus", StringArgumentType.string())
+                        .then(arg("sprache", StringArgumentType.string())
                         .executes(context -> withCiv(context, (civ, player) -> civ.religion().found(
                                 Players.caller(player), StringArgumentType.getString(context, NAME),
                                 !StringArgumentType.getString(context, "glaube").startsWith("poly"),
@@ -1550,20 +1637,20 @@ public final class CivCommandTree {
                                 StringArgumentType.getString(context, "gotteshaus"),
                                 StringArgumentType.getString(context, "sprache"),
                                 civ.calendar().today())))))))))
-                .then(Commands.literal("beitreten").then(Commands.argument(NAME, StringArgumentType.string())
+                .then(Commands.literal("beitreten").then(arg(NAME, StringArgumentType.string())
                         .executes(context -> withCiv(context, (civ, player) -> civ.religion().join(
                                 Players.caller(player), StringArgumentType.getString(context, NAME))))))
                 .then(Commands.literal("austreten")
                         .executes(context -> withCiv(context, (civ, player) -> civ.religion().leave(Players.caller(player)))))
-                .then(Commands.literal("konfession").then(Commands.argument(NAME, StringArgumentType.string())
+                .then(Commands.literal("konfession").then(arg(NAME, StringArgumentType.string())
                         .executes(context -> withCiv(context, (civ, player) -> civ.religion().denomination(
                                 Players.caller(player), StringArgumentType.getString(context, NAME),
                                 civ.calendar().today())))))
-                .then(Commands.literal("macht").then(Commands.argument(COUNT, IntegerArgumentType.integer(0, 100))
+                .then(Commands.literal("macht").then(arg(COUNT, IntegerArgumentType.integer(0, 100))
                         .executes(context -> withCiv(context, (civ, player) -> civ.religion().power(
                                 Players.caller(player), IntegerArgumentType.getInteger(context, COUNT),
                                 civ.calendar().today())))))
-                .then(Commands.literal("logo").then(Commands.argument(NAME, StringArgumentType.string())
+                .then(Commands.literal("logo").then(arg(NAME, StringArgumentType.string())
                         .executes(context -> withCiv(context, (civ, player) -> civ.religion().logo(
                                 Players.caller(player), StringArgumentType.getString(context, NAME))))))
                 .then(Commands.literal("menue").executes(context -> withCiv(context, (civ, player) -> {
@@ -1575,21 +1662,152 @@ public final class CivCommandTree {
                         .executes(context -> withCiv(context, (civ, player) -> civ.religion().pray(Players.caller(player)))))
                 .then(Commands.literal("gottesdienst")
                         .executes(context -> withCiv(context, (civ, player) -> civ.religion().service(Players.caller(player)))))
-                .then(Commands.literal("taufe").then(Commands.argument(PLAYER, StringArgumentType.word())
-                        .executes(context -> withCiv(context, (civ, player) -> civ.religion().rite(Players.caller(player),
-                                "taufe", StringArgumentType.getString(context, PLAYER), civ.calendar().today())))))
-                .then(Commands.literal("segnen").then(Commands.argument(PLAYER, StringArgumentType.word())
-                        .executes(context -> withCiv(context, (civ, player) -> civ.religion().rite(Players.caller(player),
-                                "segnung", StringArgumentType.getString(context, PLAYER), civ.calendar().today())))))
+                .then(Commands.literal("taufe").then(arg(PLAYER, StringArgumentType.word())
+                        .suggests(CivCommandTree::suggestPeople)
+                        .executes(context -> withCiv(context, (civ, player) -> rite(civ, player, "taufe",
+                                StringArgumentType.getString(context, PLAYER))))))
+                .then(Commands.literal("segnen").then(arg(PLAYER, StringArgumentType.word())
+                        .suggests(CivCommandTree::suggestPeople)
+                        .executes(context -> withCiv(context, (civ, player) -> rite(civ, player, "segnung",
+                                StringArgumentType.getString(context, PLAYER))))))
+                .then(Commands.literal("schrift")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.religion().scripture(
+                                Players.caller(player))))
+                        .then(Commands.literal("lesen")
+                                .executes(context -> withCiv(context, (civ, player) -> civ.religion().scripture(
+                                        Players.caller(player))))
+                                .then(arg(NAME, StringArgumentType.string())
+                                        .suggests(this::suggestReligions)
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.religion().scripture(
+                                                StringArgumentType.getString(context, NAME))))))
+                        .then(Commands.literal("schreiben")
+                                .then(arg(TEXT, StringArgumentType.greedyString())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.religion()
+                                                .writeScripture(Players.caller(player),
+                                                        StringArgumentType.getString(context, TEXT), false,
+                                                        civ.calendar().today())))))
+                        .then(Commands.literal("anhaengen")
+                                .then(arg(TEXT, StringArgumentType.greedyString())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.religion()
+                                                .writeScripture(Players.caller(player),
+                                                        StringArgumentType.getString(context, TEXT), true,
+                                                        civ.calendar().today())))))
+                        .then(Commands.literal("benennen")
+                                .then(arg("was", StringArgumentType.word())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                List.of("schrift", "gotteshaus", "sprache"), builder))
+                                        .then(arg(TEXT, StringArgumentType.greedyString())
+                                                .executes(context -> withCiv(context, (civ, player) -> civ.religion()
+                                                        .rename(Players.caller(player),
+                                                                StringArgumentType.getString(context, "was"),
+                                                                StringArgumentType.getString(context, TEXT),
+                                                                civ.calendar().today())))))))
+                .then(Commands.literal("amt")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.religion().listRoles(
+                                Players.caller(player))))
+                        .then(Commands.literal("liste")
+                                .executes(context -> withCiv(context, (civ, player) -> civ.religion().listRoles(
+                                        Players.caller(player)))))
+                        .then(Commands.literal("festlegen")
+                                .then(arg(NAME, StringArgumentType.string())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                roleSuggestions(context), builder))
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.religion()
+                                                .defineRole(Players.caller(player),
+                                                        StringArgumentType.getString(context, NAME), List.of())))
+                                        .then(arg(TEXT, StringArgumentType.greedyString())
+                                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                        List.of("segnen", "taufen", "gottesdienst", "schrift"), builder))
+                                                .executes(context -> withCiv(context, (civ, player) -> civ.religion()
+                                                        .defineRole(Players.caller(player),
+                                                                StringArgumentType.getString(context, NAME),
+                                                                List.of(StringArgumentType.getString(context, TEXT)
+                                                                        .trim().split("[ ,]+"))))))))
+                        .then(Commands.literal("abschaffen")
+                                .then(arg(NAME, StringArgumentType.string())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                roleSuggestions(context), builder))
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.religion()
+                                                .deleteRole(Players.caller(player),
+                                                        StringArgumentType.getString(context, NAME))))))
+                        .then(Commands.literal("vergeben")
+                                .then(arg(NAME, StringArgumentType.string())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                roleSuggestions(context), builder))
+                                        .then(arg(PLAYER, StringArgumentType.word())
+                                                .suggests(CivCommandTree::suggestPeople)
+                                                .executes(context -> withCiv(context, (civ, player) -> assign(civ, player,
+                                                        StringArgumentType.getString(context, NAME),
+                                                        StringArgumentType.getString(context, PLAYER)))))))
+                        .then(Commands.literal("entziehen")
+                                .then(arg(PLAYER, StringArgumentType.word())
+                                        .suggests(CivCommandTree::suggestPeople)
+                                        .executes(context -> withCiv(context, (civ, player) -> revoke(civ, player,
+                                                StringArgumentType.getString(context, PLAYER)))))))
                 .then(Commands.literal("wahl")
                         .then(Commands.literal("ausrufen").executes(context -> withCiv(context, (civ, player) ->
                                 civ.religion().callElection(Players.caller(player), civ.calendar().today()))))
                         .then(Commands.literal("kandidieren").executes(context -> withCiv(context, (civ, player) ->
                                 civ.religion().candidate(Players.caller(player), civ.calendar().today()))))
-                        .then(Commands.literal("waehlen").then(Commands.argument(PLAYER, StringArgumentType.word())
+                        .then(Commands.literal("waehlen").then(arg(PLAYER, StringArgumentType.word())
                                 .executes(context -> withCiv(context, (civ, player) -> civ.religion().vote(
                                         Players.caller(player), StringArgumentType.getString(context, PLAYER),
                                         civ.calendar().today()))))));
+    }
+
+    /** Taufe oder Segnung: ein Spielername oder {@code dorfbewohner} für den nächsten Dorfbewohner in Reichweite. */
+    private static Reply rite(CivServer civ, ServerPlayer player, String kind, String who) {
+        if (who.equalsIgnoreCase("dorfbewohner")) {
+            return nearestVillager(player).map(villager -> civ.religion().rite(Players.caller(player), kind, villager,
+                            villagerName(villager), civ.calendar().today()))
+                    .orElseGet(() -> Reply.failure(Message.of(MessageKey.RELIGION_NEEDS_VILLAGER)));
+        }
+        return civ.religion().rite(Players.caller(player), kind, who, civ.calendar().today());
+    }
+
+    private static String villagerName(ActorRef villager) {
+        return de.etiennebader.civ.domain.population.VillagerIdentity.of((PersonRef) villager).fullName();
+    }
+
+    private static Reply assign(CivServer civ, ServerPlayer player, String role, String who) {
+        if (who.equalsIgnoreCase("dorfbewohner")) {
+            return nearestVillager(player).map(villager -> civ.religion().assignRole(Players.caller(player), role,
+                            villager, villagerName(villager)))
+                    .orElseGet(() -> Reply.failure(Message.of(MessageKey.RELIGION_NEEDS_VILLAGER)));
+        }
+        return civ.players().findByName(who)
+                .map(target -> civ.religion().assignRole(Players.caller(player), role, target, who))
+                .orElseGet(() -> Reply.failure(Message.of(MessageKey.RELIGION_UNKNOWN_PLAYER, who)));
+    }
+
+    private static Reply revoke(CivServer civ, ServerPlayer player, String who) {
+        if (who.equalsIgnoreCase("dorfbewohner")) {
+            return nearestVillager(player).map(villager -> civ.religion().revokeRoles(Players.caller(player), villager,
+                            villagerName(villager)))
+                    .orElseGet(() -> Reply.failure(Message.of(MessageKey.RELIGION_NEEDS_VILLAGER)));
+        }
+        return civ.players().findByName(who)
+                .map(target -> civ.religion().revokeRoles(Players.caller(player), target, who))
+                .orElseGet(() -> Reply.failure(Message.of(MessageKey.RELIGION_UNKNOWN_PLAYER, who)));
+    }
+
+    private List<String> roleSuggestions(CommandContext<CommandSourceStack> context) {
+        ServerPlayer player = context.getSource().getPlayer();
+        List<String> names = new java.util.ArrayList<>();
+        host.current().ifPresent(civ -> {
+            if (player != null) {
+                civ.religion().roleNames(Players.ref(player)).forEach(name -> names.add(quoted(name)));
+            }
+        });
+        return names;
+    }
+
+    private CompletableFuture<Suggestions> suggestReligions(CommandContext<CommandSourceStack> context,
+                                                            SuggestionsBuilder builder) {
+        List<String> names = new java.util.ArrayList<>();
+        host.current().ifPresent(civ -> civ.religion().summaries(Optional.empty())
+                .forEach(summary -> names.add(quoted(summary.name()))));
+        return SharedSuggestionProvider.suggest(names, builder);
     }
 
     /** {@code /civ familie}: Ehepaare und Kinder der eigenen Gemeinde (Issue #27). */
@@ -1665,12 +1883,261 @@ public final class CivCommandTree {
                 Players.caller(player), StringArgumentType.getString(context, COMPANY), rank)));
     }
 
+    private static final String MINISTRY = "ministerium";
+    private static final String MODE = "auswahl";
+
+    private static de.etiennebader.civ.domain.government.Selection selection(String word) {
+        return switch (word.toLowerCase(java.util.Locale.ROOT)) {
+            case "wahl", "election" -> de.etiennebader.civ.domain.government.Selection.ELECTION;
+            default -> de.etiennebader.civ.domain.government.Selection.APPOINTMENT;
+        };
+    }
+
+    private static de.etiennebader.civ.domain.government.StateForm stateForm(String word) {
+        return switch (word.toLowerCase(java.util.Locale.ROOT)) {
+            case "republik", "republic" -> de.etiennebader.civ.domain.government.StateForm.REPUBLIC;
+            case "monarchie", "monarchy" -> de.etiennebader.civ.domain.government.StateForm.MONARCHY;
+            case "kaiserreich", "empire" -> de.etiennebader.civ.domain.government.StateForm.EMPIRE;
+            case "fuerstentum", "principality" -> de.etiennebader.civ.domain.government.StateForm.PRINCIPALITY;
+            default -> de.etiennebader.civ.domain.government.StateForm.CUSTOM;
+        };
+    }
+
+    /** {@code /civ regierung ...}: Oberhaupt, Ministerien und Haushalt (Issue #79). */
+    private LiteralArgumentBuilder<CommandSourceStack> governmentCommands() {
+        com.mojang.brigadier.arguments.LongArgumentType money = com.mojang.brigadier.arguments.LongArgumentType.longArg(0);
+        return Commands.literal("regierung")
+                .executes(context -> withCiv(context, (civ, player) -> civ.government().overview(Players.caller(player))))
+                .then(Commands.literal("oberhaupt")
+                        .then(Commands.literal("titel").then(arg(TEXT, StringArgumentType.greedyString())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.government().setTitle(
+                                        Players.caller(player), StringArgumentType.getString(context, TEXT))))))
+                        .then(Commands.literal("form").then(arg(MODE, StringArgumentType.word())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.government().setForm(
+                                        Players.caller(player), stateForm(StringArgumentType.getString(context, MODE)))))))
+                        .then(Commands.literal("modus").then(arg(MODE, StringArgumentType.word())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.government().setHeadSelection(
+                                        Players.caller(player), selection(StringArgumentType.getString(context, MODE)))))))
+                        .then(Commands.literal("gehalt").then(arg(AMOUNT, money)
+                                .executes(context -> withCiv(context, (civ, player) -> civ.government().setHeadSalary(
+                                        Players.caller(player),
+                                        com.mojang.brigadier.arguments.LongArgumentType.getLong(context, AMOUNT))))))
+                        .then(Commands.literal("befugnisse")
+                                .then(arg("veto", com.mojang.brigadier.arguments.BoolArgumentType.bool())
+                                        .then(arg("regierung", com.mojang.brigadier.arguments.BoolArgumentType.bool())
+                                                .then(arg("neuwahl", com.mojang.brigadier.arguments.BoolArgumentType.bool())
+                                                        .executes(context -> withCiv(context, (civ, player) ->
+                                                                civ.government().setPowers(Players.caller(player),
+                                                                        com.mojang.brigadier.arguments.BoolArgumentType.getBool(context, "veto"),
+                                                                        com.mojang.brigadier.arguments.BoolArgumentType.getBool(context, "regierung"),
+                                                                        com.mojang.brigadier.arguments.BoolArgumentType.getBool(context, "neuwahl")))))))))
+                .then(Commands.literal("regeln")
+                        .then(arg("hoechstzahl", IntegerArgumentType.integer(1, 30))
+                                .then(arg("tage", IntegerArgumentType.integer(1, 60))
+                                        .then(arg("prozent", IntegerArgumentType.integer(1, 99))
+                                                .executes(context -> withCiv(context, (civ, player) -> civ.government().setRules(
+                                                        Players.caller(player),
+                                                        IntegerArgumentType.getInteger(context, "hoechstzahl"),
+                                                        IntegerArgumentType.getInteger(context, "tage"),
+                                                        IntegerArgumentType.getInteger(context, "prozent"))))))))
+                .then(Commands.literal("vorbereiter").then(arg(MINISTRY, StringArgumentType.string())
+                        .executes(context -> withCiv(context, (civ, player) -> civ.government().setPreparer(
+                                Players.caller(player), StringArgumentType.getString(context, MINISTRY))))))
+                .then(Commands.literal("ministerium")
+                        .then(Commands.literal("anlegen").then(arg(MINISTRY, StringArgumentType.string())
+                                .then(arg(MODE, StringArgumentType.word())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.government().createMinistry(
+                                                Players.caller(player), StringArgumentType.getString(context, MINISTRY), "",
+                                                selection(StringArgumentType.getString(context, MODE)))))
+                                        .then(arg(TEXT, StringArgumentType.greedyString())
+                                                .executes(context -> withCiv(context, (civ, player) -> civ.government().createMinistry(
+                                                        Players.caller(player), StringArgumentType.getString(context, MINISTRY),
+                                                        StringArgumentType.getString(context, TEXT),
+                                                        selection(StringArgumentType.getString(context, MODE)))))))))
+                        .then(Commands.literal("aufloesen").then(arg(MINISTRY, StringArgumentType.string())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.government().dissolveMinistry(
+                                        Players.caller(player), StringArgumentType.getString(context, MINISTRY))))))
+                        .then(Commands.literal("zustaendigkeit").then(arg(MINISTRY, StringArgumentType.string())
+                                .then(arg(TEXT, StringArgumentType.greedyString())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.government().setMandate(
+                                                Players.caller(player), StringArgumentType.getString(context, MINISTRY),
+                                                StringArgumentType.getString(context, TEXT)))))))
+                        .then(Commands.literal("modus").then(arg(MINISTRY, StringArgumentType.string())
+                                .then(arg(MODE, StringArgumentType.word())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.government().setMinistrySelection(
+                                                Players.caller(player), StringArgumentType.getString(context, MINISTRY),
+                                                selection(StringArgumentType.getString(context, MODE))))))))
+                        .then(Commands.literal("lohn").then(arg(MINISTRY, StringArgumentType.string())
+                                .then(arg("minister", money).then(arg("angestellte", money)
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.government().setWages(
+                                                Players.caller(player), StringArgumentType.getString(context, MINISTRY),
+                                                com.mojang.brigadier.arguments.LongArgumentType.getLong(context, "minister"),
+                                                com.mojang.brigadier.arguments.LongArgumentType.getLong(context, "angestellte"))))))))
+                        .then(Commands.literal("ernennen").then(arg(MINISTRY, StringArgumentType.string())
+                                .then(arg(PLAYER, StringArgumentType.word())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.government().appoint(
+                                                Players.caller(player), StringArgumentType.getString(context, MINISTRY),
+                                                StringArgumentType.getString(context, PLAYER)))))))
+                        .then(Commands.literal("abberufen").then(arg(MINISTRY, StringArgumentType.string())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.government().dismiss(
+                                        Players.caller(player), StringArgumentType.getString(context, MINISTRY))))))
+                        .then(Commands.literal("einstellen").then(arg(MINISTRY, StringArgumentType.string())
+                                .then(arg(PLAYER, StringArgumentType.word())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.government().hire(
+                                                Players.caller(player), StringArgumentType.getString(context, MINISTRY),
+                                                StringArgumentType.getString(context, PLAYER)))))))
+                        .then(Commands.literal("kuendigen").then(arg(MINISTRY, StringArgumentType.string())
+                                .then(arg(PLAYER, StringArgumentType.word())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.government().fire(
+                                                Players.caller(player), StringArgumentType.getString(context, MINISTRY),
+                                                StringArgumentType.getString(context, PLAYER))))))))
+                .then(Commands.literal("haushalt")
+                        .then(Commands.literal("entwurf").then(arg(MINISTRY, StringArgumentType.string())
+                                .then(arg(AMOUNT, money)
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.government().draft(
+                                                Players.caller(player), StringArgumentType.getString(context, MINISTRY),
+                                                com.mojang.brigadier.arguments.LongArgumentType.getLong(context, AMOUNT)))))))
+                        .then(Commands.literal("abstimmen")
+                                .then(arg("zustimmung", com.mojang.brigadier.arguments.BoolArgumentType.bool())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.government().vote(
+                                                Players.caller(player),
+                                                com.mojang.brigadier.arguments.BoolArgumentType.getBool(context, "zustimmung"))))))
+                        .then(Commands.literal("schliessen")
+                                .executes(context -> withCiv(context, (civ, player) -> civ.government().closeBudget(Players.caller(player))))))
+                .then(governmentMinistryExtras())
+                .then(governmentCoalition())
+                .then(governmentSubsidies())
+                .then(governmentElections())
+                .then(governmentVeto());
+    }
+
+    /** Veto-Recht: wartende Gesetze ansehen, unterzeichnen, Veto einlegen, Frist setzen. */
+    private LiteralArgumentBuilder<CommandSourceStack> governmentVeto() {
+        return Commands.literal("gesetze")
+                .executes(context -> withCiv(context, (civ, player) -> civ.government().veto().list(Players.caller(player))))
+                .then(Commands.literal("unterzeichnen").then(arg(NUMBER, IntegerArgumentType.integer(1))
+                        .executes(context -> withCiv(context, (civ, player) -> civ.government().veto().sign(
+                                Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))))
+                .then(Commands.literal("veto").then(arg(NUMBER, IntegerArgumentType.integer(1))
+                        .executes(context -> withCiv(context, (civ, player) -> civ.government().veto().veto(
+                                Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))))
+                .then(Commands.literal("vetofrist").then(arg("tage", IntegerArgumentType.integer(0, 14))
+                        .executes(context -> withCiv(context, (civ, player) -> civ.government().veto().setVetoDays(
+                                Players.caller(player), IntegerArgumentType.getInteger(context, "tage"))))));
+    }
+
+    private static de.etiennebader.civ.domain.government.Portfolio portfolio(String word) {
+        return switch (word.toLowerCase(java.util.Locale.ROOT)) {
+            case "finanzen", "finance" -> de.etiennebader.civ.domain.government.Portfolio.FINANCE;
+            case "inneres", "interior" -> de.etiennebader.civ.domain.government.Portfolio.INTERIOR;
+            case "verteidigung", "defence" -> de.etiennebader.civ.domain.government.Portfolio.DEFENCE;
+            case "wirtschaft", "economy" -> de.etiennebader.civ.domain.government.Portfolio.ECONOMY;
+            case "kanzleramt", "chancellery" -> de.etiennebader.civ.domain.government.Portfolio.CHANCELLERY;
+            default -> de.etiennebader.civ.domain.government.Portfolio.FREE;
+        };
+    }
+
+    /** Bereich, Verordnungsrecht und Gesetzesvorschläge der Ministerien. */
+    private LiteralArgumentBuilder<CommandSourceStack> governmentMinistryExtras() {
+        return Commands.literal("ministerium")
+                .then(Commands.literal("bereich").then(arg(MINISTRY, StringArgumentType.string())
+                        .then(arg(MODE, StringArgumentType.word())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.government().politics().setPortfolio(
+                                        Players.caller(player), StringArgumentType.getString(context, MINISTRY),
+                                        portfolio(StringArgumentType.getString(context, MODE))))))))
+                .then(Commands.literal("verordnung").then(arg(MINISTRY, StringArgumentType.string())
+                        .then(arg("erlaubt", com.mojang.brigadier.arguments.BoolArgumentType.bool())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.government().politics().setDecrees(
+                                        Players.caller(player), StringArgumentType.getString(context, MINISTRY),
+                                        com.mojang.brigadier.arguments.BoolArgumentType.getBool(context, "erlaubt")))))))
+                .then(Commands.literal("vorschlag").then(arg(MINISTRY, StringArgumentType.string())
+                        .then(arg("regelung", StringArgumentType.word())
+                                .then(arg(TEXT, StringArgumentType.greedyString())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.government().politics().propose(
+                                                Players.caller(player), StringArgumentType.getString(context, MINISTRY),
+                                                StringArgumentType.getString(context, "regelung"),
+                                                StringArgumentType.getString(context, TEXT))))))));
+    }
+
+    /** Regierungsbildung und Koalitionsvertrag. */
+    private LiteralArgumentBuilder<CommandSourceStack> governmentCoalition() {
+        return Commands.literal("koalition")
+                .then(Commands.literal("bilden").executes(context -> withCiv(context, (civ, player) ->
+                        civ.government().politics().form(Players.caller(player)))))
+                .then(Commands.literal("entlassen").executes(context -> withCiv(context, (civ, player) ->
+                        civ.government().politics().dismissGovernment(Players.caller(player)))))
+                .then(Commands.literal("neuwahl").executes(context -> withCiv(context, (civ, player) ->
+                        civ.government().politics().newElection(Players.caller(player)))))
+                .then(Commands.literal("regeln").then(arg("abstand", IntegerArgumentType.integer(0, 200))
+                        .then(arg("minderheit", com.mojang.brigadier.arguments.BoolArgumentType.bool())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.government().politics().setCoalitionRules(
+                                        Players.caller(player), IntegerArgumentType.getInteger(context, "abstand"),
+                                        com.mojang.brigadier.arguments.BoolArgumentType.getBool(context, "minderheit")))))))
+                .then(Commands.literal("vorhaben").then(arg("regelung", StringArgumentType.word())
+                        .then(arg(TEXT, StringArgumentType.greedyString())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.government().politics().addAgreement(
+                                        Players.caller(player), StringArgumentType.getString(context, "regelung"),
+                                        StringArgumentType.getString(context, TEXT)))))));
+    }
+
+    /** Förderungen und Hilfen. */
+    private LiteralArgumentBuilder<CommandSourceStack> governmentSubsidies() {
+        com.mojang.brigadier.arguments.LongArgumentType money = com.mojang.brigadier.arguments.LongArgumentType.longArg(0);
+        return Commands.literal("foerderung")
+                .then(Commands.literal("liste").executes(context -> withCiv(context, (civ, player) ->
+                        civ.government().politics().listSubsidies(Players.caller(player)))))
+                .then(Commands.literal("anlegen").then(arg(NAME, StringArgumentType.string())
+                        .then(arg(MINISTRY, StringArgumentType.string())
+                                .then(arg(AMOUNT, money)
+                                        .then(arg("empfaenger", StringArgumentType.string())
+                                                .then(arg("tage", IntegerArgumentType.integer(0, 3650))
+                                                        .executes(context -> withCiv(context, (civ, player) -> civ.government().politics().createSubsidy(
+                                                                Players.caller(player), StringArgumentType.getString(context, NAME),
+                                                                StringArgumentType.getString(context, MINISTRY),
+                                                                com.mojang.brigadier.arguments.LongArgumentType.getLong(context, AMOUNT),
+                                                                StringArgumentType.getString(context, "empfaenger"),
+                                                                IntegerArgumentType.getInteger(context, "tage"), 0, 0)))
+                                                        .then(arg("volleBis", money).then(arg("auslaufBis", money)
+                                                                .executes(context -> withCiv(context, (civ, player) -> civ.government().politics().createSubsidy(
+                                                                        Players.caller(player), StringArgumentType.getString(context, NAME),
+                                                                        StringArgumentType.getString(context, MINISTRY),
+                                                                        com.mojang.brigadier.arguments.LongArgumentType.getLong(context, AMOUNT),
+                                                                        StringArgumentType.getString(context, "empfaenger"),
+                                                                        IntegerArgumentType.getInteger(context, "tage"),
+                                                                        com.mojang.brigadier.arguments.LongArgumentType.getLong(context, "volleBis"),
+                                                                        com.mojang.brigadier.arguments.LongArgumentType.getLong(context, "auslaufBis"))))))))))))
+                .then(Commands.literal("beenden").then(arg(NAME, StringArgumentType.string())
+                        .executes(context -> withCiv(context, (civ, player) -> civ.government().politics().cancelSubsidy(
+                                Players.caller(player), StringArgumentType.getString(context, NAME))))))
+                .then(Commands.literal("abstimmen").then(arg(NAME, StringArgumentType.string())
+                        .then(arg("zustimmung", com.mojang.brigadier.arguments.BoolArgumentType.bool())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.government().politics().voteSubsidy(
+                                        Players.caller(player), StringArgumentType.getString(context, NAME),
+                                        com.mojang.brigadier.arguments.BoolArgumentType.getBool(context, "zustimmung")))))));
+    }
+
+    /** Volkswahl der Minister. */
+    private LiteralArgumentBuilder<CommandSourceStack> governmentElections() {
+        return Commands.literal("wahl")
+                .then(Commands.literal("ausrufen").then(arg(MINISTRY, StringArgumentType.string())
+                        .executes(context -> withCiv(context, (civ, player) -> civ.government().politics().callElection(
+                                Players.caller(player), StringArgumentType.getString(context, MINISTRY))))))
+                .then(Commands.literal("kandidieren").then(arg(MINISTRY, StringArgumentType.string())
+                        .executes(context -> withCiv(context, (civ, player) -> civ.government().politics().stand(
+                                Players.caller(player), StringArgumentType.getString(context, MINISTRY))))))
+                .then(Commands.literal("waehlen").then(arg(MINISTRY, StringArgumentType.string())
+                        .then(arg(PLAYER, StringArgumentType.word())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.government().politics().castBallot(
+                                        Players.caller(player), StringArgumentType.getString(context, MINISTRY),
+                                        StringArgumentType.getString(context, PLAYER)))))));
+    }
+
     private LiteralArgumentBuilder<CommandSourceStack> warCommands() {
         return Commands.literal("krieg")
                 .then(Commands.literal("liste")
                         .executes(context -> withCiv(context, (civ, player) -> civ.war().list())))
                 .then(Commands.literal("erklaeren")
-                        .then(Commands.argument(COMPANY, StringArgumentType.string())
+                        .then(arg(COMPANY, StringArgumentType.string())
                                 .executes(context -> withCiv(context, (civ, player) -> civ.war().declare(
                                         Players.caller(player), StringArgumentType.getString(context, COMPANY))))))
                 .then(Commands.literal("dienen")
@@ -1693,15 +2160,15 @@ public final class CivCommandTree {
                 .then(Commands.literal("entlassen")
                         .executes(context -> withCiv(context, (civ, player) -> civ.war().discharge(Players.caller(player)))))
                 .then(Commands.literal("wille")
-                        .then(Commands.argument(COMPANY, StringArgumentType.string())
+                        .then(arg(COMPANY, StringArgumentType.string())
                                 .executes(context -> withCiv(context, (civ, player) -> civ.war().willAgainst(
                                         Players.caller(player), StringArgumentType.getString(context, COMPANY))))))
                 .then(Commands.literal("front")
-                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                        .then(arg(NUMBER, IntegerArgumentType.integer(1))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.war().front(
                                         Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))))
                 .then(Commands.literal("feldzug")
-                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                        .then(arg(NUMBER, IntegerArgumentType.integer(1))
                                 .then(campaignKind("angriff", de.etiennebader.civ.domain.war.BattleKind.ASSAULT))
                                 .then(campaignKind("hinterhalt", de.etiennebader.civ.domain.war.BattleKind.AMBUSH))
                                 .then(campaignKind("verteidigung", de.etiennebader.civ.domain.war.BattleKind.DEFENSIVE))))
@@ -1710,40 +2177,149 @@ public final class CivCommandTree {
                 .then(Commands.literal("ausruesten")
                         .executes(context -> withCiv(context, (civ, player) -> civ.war().equip(Players.caller(player)))))
                 .then(Commands.literal("lazarett")
-                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(1, 1000))
+                        .then(arg(COUNT, IntegerArgumentType.integer(1, 1000))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.war().hospital(
                                         Players.caller(player), IntegerArgumentType.getInteger(context, COUNT))))))
                 .then(Commands.literal("anspruch")
-                        .then(Commands.argument(COMPANY, StringArgumentType.string())
+                        .then(arg(COMPANY, StringArgumentType.string())
                                 .executes(context -> withCiv(context, (civ, player) -> civ.war().claim(
                                         Players.caller(player), StringArgumentType.getString(context, COMPANY))))))
                 .then(Commands.literal("buendnisse")
                         .executes(context -> withCiv(context, (civ, player) -> civ.war().allies(Players.caller(player)))))
                 .then(Commands.literal("buendnis")
                         .then(Commands.literal("vorschlagen")
-                                .then(Commands.argument(COMPANY, StringArgumentType.string())
+                                .then(arg(COMPANY, StringArgumentType.string())
                                         .executes(context -> withCiv(context, (civ, player) -> civ.war().propose(
                                                 Players.caller(player), StringArgumentType.getString(context, COMPANY))))))
                         .then(Commands.literal("annehmen")
-                                .then(Commands.argument(COMPANY, StringArgumentType.string())
+                                .then(arg(COMPANY, StringArgumentType.string())
                                         .executes(context -> withCiv(context, (civ, player) -> civ.war().accept(
                                                 Players.caller(player), StringArgumentType.getString(context, COMPANY))))))
                         .then(Commands.literal("kuendigen")
-                                .then(Commands.argument(COMPANY, StringArgumentType.string())
+                                .then(arg(COMPANY, StringArgumentType.string())
                                         .executes(context -> withCiv(context, (civ, player) -> civ.war().breakAlliance(
                                                 Players.caller(player), StringArgumentType.getString(context, COMPANY)))))))
                 .then(Commands.literal("gefecht")
-                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                        .then(arg(NUMBER, IntegerArgumentType.integer(1))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.war().battle(
                                         Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))))
+                .then(Commands.literal("beute")
+                        .then(arg(NUMBER, IntegerArgumentType.integer(1))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.war().spoilsInfo(
+                                        Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))
+                                .then(arg(COUNT, IntegerArgumentType.integer(0, 16))
+                                        .then(arg(AMOUNT, IntegerArgumentType.integer(0))
+                                                .executes(context -> withCiv(context, (civ, player) -> civ.war().spoils(
+                                                        Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER),
+                                                        IntegerArgumentType.getInteger(context, COUNT),
+                                                        IntegerArgumentType.getInteger(context, AMOUNT))))))))
                 .then(Commands.literal("frieden")
-                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                        .then(arg(NUMBER, IntegerArgumentType.integer(1))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.war().peace(
                                         Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))))
                 .then(Commands.literal("neutralitaet")
-                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(1, 365))
+                        .then(arg(COUNT, IntegerArgumentType.integer(1, 365))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.war().neutrality(
                                         Players.caller(player), IntegerArgumentType.getInteger(context, COUNT))))));
+    }
+
+    /**
+     * {@code /civ logo <Einheit> [wappen|plakat|reklame]}: das hochgeladene Bild einer Einheit als Karte in die Hand.
+     * Hochgeladen wird auf der Webseite, von der Spitze der Einheit.
+     */
+    private LiteralArgumentBuilder<CommandSourceStack> logoCommands() {
+        return Commands.literal("logo")
+                .then(arg(NAME, StringArgumentType.string())
+                        .suggests(this::suggestPolityNames)
+                        .executes(context -> withCiv(context, (civ, player) -> giveLogo(civ, player,
+                                StringArgumentType.getString(context, NAME), de.etiennebader.civ.domain.civic.ImageKind.WAPPEN)))
+                        .then(Commands.literal("wappen").executes(context -> withCiv(context, (civ, player) -> giveLogo(
+                                civ, player, StringArgumentType.getString(context, NAME),
+                                de.etiennebader.civ.domain.civic.ImageKind.WAPPEN))))
+                        .then(Commands.literal("plakat").executes(context -> withCiv(context, (civ, player) -> giveLogo(
+                                civ, player, StringArgumentType.getString(context, NAME),
+                                de.etiennebader.civ.domain.civic.ImageKind.WAHLPLAKAT))))
+                        .then(Commands.literal("reklame").executes(context -> withCiv(context, (civ, player) -> giveLogo(
+                                civ, player, StringArgumentType.getString(context, NAME),
+                                de.etiennebader.civ.domain.civic.ImageKind.LEUCHTREKLAME)))));
+    }
+
+    /**
+     * {@code /civ zeichen <flagge|wappen|plakat> [leer | farbe <Farbe> | bild <Einheit>]}: gibt eine Flagge, ein Wappen
+     * oder ein Wahlplakat als Block-Item (Issue #82): leer, einfarbig oder mit dem hochgeladenen Bild der Einheit.
+     */
+    private LiteralArgumentBuilder<CommandSourceStack> emblemCommands() {
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("zeichen");
+        for (var entry : java.util.Map.of("flagge", de.etiennebader.civ.fabric.content.EmblemBlock.Kind.FLAG,
+                "wappen", de.etiennebader.civ.fabric.content.EmblemBlock.Kind.COAT_OF_ARMS,
+                "plakat", de.etiennebader.civ.fabric.content.EmblemBlock.Kind.POSTER).entrySet()) {
+            var kind = entry.getValue();
+            root.then(Commands.literal(entry.getKey())
+                    .executes(context -> withCiv(context, (civ, player) -> giveEmblem(player, kind, "blank", "")))
+                    .then(Commands.literal("leer").executes(context -> withCiv(context,
+                            (civ, player) -> giveEmblem(player, kind, "blank", ""))))
+                    .then(Commands.literal("farbe").then(arg("farbe", StringArgumentType.word())
+                            .suggests((context, builder) -> net.minecraft.commands.SharedSuggestionProvider.suggest(
+                                    java.util.Arrays.stream(net.minecraft.world.item.DyeColor.values())
+                                            .map(net.minecraft.world.item.DyeColor::getSerializedName), builder))
+                            .executes(context -> withCiv(context, (civ, player) -> {
+                                String color = StringArgumentType.getString(context, "farbe");
+                                if (net.minecraft.world.item.DyeColor.byName(color, null) == null) {
+                                    return Reply.failure(Message.of(MessageKey.EMBLEM_NO_IMAGE, color));
+                                }
+                                return giveEmblem(player, kind, "color:" + color, "");
+                            }))))
+                    .then(Commands.literal("bild").then(arg(NAME, StringArgumentType.string())
+                            .suggests(this::suggestPolityNames)
+                            .executes(context -> withCiv(context, (civ, player) -> {
+                                String name = StringArgumentType.getString(context, NAME);
+                                Optional<PolityView> polity = civ.queries().polityNamed(name);
+                                if (polity.isEmpty()) {
+                                    return Reply.failure(Message.of(MessageKey.LOGO_UNKNOWN_POLITY, name));
+                                }
+                                Optional<de.etiennebader.civ.domain.civic.CustomImage> image = civ.civic()
+                                        .imagesOf(polity.get().id(), Emblems.imageKind(kind)).stream().findFirst();
+                                if (image.isEmpty()) {
+                                    return Reply.failure(Message.of(MessageKey.EMBLEM_NO_IMAGE,
+                                            polity.get().name().value()));
+                                }
+                                return giveEmblem(player, kind, "image:" + image.get().hash(),
+                                        polity.get().name().value());
+                            })))));
+        }
+        return root;
+    }
+
+    private Reply giveEmblem(ServerPlayer player, de.etiennebader.civ.fabric.content.EmblemBlock.Kind kind,
+                             String style, String label) {
+        net.minecraft.world.item.ItemStack stack = Emblems.instance().stack(kind, style);
+        if (!label.isEmpty()) {
+            stack.set(DataComponents.CUSTOM_NAME, Component.literal(label));
+        }
+        player.getInventory().placeItemBackInInventory(stack, Prediction.SERVER_ONLY);
+        return Reply.success(Message.of(MessageKey.EMBLEM_GIVEN, style));
+    }
+
+    private Reply giveLogo(CivServer civ, ServerPlayer player, String polityName,
+                           de.etiennebader.civ.domain.civic.ImageKind kind) {
+        Optional<PolityView> polity = civ.queries().polityNamed(polityName);
+        if (polity.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.LOGO_UNKNOWN_POLITY, polityName));
+        }
+        Optional<de.etiennebader.civ.domain.civic.CustomImage> image = civ.civic().imagesOf(polity.get().id(), kind)
+                .stream().findFirst();
+        Optional<Path> images = civ.imagesDirectory();
+        if (image.isEmpty() || images.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.LOGO_NONE, polity.get().name().value()));
+        }
+        Optional<net.minecraft.world.item.ItemStack> map = host.logoMaps().map(
+                (net.minecraft.server.level.ServerLevel) player.level(), images.get(), image.get().hash());
+        if (map.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.LOGO_NONE, polity.get().name().value()));
+        }
+        map.get().set(DataComponents.CUSTOM_NAME, Component.literal(polity.get().name().value()));
+        player.getInventory().placeItemBackInInventory(map.get(), Prediction.SERVER_ONLY);
+        return Reply.success(Message.of(MessageKey.LOGO_GIVEN, polity.get().name().value()));
     }
 
     /** {@code /civ bau}: Baupläne ansehen, Bauaufträge vergeben, Bauamt entscheidet (Issue #19). */
@@ -1755,29 +2331,47 @@ public final class CivCommandTree {
                         .executes(context -> withCiv(context, (civ, player) -> civ.construction()
                                 .list(Players.caller(player)))))
                 .then(Commands.literal("beauftragen")
-                        .then(Commands.argument(TYPE, StringArgumentType.word())
+                        .then(arg(TYPE, StringArgumentType.word())
                                 .suggests((context, builder) -> SharedSuggestionProvider.suggest(
                                         host.current().map(civ -> civ.construction().library().all().stream()
                                                 .map(plan -> plan.name()).toList())
                                                 .orElse(java.util.List.of()), builder))
-                                .then(Commands.argument(COMPANY, StringArgumentType.string())
-                                        .executes(context -> order(context, false, 0))
+                                .then(arg(COMPANY, StringArgumentType.string())
+                                        .executes(context -> order(context, false, ConstructionService.AUTO))
                                         .then(Commands.literal("material")
                                                 .then(Commands.literal("firma")
-                                                        .executes(context -> order(context, false, 0))
-                                                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(0, 270))
+                                                        .executes(context -> order(context, false, ConstructionService.AUTO))
+                                                        .then(arg(COUNT, IntegerArgumentType.integer(0, 270))
                                                                 .executes(context -> order(context, false,
                                                                         IntegerArgumentType.getInteger(context, COUNT)))))
                                                 .then(Commands.literal("selbst")
-                                                        .executes(context -> order(context, true, 0))
-                                                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(0, 270))
+                                                        .executes(context -> order(context, true, ConstructionService.AUTO))
+                                                        .then(arg(COUNT, IntegerArgumentType.integer(0, 270))
                                                                 .executes(context -> order(context, true,
                                                                         IntegerArgumentType.getInteger(context, COUNT))))))
-                                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(0, 270))
+                                        .then(arg(COUNT, IntegerArgumentType.integer(0, 270))
                                                 .executes(context -> order(context, false,
                                                         IntegerArgumentType.getInteger(context, COUNT)))))))
+                .then(Commands.literal("planung")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.construction()
+                                .planningReport(Players.caller(player)))))
+                .then(Commands.literal("vorschau")
+                        .then(Commands.literal("aus")
+                                .executes(context -> withCiv(context, (civ, player) -> {
+                                    host.hideHologram(player);
+                                    return Reply.success(Message.of(MessageKey.BUILD_PREVIEW_OFF));
+                                })))
+                        .then(arg(TYPE, StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                        host.current().map(civ -> civ.construction().library().all().stream()
+                                                .map(plan -> plan.name()).toList())
+                                                .orElse(java.util.List.of()), builder))
+                                .executes(context -> previewPlan(context, ConstructionService.AUTO))
+                                .then(arg(COUNT, IntegerArgumentType.integer(0, 270))
+                                        .executes(context -> previewPlan(context,
+                                                IntegerArgumentType.getInteger(context, COUNT))))))
                 .then(Commands.literal("material")
-                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                        .then(arg(NUMBER, IntegerArgumentType.integer(1))
                                 .executes(context -> withCiv(context, (civ, player) -> {
                                     int number = IntegerArgumentType.getInteger(context, NUMBER);
                                     int given = ConstructionSites.deliver(player, civ, number);
@@ -1790,25 +2384,91 @@ public final class CivCommandTree {
                                     lines.addAll(left.lines());
                                     return left.success() ? Reply.success(lines) : left;
                                 }))))
+                .then(Commands.literal("selbstbau")
+                        .then(arg(TYPE, StringArgumentType.word())
+                                .then(arg(COMPANY, StringArgumentType.string())
+                                        .then(arg(PLAYER, StringArgumentType.word())
+                                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                        context.getSource().getOnlinePlayerNames(), builder))
+                                                .executes(context -> withCiv(context, (civ, player) -> civ.construction()
+                                                        .order(Players.caller(player),
+                                                                StringArgumentType.getString(context, TYPE),
+                                                                StringArgumentType.getString(context, COMPANY), false, 0,
+                                                                StringArgumentType.getString(context, PLAYER))))))))
+                .then(Commands.literal("weitergeben")
+                        .then(arg(NUMBER, IntegerArgumentType.integer(1))
+                                .then(arg(PLAYER, StringArgumentType.word())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                context.getSource().getOnlinePlayerNames(), builder))
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.construction()
+                                                .subcontract(Players.caller(player),
+                                                        IntegerArgumentType.getInteger(context, NUMBER),
+                                                        StringArgumentType.getString(context, PLAYER)))))))
+                .then(Commands.literal("firma")
+                        .then(Commands.literal("annehmen")
+                                .then(arg(NUMBER, IntegerArgumentType.integer(1))
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.construction()
+                                                .answerFirm(Players.caller(player),
+                                                        IntegerArgumentType.getInteger(context, NUMBER), true)))))
+                        .then(Commands.literal("ablehnen")
+                                .then(arg(NUMBER, IntegerArgumentType.integer(1))
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.construction()
+                                                .answerFirm(Players.caller(player),
+                                                        IntegerArgumentType.getInteger(context, NUMBER), false))))))
+                .then(Commands.literal("auftrag")
+                        .then(Commands.literal("annehmen")
+                                .then(arg(NUMBER, IntegerArgumentType.integer(1))
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.construction()
+                                                .answerJob(Players.caller(player),
+                                                        IntegerArgumentType.getInteger(context, NUMBER), true)))))
+                        .then(Commands.literal("ablehnen")
+                                .then(arg(NUMBER, IntegerArgumentType.integer(1))
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.construction()
+                                                .answerJob(Players.caller(player),
+                                                        IntegerArgumentType.getInteger(context, NUMBER), false))))))
+                .then(Commands.literal("vorlage")
+                        .then(arg(NUMBER, IntegerArgumentType.integer(1))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.construction()
+                                        .blueprintInfo(Players.caller(player),
+                                                IntegerArgumentType.getInteger(context, NUMBER))))))
                 .then(Commands.literal("genehmigen")
-                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                        .then(arg(NUMBER, IntegerArgumentType.integer(1))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.construction()
                                         .approve(Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))))
                 .then(Commands.literal("ablehnen")
-                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                        .then(arg(NUMBER, IntegerArgumentType.integer(1))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.construction()
                                         .reject(Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))))
                 .then(Commands.literal("abbrechen")
-                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                        .then(arg(NUMBER, IntegerArgumentType.integer(1))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.construction()
                                         .cancel(Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))));
     }
 
     private int order(CommandContext<CommandSourceStack> context, boolean selfSupplied, int degrees)
             throws CommandSyntaxException {
-        return withCiv(context, (civ, player) -> civ.construction().order(Players.caller(player),
-                StringArgumentType.getString(context, TYPE), StringArgumentType.getString(context, COMPANY),
-                selfSupplied, degrees));
+        return withCiv(context, (civ, player) -> {
+            Reply reply = civ.construction().order(Players.caller(player),
+                    StringArgumentType.getString(context, TYPE), StringArgumentType.getString(context, COMPANY),
+                    selfSupplied, degrees);
+            if (reply.success()) {
+                // Wer einen Bau beauftragt, sieht das Bauwerk gleich als Hologramm auf dem Grundstück.
+                civ.construction().preview(Players.caller(player), StringArgumentType.getString(context, TYPE),
+                        degrees)
+                        .preview().ifPresent(preview -> host.showHologram(player, preview));
+            }
+            return reply;
+        });
+    }
+
+    /** {@code /civ bau vorschau <Plan> [Drehung]}: Hologramm des Plans auf dem Grundstück unter dem Spieler. */
+    private int previewPlan(CommandContext<CommandSourceStack> context, int degrees) throws CommandSyntaxException {
+        return withCiv(context, (civ, player) -> {
+            ConstructionService.PreviewResult result = civ.construction().preview(Players.caller(player),
+                    StringArgumentType.getString(context, TYPE), degrees);
+            result.preview().ifPresent(preview -> host.showHologram(player, preview));
+            return result.reply();
+        });
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> plotCommands() {
@@ -1821,17 +2481,17 @@ public final class CivCommandTree {
                 .then(Commands.literal("ecke2")
                         .executes(context -> withCiv(context, (civ, player) -> corner(civ, player, 2))))
                 .then(Commands.literal("erstellen")
-                        .then(Commands.argument(TYPE, StringArgumentType.word())
+                        .then(arg(TYPE, StringArgumentType.word())
                                 .suggests((context, builder) -> SharedSuggestionProvider.suggest(PlotService.typeNames(), builder))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.plots().createFromSelection(
                                         Players.caller(player), StringArgumentType.getString(context, TYPE))))))
                 .then(Commands.literal("chunk")
-                        .then(Commands.argument(TYPE, StringArgumentType.word())
+                        .then(arg(TYPE, StringArgumentType.word())
                                 .suggests((context, builder) -> SharedSuggestionProvider.suggest(PlotService.typeNames(), builder))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.plots().createChunk(
                                         Players.caller(player), StringArgumentType.getString(context, TYPE))))))
                 .then(Commands.literal("anbieten")
-                        .then(Commands.argument(PRICE, StringArgumentType.word())
+                        .then(arg(PRICE, StringArgumentType.word())
                                 .executes(context -> withCiv(context, (civ, player) -> civ.plots().offer(
                                         Players.caller(player), StringArgumentType.getString(context, PRICE))))))
                 .then(Commands.literal("zurueckziehen")
@@ -1843,15 +2503,84 @@ public final class CivCommandTree {
                                 Feedback.fanfare(player);
                             }
                             return reply;
-                        })))
+                        }))
+                        .then(arg(COMPANY, StringArgumentType.string())
+                                .executes(context -> withCiv(context, (civ, player) -> {
+                                    Reply reply = civ.plots().buyForCompany(Players.caller(player),
+                                            StringArgumentType.getString(context, COMPANY));
+                                    if (reply.success()) {
+                                        Feedback.fanfare(player);
+                                    }
+                                    return reply;
+                                }))))
+                .then(Commands.literal("uebertragen")
+                        .then(arg(COMPANY, StringArgumentType.string())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.plots().transferToCompany(
+                                        Players.caller(player), StringArgumentType.getString(context, COMPANY))))))
                 .then(Commands.literal("vergeben")
-                        .then(Commands.argument(PLAYER, StringArgumentType.word())
+                        .then(arg(PLAYER, StringArgumentType.word())
                                 .suggests((context, builder) -> SharedSuggestionProvider.suggest(
                                         context.getSource().getOnlinePlayerNames(), builder))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.plots().assign(
                                         Players.caller(player), StringArgumentType.getString(context, PLAYER))))))
                 .then(Commands.literal("aufloesen")
-                        .executes(context -> withCiv(context, (civ, player) -> civ.plots().dissolve(Players.caller(player)))));
+                        .executes(context -> withCiv(context, (civ, player) -> civ.plots().dissolve(Players.caller(player)))))
+                .then(plotRightsCommands());
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> plotRightsCommands() {
+        java.util.function.Function<String, com.mojang.brigadier.builder.RequiredArgumentBuilder<CommandSourceStack, String>>
+                answer = name -> arg(name, StringArgumentType.word())
+                .suggests((context, builder) -> SharedSuggestionProvider.suggest(List.of("ja", "nein"), builder));
+        return Commands.literal("rechte")
+                .executes(context -> withCiv(context, (civ, player) -> civ.plotRights().show(Players.caller(player))))
+                .then(plotAudience("mitglieder", true, answer))
+                .then(plotAudience("fremde", false, answer))
+                .then(Commands.literal("gast")
+                        .then(arg(PLAYER, StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                        context.getSource().getOnlinePlayerNames(), builder))
+                                .then(arg(TYPE, StringArgumentType.word())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                PlotRightsService.actionNames(), builder))
+                                        .then(answer.apply(PRICE)
+                                                .executes(context -> withCiv(context, (civ, player) ->
+                                                        civ.plotRights().setGuest(Players.caller(player),
+                                                                StringArgumentType.getString(context, PLAYER),
+                                                                StringArgumentType.getString(context, TYPE),
+                                                                StringArgumentType.getString(context, PRICE))))))))
+                .then(Commands.literal("gastentfernen")
+                        .then(arg(PLAYER, StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                        context.getSource().getOnlinePlayerNames(), builder))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.plotRights().removeGuest(
+                                        Players.caller(player), StringArgumentType.getString(context, PLAYER))))))
+                .then(Commands.literal("regel")
+                        .then(arg(TYPE, StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                        PlotRightsService.ruleNames(), builder))
+                                .then(arg(PRICE, StringArgumentType.word())
+                                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                                PlotRightsService.stanceNames(), builder))
+                                        .executes(context -> withCiv(context, (civ, player) ->
+                                                civ.plotRights().setRule(Players.caller(player),
+                                                        StringArgumentType.getString(context, TYPE),
+                                                        StringArgumentType.getString(context, PRICE)))))))
+                .then(Commands.literal("zuruecksetzen")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.plotRights().reset(
+                                Players.caller(player)))));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> plotAudience(String name, boolean members,
+            java.util.function.Function<String, com.mojang.brigadier.builder.RequiredArgumentBuilder<CommandSourceStack, String>> answer) {
+        return Commands.literal(name)
+                .then(arg(TYPE, StringArgumentType.word())
+                        .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                PlotRightsService.actionNames(), builder))
+                        .then(answer.apply(PRICE)
+                                .executes(context -> withCiv(context, (civ, player) -> civ.plotRights().setAudience(
+                                        Players.caller(player), members, StringArgumentType.getString(context, TYPE),
+                                        StringArgumentType.getString(context, PRICE))))));
     }
 
     private Reply plotInfo(CivServer civ, ServerPlayer player) {
@@ -1918,25 +2647,25 @@ public final class CivCommandTree {
             T parent, java.util.function.Function<CommandContext<CommandSourceStack>, String> as) {
         return parent
                 .then(Commands.literal("zins")
-                        .then(Commands.argument(RECIPIENT, StringArgumentType.string())
+                        .then(arg(RECIPIENT, StringArgumentType.string())
                                 .suggests(this::suggestRecipients)
-                                .then(Commands.argument(CURRENCY, StringArgumentType.word())
+                                .then(arg(CURRENCY, StringArgumentType.word())
                                         .suggests(this::suggestCurrencies)
                                         .executes(context -> withCiv(context, (civ, player) ->
                                                 civ.credit().quote(Players.caller(player), as.apply(context),
                                                         StringArgumentType.getString(context, RECIPIENT),
                                                         StringArgumentType.getString(context, CURRENCY)))))))
                 .then(Commands.literal("nehmen")
-                        .then(Commands.argument(RECIPIENT, StringArgumentType.string())
+                        .then(arg(RECIPIENT, StringArgumentType.string())
                                 .suggests(this::suggestRecipients)
-                                .then(Commands.argument(AMOUNT, StringArgumentType.word())
-                                        .then(Commands.argument(DAYS, IntegerArgumentType.integer(1, 3_650))
+                                .then(arg(AMOUNT, StringArgumentType.word())
+                                        .then(arg(DAYS, IntegerArgumentType.integer(1, 3_650))
                                                 .executes(context -> withCiv(context, (civ, player) ->
                                                         civ.credit().take(Players.caller(player), as.apply(context),
                                                                 StringArgumentType.getString(context, RECIPIENT),
                                                                 StringArgumentType.getString(context, AMOUNT),
                                                                 IntegerArgumentType.getInteger(context, DAYS), "")))
-                                                .then(Commands.argument(CURRENCY, StringArgumentType.word())
+                                                .then(arg(CURRENCY, StringArgumentType.word())
                                                         .suggests(this::suggestCurrencies)
                                                         .executes(context -> withCiv(context, (civ, player) ->
                                                                 civ.credit().take(Players.caller(player),
@@ -1946,16 +2675,16 @@ public final class CivCommandTree {
                                                                         IntegerArgumentType.getInteger(context, DAYS),
                                                                         StringArgumentType.getString(context, CURRENCY)))))))))
                 .then(Commands.literal("anbieten")
-                        .then(Commands.argument(RECIPIENT, StringArgumentType.string())
+                        .then(arg(RECIPIENT, StringArgumentType.string())
                                 .suggests(this::suggestRecipients)
-                                .then(Commands.argument(AMOUNT, StringArgumentType.word())
-                                        .then(Commands.argument(DAYS, IntegerArgumentType.integer(1, 3_650))
+                                .then(arg(AMOUNT, StringArgumentType.word())
+                                        .then(arg(DAYS, IntegerArgumentType.integer(1, 3_650))
                                                 .executes(context -> withCiv(context, (civ, player) ->
                                                         civ.credit().offer(Players.caller(player), as.apply(context),
                                                                 StringArgumentType.getString(context, RECIPIENT),
                                                                 StringArgumentType.getString(context, AMOUNT),
                                                                 IntegerArgumentType.getInteger(context, DAYS), "")))
-                                                .then(Commands.argument(CURRENCY, StringArgumentType.word())
+                                                .then(arg(CURRENCY, StringArgumentType.word())
                                                         .suggests(this::suggestCurrencies)
                                                         .executes(context -> withCiv(context, (civ, player) ->
                                                                 civ.credit().offer(Players.caller(player),
@@ -1965,18 +2694,18 @@ public final class CivCommandTree {
                                                                         IntegerArgumentType.getInteger(context, DAYS),
                                                                         StringArgumentType.getString(context, CURRENCY)))))))))
                 .then(Commands.literal("annehmen")
-                        .then(Commands.argument(LOAN, StringArgumentType.word())
+                        .then(arg(LOAN, StringArgumentType.word())
                                 .executes(context -> withCiv(context, (civ, player) ->
                                         civ.credit().accept(Players.caller(player), as.apply(context),
                                                 StringArgumentType.getString(context, LOAN))))))
                 .then(Commands.literal("ablehnen")
-                        .then(Commands.argument(LOAN, StringArgumentType.word())
+                        .then(arg(LOAN, StringArgumentType.word())
                                 .executes(context -> withCiv(context, (civ, player) ->
                                         civ.credit().decline(Players.caller(player), as.apply(context),
                                                 StringArgumentType.getString(context, LOAN))))))
                 .then(Commands.literal("zurueckzahlen")
-                        .then(Commands.argument(LOAN, StringArgumentType.word())
-                                .then(Commands.argument(AMOUNT, StringArgumentType.word())
+                        .then(arg(LOAN, StringArgumentType.word())
+                                .then(arg(AMOUNT, StringArgumentType.word())
                                         .executes(context -> withCiv(context, (civ, player) ->
                                                 civ.credit().repay(Players.caller(player), as.apply(context),
                                                         StringArgumentType.getString(context, LOAN),
@@ -2146,21 +2875,35 @@ public final class CivCommandTree {
                         .executes(context -> withCiv(context, (civ, player) -> civ.civil().listStreets(
                                 Players.caller(player)))))
                 .then(Commands.literal("anlegen")
-                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                        .then(arg(NAME, StringArgumentType.greedyString())
                                 .executes(context -> withCiv(context, (civ, player) -> civ.civil().layStreet(
                                         Players.caller(player), name(context))))))
                 .then(Commands.literal("aufheben")
-                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                        .then(arg(NAME, StringArgumentType.greedyString())
                                 .suggests(this::suggestStreets)
                                 .executes(context -> withCiv(context, (civ, player) -> civ.civil().removeStreet(
-                                        Players.caller(player), name(context))))));
+                                        Players.caller(player), name(context))))))
+                .then(Commands.literal("wege")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.roads().list(
+                                Players.caller(player)))))
+                .then(Commands.literal("bauen")
+                        .then(Commands.literal("schaufel")
+                                .then(arg(NAME, StringArgumentType.greedyString())
+                                        .suggests(this::suggestStreets)
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.roads().order(
+                                                Players.caller(player), name(context), "schaufel")))))
+                        .then(Commands.literal("pflaster")
+                                .then(arg(NAME, StringArgumentType.greedyString())
+                                        .suggests(this::suggestStreets)
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.roads().order(
+                                                Players.caller(player), name(context), "pflaster"))))));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> addressCommands() {
         return Commands.literal("adresse")
                 .executes(context -> withCiv(context, (civ, player) -> civ.civil().address(Players.caller(player),
                         Optional.empty())))
-                .then(Commands.argument(PLAYER, StringArgumentType.word())
+                .then(arg(PLAYER, StringArgumentType.word())
                         .suggests((context, builder) -> SharedSuggestionProvider.suggest(
                                 context.getSource().getOnlinePlayerNames(), builder))
                         .executes(context -> withCiv(context, (civ, player) -> civ.civil().address(
@@ -2226,21 +2969,21 @@ public final class CivCommandTree {
                 .then(contractAction("kuendigen", (civ, player, number) -> civ.civil().giveNotice(
                         Players.caller(player), number)))
                 .then(Commands.literal("miete")
-                        .then(Commands.argument(PLAYER, StringArgumentType.word())
+                        .then(arg(PLAYER, StringArgumentType.word())
                                 .suggests((context, builder) -> SharedSuggestionProvider.suggest(
                                         context.getSource().getOnlinePlayerNames(), builder))
-                                .then(Commands.argument(PRICE, StringArgumentType.word())
+                                .then(arg(PRICE, StringArgumentType.word())
                                         .executes(context -> withCiv(context, (civ, player) -> civ.civil().offerLease(
                                                 Players.caller(player), StringArgumentType.getString(context, PLAYER),
                                                 StringArgumentType.getString(context, PRICE), Optional.empty(), 0)))
-                                        .then(Commands.argument(DEPOSIT, StringArgumentType.word())
+                                        .then(arg(DEPOSIT, StringArgumentType.word())
                                                 .executes(context -> withCiv(context, (civ, player) -> civ.civil()
                                                         .offerLease(Players.caller(player),
                                                                 StringArgumentType.getString(context, PLAYER),
                                                                 StringArgumentType.getString(context, PRICE),
                                                                 Optional.of(StringArgumentType.getString(context, DEPOSIT)),
                                                                 0)))
-                                                .then(Commands.argument(DAYS, IntegerArgumentType.integer(0, 3650))
+                                                .then(arg(DAYS, IntegerArgumentType.integer(0, 3650))
                                                         .executes(context -> withCiv(context, (civ, player) -> civ
                                                                 .civil().offerLease(Players.caller(player),
                                                                         StringArgumentType.getString(context, PLAYER),
@@ -2251,29 +2994,29 @@ public final class CivCommandTree {
                                                                                 DAYS)))))))))
                 .then(Commands.literal("arbeit")
                         .then(Commands.literal("dorfbewohner")
-                                .then(Commands.argument(PRICE, StringArgumentType.word())
+                                .then(arg(PRICE, StringArgumentType.word())
                                         .executes(context -> withCiv(context, (civ, player) -> hireVillager(civ, player,
                                                 StringArgumentType.getString(context, PRICE))))))
-                        .then(Commands.argument(PLAYER, StringArgumentType.word())
+                        .then(arg(PLAYER, StringArgumentType.word())
                                 .suggests((context, builder) -> SharedSuggestionProvider.suggest(
                                         context.getSource().getOnlinePlayerNames(), builder))
-                                .then(Commands.argument(PRICE, StringArgumentType.word())
+                                .then(arg(PRICE, StringArgumentType.word())
                                         .executes(context -> withCiv(context, (civ, player) -> civ.civil()
                                                 .offerEmployment(Players.caller(player),
                                                         StringArgumentType.getString(context, PLAYER),
                                                         StringArgumentType.getString(context, PRICE), 0)))
-                                        .then(Commands.argument(DAYS, IntegerArgumentType.integer(0, 3650))
+                                        .then(arg(DAYS, IntegerArgumentType.integer(0, 3650))
                                                 .executes(context -> withCiv(context, (civ, player) -> civ.civil()
                                                         .offerEmployment(Players.caller(player),
                                                                 StringArgumentType.getString(context, PLAYER),
                                                                 StringArgumentType.getString(context, PRICE),
                                                                 IntegerArgumentType.getInteger(context, DAYS))))))))
                 .then(Commands.literal("frei")
-                        .then(Commands.argument(RECIPIENT, StringArgumentType.string())
+                        .then(arg(RECIPIENT, StringArgumentType.string())
                                 .suggests(this::suggestRecipients)
-                                .then(Commands.argument(AMOUNT, StringArgumentType.word())
-                                        .then(Commands.argument(PRICE, StringArgumentType.word())
-                                                .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                                .then(arg(AMOUNT, StringArgumentType.word())
+                                        .then(arg(PRICE, StringArgumentType.word())
+                                                .then(arg(TEXT, StringArgumentType.greedyString())
                                                         .executes(context -> withCiv(context, (civ, player) -> civ
                                                                 .civil().offerCustom(Players.caller(player),
                                                                         StringArgumentType.getString(context, RECIPIENT),
@@ -2282,7 +3025,7 @@ public final class CivCommandTree {
                                                                         StringArgumentType.getString(context, TEXT),
                                                                         0))))))))
                 .then(Commands.literal("buendnis")
-                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                        .then(arg(NAME, StringArgumentType.greedyString())
                                 .suggests(this::suggestPolityNames)
                                 .executes(context -> withCiv(context, (civ, player) -> civ.civil().offerAlliance(
                                         Players.caller(player), name(context),
@@ -2295,7 +3038,7 @@ public final class CivCommandTree {
 
     private LiteralArgumentBuilder<CommandSourceStack> contractAction(String literal, ContractAction action) {
         return Commands.literal(literal)
-                .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                .then(arg(NUMBER, IntegerArgumentType.integer(1))
                         .executes(context -> withCiv(context, (civ, player) -> action.execute(civ, player,
                                 IntegerArgumentType.getInteger(context, NUMBER)))));
     }
@@ -2323,7 +3066,7 @@ public final class CivCommandTree {
         return Commands.literal("post")
                 .executes(context -> withCiv(context, (civ, player) -> civ.community().showInbox(Players.caller(player))))
                 .then(Commands.literal("lesen")
-                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                        .then(arg(NUMBER, IntegerArgumentType.integer(1))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.community().readLetter(
                                         Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))))
                 .then(Commands.literal("menue")
@@ -2335,9 +3078,9 @@ public final class CivCommandTree {
 
     private LiteralArgumentBuilder<CommandSourceStack> letterCommands() {
         return Commands.literal("brief")
-                .then(Commands.argument(PLAYER, StringArgumentType.word())
+                .then(arg(PLAYER, StringArgumentType.word())
                         .suggests(this::suggestFriends)
-                        .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                        .then(arg(TEXT, StringArgumentType.greedyString())
                                 .executes(context -> withCiv(context, (civ, player) -> civ.community().sendLetter(
                                         Players.caller(player), StringArgumentType.getString(context, PLAYER),
                                         StringArgumentType.getString(context, TEXT))))));
@@ -2346,32 +3089,32 @@ public final class CivCommandTree {
     private LiteralArgumentBuilder<CommandSourceStack> friendCommands() {
         return Commands.literal("freund")
                 .then(Commands.literal("annehmen")
-                        .then(Commands.argument(PLAYER, StringArgumentType.word())
+                        .then(arg(PLAYER, StringArgumentType.word())
                                 .suggests(this::suggestIncoming)
                                 .executes(context -> withCiv(context, (civ, player) -> civ.community().befriend(
                                         Players.ref(player), Players.name(player),
                                         StringArgumentType.getString(context, PLAYER))))))
                 .then(Commands.literal("ablehnen")
-                        .then(Commands.argument(PLAYER, StringArgumentType.word())
+                        .then(arg(PLAYER, StringArgumentType.word())
                                 .suggests(this::suggestIncoming)
                                 .executes(context -> withCiv(context, (civ, player) -> civ.community().decline(
                                         Players.ref(player), StringArgumentType.getString(context, PLAYER))))))
                 .then(Commands.literal("vertrauen")
-                        .then(Commands.argument(PLAYER, StringArgumentType.word())
+                        .then(arg(PLAYER, StringArgumentType.word())
                                 .suggests(this::suggestFriends)
                                 .executes(context -> withCiv(context, (civ, player) -> civ.community().trust(
                                         Players.ref(player), StringArgumentType.getString(context, PLAYER), true)))))
                 .then(Commands.literal("misstrauen")
-                        .then(Commands.argument(PLAYER, StringArgumentType.word())
+                        .then(arg(PLAYER, StringArgumentType.word())
                                 .suggests(this::suggestFriends)
                                 .executes(context -> withCiv(context, (civ, player) -> civ.community().trust(
                                         Players.ref(player), StringArgumentType.getString(context, PLAYER), false)))))
                 .then(Commands.literal("entfernen")
-                        .then(Commands.argument(PLAYER, StringArgumentType.word())
+                        .then(arg(PLAYER, StringArgumentType.word())
                                 .suggests(this::suggestFriends)
                                 .executes(context -> withCiv(context, (civ, player) -> civ.community().unfriend(
                                         Players.ref(player), StringArgumentType.getString(context, PLAYER))))))
-                .then(Commands.argument(PLAYER, StringArgumentType.word())
+                .then(arg(PLAYER, StringArgumentType.word())
                         .suggests((context, builder) -> SharedSuggestionProvider.suggest(
                                 context.getSource().getOnlinePlayerNames(), builder))
                         .executes(context -> withCiv(context, (civ, player) -> civ.community().befriend(
@@ -2434,23 +3177,23 @@ public final class CivCommandTree {
                 .then(Commands.literal("liste")
                         .executes(context -> withCiv(context, (civ, player) -> civ.companies().list())))
                 .then(Commands.literal("info")
-                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                        .then(arg(NAME, StringArgumentType.greedyString())
                                 .suggests(this::suggestCompanies)
                                 .executes(context -> withCiv(context, (civ, player) -> civ.companies().info(
                                         Players.caller(player), Optional.of(name(context)))))))
                 .then(Commands.literal("gruenden")
-                        .then(Commands.argument(AMOUNT, StringArgumentType.word())
-                                .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                        .then(arg(AMOUNT, StringArgumentType.word())
+                                .then(arg(NAME, StringArgumentType.greedyString())
                                         .executes(context -> withCiv(context, (civ, player) -> civ.companies().found(
                                                 Players.caller(player), StringArgumentType.getString(context, AMOUNT),
                                                 name(context)))))))
                 .then(companyMemberCommand("aufnehmen", true))
                 .then(companyMemberCommand("entlassen", false))
                 .then(Commands.literal("einstellen")
-                        .then(Commands.argument(COMPANY, StringArgumentType.string())
+                        .then(arg(COMPANY, StringArgumentType.string())
                                 .suggests(this::suggestOwnCompanies)
                                 .then(Commands.literal("dorfbewohner")
-                                        .then(Commands.argument(PRICE, StringArgumentType.word())
+                                        .then(arg(PRICE, StringArgumentType.word())
                                                 .executes(context -> withCiv(context, (civ, player) -> nearestVillager(
                                                         player).map(villager -> civ.companies().hire(
                                                                 Players.caller(player),
@@ -2458,17 +3201,17 @@ public final class CivCommandTree {
                                                                 StringArgumentType.getString(context, PRICE)))
                                                         .orElseGet(() -> Reply.failure(Message.of(
                                                                 MessageKey.VILLAGER_NONE_NEAR)))))))
-                                .then(Commands.argument(PLAYER, StringArgumentType.word())
+                                .then(arg(PLAYER, StringArgumentType.word())
                                         .suggests((context, builder) -> SharedSuggestionProvider.suggest(
                                                 context.getSource().getOnlinePlayerNames(), builder))
-                                        .then(Commands.argument(PRICE, StringArgumentType.word())
+                                        .then(arg(PRICE, StringArgumentType.word())
                                                 .executes(context -> withCiv(context, (civ, player) -> civ.companies()
                                                         .hire(Players.caller(player),
                                                                 StringArgumentType.getString(context, COMPANY),
                                                                 StringArgumentType.getString(context, PLAYER),
                                                                 StringArgumentType.getString(context, PRICE))))))))
                 .then(Commands.literal("menue")
-                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                        .then(arg(NAME, StringArgumentType.greedyString())
                                 .suggests(this::suggestCompanies)
                                 .executes(context -> withCiv(context, (civ, player) -> {
                                     Screens.open(player, new de.etiennebader.civ.fabric.screen.CompanyScreen(civ, player,
@@ -2476,9 +3219,9 @@ public final class CivCommandTree {
                                     return null;
                                 }))))
                 .then(Commands.literal("branche")
-                        .then(Commands.argument(COMPANY, StringArgumentType.string())
+                        .then(arg(COMPANY, StringArgumentType.string())
                                 .suggests(this::suggestOwnCompanies)
-                                .then(Commands.argument(TYPE, StringArgumentType.word())
+                                .then(arg(TYPE, StringArgumentType.word())
                                         .suggests((context, builder) -> SharedSuggestionProvider.suggest(
                                                 de.etiennebader.civ.domain.production.Branch.ids(), builder))
                                         .executes(context -> withCiv(context, (civ, player) -> civ.companies()
@@ -2486,17 +3229,17 @@ public final class CivCommandTree {
                                                         StringArgumentType.getString(context, COMPANY),
                                                         StringArgumentType.getString(context, TYPE)))))))
                 .then(Commands.literal("investieren")
-                        .then(Commands.argument(COMPANY, StringArgumentType.string())
+                        .then(arg(COMPANY, StringArgumentType.string())
                                 .suggests(this::suggestOwnCompanies)
-                                .then(Commands.argument(AMOUNT, StringArgumentType.word())
+                                .then(arg(AMOUNT, StringArgumentType.word())
                                         .executes(context -> withCiv(context, (civ, player) -> civ.companies()
                                                 .invest(Players.caller(player),
                                                         StringArgumentType.getString(context, COMPANY),
                                                         StringArgumentType.getString(context, AMOUNT)))))))
                 .then(Commands.literal("verkauf")
-                        .then(Commands.argument(COMPANY, StringArgumentType.string())
+                        .then(arg(COMPANY, StringArgumentType.string())
                                 .suggests(this::suggestOwnCompanies)
-                                .then(Commands.argument(TYPE, StringArgumentType.word())
+                                .then(arg(TYPE, StringArgumentType.word())
                                         .suggests((context, builder) -> SharedSuggestionProvider.suggest(
                                                 List.of("automatisch", "hand", "jetzt"), builder))
                                         .executes(context -> withCiv(context, (civ, player) -> civ.companies()
@@ -2504,14 +3247,14 @@ public final class CivCommandTree {
                                                         StringArgumentType.getString(context, COMPANY),
                                                         StringArgumentType.getString(context, TYPE)))))))
                 .then(Commands.literal("lager")
-                        .then(Commands.argument(COMPANY, StringArgumentType.string())
+                        .then(arg(COMPANY, StringArgumentType.string())
                                 .suggests(this::suggestCompanies)
                                 .executes(context -> withCiv(context, (civ, player) -> civ.companies()
                                         .stock(Players.caller(player), StringArgumentType.getString(context, COMPANY))))))
                 .then(Commands.literal("abholen")
-                        .then(Commands.argument(COMPANY, StringArgumentType.string())
+                        .then(arg(COMPANY, StringArgumentType.string())
                                 .suggests(this::suggestOwnCompanies)
-                                .then(Commands.argument(ITEM, StringArgumentType.word())
+                                .then(arg(ITEM, StringArgumentType.word())
                                         .suggests((context, builder) -> SharedSuggestionProvider.suggest(host.current()
                                                 .map(civ -> civ.companies().stockItems(
                                                         StringArgumentType.getString(context, COMPANY)))
@@ -2519,19 +3262,19 @@ public final class CivCommandTree {
                                         .executes(context -> withCiv(context, (civ, player) -> pickup(civ, player,
                                                 StringArgumentType.getString(context, COMPANY),
                                                 StringArgumentType.getString(context, ITEM), 64)))
-                                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(1, 64 * 36))
+                                        .then(arg(COUNT, IntegerArgumentType.integer(1, 64 * 36))
                                                 .executes(context -> withCiv(context, (civ, player) -> pickup(civ, player,
                                                         StringArgumentType.getString(context, COMPANY),
                                                         StringArgumentType.getString(context, ITEM),
                                                         IntegerArgumentType.getInteger(context, COUNT))))))))
                 .then(machineCommands())
                 .then(Commands.literal("einlagern")
-                        .then(Commands.argument(COMPANY, StringArgumentType.string())
+                        .then(arg(COMPANY, StringArgumentType.string())
                                 .suggests(this::suggestOwnCompanies)
                                 .executes(context -> withCiv(context, (civ, player) -> deposit(civ, player,
                                         StringArgumentType.getString(context, COMPANY))))))
                 .then(Commands.literal("kuendigen")
-                        .then(Commands.argument(COMPANY, StringArgumentType.string())
+                        .then(arg(COMPANY, StringArgumentType.string())
                                 .suggests(this::suggestOwnCompanies)
                                 .then(Commands.literal("dorfbewohner")
                                         .executes(context -> withCiv(context, (civ, player) -> nearestVillager(player)
@@ -2540,7 +3283,7 @@ public final class CivCommandTree {
                                                         villager))
                                                 .orElseGet(() -> Reply.failure(Message.of(
                                                         MessageKey.VILLAGER_NONE_NEAR))))))
-                                .then(Commands.argument(PLAYER, StringArgumentType.word())
+                                .then(arg(PLAYER, StringArgumentType.word())
                                         .suggests((context, builder) -> SharedSuggestionProvider.suggest(
                                                 context.getSource().getOnlinePlayerNames(), builder))
                                         .executes(context -> withCiv(context, (civ, player) -> civ.companies()
@@ -2548,25 +3291,25 @@ public final class CivCommandTree {
                                                         StringArgumentType.getString(context, COMPANY),
                                                         StringArgumentType.getString(context, PLAYER)))))))
                 .then(Commands.literal("dividende")
-                        .then(Commands.argument(COMPANY, StringArgumentType.string())
+                        .then(arg(COMPANY, StringArgumentType.string())
                                 .suggests(this::suggestOwnCompanies)
-                                .then(Commands.argument(AMOUNT, StringArgumentType.word())
+                                .then(arg(AMOUNT, StringArgumentType.word())
                                         .executes(context -> withCiv(context, (civ, player) -> civ.companies()
                                                 .dividend(Players.caller(player),
                                                         StringArgumentType.getString(context, COMPANY),
                                                         StringArgumentType.getString(context, AMOUNT)))))))
                 .then(Commands.literal("ausgeben")
-                        .then(Commands.argument(COMPANY, StringArgumentType.string())
+                        .then(arg(COMPANY, StringArgumentType.string())
                                 .suggests(this::suggestOwnCompanies)
-                                .then(Commands.argument(COUNT, IntegerArgumentType.integer(1, 1_000_000))
-                                        .then(Commands.argument(PRICE, StringArgumentType.word())
+                                .then(arg(COUNT, IntegerArgumentType.integer(1, 1_000_000))
+                                        .then(arg(PRICE, StringArgumentType.word())
                                                 .executes(context -> withCiv(context, (civ, player) -> civ.companies()
                                                         .issue(Players.caller(player),
                                                                 StringArgumentType.getString(context, COMPANY),
                                                                 IntegerArgumentType.getInteger(context, COUNT),
                                                                 StringArgumentType.getString(context, PRICE))))))))
                 .then(Commands.literal("aufloesen")
-                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                        .then(arg(NAME, StringArgumentType.greedyString())
                                 .suggests(this::suggestOwnCompanies)
                                 .executes(context -> withCiv(context, (civ, player) -> civ.companies().dissolve(
                                         Players.caller(player), name(context))))));
@@ -2574,9 +3317,9 @@ public final class CivCommandTree {
 
     private LiteralArgumentBuilder<CommandSourceStack> companyMemberCommand(String literal, boolean admit) {
         return Commands.literal(literal)
-                .then(Commands.argument(COMPANY, StringArgumentType.string())
+                .then(arg(COMPANY, StringArgumentType.string())
                         .suggests(this::suggestOwnCompanies)
-                        .then(Commands.argument(PLAYER, StringArgumentType.word())
+                        .then(arg(PLAYER, StringArgumentType.word())
                                 .suggests((context, builder) -> SharedSuggestionProvider.suggest(
                                         context.getSource().getOnlinePlayerNames(), builder))
                                 .executes(context -> withCiv(context, (civ, player) -> admit
@@ -2604,25 +3347,25 @@ public final class CivCommandTree {
                         .executes(context -> withCiv(context, (civ, player) -> civ.companies().depot(
                                 Players.caller(player)))))
                 .then(Commands.literal("buch")
-                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                        .then(arg(NAME, StringArgumentType.greedyString())
                                 .suggests(this::suggestCompanies)
                                 .executes(context -> withCiv(context, (civ, player) -> civ.companies().book(
                                         name(context))))))
                 .then(Commands.literal("streichen")
-                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                        .then(arg(NUMBER, IntegerArgumentType.integer(1))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.companies().cancel(
                                         Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> tradeCommand(String literal, Side side) {
         return Commands.literal(literal)
-                .then(Commands.argument(COMPANY, StringArgumentType.string())
+                .then(arg(COMPANY, StringArgumentType.string())
                         .suggests(this::suggestCompanies)
-                        .then(Commands.argument(COUNT, IntegerArgumentType.integer(1, 1_000_000))
+                        .then(arg(COUNT, IntegerArgumentType.integer(1, 1_000_000))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.companies().trade(
                                         Players.caller(player), side, StringArgumentType.getString(context, COMPANY),
                                         IntegerArgumentType.getInteger(context, COUNT), Optional.empty())))
-                                .then(Commands.argument(LIMIT, StringArgumentType.word())
+                                .then(arg(LIMIT, StringArgumentType.word())
                                         .executes(context -> withCiv(context, (civ, player) -> civ.companies().trade(
                                                 Players.caller(player), side,
                                                 StringArgumentType.getString(context, COMPANY),
@@ -2641,11 +3384,11 @@ public final class CivCommandTree {
                             return null;
                         })))
                 .then(Commands.literal("gruenden")
-                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                        .then(arg(NAME, StringArgumentType.greedyString())
                                 .executes(context -> withCiv(context, (civ, player) -> civ.press().found(
                                         Players.caller(player), name(context))))))
                 .then(Commands.literal("redakteur")
-                        .then(Commands.argument(PAPER, StringArgumentType.string())
+                        .then(arg(PAPER, StringArgumentType.string())
                                 .suggests(this::suggestOwnPapers)
                                 .then(Commands.literal("dorfbewohner")
                                         .executes(context -> withCiv(context, (civ, player) -> nearestVillager(player)
@@ -2653,44 +3396,44 @@ public final class CivCommandTree {
                                                         StringArgumentType.getString(context, PAPER), villager))
                                                 .orElseGet(() -> Reply.failure(Message.of(
                                                         MessageKey.VILLAGER_NONE_NEAR))))))
-                                .then(Commands.argument(PLAYER, StringArgumentType.word())
+                                .then(arg(PLAYER, StringArgumentType.word())
                                         .suggests((context, builder) -> SharedSuggestionProvider.suggest(
                                                 context.getSource().getOnlinePlayerNames(), builder))
                                         .executes(context -> withCiv(context, (civ, player) -> civ.press().addEditor(
                                                 Players.caller(player), StringArgumentType.getString(context, PAPER),
                                                 StringArgumentType.getString(context, PLAYER)))))))
                 .then(Commands.literal("entlassen")
-                        .then(Commands.argument(PAPER, StringArgumentType.string())
+                        .then(arg(PAPER, StringArgumentType.string())
                                 .suggests(this::suggestOwnPapers)
-                                .then(Commands.argument(PLAYER, StringArgumentType.word())
+                                .then(arg(PLAYER, StringArgumentType.word())
                                         .executes(context -> withCiv(context, (civ, player) -> civ.press().removeEditor(
                                                 Players.caller(player), StringArgumentType.getString(context, PAPER),
                                                 StringArgumentType.getString(context, PLAYER)))))))
                 .then(Commands.literal("schreiben")
-                        .then(Commands.argument(PAPER, StringArgumentType.string())
+                        .then(arg(PAPER, StringArgumentType.string())
                                 .suggests(this::suggestMyPapers)
-                                .then(Commands.argument(TEXT, StringArgumentType.greedyString())
+                                .then(arg(TEXT, StringArgumentType.greedyString())
                                         .executes(context -> withCiv(context, (civ, player) -> civ.press().write(
                                                 Players.caller(player), StringArgumentType.getString(context, PAPER),
                                                 StringArgumentType.getString(context, TEXT)))))))
                 .then(Commands.literal("veroeffentlichen")
-                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                        .then(arg(NAME, StringArgumentType.greedyString())
                                 .suggests(this::suggestMyPapers)
                                 .executes(context -> withCiv(context, (civ, player) -> publishBook(civ, player,
                                         name(context))))))
                 .then(Commands.literal("lesen")
                         .executes(context -> withCiv(context, (civ, player) -> giveEdition(civ, player,
                                 Optional.empty())))
-                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                        .then(arg(NAME, StringArgumentType.greedyString())
                                 .suggests(this::suggestPapers)
                                 .executes(context -> withCiv(context, (civ, player) -> giveEdition(civ, player,
                                         Optional.of(name(context)))))))
                 .then(Commands.literal("artikel")
-                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(1))
+                        .then(arg(NUMBER, IntegerArgumentType.integer(1))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.press().show(
                                         IntegerArgumentType.getInteger(context, NUMBER))))))
                 .then(Commands.literal("aufloesen")
-                        .then(Commands.argument(NAME, StringArgumentType.greedyString())
+                        .then(arg(NAME, StringArgumentType.greedyString())
                                 .suggests(this::suggestOwnPapers)
                                 .executes(context -> withCiv(context, (civ, player) -> civ.press().dissolve(
                                         Players.caller(player), name(context))))));
@@ -2727,6 +3470,144 @@ public final class CivCommandTree {
         return player.level().getEntitiesOfClass(Villager.class, range).stream()
                 .min(java.util.Comparator.comparingDouble(villager -> villager.distanceToSqr(player)))
                 .map(villager -> new PersonRef(new PersonId(villager.getUUID())));
+    }
+
+    // ------------------------------------------------------------------ Automatische Vorschläge
+
+    /**
+     * Ein Befehlsargument mit passenden Vorschlägen: Je nach Name des Arguments und Pfad des Befehls schlägt das Spiel
+     * Zahlen, eigene Aufträge, Verträge, Firmen, Spieler, Währungen und anderes vor, mit einer kurzen Erklärung
+     * daneben. Ein später angehängtes {@code suggests} überschreibt das.
+     */
+    private <T> com.mojang.brigadier.builder.RequiredArgumentBuilder<CommandSourceStack, T> arg(
+            String name, com.mojang.brigadier.arguments.ArgumentType<T> type) {
+        com.mojang.brigadier.builder.RequiredArgumentBuilder<CommandSourceStack, T> builder =
+                Commands.argument(name, type);
+        com.mojang.brigadier.suggestion.SuggestionProvider<CommandSourceStack> provider = smart(name);
+        if (provider != null) {
+            builder.suggests(provider);
+        }
+        return builder;
+    }
+
+    private static CompletableFuture<Suggestions> hints(SuggestionsBuilder builder, String explanation, String... values) {
+        com.mojang.brigadier.Message tooltip = new com.mojang.brigadier.LiteralMessage(explanation);
+        for (String value : values) {
+            if (value.toLowerCase(java.util.Locale.ROOT).startsWith(builder.getRemainingLowerCase())) {
+                builder.suggest(value, tooltip);
+            }
+        }
+        return builder.buildFuture();
+    }
+
+    private static List<String> pathOf(CommandContext<CommandSourceStack> context) {
+        return context.getNodes().stream().map(node -> node.getNode().getName()).toList();
+    }
+
+    private static boolean on(List<String> path, String... words) {
+        for (String word : words) {
+            if (path.contains(word) || path.contains(EnglishCommands.translate("", word))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private com.mojang.brigadier.suggestion.SuggestionProvider<CommandSourceStack> smart(String name) {
+        return switch (name) {
+            case NUMBER -> this::suggestNumbers;
+            case COUNT -> (context, builder) -> {
+                List<String> path = pathOf(context);
+                if (on(path, "macht")) {
+                    return hints(builder, "Machtgrad des Klerus, 0 bis 100", "0", "25", "50", "75", "100");
+                }
+                if (on(path, "bau")) {
+                    return hints(builder, "Drehung in Grad (leer: zur Straße)", "0", "90", "180", "270");
+                }
+                return hints(builder, "Anzahl", "1", "5", "10", "32", "64");
+            };
+            case AMOUNT, PRICE, DEPOSIT -> (context, builder) -> hints(builder,
+                    "Betrag in der Währung der Gemeinde (Smaragde)", "1", "5", "10", "25", "50", "100", "500");
+            case DAYS -> (context, builder) -> hints(builder, "Anzahl Tage", "1", "3", "7", "14", "30", "90", "365");
+            case PERCENT -> (context, builder) -> hints(builder, "Prozent", "0", "5", "10", "20", "25", "50");
+            case RATE -> (context, builder) -> hints(builder, "Kurs: so viele Smaragde ist eine Einheit wert",
+                    "0.5", "1", "1.5", "2", "5", "10");
+            case SYMBOL -> (context, builder) -> hints(builder, "Währungssymbol", "$", "€", "£", "¥", "₣", "ƒ");
+            case CURRENCY, TARGET -> this::suggestCurrencies;
+            case COMPANY -> this::suggestCompanies;
+            case PLAYER -> (context, builder) -> SharedSuggestionProvider.suggest(
+                    context.getSource().getOnlinePlayerNames(), builder);
+            case TOWN -> this::suggestPolityNames;
+            case ITEM -> (context, builder) -> SharedSuggestionProvider.suggestResource(
+                    BuiltInRegistries.ITEM.keySet(), builder);
+            case ORDER_AXIS, ECONOMY_AXIS -> (context, builder) -> hints(builder,
+                    "Achse von -100 bis 100 (0 = Mitte)", "-100", "-50", "0", "50", "100");
+            case VALUE -> (context, builder) -> hints(builder, "Wert: ja, nein oder eine Zahl", "ja", "nein", "0", "5",
+                    "10", "20");
+            case LOAN -> (context, builder) -> hints(builder, "Kennung des Kredits (siehe /civ kredit liste)");
+            case NAME -> this::suggestNames;
+            case "glaube" -> (context, builder) -> hints(builder, "ein Gott oder viele", "mono", "poly");
+            default -> null;
+        };
+    }
+
+    /** Namen je nach Befehl: Straßen, Religionen, Parteien, Zeitungen, Firmen, Gemeinden. */
+    private CompletableFuture<Suggestions> suggestNames(CommandContext<CommandSourceStack> context,
+                                                        SuggestionsBuilder builder) {
+        List<String> path = pathOf(context);
+        if (on(path, "strasse")) {
+            return suggestStreets(context, builder);
+        }
+        if (on(path, "religion")) {
+            return suggestReligions(context, builder);
+        }
+        if (on(path, "partei")) {
+            return suggestPartyNames(context, builder);
+        }
+        if (on(path, "zeitung")) {
+            return suggestPapers(context, builder);
+        }
+        if (on(path, "firma", "boerse")) {
+            return suggestCompanies(context, builder);
+        }
+        if (on(path, "gemeinde", "ebene", "bund", "land")) {
+            return suggestPolityNames(context, builder);
+        }
+        return builder.buildFuture();
+    }
+
+    /** Nummern je nach Befehl: eigene Bauaufträge, Fälle, Verträge oder Briefe; sonst kleine Zahlen. */
+    private CompletableFuture<Suggestions> suggestNumbers(CommandContext<CommandSourceStack> context,
+                                                          SuggestionsBuilder builder) {
+        List<String> path = pathOf(context);
+        ServerPlayer player = context.getSource().getPlayer();
+        java.util.Map<Integer, String> numbers = new java.util.TreeMap<>();
+        host.current().ifPresent(civ -> {
+            if (player == null) {
+                return;
+            }
+            var me = Players.ref(player);
+            if (on(path, "bau")) {
+                civ.construction().projects().stream().filter(p -> p.status().isActive())
+                        .filter(p -> p.client().equals(me) || p.contractor().filter(me::equals).isPresent())
+                        .forEach(p -> numbers.put(p.number(), "Bauauftrag " + p.blueprint()));
+            } else if (on(path, "gericht")) {
+                civ.justice().casesOf(me).forEach(view -> numbers.put(view.number(), "Fall Nr. " + view.number()));
+            } else if (on(path, "vertrag", "miete", "arbeit")) {
+                civ.civil().contractsOf(me).forEach(view -> numbers.put(view.number(), "Vertrag Nr. " + view.number()));
+            } else if (on(path, "post", "brief")) {
+                civ.community().inbox(me).forEach(view -> numbers.put(view.number(), "Brief von " + view.from()));
+            }
+        });
+        if (numbers.isEmpty()) {
+            return hints(builder, "Nummer (siehe die Liste des Befehls)", "1", "2", "3", "4", "5");
+        }
+        numbers.forEach((number, text) -> {
+            if (Integer.toString(number).startsWith(builder.getRemainingLowerCase())) {
+                builder.suggest(number, new com.mojang.brigadier.LiteralMessage(text));
+            }
+        });
+        return builder.buildFuture();
     }
 
     private CompletableFuture<Suggestions> suggestCompanies(CommandContext<CommandSourceStack> context,

@@ -16,6 +16,7 @@ import de.etiennebader.civ.domain.polity.Office;
 import de.etiennebader.civ.domain.polity.OfficeTerm;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.population.Personality;
+import de.etiennebader.civ.domain.polity.PolityKind;
 import de.etiennebader.civ.domain.production.Branch;
 import de.etiennebader.civ.domain.production.Enterprise;
 import de.etiennebader.civ.domain.shared.Day;
@@ -114,7 +115,8 @@ public final class VillagerBusiness {
                 return 0;
             }
             if (enterprise.isEmpty()) {
-                production.chooseBranch(head, id, branchFor(personality, head), day);
+                production.chooseBranch(head, id, builderNeeded(world) ? Branch.CONSTRUCTION
+                        : branchFor(personality, head), day);
                 return 1;
             }
             long free = treasury - reserve;
@@ -168,6 +170,17 @@ public final class VillagerBusiness {
     /** Anteil des Überschusses, der als Dividende fließt: Großzügige mehr, Sparsame weniger. */
     static double payoutRatio(Personality personality) {
         return Math.max(0.1, Math.min(0.7, 0.4 - personality.thrift() / 300.0));
+    }
+
+    /**
+     * Ob die Welt noch Baufirmen braucht: ohne sie kann niemand bauen lassen, auch die Gemeinden nicht. Es soll je
+     * drei Gemeinden (mindestens eine) eine Baufirma geben; die nächste Firma, die eine Branche wählt, wird eine.
+     */
+    static boolean builderNeeded(WorldQueries world) {
+        long towns = world.polities().stream().filter(polity -> polity.kind() == PolityKind.TERRITORIAL).count();
+        long builders = world.companies().stream().filter(company -> world.production().enterpriseOf(company.id())
+                .filter(enterprise -> enterprise.branch() == Branch.CONSTRUCTION).isPresent()).count();
+        return builders < Math.max(1, (towns + 2) / 3);
     }
 
     static Branch branchFor(Personality personality, PersonRef head) {

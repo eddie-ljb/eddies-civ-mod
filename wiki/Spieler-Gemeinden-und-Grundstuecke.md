@@ -22,7 +22,7 @@ Die Siedlungsstufe richtet sich nach allen Einwohnern: ab 10 Marktgemeinde, ab 3
 - **Persönlichkeit:** feste Ansichten auf drei Achsen – *Ordnung ↔ Freiheit*, *Sparsamkeit ↔ Großzügigkeit*, *Heimatverbundenheit*.
 - **Zufriedenheit** (-100 bis 100) setzt sich zusammen aus Grundstimmung, *Ordnung* (wie streng Explosionen, Feuer und Rechte von Fremden geregelt sind), *Steuern*, *Mitsprache* (gewählter Bürgermeister, Abstimmungen, Wahlrecht) und *Wohlstand* (Siedlungsstufe).
 - **Abwanderung:** Wer unter -30 Zufriedenheit fällt, denkt ans Wegziehen; je unzufriedener und rastloser, desto eher geht er am Tagesende. Gibt es eine Gemeinde, in der er deutlich zufriedener wäre, zieht er dorthin, sonst verschwindet er in die Wildnis. Höchstens ein Viertel der Dorfbewohner geht pro Tag. Abschaltbar mit `villager_emigration=false`.
-- Klick auf die Glocke im Gemeindehaus zeigt die Stimmung im Detail, `/civ stimmung` fasst sie im Chat zusammen. Schleichen + Rechtsklick mit leerer Hand auf einen Dorfbewohner zeigt seine Persönlichkeit, Zufriedenheit und Loyalität. Zufriedene lassen grüne Funken aufsteigen, Unzufriedene kleine Gewitterwolken.
+- Klick auf die Glocke im Gemeindehaus zeigt die Stimmung im Detail, `/civ stimmung` fasst sie im Chat zusammen. Schleichen + Rechtsklick mit leerer Hand auf einen Dorfbewohner öffnet sein Menü mit Persönlichkeit, Zufriedenheit und Loyalität (und Knöpfen zum Reden, Beeinflussen und für Post). Zufriedene lassen grüne Funken aufsteigen, Unzufriedene kleine Gewitterwolken.
 - **Loyalität** (-100 bis 100): anders als die tagesaktuelle Zufriedenheit sammelt sich Loyalität über die Zeit an – neue Einwohner haben nur ihre Heimatverbundenheit als Loyalität, mit wachsender Mitgliedsdauer (volles Gewicht nach 60 Tagen) schlägt die seitherige Zufriedenheit zunehmend durch. Dauerhaft zufriedene Dorfbewohner werden so loyaler, dauerhaft unzufriedene illoyaler. Loyalität gibt es auch zur eigenen Partei, zu deren Vorsitz (bzw. zum Bürgermeister/Vorsitz eines Bundes) und zum Arbeitgeber. Loyale Dorfbewohner folgen ihrer Partei beim Wählen stärker, illoyale schwächer; loyale wandern seltener ab (höchstens halb so wahrscheinlich wie unloyale, unabhängig von der reinen Tageszufriedenheit).
 
 ## Läden
@@ -41,6 +41,21 @@ Grundstücke teilen das Gemeindeland auf. Nur ihre Inhaber dürfen dort bauen, u
 2. `/civ grundstueck erstellen <Art>` macht daraus ein Grundstück, `/civ grundstueck chunk <Art>` nimmt den ganzen Chunk. Arten: `wohnen`, `gewerbe`, `industrie`, `landwirtschaft`, `oeffentlich`, `botschaft`.
 3. Danach: `/civ grundstueck anbieten 12,5` (Kauf per `/civ grundstueck kaufen` oder Shift-Klick im Menü) oder `/civ grundstueck vergeben <Spieler>` (verschenken).
 4. Inhaber bieten ihr eigenes Grundstück genauso an. `/civ grundstueck` zeigt das Grundstück unter einem und seinen Umriss.
+
+### Rechte auf dem eigenen Grundstück
+Der Inhaber stellt ein, was auf seinem Grundstück erlaubt ist (Rechtsklick auf das Grundstück im Grundstücksmenü oder per Befehl):
+- `/civ grundstueck rechte` zeigt die Einstellungen.
+- `/civ grundstueck rechte mitglieder|fremde <bauen|benutzen|behaelter> <ja|nein>` erlaubt oder verbietet Mitgliedern der Gemeinde bzw. allen anderen das Bauen, das Benutzen von Türen, Knöpfen und Hebeln oder das Öffnen von Behältern. Standard: Mitglieder benutzen Türen, Fremde nichts.
+- `/civ grundstueck rechte gast <Spieler> <Handlung> <ja|nein>` und `gastentfernen <Spieler>` geben einzelnen Spielern Rechte (bis zu 32 Gäste, auch Dorfbewohner der Gemeinde mit vollem Namen; im Menü per Klick umschalten).
+- `/civ grundstueck rechte regel <pvp|monster|explosionen|feuer|tiere> <gesetz|erlauben|verbieten>` stellt Regeln abweichend vom Gesetz ein: Kämpfe, feindliche Monster, Explosionen, Feuerausbreitung und ob Fremde Tiere verletzen dürfen.
+- `/civ grundstueck rechte zuruecksetzen` stellt den Standard wieder her.
+
+Ob der Inhaber Gemeinde-, Länder- und Nationenrecht überschreiben darf, regelt das Gesetz `plot_rights_override` (Standard ja). Steht es auf nein, gilt das Recht auch auf Grundstücken: Was es Fremden erlaubt, ist überall erlaubt, und die Regeln des Grundstücks werden ignoriert. Wechselt das Grundstück den Inhaber, gilt wieder der Standard. Gemeindeland ist davon nicht betroffen; dafür entscheidet das Recht der Gemeinde.
+
+### Dorfbewohner als Bauamt und Bauherren
+Ist das Bauamt (Planer, sonst Bürgermeister) ein Dorfbewohner, schneidet er neue Grundstücke zu und schreibt sie zum Verkauf aus, plant Schule, Gotteshaus und öffentliche Plätze und lässt darauf kommunale Bauten von einer Baufirma errichten, bezahlt aus der Gemeindekasse. Dorfbewohner kaufen angebotenes Wohnland und bauen darauf; Firmenchefs und Zeitungsleiter lassen auf den Grundstücken ihrer Organisation bauen. Bleibt das Baufeld drei Tage lang blockiert, endet der Auftrag. Auf Grundstücken einer Gemeinde, Firma, Zeitung, Partei oder eines Bundes baut deren Leitung (Spieler oder Dorfbewohner) auf Kosten der Kasse. Über 50 eingebaute Bauvorlagen (`/civ bau plaene`) decken Wohnen, Gewerbe, Industrie, Landwirtschaft und kommunale Bauten ab.
+
+Mehr zu Bauaufträgen, Absperrung, Ausrichtung und Wegebau: [Bauen und Straßen](Spieler-Bauen-und-Strassen.md).
 
 ## Straßen und Adressen
 - Bürgermeister oder Bauamt markieren eine Straße mit dem Grundstücksstab und legen sie mit `/civ strasse anlegen <Name>` an; `aufheben <Name>` und `liste` gibt es auch.

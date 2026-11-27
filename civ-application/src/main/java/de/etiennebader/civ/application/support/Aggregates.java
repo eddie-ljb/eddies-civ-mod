@@ -29,10 +29,20 @@ public final class Aggregates {
 
     private final Repositories repositories;
     private final DomainEventPublisher publisher;
+    private volatile MotionGate motionGate = MotionGate.PASS;
 
     public Aggregates(Repositories repositories, DomainEventPublisher publisher) {
         this.repositories = Objects.requireNonNull(repositories, "repositories");
         this.publisher = Objects.requireNonNull(publisher, "publisher");
+    }
+
+    /** Wer angenommene Anträge zurückhalten darf (Veto); Standard: niemand. */
+    public MotionGate motionGate() {
+        return motionGate;
+    }
+
+    public void motionGate(MotionGate gate) {
+        this.motionGate = Objects.requireNonNull(gate, "gate");
     }
 
     /**

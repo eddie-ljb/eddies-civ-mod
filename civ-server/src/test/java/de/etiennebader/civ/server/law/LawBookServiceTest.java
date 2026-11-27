@@ -31,6 +31,27 @@ class LawBookServiceTest {
     private final CivServerFixture server = CivServerFixture.start(ids);
 
     @Test
+    @DisplayName("Nummern zählen je Gesetz; bei gleicher Nummer in mehreren Gesetzen braucht es den Gesetzesnamen")
+    void numbersPerLaw() {
+        town();
+        server.lawBooks().enact(caller(alice), "Baugesetz > Teil 1 > Bauen", "Fremde dürfen bauen.");
+        server.lawBooks().enact(caller(alice), "Baugesetz > Teil 2 > Feuer", "Feuer ist erlaubt.");
+        server.lawBooks().enact(caller(alice), "Steuergesetz > Abgaben", "Die Umsatzsteuer beträgt 10 %.");
+
+        List<ParagraphView> paragraphs = server.lawBooks().paragraphsOf(named("Nordhain"));
+        assertEquals(List.of(1, 2, 1), paragraphs.stream().map(ParagraphView::number).toList());
+        assertEquals("Baugesetz > Teil 2 > Feuer", paragraphs.get(1).qualifiedTitle());
+
+        Reply ambiguous = server.lawBooks().show(caller(alice), 1);
+        assertFalse(ambiguous.success());
+        assertEquals(MessageKey.AMBIGUOUS_PARAGRAPH.key(), ambiguous.lines().getFirst().key());
+        assertTrue(server.lawBooks().show(caller(alice), 1, java.util.Optional.of("steuergesetz")).success());
+        assertTrue(server.lawBooks().repeal(caller(alice), 2, java.util.Optional.of("Baugesetz")).success());
+        assertEquals(2, server.lawBooks().paragraphsOf(named("Nordhain")).size());
+        assertFalse(server.lawBooks().show(caller(alice), 2, java.util.Optional.of("Steuergesetz")).success());
+    }
+
+    @Test
     @DisplayName("Erlassen, lesen, prüfen, aufheben; mit Abstimmungspflicht wird ein Antrag daraus")
     void lifecycle() {
         town();

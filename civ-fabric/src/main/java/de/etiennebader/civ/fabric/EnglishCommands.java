@@ -18,17 +18,28 @@ final class EnglishCommands {
 
     /** Deutsches Wort → englisches Wort; mit {@code eltern.wort} für Wörter, die je nach Befehl anders heißen. */
     static final Map<String, String> WORDS = Map.ofEntries(
+            Map.entry("regierung", "government"), Map.entry("oberhaupt", "head"), Map.entry("ministerium", "ministry"),
+            Map.entry("haushalt", "budget"), Map.entry("entwurf", "draft"),
+            Map.entry("titel", "title"), Map.entry("form", "form"), Map.entry("modus", "mode"),
+            Map.entry("gehalt", "salary"), Map.entry("befugnisse", "powers"), Map.entry("regeln", "rules"),
+            Map.entry("vorbereiter", "preparer"), Map.entry("zustaendigkeit", "mandate"), Map.entry("lohn", "wage"),
+            Map.entry("abberufen", "recall"),
+            Map.entry("koalition", "coalition"), Map.entry("bilden", "form"), Map.entry("neuwahl", "new-election"),
+            Map.entry("vorhaben", "agreement"), Map.entry("bereich", "portfolio"), Map.entry("verordnung", "decree"),
+            Map.entry("vorschlag", "proposal"), Map.entry("foerderung", "subsidy"), Map.entry("beenden", "end"),
+            Map.entry("waehlen", "ballot"), Map.entry("regelung", "rule"), Map.entry("abstand", "distance"),
+            Map.entry("unterzeichnen", "sign"), Map.entry("vetofrist", "veto-period"), Map.entry("veto", "veto"),
             Map.entry("abheben", "withdraw"), Map.entry("abholen", "collect"), Map.entry("abbrechen", "cancel"), Map.entry("ablehnen", "decline"),
             Map.entry("abmelden", "logout"), Map.entry("abstimmen", "vote"), Map.entry("abstimmungen", "votes"),
             Map.entry("adresse", "address"), Map.entry("adressen", "addresses"), Map.entry("aemter", "offices"),
             Map.entry("akte", "file"), Map.entry("amt", "office"), Map.entry("anbieten", "offer"),
             Map.entry("anlegen", "create"), Map.entry("annehmen", "accept"), Map.entry("arbeit", "work"),
             Map.entry("artikel", "article"), Map.entry("aufheben", "repeal"), Map.entry("aufloesen", "dissolve"),
-            Map.entry("aufnehmen", "admit"), Map.entry("ausgeben", "issue"), Map.entry("ausrufen", "call"),
+            Map.entry("aufnehmen", "admit"), Map.entry("uebertragen", "transfer"), Map.entry("planung", "planning"), Map.entry("kultur", "culture"), Map.entry("aus", "off"), Map.entry("vorschau", "preview"), Map.entry("ausgeben", "issue"), Map.entry("ausrufen", "call"),
             Map.entry("aussage", "testify"), Map.entry("aussenposten", "outpost"), Map.entry("austreten", "leave"),
             Map.entry("beanspruchen", "claim"), Map.entry("beeinflussen", "influence"),
             Map.entry("bau", "build"), Map.entry("beauftragen", "commission"), Map.entry("beitreten", "join"), Map.entry("berufung", "appeal"),
-            Map.entry("beweis", "evidence"), Map.entry("boerse", "exchange"), Map.entry("branche", "branch"),
+            Map.entry("beweis", "evidence"), Map.entry("beute", "spoils"), Map.entry("boerse", "exchange"), Map.entry("branche", "branch"),
             Map.entry("brief", "letter"), Map.entry("buch", "book"), Map.entry("buendnis", "alliance"),
             Map.entry("bund", "federation"), Map.entry("debatte", "debate"), Map.entry("depot", "portfolio"),
             Map.entry("dividende", "dividend"), Map.entry("dorfbewohner", "villager"), Map.entry("ebene", "level"),
@@ -44,7 +55,7 @@ final class EnglishCommands {
             Map.entry("gemeinde-entfernen", "town-remove"),
             Map.entry("gericht", "court"), Map.entry("gesetz", "statute"), Map.entry("gesetze", "statutes"),
             Map.entry("grenzen", "borders"), Map.entry("gruenden", "found"), Map.entry("grundstueck", "plot"),
-            Map.entry("heim", "home"), Map.entry("hilfe", "help"), Map.entry("handbuch", "handbook"), Map.entry("holen", "get"), Map.entry("hymne", "anthem"),
+            Map.entry("heim", "home"), Map.entry("hilfe", "help"), Map.entry("handbuch", "handbook"), Map.entry("holen", "get"), Map.entry("hymne", "anthem"), Map.entry("platte", "record"), Map.entry("noten", "notes"),
             Map.entry("investieren", "invest"), Map.entry("ja", "yes"), Map.entry("kandidieren", "run"),
             Map.entry("karte", "map"), Map.entry("kasse", "treasury"), Map.entry("kaufen", "buy"),
             Map.entry("klage", "sue"), Map.entry("konjunktur", "conjuncture"), Map.entry("konto", "account"),
@@ -59,7 +70,7 @@ final class EnglishCommands {
             Map.entry("recht", "rules"), Map.entry("redakteur", "editor"), Map.entry("rede", "speech"),
             Map.entry("reden", "talk"),
             Map.entry("richter", "judge"), Map.entry("richtung", "direction"), Map.entry("schliessen", "close"),
-            Map.entry("schreiben", "write"), Map.entry("schuldig", "guilty"), Map.entry("setzen", "set"),
+            Map.entry("schreiben", "write"), Map.entry("schuldig", "guilty"),
             Map.entry("sicherung", "backup"), Map.entry("spielen", "play"), Map.entry("staatsanwalt", "prosecutor"),
             Map.entry("starten", "start"), Map.entry("stimme", "vote"), Map.entry("stimmen", "vote"),
             Map.entry("stimmung", "mood"), Map.entry("strasse", "street"), Map.entry("streichen", "strike"),
@@ -75,7 +86,11 @@ final class EnglishCommands {
             Map.entry("selbstbedienung", "selfservice"), Map.entry("als", "as"),
             Map.entry("wahl", "election"), Map.entry("wahlergebnis", "results"), Map.entry("wahlkreis", "district"),
             Map.entry("wappen", "crest"), Map.entry("zugang", "access"), Map.entry("weiter", "advance"), Map.entry("zeigen", "show"),
-            Map.entry("zeitung", "newspaper"), Map.entry("familie", "family"), Map.entry("kinder", "children"), Map.entry("zeuge", "witness"), Map.entry("zurueckziehen", "retract"));
+            Map.entry("zeitung", "newspaper"), Map.entry("bauen", "construct"), Map.entry("plakat", "poster"), Map.entry("reklame", "billboard"), Map.entry("schrift", "scripture"), Map.entry("wege", "roads"),
+            Map.entry("segnen", "bless"), Map.entry("taufe", "baptize"), Map.entry("anhaengen", "append"),
+            Map.entry("benennen", "rename"), Map.entry("festlegen", "define"), Map.entry("abschaffen", "abolish"),
+            Map.entry("entziehen", "revoke"),
+            Map.entry("schaufel", "shovel"), Map.entry("pflaster", "paving"), Map.entry("familie", "family"), Map.entry("kinder", "children"), Map.entry("zeuge", "witness"), Map.entry("zurueckziehen", "retract"));
 
     private EnglishCommands() {
     }

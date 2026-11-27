@@ -1,4 +1,4 @@
-# Issue #84 – Polizei und Militär
+# Issue #84 – Polizei und Militär (Version 1.0.9)
 
 ## Umgesetzt
 - **Polizei** (`civ-domain/.../police`, `PoliceService`, `police.tsv`): Dienstgrade Kadett → Polizist → Wachtmeister →

@@ -31,7 +31,8 @@ import java.util.Optional;
  * Kinder zählen erst, wenn sie erwachsen sind. Dorfbewohner in nicht geladenen Chunks behalten ihre Gemeinde.
  *
  * <p>Zeigt außerdem die Stimmung: Zufriedene lassen ab und zu grüne Funken aufsteigen, Unzufriedene Gewitterwolken.
- * Wer schleicht und einen Dorfbewohner mit leerer Hand anklickt, erfährt seine Persönlichkeit und Zufriedenheit.
+ * Wer schleicht und einen Dorfbewohner mit leerer Hand anklickt, öffnet sein Menü (Auskunft, reden, beeinflussen, Post);
+ * dieselbe Auskunft gibt {@code /civ dorfbewohner info} im Chat.
  * Abgewanderte holt der Census beim nächsten Durchgang ab, sobald ihr Chunk geladen ist.
  */
 final class VillagerCensus {
@@ -54,7 +55,7 @@ final class VillagerCensus {
                 return InteractionResult.PASS;
             }
             if (player instanceof ServerPlayer serverPlayer) {
-                host.current().ifPresent(civ -> Components.send(serverPlayer, civ.villagers().describe(ref(villager))));
+                host.current().ifPresent(civ -> MenuOpener.villager(civ, serverPlayer, ref(villager)));
             }
             return InteractionResult.SUCCESS;
         });
@@ -208,6 +209,7 @@ final class VillagerCensus {
         civ.villagers().grownUp(ref(villager));
         civ.villagers().seen(ref(villager), Players.position(villager.level(), villager.blockPosition()),
                 civ.calendar().today());
+        VillagerLooks.apply(civ, villager);
     }
 
     /**

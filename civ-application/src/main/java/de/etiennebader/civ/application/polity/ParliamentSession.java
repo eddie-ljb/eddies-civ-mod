@@ -158,7 +158,8 @@ public final class ParliamentSession {
         if (inFavour + against > 0) {
             outcomes.add(new Voted(polity.id(), current, inFavour, against));
         }
-        VoteOutcome outcome = Ballots.settle(polity, current, Ballots.evaluate(polity, current), ids, day);
+        VoteOutcome outcome = Ballots.settle(polity, current, Ballots.evaluate(polity, current), ids, day,
+                aggregates.motionGate());
         if (outcome != VoteOutcome.OPEN) {
             outcomes.add(new Decided(polity.id(), current, outcome));
         }

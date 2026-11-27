@@ -33,6 +33,8 @@ final class PlotsScreen extends MenuScreen {
     private final PolityId town;
     private final String townName;
     private int page;
+    /** Die Firma, für die gekauft und der übergeben wird; leer: für den Spieler selbst. */
+    private Optional<String> company = Optional.empty();
 
     PlotsScreen(CivServer civ, ServerPlayer player, PolityId town, String townName, Screen parent) {
         super(civ, player, Optional.of(parent));
@@ -61,10 +63,23 @@ final class PlotsScreen extends MenuScreen {
         for (int index = 0; index < PER_PAGE && page * PER_PAGE + index < plots.size(); index++) {
             PlotView plot = plots.get(page * PER_PAGE + index);
             canvas.set(index, icon(plot), click -> {
+                if (plot.heldByViewer() && !plot.townLand() && click.right()) {
+                    Feedback.click(click.player());
+                    de.etiennebader.civ.fabric.gui.Screens.open(click.player(),
+                            new PlotRightsScreen(civ, click.player(), plot.town(), plot.id(), plot.townName(), this));
+                    return;
+                }
+                if (click.shift() && company.isPresent() && plot.heldByViewer() && !plot.townLand()) {
+                    Reply handed = civ.plots().transferToCompany(caller(), plot.town(), plot.id(), company.get());
+                    report(click, handed);
+                    return;
+                }
                 if (!click.shift() || plot.askingPrice().isEmpty() || plot.heldByViewer()) {
                     return;
                 }
-                Reply reply = civ.plots().buy(caller(), plot.town(), plot.id());
+                Reply reply = company.isPresent()
+                        ? civ.plots().buyForCompany(caller(), plot.town(), plot.id(), company.get())
+                        : civ.plots().buy(caller(), plot.town(), plot.id());
                 report(click, reply);
                 if (reply.success()) {
                     Feedback.fanfare(click.player());
@@ -73,6 +88,19 @@ final class PlotsScreen extends MenuScreen {
         }
         canvas.fillRow(5, Icon.of(Items.STAINED_GLASS_PANE.black()).hidden().build());
         backButton(canvas);
+        List<String> companies = civ.plots().companiesHeadedBy(Players.ref(player));
+        if (company.filter(name -> !companies.contains(name)).isPresent()) {
+            company = Optional.empty();
+        }
+        if (!companies.isEmpty()) {
+            canvas.set(47, Icon.of(Items.EMERALD_BLOCK)
+                    .name(company.map(name -> GuiKeys.PLOTS_COMPANY.text(name))
+                            .orElseGet(() -> GuiKeys.PLOTS_COMPANY_SELF.text()), Icon.TITLE)
+                    .hint(GuiKeys.PLOTS_COMPANY_HINT.text()).build(), click -> {
+                        int next = company.map(companies::indexOf).orElse(-1) + 1;
+                        company = next >= companies.size() ? Optional.empty() : Optional.of(companies.get(next));
+                    });
+        }
         if (page > 0) {
             canvas.set(46, Icon.of(Items.ARROW).name(GuiKeys.PAGE_PREVIOUS.text()).build(), click -> page--);
         }
@@ -94,10 +122,17 @@ final class PlotsScreen extends MenuScreen {
         if (plot.askingPrice().isPresent()) {
             icon.line(GuiKeys.PLOT_ENTRY_PRICE.text(money(plot.askingPrice().get())), Icon.GOOD).glint();
             if (!plot.heldByViewer()) {
-                icon.blank().hint(GuiKeys.PLOT_BUY_HINT.text());
+                icon.blank().hint(company.isPresent() ? GuiKeys.PLOT_COMPANY_BUY_HINT.text()
+                        : GuiKeys.PLOT_BUY_HINT.text());
             }
         } else {
             icon.hint(GuiKeys.PLOT_ENTRY_NOT_OFFERED.text());
+        }
+        if (plot.heldByViewer() && !plot.townLand()) {
+            icon.hint(GuiKeys.PLOT_RIGHTS_EDIT_HINT.text());
+            if (company.isPresent()) {
+                icon.hint(GuiKeys.PLOT_COMPANY_TRANSFER_HINT.text());
+            }
         }
         return icon.build();
     }

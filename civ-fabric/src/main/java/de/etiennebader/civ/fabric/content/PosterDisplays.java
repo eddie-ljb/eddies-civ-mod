@@ -30,6 +30,9 @@ public final class PosterDisplays {
     private static final int ACTIVE_BACKGROUND = 0xC0204020;
     private static final int WAITING_BACKGROUND = 0xA0303030;
 
+    private static final int READERS = 3;
+    private static final double READ_RANGE = 4.0;
+
     private PosterDisplays() {
     }
 
@@ -80,6 +83,32 @@ public final class PosterDisplays {
                     display.setText(text);
                     display.setBackgroundColor(label.active() ? ACTIVE_BACKGROUND : WAITING_BACKGROUND);
                 });
+            }
+        }
+    }
+
+    /**
+     * Villager in der Nähe lesen die Plakate: höchstens {@value #READERS} je Plakat und Durchgang; wie oft ein
+     * Dorfbewohner tatsächlich wirkt, begrenzt der Wahlkampf (einmal am Tag).
+     */
+    public static void villagersRead(MinecraftServer server, CivServer civ) {
+        for (CampaignService.PosterLabel label : civ.campaigns().posters()) {
+            if (!label.active()) {
+                continue;
+            }
+            Optional<ServerLevel> level = level(server, label.position());
+            BlockPos pos = new BlockPos(label.position().x(), label.position().y(), label.position().z());
+            if (level.isEmpty() || !level.get().isLoaded(pos)) {
+                continue;
+            }
+            java.util.List<de.etiennebader.civ.domain.actor.PersonRef> readers = level.get()
+                    .getEntitiesOfClass(net.minecraft.world.entity.npc.villager.Villager.class,
+                            new AABB(pos).inflate(READ_RANGE)).stream().limit(READERS)
+                    .map(villager -> new de.etiennebader.civ.domain.actor.PersonRef(
+                            new de.etiennebader.civ.domain.shared.PersonId(villager.getUUID())))
+                    .toList();
+            if (!readers.isEmpty()) {
+                civ.campaigns().villagersRead(readers, label.position());
             }
         }
     }

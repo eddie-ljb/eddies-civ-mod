@@ -37,17 +37,25 @@ final class CivMenu extends ChestMenu {
 
     private void redraw() {
         canvas.clear();
-        screen.render(canvas);
+        try {
+            screen.render(canvas);
+        } catch (RuntimeException e) {
+            EddiesCivMod.LOGGER.error("Fehler beim Zeichnen eines Menüs des Mods", e);
+        }
     }
 
     @Override
     public void clicked(int slotId, int button, ContainerInput input, Player player) {
-        if (slotId == OUTSIDE || slotId < 0 || slotId >= slots.size()
-                || (input != ContainerInput.PICKUP && input != ContainerInput.QUICK_MOVE)) {
+        // Zahlentasten (SWAP) und Mittelklick (CLONE) zählen als gewöhnlicher Klick. Der Doppelklick (PICKUP_ALL)
+        // folgt immer auf zwei einzelne Klicks und darf nicht zum dritten Mal auslösen.
+        boolean clickLike = input == ContainerInput.PICKUP || input == ContainerInput.QUICK_MOVE
+                || input == ContainerInput.SWAP || input == ContainerInput.CLONE;
+        if (slotId == OUTSIDE || slotId < 0 || slotId >= slots.size() || !clickLike) {
             sendAllDataToRemote();
             return;
         }
-        Click click = new Click(viewer, button == 1, input == ContainerInput.QUICK_MOVE);
+        Click click = new Click(viewer, input == ContainerInput.PICKUP && button == 1,
+                input == ContainerInput.QUICK_MOVE);
         Screens.handlingClick(true);
         try {
             if (slotId < canvas.size()) {

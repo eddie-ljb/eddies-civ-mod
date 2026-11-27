@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/fence_post",
+  "textures": {
+    "texture": "eddies-civ-mod:block/construction_barrier"
+  }
+}

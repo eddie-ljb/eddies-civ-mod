@@ -63,6 +63,16 @@ public final class PlotService {
     private final Texts texts;
     private final Map<PlayerRef, Selection> selections = new HashMap<>();
     private final Map<PlayerRef, Optional<PlotId>> lastPlot = new HashMap<>();
+    private de.etiennebader.civ.server.road.StreetAccess streets;
+
+    /** Die Straßenpflicht für neue und ausgeschriebene Grundstücke; ohne sie gibt es keine. */
+    public void streetAccess(de.etiennebader.civ.server.road.StreetAccess streets) {
+        this.streets = streets;
+    }
+
+    private boolean onStreet(PolityView town, Area area) {
+        return streets == null || streets.served(town, area);
+    }
 
     /** Die beiden ausgewählten Ecken eines künftigen Grundstücks. */
     public record Selection(Optional<BlockPosition> first, Optional<BlockPosition> second) {
@@ -135,7 +145,9 @@ public final class PlotService {
         if (area.size() > MAX_AREA) {
             return Reply.failure(Message.of(MessageKey.PLOT_TOO_LARGE, area.size(), MAX_AREA));
         }
-        return asPlotManager(caller, town -> attempt(() -> {
+        return asPlotManager(caller, town -> !onStreet(town, area)
+                ? Reply.failure(Message.of(MessageKey.PLOT_NEEDS_STREET, de.etiennebader.civ.server.road.StreetAccess.reach()))
+                : attempt(() -> {
             app.createPlot().execute(new CreatePlot.Command(town.id(), area, type.get(), calendar.today()));
             return Reply.success(Message.of(MessageKey.PLOT_CREATED, Message.of(TranslationKeys.plotType(type.get())),
                     area.width(), area.depth(), town.name().value()));
@@ -168,7 +180,10 @@ public final class PlotService {
         } catch (IllegalArgumentException e) {
             return Reply.failure(Message.of(MessageKey.INVALID_AMOUNT, priceInput.strip()));
         }
-        return withOwnPlot(caller, (view, seller) -> attempt(() -> {
+        return withOwnPlot(caller, (view, seller) -> !onStreet(queries.polity(view.town()).orElseThrow(), view.area())
+                && units > 0
+                ? Reply.failure(Message.of(MessageKey.PLOT_NEEDS_STREET, de.etiennebader.civ.server.road.StreetAccess.reach()))
+                : attempt(() -> {
             Money price = Money.of(units, queries.polity(view.town()).orElseThrow().currency());
             app.offerPlot().execute(new OfferPlot.Command(view.town(), view.id(), seller, Optional.of(price),
                     calendar.today()));
@@ -204,6 +219,84 @@ public final class PlotService {
             lastPlot.remove(caller.player());
             return Reply.success(Message.of(MessageKey.PLOT_BOUGHT, texts.money(price)));
         });
+    }
+
+    /** Namen der Firmen, die der Spieler leitet; für die Firmenwahl im Grundstücksmenü. */
+    public List<String> companiesHeadedBy(PlayerRef player) {
+        return queries.companies().stream()
+                .filter(company -> company.holds(player, de.etiennebader.civ.domain.polity.Office.MAYOR))
+                .map(company -> company.name().value()).sorted(String.CASE_INSENSITIVE_ORDER).toList();
+    }
+
+    /**
+     * Die Leitung einer Firma kauft das angebotene Grundstück unter sich für die Firma: Der Preis kommt aus der
+     * Firmenkasse, das Grundstück gehört danach der Firma (Voraussetzung für Maschinen und {@code company_plot_required}).
+     */
+    public Reply buyForCompany(Caller caller, String companyName) {
+        Optional<PlotView> plot = plotAt(caller.player(), caller.position());
+        if (plot.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.PLOT_NONE_HERE));
+        }
+        return buyForCompany(caller, plot.get().town(), plot.get().id(), companyName);
+    }
+
+    /** Wie {@link #buyForCompany(Caller, String)} für ein bestimmtes Grundstück, z. B. aus dem Grundstücksmenü. */
+    public Reply buyForCompany(Caller caller, PolityId town, PlotId plotId, String companyName) {
+        Optional<PolityView> company = headedCompany(caller, companyName);
+        if (company.isEmpty()) {
+            return companyFailure(caller, companyName);
+        }
+        Optional<Plot> current = queries.land(town).plot(plotId);
+        if (current.isPresent() && current.get().holder().equals(company.get().asActor())) {
+            return Reply.failure(Message.of(MessageKey.PLOT_ALREADY_YOURS));
+        }
+        return attempt(() -> {
+            Money price = app.buyPlot().execute(new BuyPlot.Command(town, plotId, company.get().asActor(),
+                    calendar.today()));
+            return Reply.success(Message.of(MessageKey.PLOT_BOUGHT_FOR_COMPANY, company.get().name().value(),
+                    texts.money(price)));
+        });
+    }
+
+    /** Der Inhaber übergibt das Grundstück unter sich ohne Kaufpreis an seine Firma. */
+    public Reply transferToCompany(Caller caller, String companyName) {
+        Optional<PlotView> plot = plotAt(caller.player(), caller.position());
+        if (plot.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.PLOT_NONE_HERE));
+        }
+        return transferToCompany(caller, plot.get().town(), plot.get().id(), companyName);
+    }
+
+    /** Wie {@link #transferToCompany(Caller, String)} für ein bestimmtes Grundstück. */
+    public Reply transferToCompany(Caller caller, PolityId town, PlotId plotId, String companyName) {
+        Optional<PolityView> company = headedCompany(caller, companyName);
+        if (company.isEmpty()) {
+            return companyFailure(caller, companyName);
+        }
+        Optional<Plot> current = queries.land(town).plot(plotId);
+        if (current.isEmpty() || !current.get().isHeldBy(caller.player())) {
+            return Reply.failure(Message.of(MessageKey.PLOT_NOT_OWN));
+        }
+        return attempt(() -> {
+            app.transferPlot().execute(new de.etiennebader.civ.application.land.TransferPlot.Command(town, plotId,
+                    caller.player(), company.get().asActor(), calendar.today()));
+            lastPlot.remove(caller.player());
+            return Reply.success(Message.of(MessageKey.PLOT_TRANSFERRED_TO_COMPANY, company.get().name().value()));
+        });
+    }
+
+    private Optional<PolityView> headedCompany(Caller caller, String companyName) {
+        return queries.companies().stream()
+                .filter(found -> found.name().value().equalsIgnoreCase(companyName.strip()))
+                .filter(found -> found.holds(caller.player(), de.etiennebader.civ.domain.polity.Office.MAYOR))
+                .findFirst();
+    }
+
+    private Reply companyFailure(Caller caller, String companyName) {
+        boolean exists = queries.companies().stream()
+                .anyMatch(found -> found.name().value().equalsIgnoreCase(companyName.strip()));
+        return Reply.failure(exists ? Message.of(MessageKey.PLOT_NOT_COMPANY_HEAD, companyName.strip())
+                : Message.of(MessageKey.BUILD_UNKNOWN_FIRM, companyName.strip()));
     }
 
     /** Ein Bürger vergibt Gemeindeland kostenlos an einen Spieler. */

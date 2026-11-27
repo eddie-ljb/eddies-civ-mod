@@ -5,6 +5,7 @@ import de.etiennebader.civ.application.media.PressUseCases;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.actor.PlayerRef;
+import de.etiennebader.civ.domain.civic.Anthem;
 import de.etiennebader.civ.domain.civic.CustomImage;
 import de.etiennebader.civ.domain.civic.ImageKind;
 import de.etiennebader.civ.domain.exchange.Side;
@@ -308,6 +309,10 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                 case "POST /api/war/campaign" -> withLogin(request, login -> action(request, body -> game.call(() ->
                         warCampaign(login, body)), texts));
                 case "GET /api/families" -> HttpResponse.json(200, game.call(this::families));
+                case "GET /api/religions" -> HttpResponse.json(200, game.call(() -> religions(
+                        request.cookie(SESSION_COOKIE).flatMap(sessions::session))));
+                case "POST /api/religions" -> withLogin(request, login -> action(request, body -> game.call(() ->
+                        religionAction(login, body)), texts));
                 case "GET /api/press" -> HttpResponse.json(200, game.call(this::press));
                 case "POST /api/press" -> withLogin(request, login -> action(request, body -> game.call(() ->
                         civ.press().publish(login.player(), body.getOrDefault("paper", ""),
@@ -330,12 +335,20 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                         lawAction(login, body)), texts));
                 case "GET /api/show" -> HttpResponse.json(200, game.call(() -> show(texts)));
                 case "GET /api/civic" -> HttpResponse.json(200, game.call(() -> civic(texts)));
+                case "GET /api/logos" -> withLogin(request, login -> HttpResponse.json(200, game.call(() -> logos(login))));
                 case "POST /api/image" -> withLogin(request, login -> imageUpload(request, login, texts));
                 case "GET /api/image" -> imageGet(request.query().getOrDefault("id", ""));
                 case "POST /api/image/remove" -> withLogin(request, login -> {
                     Map<String, String> body = Json.parseFlat(request.body());
                     return domain(texts, () -> game.call(() -> imageRemove(login, body.getOrDefault("id", ""))));
                 });
+                case "POST /api/anthem-audio" -> withLogin(request, login -> anthemAudioUpload(request, login, texts));
+                case "POST /api/anthem-audio/remove" -> withLogin(request, login -> {
+                    Map<String, String> body = Json.parseFlat(request.body());
+                    return domain(texts, () -> game.call(() -> anthemAudioRemove(login, body.getOrDefault("polity", ""))));
+                });
+                case "GET /api/anthem-audio" -> anthemAudioGet(request.query().getOrDefault("hash", ""));
+                case "GET /api/anthem-pack.zip" -> anthemPack();
                 case "POST /api/login" -> login(request);
                 case "POST /api/logout" -> logout(request);
                 case "GET /api/me" -> withLogin(request, login -> HttpResponse.json(200, game.call(() -> me(login, texts))));
@@ -896,6 +909,9 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                                         .put("front", entry.front()).put("shift", entry.shift())
                                         .put("woundedAggressor", entry.woundedAggressor())
                                         .put("woundedDefender", entry.woundedDefender()).build()))
+                        .put("conquest", war.outcome().map(terms -> terms.conquest()).orElse(0))
+                        .put("points", war.outcome().map(terms -> terms.points()).orElse(0))
+                        .put("spoilsOpen", war.outcome().map(terms -> !terms.settled()).orElse(false))
                         .raw("campaigns", Json.array(registry.campaigns().stream()
                                 .filter(campaign -> campaign.war().equals(war.id())).toList(), campaign -> Json.object()
                                 .put("kind", campaign.kind().name())
@@ -925,6 +941,109 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                         .put("divorced", divorce.divorced().value()).build()))
                 .put("children", registry.children().size())
                 .build();
+    }
+
+    /**
+     * {@code GET /api/logos}: die Einheiten, die der Angemeldete führt (Bürgermeister, Vorsitz, Firmenchef), mit ihren
+     * hochgeladenen Bildern. Nur die Spitze darf Wappen, Wahlplakat und Leuchtreklame hochladen; im Spiel erscheinen die
+     * Wappen über dem Gemeindehaus, alle Bilder gibt es mit {@code /civ logo} als Karte.
+     */
+    private String logos(WebSessions.Login login) {
+        return Json.object().raw("polities", Json.array(civ.queries().polities().stream()
+                .filter(polity -> de.etiennebader.civ.application.civic.CivicUseCases.isHead(polity, login.player()))
+                .toList(), polity -> Json.object()
+                .put("name", polity.name().value())
+                .put("kind", polity.kind().name())
+                .raw("images", Json.array(civ.civic().imagesOf(polity.id()), image -> Json.object()
+                        .put("id", image.id())
+                        .put("kind", image.kind().name())
+                        .put("width", image.width())
+                        .put("height", image.height())
+                        .put("uploaded", image.uploadedAt().value())
+                        .build()))
+                .build())).build();
+    }
+
+    private String religions(Optional<WebSessions.Login> login) {
+        var census = civ.religion().census();
+        return Json.object()
+                .raw("religions", Json.array(civ.religion().summaries(login.map(WebSessions.Login::player)),
+                        r -> Json.object()
+                                .put("id", r.id())
+                                .put("name", r.name())
+                                .put("logo", r.logo())
+                                .put("monotheistic", r.monotheistic())
+                                .put("scripture", r.scripture())
+                                .put("temple", r.temple())
+                                .put("language", r.language())
+                                .put("head", r.head())
+                                .put("power", r.power())
+                                .put("members", r.members())
+                                .put("villagers", r.villagers())
+                                .put("fervor", r.fervor())
+                                .raw("denominations", Json.array(r.denominations(), Json::string))
+                                .put("founder", r.founder())
+                                .put("founded", r.founded())
+                                .put("electionOpen", r.electionOpen())
+                                .put("electionCloses", r.electionCloses())
+                                .raw("candidates", Json.array(r.candidates(), Json::string))
+                                .put("mine", r.mine())
+                                .put("denomination", r.denomination())
+                                .put("scriptureText", civ.religion().scriptureText(r.id()))
+                                .put("canEdit", login.map(l -> civ.religion().canEditScripture(l.player(), r.id()))
+                                        .orElse(false))
+                                .put("leads", login.map(l -> civ.religion().leadsReligion(l.player(), r.id()))
+                                        .orElse(false))
+                                .raw("roles", Json.array(civ.religion().roleViews(r.id()), role -> Json.object()
+                                        .put("name", role.name())
+                                        .raw("rights", Json.array(role.rights(), Json::string))
+                                        .raw("holders", Json.array(role.holders(), Json::string))
+                                        .build()))
+                                .build()))
+                .raw("census", Json.object()
+                        .put("believers", census.believers())
+                        .put("undecided", census.undecided())
+                        .put("atheists", census.atheists())
+                        .put("organised", census.organised()).build())
+                .raw("rites", Json.array(civ.religion().recentRites(20), Json::string))
+                .put("loggedIn", login.isPresent())
+                .build();
+    }
+
+    private Reply religionAction(WebSessions.Login login, Map<String, String> body) {
+        Caller caller = caller(login);
+        var religion = civ.religion();
+        var today = civ.calendar().today();
+        return switch (body.getOrDefault("action", "")) {
+            case "join" -> religion.join(caller, body.getOrDefault("name", ""));
+            case "leave" -> religion.leave(caller);
+            case "found" -> religion.found(caller, body.getOrDefault("name", ""),
+                    Boolean.parseBoolean(body.getOrDefault("monotheistic", "false")),
+                    body.getOrDefault("scripture", ""), body.getOrDefault("temple", ""),
+                    body.getOrDefault("language", ""), today);
+            case "candidate" -> religion.candidate(caller, today);
+            case "vote" -> religion.vote(caller, body.getOrDefault("candidate", ""), today);
+            case "denomination" -> religion.denomination(caller, body.getOrDefault("name", ""), today);
+            case "scripture" -> religion.writeScripture(caller, body.getOrDefault("text", ""),
+                    Boolean.parseBoolean(body.getOrDefault("append", "false")), today);
+            case "rename" -> religion.rename(caller, body.getOrDefault("what", ""), body.getOrDefault("value", ""), today);
+            case "role" -> religion.defineRole(caller, body.getOrDefault("name", ""),
+                    java.util.Arrays.stream(body.getOrDefault("rights", "").split("[ ,]+")).filter(w -> !w.isBlank())
+                            .toList());
+            case "roledelete" -> religion.deleteRole(caller, body.getOrDefault("name", ""));
+            case "roleassign" -> civ.players().findByName(body.getOrDefault("player", ""))
+                    .map(target -> religion.assignRole(caller, body.getOrDefault("name", ""), target,
+                            body.getOrDefault("player", "")))
+                    .orElseGet(() -> Reply.failure(Message.of(MessageKey.RELIGION_UNKNOWN_PLAYER,
+                            body.getOrDefault("player", ""))));
+            case "rolerevoke" -> civ.players().findByName(body.getOrDefault("player", ""))
+                    .map(target -> religion.revokeRoles(caller, target, body.getOrDefault("player", "")))
+                    .orElseGet(() -> Reply.failure(Message.of(MessageKey.RELIGION_UNKNOWN_PLAYER,
+                            body.getOrDefault("player", ""))));
+            case "bless" -> religion.rite(caller, "segnung", body.getOrDefault("player", ""), today);
+            case "baptize" -> religion.rite(caller, "taufe", body.getOrDefault("player", ""), today);
+            default -> Reply.failure(Message.of(MessageKey.RELIGION_ERROR, "Unbekannte Aktion"));
+        };
     }
 
     private String press() {
@@ -1384,6 +1503,209 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                 })));
     }
 
+    // ---- Hymnen-Aufnahmen (OGG/MP3) ----
+
+    /** Version des Ressourcenpaket-Formats für das erzeugte Hymnen-Paket. */
+    private static final int PACK_FORMAT = 84;
+    private static final java.util.regex.Pattern HASH = java.util.regex.Pattern.compile("[0-9a-f]{64}");
+
+    /**
+     * {@code POST /api/anthem-audio}: {@code {"polity": "<Name>", "data": "<OGG oder MP3 als Base64>"}}. Nur die
+     * Spitze der Einheit darf hochladen. MP3 wird mit {@code ffmpeg} nach OGG Vorbis umgewandelt, falls der Server es
+     * findet; sonst bitte eine OGG-Datei hochladen.
+     */
+    private HttpResponse anthemAudioUpload(HttpRequest request, WebSessions.Login login, Translator texts) {
+        Map<String, String> body = Json.parseFlat(request.body());
+        Optional<PolityView> polity = game.call(() -> civ.queries().polityNamed(body.getOrDefault("polity", "")));
+        if (polity.isEmpty()) {
+            return HttpResponse.error(400, "Unbekannte Einheit");
+        }
+        byte[] bytes;
+        try {
+            bytes = Base64.getDecoder().decode(body.getOrDefault("data", ""));
+        } catch (IllegalArgumentException e) {
+            return invalidAudio(texts, "Base64");
+        }
+        if (bytes.length > Anthem.MAX_AUDIO_BYTES) {
+            return invalidAudio(texts, "max. " + Anthem.MAX_AUDIO_BYTES / (1024 * 1024) + " MB");
+        }
+        if (!isOgg(bytes)) {
+            Optional<byte[]> converted = looksLikeMp3(bytes) ? convertToOgg(bytes) : Optional.empty();
+            if (converted.isEmpty()) {
+                return invalidAudio(texts, "OGG Vorbis (oder MP3 mit ffmpeg auf dem Server)");
+            }
+            bytes = converted.get();
+            if (bytes.length > Anthem.MAX_AUDIO_BYTES) {
+                return invalidAudio(texts, "max. " + Anthem.MAX_AUDIO_BYTES / (1024 * 1024) + " MB");
+            }
+        }
+        Optional<java.nio.file.Path> dir = civ.anthemsDirectory();
+        if (dir.isEmpty()) {
+            return HttpResponse.error(503, "Hymnen-Ablage nicht verfügbar");
+        }
+        String hash = sha256Hex(bytes);
+        try {
+            Files.createDirectories(dir.get());
+            java.nio.file.Path file = dir.get().resolve(hash + ".ogg");
+            if (!Files.exists(file)) {
+                Files.write(file, bytes);
+            }
+        } catch (IOException e) {
+            return HttpResponse.error(500, "Aufnahme konnte nicht gespeichert werden");
+        }
+        PolityView target = polity.get();
+        Optional<java.nio.file.Path> directory = dir;
+        Reply reply = game.call(() -> {
+            Reply result = civ.civic().setAnthemAudio(caller(login), target, hash,
+                    old -> deleteUnusedAudio(directory.get(), old));
+            if (!result.success()) {
+                // Die frisch geschriebene Datei gehört niemandem: wieder aufräumen.
+                deleteUnusedAudio(directory.get(), hash);
+            }
+            return result;
+        });
+        return domain(texts, () -> reply);
+    }
+
+    private Reply anthemAudioRemove(WebSessions.Login login, String polityName) {
+        Optional<PolityView> polity = civ.queries().polityNamed(polityName);
+        if (polity.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.ANTHEM_NONE, polityName));
+        }
+        Optional<java.nio.file.Path> dir = civ.anthemsDirectory();
+        return civ.civic().removeAnthemAudio(caller(login), polity.get(),
+                old -> dir.ifPresent(directory -> deleteUnusedAudio(directory, old)));
+    }
+
+    /** Löscht die Datei nur, wenn keine Hymne sie mehr braucht (der Hash ist inhaltsadressiert). */
+    private void deleteUnusedAudio(java.nio.file.Path directory, String hash) {
+        if (HASH.matcher(hash).matches() && !civ.civic().audioInUse(hash)) {
+            try {
+                Files.deleteIfExists(directory.resolve(hash + ".ogg"));
+            } catch (IOException ignored) {
+                // bleibt als verwaiste Datei liegen; harmlos
+            }
+        }
+    }
+
+    private static boolean isOgg(byte[] bytes) {
+        return bytes.length > 64 && bytes[0] == 'O' && bytes[1] == 'g' && bytes[2] == 'g' && bytes[3] == 'S';
+    }
+
+    private static boolean looksLikeMp3(byte[] bytes) {
+        boolean id3 = bytes.length > 64 && bytes[0] == 'I' && bytes[1] == 'D' && bytes[2] == '3';
+        boolean frame = bytes.length > 64 && (bytes[0] & 0xFF) == 0xFF && (bytes[1] & 0xE0) == 0xE0;
+        return id3 || frame;
+    }
+
+    /** Wandelt MP3 mit {@code ffmpeg} in Mono-OGG-Vorbis um (Minecraft spielt nur OGG); leer ohne ffmpeg. */
+    private static Optional<byte[]> convertToOgg(byte[] mp3) {
+        java.nio.file.Path in = null;
+        java.nio.file.Path out = null;
+        try {
+            in = Files.createTempFile("civ-anthem", ".mp3");
+            out = Files.createTempFile("civ-anthem", ".ogg");
+            Files.write(in, mp3);
+            Process process = new ProcessBuilder("ffmpeg", "-y", "-loglevel", "error", "-i", in.toString(), "-vn",
+                    "-ac", "1", "-ar", "44100", "-c:a", "libvorbis", "-q:a", "3", "-f", "ogg", out.toString())
+                    .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+            if (!process.waitFor(60, java.util.concurrent.TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                return Optional.empty();
+            }
+            if (process.exitValue() != 0) {
+                return Optional.empty();
+            }
+            byte[] ogg = Files.readAllBytes(out);
+            return isOgg(ogg) ? Optional.of(ogg) : Optional.empty();
+        } catch (IOException e) {
+            return Optional.empty();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return Optional.empty();
+        } finally {
+            for (java.nio.file.Path temp : new java.nio.file.Path[] {in, out}) {
+                if (temp != null) {
+                    try {
+                        Files.deleteIfExists(temp);
+                    } catch (IOException ignored) {
+                        // Temp-Datei bleibt liegen; harmlos
+                    }
+                }
+            }
+        }
+    }
+
+    private static HttpResponse invalidAudio(Translator texts, String detail) {
+        return HttpResponse.json(422, Json.object().put("ok", false)
+                .put("message", texts.translate(Message.of(MessageKey.ANTHEM_AUDIO_INVALID, detail))).build());
+    }
+
+    /** {@code GET /api/anthem-audio?hash=<SHA-256>}: die OGG-Bytes (nur Hashes, die eine Hymne verwendet). */
+    private HttpResponse anthemAudioGet(String hash) {
+        if (!HASH.matcher(hash).matches() || !game.call(() -> civ.civic().audioInUse(hash))) {
+            return HttpResponse.error(404, "Aufnahme nicht gefunden");
+        }
+        Optional<java.nio.file.Path> dir = civ.anthemsDirectory();
+        if (dir.isEmpty()) {
+            return HttpResponse.error(404, "Hymnen-Ablage nicht verfügbar");
+        }
+        try {
+            byte[] bytes = Files.readAllBytes(dir.get().resolve(hash + ".ogg"));
+            return new HttpResponse(200, "audio/ogg", bytes, Map.of("Cache-Control", "public, max-age=86400"));
+        } catch (IOException e) {
+            return HttpResponse.error(404, "Aufnahme fehlt");
+        }
+    }
+
+    /**
+     * {@code GET /api/anthem-pack.zip}: Ressourcenpaket mit allen Hymnen-Aufnahmen. Der Server (oder jeder Spieler)
+     * lädt es als Ressourcenpaket; die Klänge heißen {@code eddies-civ-mod:anthem.<Kurzhash>}.
+     */
+    private HttpResponse anthemPack() {
+        Optional<java.nio.file.Path> dir = civ.anthemsDirectory();
+        if (dir.isEmpty()) {
+            return HttpResponse.error(404, "Hymnen-Ablage nicht verfügbar");
+        }
+        List<Anthem> anthems = game.call(() -> civ.queries().civic().anthems().values().stream()
+                .filter(Anthem::hasAudio).distinct().toList());
+        java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
+        try (java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(buffer)) {
+            zipEntry(zip, "pack.mcmeta", ("{\"pack\":{\"pack_format\":" + PACK_FORMAT
+                    + ",\"description\":\"Eddies Civ Mod: Hymnen\"}}").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sounds = new StringBuilder("{");
+            String separator = "";
+            java.util.Set<String> written = new java.util.HashSet<>();
+            for (Anthem anthem : anthems) {
+                if (!written.add(anthem.soundName())) {
+                    continue;
+                }
+                byte[] ogg;
+                try {
+                    ogg = Files.readAllBytes(dir.get().resolve(anthem.audio() + ".ogg"));
+                } catch (IOException e) {
+                    continue;
+                }
+                zipEntry(zip, "assets/eddies-civ-mod/sounds/" + anthem.soundName().replace('.', '_') + ".ogg", ogg);
+                sounds.append(separator).append('"').append(anthem.soundName())
+                        .append("\":{\"category\":\"record\",\"sounds\":[{\"name\":\"eddies-civ-mod:")
+                        .append(anthem.soundName().replace('.', '_')).append("\",\"stream\":true}]}");
+                separator = ",";
+            }
+            zipEntry(zip, "assets/eddies-civ-mod/sounds.json",
+                    sounds.append('}').toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            return HttpResponse.error(500, "Paket konnte nicht erstellt werden");
+        }
+        return new HttpResponse(200, "application/zip", buffer.toByteArray(), Map.of("Cache-Control", "no-cache"));
+    }
+
+    private static void zipEntry(java.util.zip.ZipOutputStream zip, String name, byte[] bytes) throws IOException {
+        zip.putNextEntry(new java.util.zip.ZipEntry(name));
+        zip.write(bytes);
+        zip.closeEntry();
+    }
+
     private static HttpResponse invalidImage(Translator texts) {
         return HttpResponse.json(422, Json.object().put("ok", false)
                 .put("message", texts.translate(Message.of(MessageKey.IMAGE_INVALID))).build());
@@ -1478,8 +1800,16 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                         .put("preamble", polity.constitution().preamble())
                         .raw("paragraphs", Json.array(books.paragraphsOf(polity), paragraph -> Json.object()
                                 .put("number", paragraph.number())
+                                .put("id", paragraph.id().value().toString())
+                                .put("law", paragraph.lawName())
+                                .put("part", paragraph.partName())
                                 .put("title", paragraph.title())
                                 .put("text", paragraph.text())
+                                .raw("sections", Json.array(paragraph.sections(), section -> Json.object()
+                                        .put("number", section.number())
+                                        .raw("sentences", Json.array(section.sentences(), Json::string))
+                                        .raw("enumeration", Json.array(section.enumeration(), Json::string))
+                                        .build()))
                                 .put("enactedOn", paragraph.enactedOn())
                                 .raw("effects", Json.array(paragraph.effects(), effect -> Json.object()
                                         .put("id", effect.id())
@@ -1537,8 +1867,10 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
             return Reply.failure(Message.of(MessageKey.NOT_IN_MUNICIPALITY));
         }
         return switch (action) {
-            case "enact" -> books.enact(caller, polity, body.getOrDefault("title", ""), body.getOrDefault("text", ""));
-            case "repeal" -> books.repeal(caller, polity, Integer.parseInt(body.getOrDefault("number", "0")));
+            case "enact" -> books.enact(caller, polity, body.getOrDefault("law", ""), body.getOrDefault("part", ""),
+                    body.getOrDefault("title", ""), body.getOrDefault("text", ""));
+            case "repeal" -> books.repeal(caller, polity,
+                    new de.etiennebader.civ.domain.shared.StatuteId(UUID.fromString(body.getOrDefault("id", ""))));
             case "rights" -> {
                 Map<String, String> values = new java.util.LinkedHashMap<>();
                 body.forEach((key, value) -> {
@@ -1685,6 +2017,7 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                                     .put("title", found.title())
                                     .put("instrument", found.instrument())
                                     .put("notes", found.notes())
+                                    .put("audio", found.audio())
                                     .raw("melody", Json.array(found.melody(), note -> Json.object()
                                             .put("s", note.semitones())
                                             .put("t", note.ticks())

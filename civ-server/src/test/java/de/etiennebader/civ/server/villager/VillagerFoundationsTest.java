@@ -79,7 +79,7 @@ class VillagerFoundationsTest {
         assertTrue(founded, "eine Gemeinde entstand");
         assertEquals(before + 1, towns());
         PolityView created = server.queries().polities().stream()
-                .filter(p -> p.kind() == PolityKind.TERRITORIAL && p.name().value().startsWith("Neustadt"))
+                .filter(p -> p.kind() == PolityKind.TERRITORIAL && !p.name().value().equals("Nordhain"))
                 .findFirst().orElseThrow();
         // Bis zur ersten Wahl führt der Gründer als kommissarischer Bürgermeister (villagerPolitics).
         assertTrue(created.mayor(true).filter(PersonRef.class::isInstance).isPresent(), "ein Dorfbewohner führt sie");
@@ -107,6 +107,27 @@ class VillagerFoundationsTest {
     }
 
     @Test
+    @DisplayName("Mit Gründungsgebühr zahlt die Heimatgemeinde die Starthilfe, wenn ihre Kasse es trägt")
+    void homeTreasuryFundsSettlers() {
+        PolityView town = nordhainWithVillagers(6, true);
+        var fees = de.etiennebader.civ.server.founding.FoundingFees.DEFAULT;
+        long fee = fees.municipality() * VillagerFoundations.SETTLER_FEE_PERCENT / 100;
+        server.bank().deposit(new Caller(alice, "Alice", new BlockPosition(DimensionId.OVERWORLD, 8, 64, 8)), 500);
+        server.app().transferFunds().execute(new de.etiennebader.civ.application.economy.TransferFunds.Command(alice,
+                town.asActor(), de.etiennebader.civ.domain.shared.Money.of(fee * 10, town.currency()),
+                de.etiennebader.civ.domain.economy.TransferReason.GRANT, Day.of(2)));
+        VillagerFoundations paying = new VillagerFoundations(server.app(),
+                villager -> Optional.ofNullable(seen.get(villager)), new Announcements(), fees);
+        boolean founded = false;
+        for (int i = 0; i < 400 && !founded; i++) {
+            founded = paying.endOfDay(Day.of(10 + i));
+        }
+        assertTrue(founded, "die Heimatgemeinde rüstet die Siedler aus");
+        assertEquals(2, towns());
+        assertTrue(server.queries().ledger().balanceOf(town.asActor(), town.currency()).amount() < fee * 10);
+    }
+
+    @Test
     @DisplayName("Ohne Ehrgeiz oder in kleinen Gemeinden gründet niemand etwas")
     void nothingWithoutAmbitionOrSize() {
         nordhainWithVillagers(6, false);
@@ -117,14 +138,32 @@ class VillagerFoundationsTest {
     }
 
     @Test
-    @DisplayName("Schlägt die Claim-Prüfung fehl, bleibt der Dorfbewohner in seiner Gemeinde")
-    void rejectedClaimKeepsMembership() {
+    @DisplayName("Wer mitten in der Heimatgemeinde lebt, gründet an einem freien Ort in der Nähe und zieht dorthin")
+    void villagerInsideHomeTerritoryFoundsNearby() {
         PolityView town = nordhainWithVillagers(6, true);
-        seen.replaceAll((villager, position) -> new BlockPosition(DimensionId.OVERWORLD, 8, 64, 8)); // schon beansprucht
-        for (int i = 0; i < 300; i++) {
-            assertFalse(foundations.endOfDay(Day.of(10 + i)));
+        BlockPosition inside = new BlockPosition(DimensionId.OVERWORLD, 8, 64, 8); // im beanspruchten Kerngebiet
+        seen.replaceAll((villager, position) -> inside);
+        java.util.List<java.util.Map.Entry<PersonRef, BlockPosition>> relocated = new ArrayList<>();
+        VillagerFoundations relocating = new VillagerFoundations(server.app(),
+                villager -> Optional.ofNullable(seen.get(villager)), new Announcements(),
+                de.etiennebader.civ.server.founding.FoundingFees.FREE,
+                (villager, seat) -> relocated.add(java.util.Map.entry(villager, seat)));
+        boolean founded = false;
+        for (int i = 0; i < 400 && !founded; i++) {
+            founded = relocating.endOfDay(Day.of(10 + i));
         }
-        assertEquals(1, towns());
-        assertEquals(7, server.queries().polity(town.id()).orElseThrow().members().size());
+        assertTrue(founded, "trotz Wohnsitz im fremden Gebiet entsteht eine Gemeinde");
+        assertEquals(2, towns());
+        PolityView created = server.queries().polities().stream()
+                .filter(p -> p.kind() == PolityKind.TERRITORIAL && !p.name().value().equals("Nordhain"))
+                .findFirst().orElseThrow();
+        BlockPosition seat = created.seat().orElseThrow();
+        assertTrue(server.queries().territory().sovereignOf(seat.chunk()).filter(created.id()::equals).isPresent(),
+                "das Gemeindehaus liegt im eigenen Gebiet");
+        assertTrue(Math.abs(seat.chunk().x()) > VillagerFoundations.SITE_GAP
+                || Math.abs(seat.chunk().z()) > VillagerFoundations.SITE_GAP, "mit Abstand zur Heimatgemeinde");
+        assertEquals(created.members().size(), relocated.size(), "Gründer und Gefolge werden zum Gemeindehaus gebracht");
+        assertTrue(relocated.stream().allMatch(entry -> entry.getValue().equals(seat)));
+        assertEquals(7, created.members().size() + server.queries().polity(town.id()).orElseThrow().members().size());
     }
 }

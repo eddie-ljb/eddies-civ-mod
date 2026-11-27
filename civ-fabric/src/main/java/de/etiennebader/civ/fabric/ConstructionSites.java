@@ -3,6 +3,7 @@ package de.etiennebader.civ.fabric;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import de.etiennebader.civ.domain.construction.Blueprint;
 import de.etiennebader.civ.domain.territory.BlockPosition;
+import de.etiennebader.civ.fabric.content.CivContent;
 import de.etiennebader.civ.server.CivServer;
 import de.etiennebader.civ.server.construction.ConstructionService;
 import net.minecraft.commands.arguments.blocks.BlockStateParser;
@@ -20,11 +21,14 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.npc.villager.Villager;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -40,7 +44,10 @@ import java.util.UUID;
 final class ConstructionSites {
 
     private static final int INTERVAL = 40;
-    private static final int MAX_FOUNDATION = 12;
+    private static final int MAX_FOUNDATION = 24;
+
+    /** Baustellen, deren Absperrung schon abgebaut wurde. */
+    private final Set<UUID> cleared = new HashSet<>();
 
     private final Map<String, BlockState> parsed = new HashMap<>();
     private int ticks;
@@ -51,8 +58,97 @@ final class ConstructionSites {
         }
         long elapsed = ticks;
         ticks = 0;
+        civ.construction().siteSurvey(survey(server));
         for (ConstructionService.Build build : civ.construction().advance(elapsed, terrain(server))) {
             place(server, build);
+        }
+        fences(server, civ);
+    }
+
+    // ------------------------------------------------------------------ Absperrung
+
+    private static Block barrier() {
+        return BuiltInRegistries.BLOCK.getValue(CivContent.CONSTRUCTION_BARRIER_ID);
+    }
+
+    /**
+     * Die Bauabsperrung: Um jede laufende Baustelle steht ein Zaun (ein Block Abstand zum Bau, höchstens bis zur
+     * Grundstücksgrenze). Fertige oder abgebrochene Baustellen bekommen ihn abgenommen.
+     */
+    private void fences(MinecraftServer server, CivServer civ) {
+        for (ConstructionService.Site site : civ.construction().sites()) {
+            if (!site.active() && cleared.contains(site.project())) {
+                continue;
+            }
+            Optional<ServerLevel> found = levelOf(server, site.min());
+            if (found.isEmpty()) {
+                continue;
+            }
+            ServerLevel level = found.get();
+            int x1 = Math.max(site.limit().minX(), site.min().x() - 1);
+            int z1 = Math.max(site.limit().minZ(), site.min().z() - 1);
+            int x2 = Math.min(site.limit().maxX(), site.min().x() + site.sizeX());
+            int z2 = Math.min(site.limit().maxZ(), site.min().z() + site.sizeZ());
+            if (!ChunkLoader.ensureArea(level, x1, z1, x2, z2, false)) {
+                continue;
+            }
+            Block barrier = barrier();
+            boolean complete = true;
+            for (int x = x1; x <= x2; x++) {
+                for (int z = z1; z <= z2; z++) {
+                    if (x != x1 && x != x2 && z != z1 && z != z2) {
+                        continue;
+                    }
+                    if (site.active()) {
+                        complete &= raise(level, barrier, x, z);
+                    } else {
+                        remove(level, barrier, x, z, site.min().y());
+                    }
+                }
+            }
+            if (!site.active()) {
+                cleared.add(site.project());
+            }
+        }
+    }
+
+    /**
+     * Stellt an der Stelle einen Zaun auf den Boden, genau einen Block hoch. Die Höhe misst der Zaun selbst mit
+     * (er zählt als Boden); deshalb wird zuerst der unterste Zaun der Spalte gesucht und alles darüber abgeräumt, sonst
+     * wüchse er bei jedem Durchgang um einen Block.
+     */
+    private static boolean raise(ServerLevel level, Block barrier, int x, int z) {
+        int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+        BlockPos pos = new BlockPos(x, y, z);
+        if (level.getBlockState(pos.below()).is(barrier)) {
+            BlockPos lowest = pos.below();
+            while (level.getBlockState(lowest.below()).is(barrier)) {
+                lowest = lowest.below();
+            }
+            for (BlockPos stacked = lowest.above(); stacked.getY() < y; stacked = stacked.above()) {
+                level.setBlock(stacked, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+            }
+            return true;
+        }
+        BlockState here = level.getBlockState(pos);
+        if (here.is(barrier)) {
+            return true;
+        }
+        if (!replaceable(here) || level.getBlockState(pos.below()).isAir()) {
+            return false;
+        }
+        level.setBlock(pos, barrier.defaultBlockState(), Block.UPDATE_ALL);
+        return true;
+    }
+
+    /** Nimmt den Zaun in der Spalte weg, wo immer er steht (Gelände kann sich geändert haben). */
+    private static void remove(ServerLevel level, Block barrier, int x, int z, int baseY) {
+        int top = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) + 2;
+        for (int y = Math.max(level.getMinY(), baseY - 8); y <= top; y++) {
+            BlockPos pos = new BlockPos(x, y, z);
+            if (level.getBlockState(pos).is(barrier)) {
+                level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+            }
         }
     }
 
@@ -62,12 +158,87 @@ final class ConstructionSites {
                 : Optional.ofNullable(server.getLevel(ResourceKey.create(Registries.DIMENSION, dimension)));
     }
 
+    /**
+     * Ob auf einer Fläche schon gebaut wurde, auch ohne Bauauftrag: In jeder Spalte zählen die obersten Blöcke, die
+     * weder Luft, Flüssigkeit, Pflanzen, Laub, Holz noch natürliches Gelände (Erde, Stein, Sand, Schnee …) sind.
+     * Liegt ein Teil der Fläche in einem nicht geladenen Chunk, ist das Ergebnis offen.
+     */
+    private static ConstructionService.SiteSurvey survey(MinecraftServer server) {
+        return area -> {
+            Optional<ServerLevel> found = levelOf(server, new BlockPosition(area.dimension(), area.minX(), 0, area.minZ()));
+            if (found.isEmpty()) {
+                return Optional.empty();
+            }
+            ServerLevel level = found.get();
+            if (!ChunkLoader.ensureArea(level, area.minX(), area.minZ(), area.maxX(), area.maxZ(), false)) {
+                return Optional.empty();
+            }
+            BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+            for (int x = area.minX(); x <= area.maxX(); x++) {
+                for (int z = area.minZ(); z <= area.maxZ(); z++) {
+                    int top = level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z);
+                    for (int y = top - 1; y >= Math.max(level.getMinY(), top - 6); y--) {
+                        pos.set(x, y, z);
+                        if (!natural(level.getBlockState(pos))) {
+                            return Optional.of(true);
+                        }
+                    }
+                }
+            }
+            return Optional.of(false);
+        };
+    }
+
+    /** Namen natürlicher Blöcke, die in keinem Tag stehen (Pflanzen, Pilze, Moos, Tropfstein, Erz-Begleiter …). */
+    private static final java.util.Set<String> NATURAL_NAMES = java.util.Set.of("cactus", "sugar_cane", "bamboo",
+            "bamboo_sapling", "pumpkin", "melon", "brown_mushroom", "red_mushroom", "sweet_berry_bush", "lily_pad",
+            "kelp", "kelp_plant", "moss_block", "moss_carpet", "tuff", "calcite", "dripstone_block",
+            "pointed_dripstone", "magma_block", "obsidian", "cobweb", "glow_lichen", "amethyst_block",
+            "budding_amethyst", "amethyst_cluster", "azalea", "flowering_azalea", "spore_blossom", "big_dripleaf",
+            "small_dripleaf", "hanging_roots", "mangrove_roots", "muddy_mangrove_roots", "mud", "packed_ice",
+            "blue_ice", "powder_snow", "snow_block", "podzol", "mycelium", "rooted_dirt", "clay", "gravel",
+            "sandstone", "red_sandstone", "bedrock", "infested_stone", "sea_pickle", "turtle_egg", "dead_bush",
+            "fern", "large_fern", "tall_grass", "short_grass", "vine", "cave_vines", "weeping_vines", "twisting_vines",
+            "cocoa", "nether_wart", "chorus_plant", "chorus_flower", "end_stone");
+
+    /**
+     * Ob der Block von der Natur stammt: Erde, Stein, Sand, Wasser, Holz und Laub, aber auch Blumen, Erze, Pilze, Moos,
+     * Kakteen, Zuckerrohr und Ähnliches. Zählte das als „gebaut“, wäre fast jeder Streifen von 80 Blöcken Länge belegt.
+     */
+    private static boolean natural(BlockState state) {
+        String path = BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath();
+        return naturalBlock(state) || path.endsWith("_ore") || path.endsWith("_flower") || path.endsWith("_tulip")
+                || path.endsWith("_leaves") || path.endsWith("_sapling") || path.endsWith("_roots")
+                || NATURAL_NAMES.contains(path) || state.is(BlockTags.FLOWERS) || state.is(BlockTags.SAPLINGS)
+                || state.is(BlockTags.REPLACEABLE_BY_TREES) || state.is(BlockTags.MOSS_REPLACEABLE)
+                || state.is(BlockTags.DRIPSTONE_REPLACEABLE) || state.is(BlockTags.LUSH_GROUND_REPLACEABLE)
+                || state.is(BlockTags.GOLD_ORES) || state.is(BlockTags.IRON_ORES) || state.is(BlockTags.COPPER_ORES);
+    }
+
+    private static boolean naturalBlock(BlockState state) {
+        return state.isAir() || state.canBeReplaced() || !state.getFluidState().isEmpty()
+                || state.is(BlockTags.LEAVES) || state.is(BlockTags.LOGS)
+                || state.is(BlockTags.DIRT) || state.is(BlockTags.SAND) || state.is(BlockTags.TERRACOTTA)
+                || state.is(BlockTags.SNOW) || state.is(BlockTags.ICE) || state.is(BlockTags.BASE_STONE_OVERWORLD)
+                || state.is(Blocks.GRAVEL) || state.is(Blocks.CLAY) || state.is(Blocks.SANDSTONE)
+                || state.is(Blocks.RED_SANDSTONE) || state.is(Blocks.BEDROCK);
+    }
+
     private static ConstructionService.Terrain terrain(MinecraftServer server) {
         return new ConstructionService.Terrain() {
             @Override
             public boolean isLoaded(BlockPosition position) {
                 return levelOf(server, position)
-                        .map(level -> level.isLoaded(new BlockPos(position.x(), 64, position.z()))).orElse(false);
+                        .map(level -> ChunkLoader.ensure(level, position.x(), position.z())).orElse(false);
+            }
+
+            @Override
+            public String blockName(BlockPosition position) {
+                return levelOf(server, position).map(level -> {
+                    BlockPos pos = new BlockPos(position.x(), position.y(), position.z());
+                    return level.isLoaded(pos) ? BuiltInRegistries.BLOCK.getKey(level.getBlockState(pos).getBlock())
+                            .toString() : null;
+                }).orElse(null);
             }
 
             @Override
@@ -84,6 +255,19 @@ final class ConstructionSites {
             }
 
             @Override
+            public int floorLevel(BlockPosition corner, int sizeX, int sizeZ, Optional<BlockPosition> doorFront,
+                                  int doorHeight) {
+                ServerLevel level = levelOf(server, corner).orElseThrow();
+                if (doorFront.isPresent()) {
+                    // Die Tür liegt auf Straßenhöhe: Der Boden vor der Tür ist der Maßstab.
+                    return level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, doorFront.get().x(),
+                            doorFront.get().z()) - doorHeight;
+                }
+                return level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, corner.x() + sizeX / 2,
+                        corner.z() + sizeZ / 2) - 1;
+            }
+
+            @Override
             public boolean isClear(BlockPosition min, int sizeX, int sizeY, int sizeZ) {
                 ServerLevel level = levelOf(server, min).orElseThrow();
                 BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
@@ -91,8 +275,9 @@ final class ConstructionSites {
                     for (int x = 0; x < sizeX; x++) {
                         for (int z = 0; z < sizeZ; z++) {
                             pos.set(min.x() + x, min.y() + y, min.z() + z);
-                            if (!replaceable(level.getBlockState(pos))) {
-                                return false;
+                            BlockState state = level.getBlockState(pos);
+                            if (!replaceable(state) && !natural(state)) {
+                                return false; // Gebautes bleibt stehen; Erde und Stein werden abgetragen
                             }
                         }
                     }
@@ -104,7 +289,8 @@ final class ConstructionSites {
 
     /** Luft, Pflanzen und andere ersetzbare Blöcke, Laub und Holz (Bäume) darf ein Bau verdrängen. */
     private static boolean replaceable(BlockState state) {
-        return state.isAir() || state.canBeReplaced() || state.is(BlockTags.LEAVES) || state.is(BlockTags.LOGS);
+        return state.isAir() || state.canBeReplaced() || state.is(BlockTags.LEAVES) || state.is(BlockTags.LOGS)
+                || state.is(barrier());
     }
 
     private void place(MinecraftServer server, ConstructionService.Build build) {
@@ -119,6 +305,12 @@ final class ConstructionSites {
             case 3 -> Rotation.COUNTERCLOCKWISE_90;
             default -> Rotation.NONE;
         };
+        // Auch ohne Spieler in der Nähe bauen: die Chunks des Baufelds laden (zählt schon als gebaut).
+        ChunkLoader.ensureArea(level, build.origin().x(), build.origin().z(),
+                build.origin().x() + build.footprintX(), build.origin().z() + build.footprintZ(), true);
+        if (build.first() && !build.afloat()) {
+            excavate(level, build);
+        }
         BlockPos last = null;
         for (Blueprint.Placement placement : build.blocks()) {
             BlockState state = stateOf(placement.state());
@@ -129,7 +321,7 @@ final class ConstructionSites {
             }
             BlockState turned = state.rotate(rotation);
             level.setBlock(pos, turned, Block.UPDATE_ALL);
-            if (placement.y() == 0) {
+            if (placement.y() == 0 && !build.afloat()) {
                 foundation(level, pos, turned);
             }
             last = pos;
@@ -138,6 +330,28 @@ final class ConstructionSites {
             level.sendParticles(ParticleTypes.CLOUD, last.getX() + 0.5, last.getY() + 1.0, last.getZ() + 0.5, 6, 0.4,
                     0.2, 0.4, 0.01);
             moveWorkers(level, build, last);
+        }
+    }
+
+    /**
+     * Trägt vor dem ersten Stein das Gelände im Baufeld ab: Erde, Stein und Bewuchs über der untersten Ebene
+     * verschwinden, damit das Haus eben auf Straßenhöhe steht und nicht im Hang steckt.
+     */
+    private static void excavate(ServerLevel level, ConstructionService.Build build) {
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        for (int y = 0; y < build.sizeY(); y++) {
+            for (int x = 0; x < build.footprintX(); x++) {
+                for (int z = 0; z < build.footprintZ(); z++) {
+                    pos.set(build.origin().x() + x, build.origin().y() + y, build.origin().z() + z);
+                    if (!level.isLoaded(pos)) {
+                        continue;
+                    }
+                    BlockState state = level.getBlockState(pos);
+                    if (!state.isAir() && !state.is(Blocks.BEDROCK) && (replaceable(state) || natural(state))) {
+                        level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+                    }
+                }
+            }
         }
     }
 
@@ -156,8 +370,19 @@ final class ConstructionSites {
 
     /** Die Bauarbeiter gehen zur zuletzt gebauten Stelle und schwingen den Arm. */
     private static void moveWorkers(ServerLevel level, ConstructionService.Build build, BlockPos site) {
+        int x1 = build.origin().x() - 1;
+        int z1 = build.origin().z() - 1;
+        int x2 = build.origin().x() + build.footprintX();
+        int z2 = build.origin().z() + build.footprintZ();
         for (UUID id : build.workers()) {
             if (level.getEntity(id) instanceof Villager worker) {
+                BlockPos at = worker.blockPosition();
+                if (at.getX() < x1 || at.getX() > x2 || at.getZ() < z1 || at.getZ() > z2) {
+                    // Die Absperrung hält Unbefugte draußen; die Bauarbeiter gehören dazu und kommen so hinein.
+                    if (at.distSqr(site) < 40 * 40) {
+                        worker.teleportTo(site.getX() + 0.5, site.getY() + 1.0, site.getZ() + 0.5);
+                    }
+                }
                 if (worker.blockPosition().distSqr(site) > 9) {
                     worker.getNavigation().moveTo(site.getX() + 0.5, site.getY(), site.getZ() + 0.5, 0.6);
                 } else {

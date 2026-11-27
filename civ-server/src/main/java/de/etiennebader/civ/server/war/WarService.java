@@ -71,6 +71,8 @@ public final class WarService {
     static final int VILLAGER_OFFICER_PEACE = -60;
     static final int VILLAGER_SCOUT_PEACE = -35;
     static final int BASE_WILL = 30;
+    /** Tage, die ein Spieler als Sieger Zeit hat, seine Siegpunkte auszugeben. */
+    static final int SPOILS_DAYS = 3;
 
     /** Kriegswille mit Aufschlüsselung. */
     public record Will(int value, int villagers, int party, int claim, int balance) {
@@ -295,12 +297,9 @@ public final class WarService {
         if (war.isEmpty()) {
             return Reply.failure(Message.of(MessageKey.WAR_NOT_PARTY, number));
         }
-        PolityView aggressor = queries.polity(war.get().aggressor()).orElseThrow();
-        long rate = reparationRate(aggressor);
-        int conquest = conquestCount(aggressor);
         BattleOutcome outcome;
         try {
-            outcome = registry.resolveBattle(war.get().id(), rate, conquest, calendar.today());
+            outcome = registry.resolveBattle(war.get().id(), calendar.today());
         } catch (DomainException e) {
             return Reply.failure(texts.error(e));
         }
@@ -308,10 +307,139 @@ public final class WarService {
             save();
             return Reply.success(Message.of(MessageKey.WAR_BATTLE_DRAW, number));
         }
-        PeaceTerms terms = registry.war(war.get().id()).orElseThrow().outcome().orElseThrow();
-        Message line = applyTerms(terms);
+        War decided = registry.war(war.get().id()).orElseThrow();
+        Message line = announceDecision(decided);
         save();
         return Reply.success(line);
+    }
+
+    // ------------------------------------------------------------------ Beute (Siegpunkte)
+
+    /**
+     * Zeigt dem Bürgermeister des Siegers die Siegpunkte des Kriegs {@code number} und was sie kosten.
+     */
+    public synchronized Reply spoilsInfo(Caller caller, int number) {
+        Optional<War> war = winnerWar(caller, number);
+        if (war.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.WAR_SPOILS_NONE, number));
+        }
+        PeaceTerms terms = war.get().outcome().orElseThrow();
+        PolityView lawgiver = queries.polity(war.get().aggressor()).orElseThrow();
+        int deadline = (int) (war.get().endedOn().orElseThrow().value() + SPOILS_DAYS);
+        return Reply.success(Message.of(MessageKey.WAR_SPOILS_INFO, number, nameOf(terms.loser()), terms.points(),
+                chunkCost(lawgiver), conquestCount(lawgiver), reparationRate(lawgiver), deadline));
+    }
+
+    /**
+     * Der Bürgermeister des Siegers gibt seine Siegpunkte aus: {@code chunks} Grenz-Chunks des Verlierers und
+     * {@code reparationPoints} Punkte als Reparationen. Nicht ausgegebene Punkte verfallen.
+     */
+    public synchronized Reply spoils(Caller caller, int number, int chunks, int reparationPoints) {
+        Optional<War> war = winnerWar(caller, number);
+        if (war.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.WAR_SPOILS_NONE, number));
+        }
+        PeaceTerms terms = war.get().outcome().orElseThrow();
+        PolityView lawgiver = queries.polity(war.get().aggressor()).orElseThrow();
+        long cost = chunkCost(lawgiver);
+        if (chunks < 0 || reparationPoints < 0 || chunks > conquestCount(lawgiver)
+                || chunks * cost + reparationPoints > terms.points()) {
+            return Reply.failure(Message.of(MessageKey.WAR_SPOILS_INVALID, terms.points(), cost,
+                    conquestCount(lawgiver)));
+        }
+        Message line = settle(war.get(), chunks, reparationPoints);
+        save();
+        return Reply.success(line);
+    }
+
+    /** Der entschiedene Krieg {@code number}, dessen Sieger die eigene Gemeinde ist und dessen Punkte noch offen sind. */
+    private Optional<War> winnerWar(Caller caller, int number) {
+        Optional<PolityView> own = ownTown(caller);
+        List<War> wars = registry.wars();
+        if (own.isEmpty() || !isMayor(caller, own.get()) || number < 1 || number > wars.size()) {
+            return Optional.empty();
+        }
+        return Optional.of(wars.get(number - 1))
+                .filter(war -> war.outcome().filter(terms -> !terms.settled()
+                        && terms.winner().equals(own.get().id())).isPresent());
+    }
+
+    /**
+     * Gibt den Sieg bekannt. Bei einem Dorfbewohner als Bürgermeister werden die Siegpunkte sofort verteilt, sonst
+     * hat der Spieler {@value #SPOILS_DAYS} Tage Zeit (danach verteilt das Spiel sie).
+     */
+    private Message announceDecision(War war) {
+        PeaceTerms terms = war.outcome().orElseThrow();
+        Message line = Message.of(MessageKey.WAR_VICTORY, nameOf(terms.winner()), nameOf(terms.loser()),
+                terms.points());
+        announcements.add(Announcement.toAll(line));
+        report("Sieg für " + nameOf(terms.winner()), nameOf(terms.winner()) + " hat " + nameOf(terms.loser())
+                + " geschlagen und erhält " + terms.points() + " Siegpunkte.");
+        if (villagerRuled(terms.winner())) {
+            return settleByDefault(war);
+        }
+        return line;
+    }
+
+    private boolean villagerRuled(PolityId id) {
+        return queries.polity(id).flatMap(town -> town.mayor(settings.villagerPolitics()))
+                .filter(mayor -> mayor instanceof PersonRef).isPresent();
+    }
+
+    /** Standardverteilung: so viele Chunks wie erlaubt und bezahlbar, der Rest als Reparationen. */
+    private Message settleByDefault(War war) {
+        PeaceTerms terms = war.outcome().orElseThrow();
+        PolityView lawgiver = queries.polity(war.aggressor()).orElseThrow();
+        long cost = chunkCost(lawgiver);
+        int chunks = (int) Math.min(conquestCount(lawgiver), terms.points() / cost);
+        return settle(war, chunks, (int) (terms.points() - chunks * cost));
+    }
+
+    /**
+     * Setzt die Verteilung um: erobert höchstens {@code chunksWanted} Chunks (was sich nicht erobern lässt, wird als
+     * Reparationen verrechnet), zahlt die Reparationen und schreibt das Ergebnis fest.
+     */
+    private Message settle(War war, int chunksWanted, int reparationPoints) {
+        PeaceTerms terms = war.outcome().orElseThrow();
+        PolityView winner = queries.polity(terms.winner()).orElseThrow();
+        PolityView loser = queries.polity(terms.loser()).orElseThrow();
+        PolityView lawgiver = queries.polity(war.aggressor()).orElseThrow();
+        List<ChunkCoord> taken = chunksWanted > 0
+                ? app.conquerChunks().execute(new ConquerChunks.Command(terms.winner(), terms.loser(), chunksWanted,
+                calendar.today()))
+                : List.of();
+        long refunded = (chunksWanted - taken.size()) * chunkCost(lawgiver);
+        long amount = (reparationPoints + refunded) * reparationRate(lawgiver);
+        Message paid = Message.of(MessageKey.WAR_NO_REPARATIONS);
+        long received = 0;
+        if (amount > 0) {
+            Money money = Money.of(amount, loser.currency());
+            try {
+                app.transferFunds().execute(new TransferFunds.Command(loser.asActor(), winner.asActor(), money,
+                        TransferReason.WAR_REPARATIONS, calendar.today()));
+                paid = texts.money(money);
+                received = amount;
+            } catch (DomainException e) {
+                paid = Message.of(MessageKey.WAR_REPARATIONS_UNPAID, texts.money(money));
+            }
+        }
+        registry.settleSpoils(war.id(), received, taken.size(), calendar.today());
+        Message line = Message.of(MessageKey.WAR_BATTLE_WON, winner.name().toString(), loser.name().toString(), paid);
+        announcements.add(Announcement.toAll(line));
+        if (!taken.isEmpty()) {
+            announcements.add(Announcement.toAll(Message.of(MessageKey.WAR_CONQUERED, winner.name().toString(),
+                    taken.size(), loser.name().toString())));
+        }
+        return line;
+    }
+
+    /** Verteilt die Siegpunkte, die ein Spieler nicht innerhalb der Frist ausgegeben hat. */
+    private void settleExpiredSpoils(Day day) {
+        for (War war : registry.pendingSpoils()) {
+            if (!day.isBefore(war.endedOn().orElseThrow().plus(SPOILS_DAYS))) {
+                settleByDefault(war);
+            }
+        }
     }
 
     /** Der Bürgermeister einer Kriegspartei beendet den Krieg ohne Sieger. */
@@ -595,7 +723,7 @@ public final class WarService {
                 villagersEnlist(war.defender(), day);
             }
         }
-        for (BattleReport report : registry.runDueCampaigns(day, this::reparationRate, this::conquestCount)) {
+        for (BattleReport report : registry.runDueCampaigns(day)) {
             War fought = war(report);
             Message line = Message.of(MessageKey.WAR_BATTLE_REPORT, nameOf(fought.aggressor()) + " – "
                             + nameOf(fought.defender()), kindName(report.kind()), report.front(), report.frontShift(), report.woundedAggressor(),
@@ -609,8 +737,11 @@ public final class WarService {
             report("Schlacht: " + nameOf(fought.aggressor()) + " gegen " + nameOf(fought.defender()),
                     "Die Front liegt nun bei " + report.front() + " (Verschiebung " + report.frontShift() + "). Verwundet: "
                             + report.woundedAggressor() + " Angreifer, " + report.woundedDefender() + " Verteidiger.");
-            report.decided().ifPresent(this::applyTerms);
+            if (report.decided().isPresent()) {
+                announceDecision(war(report));
+            }
         }
+        settleExpiredSpoils(day);
         villagerRulers(day);
         payWages(day);
         save();
@@ -624,46 +755,12 @@ public final class WarService {
         return queries.effectiveLaws(town).valueOf(StandardParameters.WAR_REPARATIONS_PER_STRENGTH_POINT);
     }
 
-    private long reparationRate(War war) {
-        return queries.polity(war.aggressor()).map(this::reparationRate).orElse(0L);
-    }
-
     private int conquestCount(PolityView town) {
         return queries.effectiveLaws(town).valueOf(StandardParameters.CONQUEST_CHUNKS_PER_WIN).intValue();
     }
 
-    private int conquestCount(War war) {
-        return queries.polity(war.aggressor()).map(this::conquestCount).orElse(0);
-    }
-
-    /** Zahlt Reparationen und erobert Chunks; gibt die Ergebnismeldung zurück und gibt sie bekannt. */
-    private Message applyTerms(PeaceTerms terms) {
-        PolityView winner = queries.polity(terms.winner()).orElseThrow();
-        PolityView loser = queries.polity(terms.loser()).orElseThrow();
-        Message paid = Message.of(MessageKey.WAR_NO_REPARATIONS);
-        if (terms.reparations() > 0) {
-            Money amount = Money.of(terms.reparations(), loser.currency());
-            try {
-                app.transferFunds().execute(new TransferFunds.Command(loser.asActor(), winner.asActor(), amount,
-                        TransferReason.WAR_REPARATIONS, calendar.today()));
-                paid = texts.money(amount);
-            } catch (DomainException e) {
-                paid = Message.of(MessageKey.WAR_REPARATIONS_UNPAID, texts.money(amount));
-            }
-        }
-        Message line = Message.of(MessageKey.WAR_BATTLE_WON, winner.name().toString(), loser.name().toString(), paid);
-        announcements.add(Announcement.toAll(line));
-        report("Sieg für " + winner.name(), winner.name() + " hat " + loser.name() + " geschlagen. Reparationen: "
-                + terms.reparations() + ", eroberte Chunks: " + terms.conquest() + ".");
-        if (terms.conquest() > 0) {
-            List<ChunkCoord> taken = app.conquerChunks().execute(new ConquerChunks.Command(terms.winner(),
-                    terms.loser(), terms.conquest(), calendar.today()));
-            if (!taken.isEmpty()) {
-                announcements.add(Announcement.toAll(Message.of(MessageKey.WAR_CONQUERED, winner.name().toString(),
-                        taken.size(), loser.name().toString())));
-            }
-        }
-        return line;
+    private long chunkCost(PolityView town) {
+        return queries.effectiveLaws(town).valueOf(StandardParameters.CONQUEST_POINTS_PER_CHUNK);
     }
 
     private void villagersEnlist(PolityId townId, Day day) {

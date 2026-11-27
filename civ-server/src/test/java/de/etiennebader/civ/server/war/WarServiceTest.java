@@ -86,6 +86,42 @@ class WarServiceTest {
     }
 
     @Test
+    @DisplayName("Der Sieger bekommt Siegpunkte und gibt sie fuer Chunks und Reparationen aus")
+    void victoryPointsAreSpentOnSpoils() {
+        found();
+        war();
+        assertTrue(server.war().enlist(a(), MilitaryRank.OFFICER).success());
+        assertTrue(server.war().enlist(b(), MilitaryRank.SOLDIER).success());
+        assertTrue(server.war().battle(a(), 1).success());
+        var terms = server.war().registry().wars().get(0).outcome().orElseThrow();
+        assertTrue(terms.points() >= 1);
+        assertFalse(terms.settled(), "ein Spieler als Buergermeister verteilt selbst");
+        assertTrue(server.war().spoilsInfo(a(), 1).success());
+        assertFalse(server.war().spoilsInfo(b(), 1).success(), "der Verlierer hat keine Beute");
+        assertFalse(server.war().spoils(b(), 1, 0, 0).success());
+        assertFalse(server.war().spoils(a(), 1, 0, terms.points() + 1).success(), "mehr Punkte als vorhanden");
+        assertFalse(server.war().spoils(a(), 1, 17, 0).success(), "mehr Chunks als erlaubt");
+        assertTrue(server.war().spoils(a(), 1, 0, terms.points()).success());
+        assertTrue(server.war().registry().wars().get(0).outcome().orElseThrow().settled());
+        assertFalse(server.war().spoils(a(), 1, 0, 0).success(), "nur einmal verteilen");
+    }
+
+    @Test
+    @DisplayName("Nicht ausgegebene Siegpunkte verteilt das Spiel nach der Frist selbst")
+    void unspentSpoilsAreSettledAfterDeadline() {
+        found();
+        war();
+        assertTrue(server.war().enlist(a(), MilitaryRank.OFFICER).success());
+        assertTrue(server.war().enlist(b(), MilitaryRank.SOLDIER).success());
+        assertTrue(server.war().battle(a(), 1).success());
+        long ended = server.war().registry().wars().get(0).endedOn().orElseThrow().value();
+        server.war().endOfDay(de.etiennebader.civ.domain.shared.Day.of(ended + 1));
+        assertFalse(server.war().registry().wars().get(0).outcome().orElseThrow().settled());
+        server.war().endOfDay(de.etiennebader.civ.domain.shared.Day.of(ended + WarService.SPOILS_DAYS));
+        assertTrue(server.war().registry().wars().get(0).outcome().orElseThrow().settled());
+    }
+
+    @Test
     @DisplayName("Gleichstand laesst den Krieg weiterlaufen, Frieden beendet ihn ohne Sieger")
     void drawThenPeace() {
         found();

@@ -1,4 +1,4 @@
-package de.etiennebader.civ.client.mixin;
+package de.etiennebader.civ.client;
 
 import java.util.UUID;
 
@@ -8,4 +8,9 @@ public interface CivVillagerState {
     UUID civ$uuid();
 
     void civ$setUuid(UUID uuid);
+
+    /** Größenfaktor des Dorfbewohners; daran erkennt der Client seine Rasse. */
+    float civ$scale();
+
+    void civ$setScale(float scale);
 }

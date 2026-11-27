@@ -1,0 +1,7 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": ["PP", "PP", "S "],
+  "key": { "P": "minecraft:paper", "S": "minecraft:stick" },
+  "result": { "id": "eddies-civ-mod:campaign_poster", "count": 2 }
+}

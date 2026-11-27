@@ -35,6 +35,23 @@ public final class MenuOpener {
                 () -> Feedback.reply(player, civ.commands().describeTownHall(seat)));
     }
 
+    /** Das Menü für Kultur und Rasse der eigenen Gemeinde; ohne Gemeinde ein Hinweis im Chat. */
+    public static void culture(CivServer civ, ServerPlayer player) {
+        civ.queries().municipalityOf(Players.ref(player)).ifPresentOrElse(
+                town -> {
+                    Feedback.click(player);
+                    Screens.open(player, new de.etiennebader.civ.fabric.screen.CultureScreen(civ, player, town.id(),
+                            town.name().value(), java.util.Optional.empty()));
+                },
+                () -> Feedback.reply(player, Reply.failure(Message.of(MessageKey.NOT_IN_MUNICIPALITY))));
+    }
+
+    /** Das Menü eines Dorfbewohners: Auskunft und Handlungen (reden, beeinflussen, Post). */
+    public static void villager(CivServer civ, ServerPlayer player, de.etiennebader.civ.domain.actor.PersonRef villager) {
+        Feedback.click(player);
+        Screens.open(player, new de.etiennebader.civ.fabric.screen.VillagerScreen(civ, player, villager));
+    }
+
     /** Die Verfassung der Gemeinde, in deren Gebiet der Block steht; in der Wildnis ein Hinweis. */
     public static void constitution(CivServer civ, ServerPlayer player, BlockPosition position) {
         civ.constitutions().governing(position).ifPresentOrElse(

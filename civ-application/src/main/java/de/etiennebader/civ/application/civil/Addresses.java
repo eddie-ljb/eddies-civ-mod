@@ -121,6 +121,15 @@ public final class Addresses {
                         .flatMap(plot -> of(town, plot)));
     }
 
+    /** Alle angelegten Straßen der Gemeinde, die höchstens {@link #REACH} Blöcke von der Fläche entfernt sind, nächste zuerst. */
+    public static List<Street> streetsNear(PolityView town, Area area) {
+        return town.streets().stream()
+                .filter(street -> street.area().dimension().equals(area.dimension())
+                        && distance(street.area(), area) <= REACH)
+                .sorted(Comparator.comparingLong(street -> distance(street.area(), area)))
+                .toList();
+    }
+
     private static Optional<Street> nearest(PolityView town, Area area) {
         Street best = null;
         long bestDistance = Long.MAX_VALUE;

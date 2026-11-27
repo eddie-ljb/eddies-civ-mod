@@ -88,7 +88,7 @@ class WarRegistryTest {
         }
         registry.enlist(land, person(), MilitaryRank.SOLDIER, Day.ZERO);
 
-        BattleOutcome outcome = registry.resolveBattle(war.id(), 100, new Day(1));
+        BattleOutcome outcome = registry.resolveBattle(war.id(), new Day(1));
 
         assertEquals(BattleOutcome.AGGRESSOR_WINS, outcome);
         War ended = registry.war(war.id()).orElseThrow();
@@ -97,7 +97,7 @@ class WarRegistryTest {
         assertTrue(ended.outcome().isPresent());
         assertEquals(nation, ended.outcome().get().winner());
         assertEquals(land, ended.outcome().get().loser());
-        assertTrue(ended.outcome().get().reparations() > 0, "klarer Sieg soll Reparationen > 0 ergeben");
+        assertTrue(ended.outcome().get().points() > 0, "klarer Sieg soll Siegpunkte > 0 ergeben");
         assertTrue(registry.ongoingWarsOf(nation).isEmpty(), "beendeter Krieg zählt nicht mehr als laufend");
     }
 
@@ -115,13 +115,13 @@ class WarRegistryTest {
             registry.enlist(land, person(), MilitaryRank.SOLDIER, Day.ZERO);
         }
 
-        BattleOutcome outcome = registry.resolveBattle(war.id(), 100, new Day(1));
+        BattleOutcome outcome = registry.resolveBattle(war.id(), new Day(1));
 
         assertEquals(BattleOutcome.DRAW, outcome);
         assertTrue(registry.war(war.id()).orElseThrow().ongoing(), "ohne Sieger geht der Krieg weiter");
         // ein weiteres Gefecht ist möglich, solange der Krieg läuft
         registry.enlist(nation, person(), MilitaryRank.OFFICER, Day.ZERO);
-        BattleOutcome second = registry.resolveBattle(war.id(), 100, new Day(2));
+        BattleOutcome second = registry.resolveBattle(war.id(), new Day(2));
         assertEquals(BattleOutcome.AGGRESSOR_WINS, second);
     }
 
@@ -140,11 +140,11 @@ class WarRegistryTest {
     @DisplayName("Unbekannter bzw. bereits beendeter Krieg lässt sich nicht erneut auflösen")
     void unknownOrEndedWarRejected() {
         WarRegistry registry = WarRegistry.empty();
-        assertThrows(UnknownWarException.class, () -> registry.resolveBattle(WarId.generate(ids), 0, Day.ZERO));
+        assertThrows(UnknownWarException.class, () -> registry.resolveBattle(WarId.generate(ids), Day.ZERO));
 
         War war = registry.declareWar(ids, nation, land, Day.ZERO);
         registry.negotiatePeace(war.id(), Day.ZERO);
-        assertThrows(WarAlreadyEndedException.class, () -> registry.resolveBattle(war.id(), 0, new Day(1)));
+        assertThrows(WarAlreadyEndedException.class, () -> registry.resolveBattle(war.id(), new Day(1)));
         assertThrows(WarAlreadyEndedException.class, () -> registry.negotiatePeace(war.id(), new Day(1)));
     }
 

@@ -4,6 +4,9 @@
 
 Jeder deutsche Befehl unter `/civ` hat einen englischen Zwilling mit gleicher Funktion, z. B. `/civ gericht fall 3` ↔ `/civ court case 3`, `/civ firma investieren "Holz AG" 20` ↔ `/civ company invest "Holz AG" 20`. Argumentwerte wie Ämter (`buergermeister`), Branchen oder `schuldig` bleiben deutsch. Die Übersetzung ist mechanisch (ein Wörterbuch deutsch→englisch pro Befehlswort), die Logik ist identisch – siehe [Architektur](Entwickler-Architektur.md).
 
+## Eingabehilfe
+Alle Befehle schlagen beim Tippen (Tabulator) passende Werte vor, mit einer kurzen Erklärung daneben: Nummern eigener Bauaufträge, Fälle, Verträge und Briefe; Straßen, Firmen, Zeitungen, Parteien, Religionen und Gemeinden; Währungen und Symbole; Spielernamen; Beträge, Tage und Prozente; die Drehung in Grad; Machtgrade und die Achsen der Parteirichtung; Gegenstände; die Rechte der Klerus-Ämter.
+
 ## Allgemein
 | Befehl | Wirkung |
 |---|---|
@@ -54,6 +57,7 @@ Jeder deutsche Befehl unter `/civ` hat einen englischen Zwilling mit gleicher Fu
 | `/civ bund austreten` / `aufloesen` / `info [Name]` | Bund verlassen, auflösen, Info |
 | `/civ ebenen` | eigene Gemeinde/Land/Nation mit Spitze |
 | `/civ land\|nation <Befehl>` / `/civ ebene <Ebene> <Befehl>` | `info`, `menue`, `aemter`, `wahl …`, `amt …`, `parlament`, `recht [setzen]`, `abstimmungen`, `abstimmen`, `verfassung`, `gesetze`, `umfrage`, `wahlergebnis` für diese Ebene |
+| `/civ <Ebene> hymne [spielen\|noten\|platte\|setzen\|entfernen]` | Hymne abspielen (mit Aufnahme, falls hochgeladen), nur als Notenblock-Melodie, als Schallplatte holen, festlegen, entfernen; die Aufnahme (OGG/MP3) lädt die Spitze auf der Webseite unter Staat hoch |
 | `/civ <Ebene> wahlkreis\|debatte\|flagge\|hymne\|gericht …` | Wahlkreise, Debatten, Hoheitszeichen, Gericht einer Ebene |
 | `/civ heim [Polity] [1-3]` | Zum Heimat-Hafen einer Polity porten (Standard: eigene Gemeinde, Hafen 1 = Gemeindehaus) |
 | `/civ <Ebene> heim liste\|setzen 2\|3\|entfernen 2\|3\|zugang <keiner\|buerger\|verbuendete\|alle>\|preis <Betrag>` | Heimat-Häfen einer Ebene verwalten (Spitze) |
@@ -82,6 +86,21 @@ Jeder deutsche Befehl unter `/civ` hat einen englischen Zwilling mit gleicher Fu
 | Befehl | Wirkung |
 |---|---|
 | `/civ strasse anlegen\|aufheben <Name>` / `strasse liste` | Straßen (Bürgermeister, Bauamt) |
+| `/civ strasse bauen schaufel\|pflaster <Name>` / `strasse wege` | Weg auf einer Straße bauen lassen / Stand der Wegebauten |
+| `/civ polizei status\|dienen\|kuendigen\|ernennen\|entlassen\|zellen\|anzeigen\|festnehmen\|fesseln\|loesen\|freilassen …` | Polizei, siehe [Polizei und Militär](Spieler-Polizei-und-Militaer.md) |
+| `/civ krieg befoerdern <Spieler> soldat\|unteroffizier\|offizier\|hauptmann\|general` | Militärrang vergeben (Befehlskette) |
+| `/civ [<Ebene>] gericht kandidieren\|zurueckziehen` | bei `court_staffing = election` für Richter-/Staatsanwaltsämter kandidieren |
+| `/civ krieg beute <Nr> [<Chunks> <Punkte für Reparationen>]` | Siegpunkte eines gewonnenen Kriegs ansehen und ausgeben |
+| `/civ grundstueck kaufen ["<Firma>"]` | angebotenes Grundstück unter dir kaufen, mit Firma aus der Firmenkasse für die Firma (nur Firmenleitung) |
+| `/civ grundstueck uebertragen "<Firma>"` | eigenes Grundstück unter dir ohne Preis an die eigene Firma übergeben |
+| `/civ kultur [setzen <Kultur> <Rasse>\|menue]` | Kultur und Rasse der eigenen Gemeinde ansehen und (Bürgermeister) ändern |
+| `/civ dorfbewohner info\|menue` | Auskunft über den nächsten Dorfbewohner im Chat oder als Menü |
+| `/civ bau vorschau <Plan> [Drehung]\|aus` | Hologramm eines Bauplans auf dem Grundstück unter dir |
+| `/civ bau plaene\|liste\|beauftragen\|material\|genehmigen\|ablehnen\|abbrechen …` | Bauaufträge (ohne Drehung: Tür zur Straße), siehe [Bauen](Spieler-Bauen-und-Strassen.md) |
+| `/civ religion schrift [lesen\|schreiben\|anhaengen\|benennen] …` | Heilige Schrift lesen und bearbeiten |
+| `/civ religion segnen\|taufe <Spieler\|dorfbewohner>` | segnen und taufen, auch Dorfbewohner |
+| `/civ religion amt festlegen\|vergeben\|entziehen\|abschaffen\|liste …` | Klerus-Ämter selbst definieren, siehe [Religion](Spieler-Religion.md) |
+| `/civ logo <Einheit> [wappen\|plakat\|reklame]` | hochgeladenes Logo als Karte, siehe [Logos](Spieler-Logos.md) |
 | `/civ adresse [Spieler]` / `/civ adressen` | Anschrift, Straßen und Hausnummern |
 | `/civ vertrag …` / `vertrag menue` | Verträge |
 | `/civ post [lesen <Nr>\|menue]` / `/civ brief <Spieler> <Betreff> \| <Text>` | Post |
@@ -99,3 +118,30 @@ Jeder deutsche Befehl unter `/civ` hat einen englischen Zwilling mit gleicher Fu
 | `/civ admin sicherung` | sofortige Datenbanksicherung |
 
 Benötigt den Rechte-Knoten `eddies-civ-mod:admin`, siehe [Installation und Konfiguration](Admin-Installation-und-Konfiguration.md#rechte).
+
+## Regierung (Ministerien, Haushalt, Oberhaupt)
+
+| Befehl | Wirkung |
+|---|---|
+| `/civ regierung` | Oberhaupt, Regeln, Ministerien und Haushalt anzeigen |
+| `/civ regierung oberhaupt titel\|form\|modus\|gehalt\|befugnisse ...` | Oberhaupt konfigurieren (nur Bürgermeister) |
+| `/civ regierung regeln <höchstzahl> <tage> <prozent>` | Zahl der Ministerien, Haushaltsrhythmus, nötige Mehrheit |
+| `/civ regierung vorbereiter "<Ministerium>"` | Ministerium, das den Haushalt vorbereitet |
+| `/civ regierung ministerium anlegen "<Name>" <wahl\|ernennung> [Zuständigkeit]` | Ministerium anlegen (auflösen: `aufloesen`) |
+| `/civ regierung ministerium ernennen\|abberufen\|einstellen\|kuendigen "<Name>" [Spieler]` | Minister und Angestellte |
+| `/civ regierung ministerium lohn "<Name>" <Minister> <Angestellte>` | Tageslöhne |
+| `/civ regierung haushalt entwurf "<Name>" <Betrag>` | Etat im Entwurf setzen |
+| `/civ regierung haushalt abstimmen <true\|false>` / `schliessen` | Abstimmung und Beschluss |
+| `/civ regierung koalition bilden` / `entlassen` / `neuwahl` | Regierung bilden, entlassen, Neuwahlen anordnen (Oberhaupt) |
+| `/civ regierung koalition regeln <abstand> <minderheit>` | wie weit Koalitionspartner auseinanderliegen dürfen, Minderheitsregierung erlaubt |
+| `/civ regierung koalition vorhaben <Regelung> <Wert>` | Vorhaben im Koalitionsvertrag |
+| `/civ regierung ministerium bereich "<Name>" <finanzen\|inneres\|verteidigung\|wirtschaft\|kanzleramt\|frei>` | Handlungsbereich |
+| `/civ regierung ministerium vorschlag "<Name>" <Regelung> <Wert>` | Gesetzesvorschlag bzw. Verordnung des Ministers |
+| `/civ regierung ministerium verordnung "<Name>" <true\|false>` | Verordnungsrecht erlauben |
+| `/civ regierung foerderung anlegen "<Name>" "<Ministerium>" <Betrag> <alle\|Name> <Tage> [<voll bis> <Auslauf>]` | Förderung; auch `liste`, `beenden`, `abstimmen` |
+| `/civ regierung wahl ausrufen\|kandidieren\|waehlen "<Ministerium>" [Spieler]` | Volkswahl der Minister |
+| `/civ regierung gesetze` | beschlossene Gesetze, die auf die Unterschrift warten |
+| `/civ regierung gesetze unterzeichnen <Nr>` / `veto <Nr>` | Oberhaupt: sofort in Kraft setzen oder verwerfen |
+| `/civ regierung gesetze vetofrist <Tage>` | Wartezeit (0 = kein Veto) |
+
+Englisch: `/civ government ...`

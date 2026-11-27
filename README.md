@@ -26,7 +26,7 @@ Wer eine Gemeinde betritt oder verlässt, sieht ihren Namen als Titel. Auf Grund
 **Gemeindehaus verlegen:** Der Bürgermeister setzt ein neues Gemeindehaus irgendwo im eigenen Gebiet. Das alte verschwindet und landet wieder im Inventar.
 
 ### Dorfbewohner
-- Dorfbewohner erhalten dauerhaft einen Vor- und Nachnamen. Schleichen + Rechtsklick mit leerer Hand zeigt auch die eindeutige Registernummer. `/civ dorfbewohner register [Seite]` listet Spieler und Dorfbewohner der eigenen Gemeinde.
+- Dorfbewohner erhalten dauerhaft einen Vor- und Nachnamen. Schleichen + Rechtsklick mit leerer Hand öffnet das Menü des Dorfbewohners mit Auskunft (auch die eindeutige Registernummer) und Knöpfen zum Reden, Beeinflussen und für Post; im Chat gibt es sie weiter mit `/civ dorfbewohner info`. `/civ dorfbewohner register [Seite]` listet Spieler und Dorfbewohner der eigenen Gemeinde.
 - Dorfbewohner, die das Gebiet einer Gemeinde betreten, werden dort Einwohner. In der Wildnis bleiben sie in ihrer bisherigen Gemeinde gemeldet. Stirbt ein Dorfbewohner, tritt er aus.
 - Jeder Dorfbewohner erwirtschaftet täglich Geld für die Gemeindekasse; Standard ist ¼ Smaragd. Zufriedene leisten bis zu 50 % mehr, Unzufriedene bis zu 50 % weniger.
 - **Persönlichkeit:** Jeder Dorfbewohner hat feste Ansichten auf drei Achsen: *Ordnung ↔ Freiheit*, *Sparsamkeit ↔ Großzügigkeit* und *Heimatverbundenheit*.
@@ -38,12 +38,12 @@ Wer eine Gemeinde betritt oder verlässt, sieht ihren Namen als Titel. Auf Grund
   - **Firmen übernehmen:** Aggressive kaufen Aktien einer fremden Firma auf; wer mehr als die Hälfte hält, übernimmt die Leitung, der bisherige Leiter bleibt Mitglied.
   - **Länder und Nationen:** Ein ehrgeiziger Dorfbewohner als Bürgermeister gründet über seiner Gemeinde einen Bund der nächsthöheren Ebene (höchstens einer je 3 Gemeinden), erweitert ihn um freie Gemeinden und nimmt Einladungen anderer Bünde an. Von Spielern geführte Gemeinden werden nur eingeladen, der Spieler entscheidet mit `/civ bund beitreten`.
   - **Gebiet:** Ein ehrgeiziger Dorfbewohner als Bürgermeister beansprucht angrenzende freie Chunks als Kerngebiet (höchstens 2 je Tag, es gilt das normale Claim-Limit). Wie oft, hängt von Ehrgeiz, Aggressivität und Parteirichtung ab (Ausbau und Ordnung treiben, niedrige Steuern bremsen). Aggressive suchen die Grenze zu Nachbarn, Friedfertige meiden sie.
-  - **Bauaufträge:** Villager mit Wohngrundstück beauftragen eine Baufirma ihrer Gemeinde (Sparsame wählen ein Mehrfamilienhaus), ein Villager als Bauamt genehmigt Anträge von selbst. Spieler nutzen `/civ bau` (Pläne ansehen, beauftragen, Bauamt genehmigt/lehnt ab). Optionen: `/civ bau beauftragen <Plan> "<Firma>" [material firma|selbst] [Grad]` (mit `selbst` liefert der Bauherr die Baustoffe per `/civ bau material <Nr>` und zahlt nur 40 % für die Arbeit; Drehung 0/90/180/270). Der Plan steht mittig auf dem Grundstück, bekommt ein Fundament bis zum Boden und überschreibt nichts Gebautes (ist das Baufeld nicht frei, ruht die Baustelle und der Bauherr erfährt es). Die Bauarbeiter (angestellte Dorfbewohner) laufen sichtbar zur Baustelle. Eigene Pläne: `.litematic` oder `.schem` auf der Webseite unter „Bauen" hochladen, in den Ordner `blueprints` neben der Datenbank legen oder per `POST /api/blueprints` senden.
+  - **Bauaufträge:** Villager mit Wohngrundstück beauftragen eine Baufirma ihrer Gemeinde (Sparsame wählen ein Mehrfamilienhaus), ein Villager als Bauamt genehmigt Anträge von selbst. Spieler nutzen `/civ bau` (Pläne ansehen, beauftragen, Bauamt genehmigt/lehnt ab). Optionen: `/civ bau beauftragen <Plan> "<Firma>" [material firma|selbst] [Grad]` (mit `selbst` liefert der Bauherr die Baustoffe per `/civ bau material <Nr>` und zahlt nur 40 % für die Arbeit; Drehung 0/90/180/270). Der Plan steht mittig auf dem Grundstück, bekommt ein Fundament bis zum Boden und überschreibt nichts Gebautes (ist das Baufeld nicht frei, ruht die Baustelle und der Bauherr erfährt es). Die Bauarbeiter (angestellte Dorfbewohner) laufen sichtbar zur Baustelle. Mit `/civ bau vorschau <Plan>` erscheint das Bauwerk vorab als Hologramm auf dem Grundstück (nur für dich sichtbar, 45 Sekunden); ein neuer Auftrag zeigt es ebenfalls. Eigene Pläne: `.litematic` oder `.schem` auf der Webseite unter „Bauen" hochladen, in den Ordner `blueprints` neben der Datenbank legen oder per `POST /api/blueprints` senden.
   - **Vermieter:** Wer Geld hat, kauft ein angebotenes Wohngrundstück der eigenen Gemeinde (Sparsame bis zu 3, Großzügige 1) und vermietet es an einen Mitbürger ohne Wohnung; Sparsame verlangen mehr Miete.
   - **Firmenführung:** Ein Dorfbewohner als Firmenchef führt seine Firma nach Persönlichkeit, höchstens eine Handlung je Firma und Tag: Er wählt eine Branche (Naturverbundene Forst/Obst/Schafe/Acker, Traditionelle Acker und Viehzucht, Fortschrittliche Bergwerk, Ziegelei und Baufirma), besetzt zuerst die Kernbelegschaft (2 Stellen), kauft ein angebotenes Betriebsgrundstück der Gemeinde, schüttet alle 7 Tage eine Dividende aus (Großzügige mehr, Sparsame weniger), baut die Ausstattung stufenweise aus (nur wenn die Stufe im Verhältnis zum Überschuss tragbar ist; Fortschrittliche und Großzügige leisten sich mehr) und stellt weitere arbeitslose Dorfbewohner ein (2 Stellen je Stufe, Gemeinsinnige zahlen mehr Lohn). Reicht die Kasse nicht mehr für wenige Tage Löhne, kündigt er dem zuletzt Eingestellten (Sparsame früher). Gebäude errichtet das Spiel dabei nicht selbst; der Grundstückskauf ist die wirtschaftliche Seite.
   - **Städte übernehmen** geht über die Wahl des Bürgermeisters oder Bundesleiters, nicht mit Gewalt.
   - Abschaltbar mit `villager_ambitions=false` in der Konfiguration.
-- Im Gemeindehaus zeigt ein Klick auf die Glocke die Stimmung im Detail, `/civ stimmung` fasst sie im Chat zusammen. Schleichen + Rechtsklick mit leerer Hand auf einen Dorfbewohner zeigt seine Persönlichkeit und Zufriedenheit. Zufriedene Dorfbewohner lassen ab und zu grüne Funken aufsteigen, unzufriedene kleine Gewitterwolken.
+- Im Gemeindehaus zeigt ein Klick auf die Glocke die Stimmung im Detail, `/civ stimmung` fasst sie im Chat zusammen. Schleichen + Rechtsklick mit leerer Hand auf einen Dorfbewohner öffnet sein Menü mit Persönlichkeit und Zufriedenheit. Zufriedene Dorfbewohner lassen ab und zu grüne Funken aufsteigen, unzufriedene kleine Gewitterwolken.
 - Die Siedlungsstufe richtet sich nach allen Einwohnern: ab 10 Marktgemeinde, ab 30 Stadt, ab 80 Metropole. Jede Stufe erlaubt 8 Chunks mehr Gebiet.
 - Für die Gebietsgröße zählen Dorfbewohner nur zu einem Viertel. So lässt sich Land nicht allein durch Zucht vergrößern.
 
@@ -57,15 +57,19 @@ Das Geld geht direkt auf dein Konto. Im Gemeindegebiet erhält die Gemeinde ihre
 
 Im Kreativmodus liegen alle Blöcke des Mods, der Grundstücksstab und nützliche Test-Items im eigenen Reiter **Eddies Zivilisation**.
 
+### Kultur und Rasse
+Jede Gemeinde hat eine Kultur (bestimmt die Kleidung der Dorfbewohner) und eine Rasse (Körpergröße, mit dem Mod auch Hautton und Haarfarbe). Der Gründer wählt beides nach dem Aufstellen des Gemeindehauses, der Bürgermeister ändert es später im Gemeindehaus oder mit `/civ kultur setzen <Kultur> <Rasse>`. Von Dorfbewohnern gegründete Gemeinden erben beides.
+
 ### Grundstücke
 Grundstücke teilen das Gemeindeland auf. Nur ihre Inhaber dürfen dort bauen, und nur für sie fällt Grundsteuer an.
+0. **Erst die Straße:** Grundstücke und Häuser gibt es nur an Straßen (Gesetz `street_required`, Standard ja). Zuerst wird die Straße gebaut und mit `/civ strasse anlegen <Name>` eingetragen; danach lassen sich Grundstücke in höchstens 12 Blöcken Abstand zuschneiden, ausschreiben und bebauen.
 1. Der Bürgermeister oder das Bauamt stellt sich an eine Ecke und tippt `/civ grundstueck ecke1`, an der gegenüberliegenden Ecke `ecke2`. Bequemer geht es mit dem **Grundstücksstab** (Stock + Smaragd diagonal): Linksklick auf einen Block setzt Ecke 1, Rechtsklick Ecke 2. Partikel zeigen die Auswahl.
 2. `/civ grundstueck erstellen wohnen` macht daraus ein Grundstück der Gemeinde. `/civ grundstueck chunk wohnen` nimmt stattdessen den ganzen Chunk.
    Mögliche Arten: `wohnen`, `gewerbe`, `industrie`, `landwirtschaft`, `oeffentlich`, `botschaft`.
 3. Danach gibt es zwei Möglichkeiten:
    - `/civ grundstueck anbieten 12,5` bietet es zum Verkauf an. Jeder kann es mit `/civ grundstueck kaufen` oder per Shift-Klick im Grundstücksmenü erwerben.
    - `/civ grundstueck vergeben <Spieler>` verschenkt es.
-4. Inhaber bieten ihr eigenes Grundstück genauso an. `/civ grundstueck` zeigt das Grundstück unter dir und seinen Umriss.
+4. Die Leitung einer Firma kauft ein angebotenes Grundstück für die Firma mit `/civ grundstueck kaufen "<Firma>"` (bezahlt aus der Firmenkasse) oder übergibt ein eigenes Grundstück mit `/civ grundstueck uebertragen "<Firma>"` ohne Preis an die Firma; im Grundstücksmenü wählt der Smaragdblock die Firma, Shift-Klick kauft oder übergibt. Inhaber bieten ihr eigenes Grundstück genauso an. `/civ grundstueck` zeigt das Grundstück unter dir und seinen Umriss.
 
 ### Abstimmungen
 Gilt das Gesetz **Rechtsänderungen per Abstimmung**, wird jede Änderung im Recht-Menü oder per Befehl zum Antrag.
@@ -185,6 +189,13 @@ Jede Gemeinde und jeder Bund hat ein Gericht; Richter ist, wen die Spitze ernenn
 - **Menüs:** `/civ gericht` (Gericht der eigenen Gemeinde), `/civ gericht fall <Nr>` (Akte mit allen Beteiligten, Beweisen, Protokoll und den Knöpfen, die dir offenstehen), `/civ gericht faelle`, `/civ gericht akte <Nr>` (in den Chat). Im Rathaus oben (Glocke) und im Ebenenmenü.
 - **Richterbank (Block):** Rezept Gold, Buch, Gold über drei Bretter über Brett-leer-Brett. Rechtsklick öffnet das Gericht der Gemeinde, in der sie steht.
 
+### Polizei und Militär
+- **Polizei:** Dienstgrade Kadett → Polizist → Wachtmeister → Kommissar mit Befehlskette; `/civ polizei dienen|ernennen <Spieler> <Rang>|entlassen|zellen <n>|anzeigen|festnehmen|fesseln|loesen|freilassen|status`. Dorfbewohner besetzen die Polizei selbst, haben einen Kriminalitätswert und begehen selten Straftaten; Mitbewohner zeigen sie an und sagen als Zeugen aus.
+- **Handschellen** (Item): Rechtsklick mit Polizeirang fesselt oder löst Spieler und Dorfbewohner; Gefesselte und Inhaftierte können nichts abbauen, setzen, benutzen oder schlagen.
+- **Gericht:** Festnahmen eröffnen ein Strafverfahren; der Richter setzt die Haft mit `urteil <Nr> schuldig haft <Tage> | …`. `court_staffing` (`head`, `government`, `automatic`, `election`) regelt die Besetzung von Richtern und Staatsanwälten; Spieler kandidieren mit `/civ gericht kandidieren`.
+- **Militär:** Ränge Soldat/Ausspäher → Unteroffizier → Offizier → Hauptmann → General (`/civ krieg befoerdern`). Hauptmann und General planen Feldzüge.
+- **Web:** Seite „Krieg“ mit Karte, Frontabschnitt, Feldzugplaner, Live-Ständen und Schlachtenbuch; Kriegsberichte erscheinen in den Zeitungen. Mehr im Wiki „Polizei und Militär“.
+
 ### Flaggen und Hymnen
 - **Flagge:** Banner gestalten (Webstuhl), in die Hand nehmen und `/civ <Ebene> flagge setzen`. `flagge holen` gibt ein Banner mit der Flagge, `flagge entfernen`. Im Ebenenmenü (Banner): Klick holt die Flagge. Die Webseite zeichnet die Flaggen nach.
 - **Hymne:** `/civ <Ebene> hymne setzen <Titel> | [Instrument |] <Noten>`. Noten von F#3 bis F#5 (`C4 D4 E4 F#4 …`), `*2` verdoppelt, `/2` halbiert die Länge, `-` ist eine Pause. Instrumente: `harp`, `bell`, `flute`, `chime`, `guitar`, `xylophone` und alle anderen Notenblock-Instrumente. `hymne spielen`, `hymne entfernen`; Rechtsklick aufs Banner im Ebenenmenü spielt sie. Mit `anthem_on_enter` hört man sie beim Betreten des Gebiets.
@@ -203,6 +214,7 @@ Alle Regelungen stehen im Rechtsmenü (Gemeindehaus → Recht) als Schalter oder
 | `pvp_allowed` (Standard ja) | Spieler können einander im Gebiet nicht verletzen, wenn nein („PvP ist verboten.“) |
 | `hostile_mobs_allowed` (Standard ja) | Feindliche Monster verschwinden im Gebiet alle 5 Sekunden, wenn nein; benannte bleiben („Keine Monster in der Stadt.“) |
 | `outsiders_may_hurt_animals` (Standard nein) | Fremde können Tiere nicht verletzen („Tiere sind geschützt.“) |
+| `plot_rights_override` (Standard ja) | Grundstücksinhaber dürfen auf ihrem Grundstück abweichend von Gemeinde-, Länder- und Nationenrecht einstellen, wer bauen/benutzen darf und ob PvP, Monster, Explosionen, Feuer und Tierschutz gelten (`/civ grundstueck rechte`). Bei nein gilt das Recht auch auf Grundstücken: Was es Fremden erlaubt, ist überall erlaubt |
 | `federal_levy_percent` (0–10, nur im Bund) | Bundesumlage: jedes Glied zahlt täglich diesen Anteil seiner Kasse an den Bund („Die Bundesumlage beträgt 5 %.“) |
 
 ### Schutz
@@ -335,6 +347,7 @@ Anmelden: Mit `/civ web` holst du dir im Spiel einen Code und gibst ihn auf der 
 | `/civ grundstueck ecke1` / `ecke2` | Ecken einer Auswahl setzen |
 | `/civ grundstueck erstellen <Art>` | Auswahl zum Grundstück machen (Bürgermeister, Bauamt) |
 | `/civ grundstueck chunk <Art>` | ganzen Chunk zum Grundstück machen (Bürgermeister, Bauamt) |
+| `/civ grundstueck rechte [mitglieder\|fremde <bauen\|benutzen\|behaelter> <ja\|nein>] [gast <Spieler> <Handlung> <ja\|nein>] [gastentfernen <Spieler>] [regel <pvp\|monster\|explosionen\|feuer\|tiere> <gesetz\|erlauben\|verbieten>] [zuruecksetzen]` | Rechte auf dem eigenen Grundstück einstellen (Inhaber) |
 | `/civ grundstueck anbieten <Preis>` | Grundstück zum Verkauf anbieten |
 | `/civ grundstueck zurueckziehen` | Verkaufsangebot zurückziehen |
 | `/civ grundstueck kaufen` | angebotenes Grundstück kaufen |
@@ -382,6 +395,8 @@ Anmelden: Mit `/civ web` holst du dir im Spiel einen Code und gibst ihn auf der 
 | `/civ post [lesen <Nr> \| menue]` / `/civ brief <Spieler> <Betreff> \| <Text>` | Post |
 | `/civ freund [entfernen] <Spieler>` / `/civ freunde [menue]` | Freunde |
 | `/civ nachricht <Freund> <Text>` | Direktnachricht |
+| `/civ polizei status\|dienen\|kuendigen\|ernennen\|entlassen\|zellen\|anzeigen\|festnehmen\|fesseln\|loesen\|freilassen …` | Polizei (Dienstgrade, Festnahme, Handschellen, Zellen), siehe Wiki „Polizei und Militär“ |
+| `/civ krieg befoerdern <Spieler> soldat\|unteroffizier\|offizier\|hauptmann\|general` | Militärrang vergeben |
 | `/civ gericht [faelle\|fall\|akte\|klage\|beweis\|aussage\|plaedoyer\|stimme\|urteil\|berufung …]` | Justiz, siehe oben |
 | `/civ <Ebene> wahlkreis\|debatte\|flagge\|hymne\|gericht …` | Wahlkreise, Debatten, Hoheitszeichen und Gericht einer Ebene |
 | `/civ firma gruenden\|info\|liste\|aufnehmen\|entlassen\|einstellen\|dividende\|ausgeben\|aufloesen` | Firmen, siehe oben |
@@ -425,6 +440,10 @@ Der Bürgermeister (oder mit Abstimmungen die Bürger) stellt diese Regelungen i
 | Höchste Geldstrafe (`max_fine`) | Hundertstel Smaragd, Standard 5000 |
 | Verbannung erlaubt (`exile_allowed`) | ja/nein, Standard ja |
 | Gerichtsgebühr (`court_fee`) | Hundertstel Smaragd, Standard 100 |
+| Besetzung von Richtern und Staatsanwälten (`court_staffing`) | `head` (Standard), `government`, `automatic`, `election` |
+| Polizei-Sold (`police_wage`) | Hundertstel Smaragd je Rangstufe und Tag, Standard 0 |
+| Streife (`police_patrol`) | ja/nein, Standard ja |
+| Festnahme ohne Anzeige (`police_arrest_without_report`) | ja/nein, Standard nein |
 
 ## Für Server-Admins
 `config/eddies-civ-mod.properties` wird beim ersten Start angelegt:

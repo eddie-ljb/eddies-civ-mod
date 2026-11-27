@@ -31,6 +31,50 @@ public record Blueprint(String name, String style, int units, int sizeX, int siz
     public record Placement(int x, int y, int z, String state) {
     }
 
+    /**
+     * Die Haustür: Lage der unteren Türhälfte und Himmelsrichtung, in die sie nach außen zeigt.
+     *
+     * @param outward 0 Norden, 1 Osten, 2 Süden, 3 Westen (ungedrehter Plan)
+     */
+    public record Door(int x, int y, int z, int outward) {
+    }
+
+    /** Namensteile von Wassergebäuden: Sie dürfen auf dem Wasser stehen, alle anderen Gebäude nur an Land. */
+    private static final List<String> WATER_WORDS = List.of("leuchtturm", "lighthouse", "schiff", "ship", "boot",
+            "boat", "hafen", "harbor", "harbour", "steg", "pier", "werft", "shipyard", "bruecke", "bridge");
+
+    /**
+     * Ob es ein Wassergebäude ist (Leuchtturm, Schiff, Steg, Hafen, Brücke …): Nur solche Pläne werden auf dem Wasser
+     * gebaut, alle anderen an Land. Erkannt am Namen oder am Stil {@code wasser}.
+     */
+    public boolean isWaterBuilding() {
+        String lower = name.toLowerCase(Locale.ROOT);
+        return style.equalsIgnoreCase("wasser") || style.equalsIgnoreCase("water")
+                || WATER_WORDS.stream().anyMatch(lower::contains);
+    }
+
+    /** Die niedrigste Tür in der Außenwand; leer, wenn der Plan keine hat (Plätze, Brunnen, Parks). */
+    public java.util.Optional<Door> door() {
+        Door best = null;
+        for (int i = 0; i < blocks.length; i++) {
+            if (blocks[i] == 0) {
+                continue;
+            }
+            String state = palette.get(blocks[i]);
+            if (!baseName(state).endsWith("_door") || !state.contains("half=lower")) {
+                continue;
+            }
+            int x = i % sizeX;
+            int z = (i / sizeX) % sizeZ;
+            int y = i / (sizeX * sizeZ);
+            int outward = z == 0 ? 0 : x == sizeX - 1 ? 1 : z == sizeZ - 1 ? 2 : x == 0 ? 3 : -1;
+            if (outward >= 0 && (best == null || y < best.y())) {
+                best = new Door(x, y, z, outward);
+            }
+        }
+        return java.util.Optional.ofNullable(best);
+    }
+
     public Blueprint {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(style, "style");

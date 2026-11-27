@@ -1,0 +1,7 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": ["SSS", "SPS", " S "],
+  "key": { "S": "minecraft:stone_bricks", "P": "minecraft:paper" },
+  "result": { "id": "eddies-civ-mod:coat_of_arms", "count": 1 }
+}

@@ -389,22 +389,14 @@ public final class WarRegistry extends AggregateRoot<WarEvent> implements WarVie
     }
 
     /** Führt alle am {@code day} oder früher fälligen Feldzüge aus; die Garnison heilt zuvor. */
-    public List<BattleReport> runDueCampaigns(Day day, long reparationsPerStrengthPoint, int conquestPerWin) {
-        return runDueCampaigns(day, war -> reparationsPerStrengthPoint, war -> conquestPerWin);
-    }
-
-    /** Wie {@link #runDueCampaigns(Day, long, int)}, mit Parametern je Krieg (nach den Gesetzen der Beteiligten). */
-    public List<BattleReport> runDueCampaigns(Day day, java.util.function.ToLongFunction<War> reparations,
-                                              java.util.function.ToIntFunction<War> conquest) {
+    public List<BattleReport> runDueCampaigns(Day day) {
         heal(day);
         List<BattleReport> reports = new ArrayList<>();
         for (Campaign campaign : List.copyOf(campaigns)) {
             if (campaign.on().isBefore(day) || campaign.on().equals(day)) {
                 campaigns.remove(campaign);
                 if (war(campaign.war()).filter(War::ongoing).isPresent()) {
-                    War war = war(campaign.war()).orElseThrow();
-                    reports.add(fight(campaign.war(), campaign.initiator(), campaign.kind(),
-                            reparations.applyAsLong(war), conquest.applyAsInt(war), day));
+                    reports.add(fight(campaign.war(), campaign.initiator(), campaign.kind(), day));
                 }
             }
         }
@@ -413,16 +405,12 @@ public final class WarRegistry extends AggregateRoot<WarEvent> implements WarVie
 
     /**
      * Trägt ein Gefecht aus: Die Front verschiebt sich, beide Seiten haben Verwundete. Erreicht die Front eine
-     * Grenze, endet der Krieg mit Friedensbedingungen zugunsten der siegreichen Seite.
+     * Grenze, endet der Krieg; der Sieger erhält Siegpunkte nach der Höhe seines Siegs ({@link #victoryPoints}).
      */
-    public BattleReport fight(WarId id, PolityId initiator, BattleKind kind, long reparationsPerStrengthPoint,
-                              int conquestPerWin, Day day) {
+    public BattleReport fight(WarId id, PolityId initiator, BattleKind kind, Day day) {
         Objects.requireNonNull(initiator, "initiator");
         Objects.requireNonNull(kind, "kind");
         Objects.requireNonNull(day, "day");
-        if (reparationsPerStrengthPoint < 0 || conquestPerWin < 0) {
-            throw new IllegalArgumentException("Reparationen und Eroberung dürfen nicht negativ sein");
-        }
         War war = ongoing(id);
         if (!war.involves(initiator) || (kind == BattleKind.DEFENSIVE && !war.defender().equals(initiator))) {
             throw new WarRuleException(ErrorCode.INVALID_CAMPAIGN);
@@ -451,8 +439,8 @@ public final class WarRegistry extends AggregateRoot<WarEvent> implements WarVie
         Optional<PeaceTerms> terms = Optional.empty();
         if (Math.abs(front) == 100) {
             PolityId winner = front > 0 ? war.aggressor() : war.defender();
-            long reparations = Math.round(Math.abs(aggressorPower - homeDefender) / 100.0 * reparationsPerStrengthPoint);
-            terms = Optional.of(new PeaceTerms(winner, war.opponentOf(winner), reparations, conquestPerWin));
+            terms = Optional.of(PeaceTerms.decided(winner, war.opponentOf(winner),
+                    victoryPoints(Math.abs(aggressorPower - homeDefender))));
             endWar(war, day, terms);
         }
         return new BattleReport(id, kind, aggressorPower, defenderPower, shift, front, woundedAggressor,
@@ -463,17 +451,9 @@ public final class WarRegistry extends AggregateRoot<WarEvent> implements WarVie
      * Löst die Entscheidungsschlacht des Kriegs {@code id} anhand der aktuellen Kampfkräfte auf. Bei Gleichstand geht
      * der Krieg weiter; sonst endet er sofort mit {@link PeaceTerms} zugunsten der siegreichen Seite.
      */
-    public BattleOutcome resolveBattle(WarId id, long reparationsPerStrengthPoint, Day day) {
-        return resolveBattle(id, reparationsPerStrengthPoint, 0, day);
-    }
-
-    /** Wie {@link #resolveBattle(WarId, long, Day)}, mit {@code conquest} geforderten Grenz-Chunks im Sieger-Fall. */
-    public BattleOutcome resolveBattle(WarId id, long reparationsPerStrengthPoint, int conquest, Day day) {
+    public BattleOutcome resolveBattle(WarId id, Day day) {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(day, "day");
-        if (reparationsPerStrengthPoint < 0 || conquest < 0) {
-            throw new IllegalArgumentException("Reparationen und Eroberung dürfen nicht negativ sein");
-        }
         War war = ongoing(id);
         long aggressorPower = sidePower(war, war.aggressor(), day);
         long defenderPower = sidePower(war, war.defender(), day);
@@ -491,9 +471,43 @@ public final class WarRegistry extends AggregateRoot<WarEvent> implements WarVie
         }
         fronts.put(id, winner.get().equals(war.aggressor()) ? 100 : -100);
         long homeDefender = defenderPower * BattleResolver.DEFENDER_ADVANTAGE_PERCENT / 100;
-        long reparations = Math.round(Math.abs(aggressorPower - homeDefender) / 100.0 * reparationsPerStrengthPoint);
-        endWar(war, day, Optional.of(new PeaceTerms(winner.get(), war.opponentOf(winner.get()), reparations, conquest)));
+        endWar(war, day, Optional.of(PeaceTerms.decided(winner.get(), war.opponentOf(winner.get()),
+                victoryPoints(Math.abs(aggressorPower - homeDefender)))));
         return outcome;
+    }
+
+    /**
+     * Siegpunkte für einen Sieg mit dem Kräfteunterschied {@code powerGap} (Hundertstel Soldaten): ein Punkt je
+     * Soldat Vorsprung, mindestens einer.
+     */
+    public static int victoryPoints(long powerGap) {
+        return (int) Math.max(1, Math.min(Integer.MAX_VALUE, Math.round(Math.abs(powerGap) / 100.0)));
+    }
+
+    /** Entschiedene Kriege, deren Sieger seine Siegpunkte noch nicht ausgegeben hat. */
+    public List<War> pendingSpoils() {
+        return wars.stream().filter(war -> war.outcome().filter(terms -> !terms.settled()).isPresent()).toList();
+    }
+
+    /**
+     * Schreibt fest, wofür der Sieger seine Siegpunkte ausgegeben hat: {@code conquest} Grenz-Chunks und
+     * {@code reparations} Reparationen. Die Preise prüft der Aufrufer (sie hängen von den Gesetzen ab).
+     *
+     * @throws WarRuleException wenn der Krieg nicht mit offenen Siegpunkten entschieden wurde
+     */
+    public PeaceTerms settleSpoils(WarId id, long reparations, int conquest, Day day) {
+        Objects.requireNonNull(id, "id");
+        Objects.requireNonNull(day, "day");
+        War war = war(id).orElseThrow(() -> new UnknownWarException(id));
+        PeaceTerms open = war.outcome().filter(terms -> !terms.settled())
+                .orElseThrow(() -> new WarRuleException(ErrorCode.NO_SPOILS));
+        PeaceTerms settled = open.settledWith(reparations, conquest);
+        wars.replaceAll(existing -> existing.id().equals(id)
+                ? new War(existing.id(), existing.aggressor(), existing.defender(), existing.declaredOn(),
+                existing.endedOn(), Optional.of(settled))
+                : existing);
+        raise(new WarEvent.SpoilsSettled(id, reparations, conquest, day));
+        return settled;
     }
 
     /** Verwundet einen Teil der dienstfähigen Mitglieder; Soldaten zuerst, Offiziere zuletzt. */

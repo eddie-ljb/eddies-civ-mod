@@ -57,7 +57,9 @@ final class WarStore {
                     case "WAR" -> wars.add(new War(wid(f[1]), pid(f[2]), pid(f[3]), day(f[4]),
                             f[5].isEmpty() ? Optional.empty() : Optional.of(day(f[5])),
                             f[6].isEmpty() ? Optional.empty() : Optional.of(new PeaceTerms(pid(f[6]), pid(f[7]),
-                                    Long.parseLong(f[8]), Integer.parseInt(f[9])))));
+                                    Long.parseLong(f[8]), Integer.parseInt(f[9]),
+                                    f.length > 11 ? Integer.parseInt(f[10]) : 0,
+                                    f.length <= 11 || Boolean.parseBoolean(f[11])))));
                     case "SVC" -> services.computeIfAbsent(pid(f[1]), k -> new LinkedHashMap<>())
                             .put(ActorCodec.decode(f[2]), new WarView.Service(MilitaryRank.valueOf(f[3]),
                                     Integer.parseInt(f[4]), Integer.parseInt(f[5])));
@@ -115,7 +117,9 @@ final class WarStore {
                     t.map(x -> x.winner().value().toString()).orElse(""),
                     t.map(x -> x.loser().value().toString()).orElse(""),
                     t.map(x -> Long.toString(x.reparations())).orElse("0"),
-                    t.map(x -> Integer.toString(x.conquest())).orElse("0")));
+                    t.map(x -> Integer.toString(x.conquest())).orElse("0"),
+                    t.map(x -> Integer.toString(x.points())).orElse("0"),
+                    t.map(x -> Boolean.toString(x.settled())).orElse("true")));
         }
         s.services().forEach((polity, map) -> map.forEach((member, svc) -> lines.add(String.join("\t", "SVC",
                 polity.value().toString(), ActorCodec.encode(member), svc.rank().name(),

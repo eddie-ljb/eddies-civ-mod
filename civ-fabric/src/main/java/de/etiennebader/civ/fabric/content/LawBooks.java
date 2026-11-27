@@ -17,8 +17,8 @@ public final class LawBooks {
 
     private static Item item;
 
-    /** Titel und Text eines Paragraphen aus einem beschriebenen Buch. */
-    public record Draft(String title, String text) {
+    /** Gesetz, Teil, Titel und Text eines Paragraphen aus einem beschriebenen Buch; Gesetz und Teil können leer sein. */
+    public record Draft(String lawName, String partName, String title, String text) {
     }
 
     private LawBooks() {
@@ -45,15 +45,41 @@ public final class LawBooks {
         return text.isEmpty() ? Optional.empty() : Optional.of(text);
     }
 
-    /** Erste Zeile als Titel, der Rest als Text; ohne zweite Zeile ist der ganze Text auch der Titel. */
+    /**
+     * Optionale Kopfzeilen {@code Gesetz: …} und {@code Teil: …} (in beliebiger Reihenfolge), dann der Titel als erste
+     * weitere Zeile und der Rest als Text; ohne zweite Zeile ist der ganze Text auch der Titel. Der Titel darf wie im
+     * Befehl die Schreibweise {@code Gesetz > Teil > Titel} haben.
+     */
     public static Optional<Draft> draftOf(ItemStack stack) {
-        return textOf(stack).map(text -> {
-            int newline = text.indexOf('\n');
-            if (newline < 0) {
-                return new Draft(shorten(text), text);
+        return textOf(stack).map(LawBooks::parseDraft);
+    }
+
+    static Draft parseDraft(String text) {
+        String law = "";
+        String part = "";
+        String rest = text;
+        while (true) {
+            int newline = rest.indexOf('\n');
+            String line = (newline < 0 ? rest : rest.substring(0, newline)).strip();
+            String lower = line.toLowerCase(java.util.Locale.ROOT);
+            boolean isLaw = lower.startsWith("gesetz:");
+            boolean isPart = lower.startsWith("teil:");
+            if (newline < 0 || !(isLaw || isPart)) {
+                break;
             }
-            return new Draft(shorten(text.substring(0, newline).strip()), text.substring(newline + 1).strip());
-        });
+            String value = line.substring(line.indexOf(':') + 1).strip();
+            if (isLaw) {
+                law = value;
+            } else {
+                part = value;
+            }
+            rest = rest.substring(newline + 1).strip();
+        }
+        int newline = rest.indexOf('\n');
+        if (newline < 0) {
+            return new Draft(law, part, shorten(rest), rest);
+        }
+        return new Draft(law, part, shorten(rest.substring(0, newline).strip()), rest.substring(newline + 1).strip());
     }
 
     private static String shorten(String title) {

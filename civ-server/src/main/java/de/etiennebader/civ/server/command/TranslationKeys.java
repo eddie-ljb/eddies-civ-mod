@@ -125,6 +125,16 @@ public final class TranslationKeys {
         return PREFIX + "dialogue_topic." + topic.name().toLowerCase(Locale.ROOT);
     }
 
+    /** Name einer Kultur, z. B. „Wüste“. */
+    public static String culture(de.etiennebader.civ.domain.population.Culture culture) {
+        return PREFIX + "culture." + culture.name().toLowerCase(Locale.ROOT);
+    }
+
+    /** Name einer Rasse, z. B. „Zwerg“. */
+    public static String race(de.etiennebader.civ.domain.population.Race race) {
+        return PREFIX + "race." + race.name().toLowerCase(Locale.ROOT);
+    }
+
     /** Name einer Konjunkturphase, z. B. im {@code /civ konjunktur}-Befehl. */
     public static String conjuncturePhase(BusinessPhase phase) {
         return PREFIX + "conjuncture_phase." + phase.name().toLowerCase(Locale.ROOT);
@@ -148,6 +158,8 @@ public final class TranslationKeys {
                         Arrays.stream(Satisfaction.Factor.values()).map(TranslationKeys::moodFactor),
                         Arrays.stream(Satisfaction.Factor.values()).map(TranslationKeys::moodFactorHint),
                         Arrays.stream(BusinessPhase.values()).map(TranslationKeys::conjuncturePhase),
+                        Arrays.stream(de.etiennebader.civ.domain.population.Culture.values()).map(TranslationKeys::culture),
+                        Arrays.stream(de.etiennebader.civ.domain.population.Race.values()).map(TranslationKeys::race),
                         StandardParameters.all().stream().map(TranslationKeys::law),
                         Levels.DEFAULT.all().stream().map(level -> Level.translationKey(level.id())),
                         Stream.of(yesNo(true), yesNo(false)),

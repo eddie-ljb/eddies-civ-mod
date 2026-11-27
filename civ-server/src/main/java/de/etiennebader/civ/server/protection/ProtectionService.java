@@ -3,10 +3,10 @@ package de.etiennebader.civ.server.protection;
 import de.etiennebader.civ.application.query.WorldQueries;
 import de.etiennebader.civ.domain.actor.PlayerRef;
 import de.etiennebader.civ.domain.law.ParameterKey;
-import de.etiennebader.civ.domain.law.StandardParameters;
 import de.etiennebader.civ.domain.polity.PolityView;
 import de.etiennebader.civ.domain.protection.Denial;
 import de.etiennebader.civ.domain.protection.Hazard;
+import de.etiennebader.civ.domain.protection.PlotFlag;
 import de.etiennebader.civ.domain.protection.ProtectedAction;
 import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.domain.territory.Claim;
@@ -76,12 +76,12 @@ public final class ProtectionService {
 
     /** Ob Spieler einander hier verletzen dürfen ({@code pvp_allowed}); in der Wildnis immer. */
     public boolean allowsPvp(BlockPosition position) {
-        return lawAt(position, StandardParameters.PVP_ALLOWED).orElse(true);
+        return queries.allows(PlotFlag.PVP, position);
     }
 
     /** Ob feindliche Monster hier leben dürfen ({@code hostile_mobs_allowed}); in der Wildnis immer. */
     public boolean allowsHostileMobs(BlockPosition position) {
-        return lawAt(position, StandardParameters.HOSTILE_MOBS_ALLOWED).orElse(true);
+        return queries.allows(PlotFlag.HOSTILE_MOBS, position);
     }
 
     /**
@@ -96,7 +96,7 @@ public final class ProtectionService {
         if (town.isEmpty() || town.get().isMember(player)) {
             return true;
         }
-        return queries.effectiveLaws(town.get()).valueOf(StandardParameters.OUTSIDERS_MAY_HURT_ANIMALS);
+        return queries.allows(PlotFlag.OUTSIDERS_HURT_ANIMALS, position);
     }
 
     /** Ob dieser Spieler hier etwas angreifen darf, das einem anderen Spieler gehört (PvP). */
@@ -110,10 +110,6 @@ public final class ProtectionService {
 
     private Optional<PolityView> townAt(BlockPosition position) {
         return queries.territory().claimAt(position.chunk()).map(Claim::polity).flatMap(queries::polity);
-    }
-
-    private Optional<Boolean> lawAt(BlockPosition position, ParameterKey<Boolean> key) {
-        return townAt(position).map(town -> queries.effectiveLaws(town).valueOf(key));
     }
 
     /**

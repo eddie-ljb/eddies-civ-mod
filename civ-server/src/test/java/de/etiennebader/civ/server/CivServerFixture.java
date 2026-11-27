@@ -28,7 +28,16 @@ public final class CivServerFixture {
     }
 
     public static CivServerFixture start(IdGenerator ids, ServerSettings settings) {
-        return new CivServerFixture(CivServer.start(new MemoryStateStore(), settings, ids, SaveListener.NONE));
+        CivServerFixture fixture = new CivServerFixture(
+                CivServer.start(new MemoryStateStore(), settings, ids, SaveListener.NONE));
+        // Die meisten Tests handeln nicht von Straßen: ohne Straßenpflicht starten; StreetRuleTest schaltet sie an.
+        fixture.server.streetAccess().enforced(false);
+        return fixture;
+    }
+
+    /** Schaltet die Straßenpflicht (Grundstücke und Häuser nur an gebauten Straßen) an oder ab. */
+    public void enforceStreets(boolean enforced) {
+        server.streetAccess().enforced(enforced);
     }
 
     public CivCommands commands() {
@@ -51,6 +60,10 @@ public final class CivServerFixture {
         return server.territory();
     }
 
+    public de.etiennebader.civ.server.road.RoadService roads() {
+        return server.roads();
+    }
+
     public de.etiennebader.civ.server.construction.ConstructionService construction() {
         return server.construction();
     }
@@ -63,6 +76,14 @@ public final class CivServerFixture {
         return server.villagers();
     }
 
+    public de.etiennebader.civ.server.plot.PlotRightsService plotRights() {
+        return server.plotRights();
+    }
+
+    public de.etiennebader.civ.server.religion.ReligionService religion() {
+        return server.religion();
+    }
+
     public de.etiennebader.civ.server.family.FamilyService family() {
         return server.family();
     }
@@ -73,6 +94,18 @@ public final class CivServerFixture {
 
     public de.etiennebader.civ.server.police.PoliceService police() {
         return server.police();
+    }
+
+    public de.etiennebader.civ.server.land.LandRules landRules() {
+        return server.landRules();
+    }
+
+    public de.etiennebader.civ.server.culture.CultureService culture() {
+        return server.culture();
+    }
+
+    public de.etiennebader.civ.server.government.GovernmentService government() {
+        return server.government();
     }
 
     public de.etiennebader.civ.server.war.WarService war() {

@@ -67,3 +67,19 @@ ist erlaubt; Admins mit `/civ admin umgehen` ebenfalls.
 verbietet. Anmeldung nur vor dem Serverstart. Anzeigename: Sprachschlüssel `eddies-civ-mod.law.<id>` in der
 Sprachdatei der fremden Mod. Wird die Mod entfernt, verwirft der Spielstand ihre Gesetze beim Laden statt
 abzubrechen. Das Paket `de.etiennebader.civ.api` ist die stabile Oberfläche; alles andere ist intern.
+
+## Neu: Wegebau, Namen, Logos
+- `civ-server/.../road/RoadService` verwaltet Wegebauten (`roads.tsv`); `civ-fabric/.../RoadSites` legt die Felder in die Welt. Das Bauamt aus Dorfbewohnern gründet Straßen in `construction/TownPlanning`.
+- `civ-application/.../population/FoundingNames` erzeugt alle Namen von Dorfbewohner-Gründungen (rein, ohne Zahlen, je UUID fest).
+- Bauabsperrung: Block `construction_barrier` (`content/BarrierBlock`, ein Zaun im Tag `minecraft:fences`); `ConstructionService.sites()` meldet die Baufelder, `ConstructionSites` stellt die Zäune auf und trägt das Gelände ab. `Blueprint.door()` liefert die Haustür für Ausrichtung und Höhe.
+- Logos: `LogoMaps` bildet PNGs auf Kartenfarben ab, `LogoDisplays` zeigt Wappen als Item-Display über dem Gemeindehaus; Upload über `POST /api/image`, Liste über `GET /api/logos`.
+- Religion: `ClergyRole` (Ämter mit Rechten) und Schrift-Texte liegen im `ReligionService`/`ReligionStore`, nicht im Domänen-Record.
+- Befehlsvorschläge: `CivCommandTree.arg(...)` hängt je Argumentname passende Vorschläge mit Erklärung an.
+- Menüs: `Canvas.fillRow` füllt nur noch freie Plätze; zuvor überschrieb der Rahmen Knöpfe, die vorher in dieselbe Zeile gesetzt wurden.
+
+## Polizei und Militär (#84)
+- `civ-domain/.../police`: `PoliceRegistry` (Dienstgrade, Anzeigen, Zellen, Haft, Handschellen, `CaseLink`), `Criminality`; reines Java, darf nur `shared` und `actor` nutzen (`PackageDependencyRulesTest`).
+- `civ-server/.../police`: `PoliceService` (Befehle, Tagesablauf, Streife) und `PoliceStore` (`police.tsv`); implementiert `CaseListener` und wird vom `JusticeService` über Eröffnung, Haft, Berufung und Rechtskraft benachrichtigt.
+- `civ-server/.../justice`: `CourtStaffing` (Verfassungsautomatik `court_staffing`) und `CourtCandidacies` (`court_candidacies.tsv`).
+- `civ-domain/.../war`: `MilitaryRank` mit `level()` (Befehlskette), `WarRegistry.promote`; `WarService` führt das Schlachtenbuch (`LOG` in `war.tsv`) und leitet Kriegsberichte an die Zeitungen weiter.
+- `civ-fabric`: Item `handcuffs` (`HandcuffItems`), Durchsetzung in `ProtectionListener`, Stillstand gefesselter Dorfbewohner in `VillagerCensus`.

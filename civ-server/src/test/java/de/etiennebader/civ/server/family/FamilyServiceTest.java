@@ -71,6 +71,17 @@ class FamilyServiceTest {
     }
 
     @Test
+    @DisplayName("Schon in wenigen Wochen heiraten Paare und bekommen Kinder")
+    void marriagesAndChildrenSoon() {
+        populate(12);
+        FamilyService family = server.family();
+        run(family, 21);
+        assertFalse(family.registry().marriages().isEmpty(), "in drei Wochen hat jemand geheiratet");
+        run(family, 60);
+        assertFalse(family.registry().children().isEmpty(), "und Kinder bekommen");
+    }
+
+    @Test
     @DisplayName("Dieselbe Welt ergibt denselben Verlauf")
     void deterministic() {
         populate(12);

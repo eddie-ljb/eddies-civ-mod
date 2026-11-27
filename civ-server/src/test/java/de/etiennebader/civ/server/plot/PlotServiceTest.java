@@ -45,6 +45,79 @@ class PlotServiceTest {
     }
 
     @Test
+    @DisplayName("Straßenpflicht: Grundstücke nur an einer angelegten Straße, ausgeschrieben nur dort")
+    void plotsNeedAStreet() {
+        server.enforceStreets(true);
+        server.commands().found(at(alice, 8, 8), "Nordhain");
+        var town = server.queries().polityNamed("Nordhain").orElseThrow();
+
+        Reply refused = plots.createChunk(at(alice, 5, 5), "wohnen");
+        assertFalse(refused.success());
+        assertEquals(MessageKey.PLOT_NEEDS_STREET.key(), refused.lines().get(0).key());
+
+        server.app().streets().lay(alice, town.id(), "Hauptstrasse",
+                new de.etiennebader.civ.domain.land.Area(DimensionId.OVERWORLD, 0, 0, 15, 1),
+                de.etiennebader.civ.domain.shared.Day.of(1));
+        plots.selectCorner(at(alice, 2, 6), 1);
+        plots.selectCorner(at(alice, 10, 12), 2);
+        assertTrue(plots.createFromSelection(at(alice, 5, 5), "wohnen").success(), "an der Straße geht es");
+        plots.selectCorner(at(alice, 2, 40), 1);
+        plots.selectCorner(at(alice, 10, 46), 2);
+        assertFalse(plots.createFromSelection(at(alice, 5, 5), "wohnen").success(), "zu weit von der Straße");
+
+        // Gebaut wird der Weg erst mit dem Wegebau: bis dahin zählt die Straße nicht.
+        var street = server.queries().polity(town.id()).orElseThrow().streets().get(0);
+        server.roads().start(server.queries().polity(town.id()).orElseThrow(), street, false);
+        assertEquals(MessageKey.PLOT_NEEDS_STREET.key(), plots.offer(at(alice, 5, 8), "5").lines().get(0).key());
+        for (int i = 0; i < 20; i++) {
+            server.roads().advance(10_000);
+        }
+        assertTrue(plots.offer(at(alice, 5, 8), "5").success(), "mit gebauter Straße darf ausgeschrieben werden");
+    }
+
+    @Test
+    @DisplayName("Die Firmenleitung kauft ein angebotenes Grundstück aus der Firmenkasse für die Firma")
+    void companyBuysPlot() {
+        server.commands().found(at(alice, 8, 8), "Nordhain");
+        server.bank().deposit(at(alice, 8, 8), 600);
+        assertTrue(server.companies().found(at(alice, 8, 8), "100", "Bau AG").success());
+        assertTrue(plots.createChunk(at(alice, 5, 5), "gewerbe").success());
+        assertTrue(plots.offer(at(alice, 5, 5), "5").success());
+        var company = server.queries().companies().stream()
+                .filter(c -> c.name().value().equals("Bau AG")).findFirst().orElseThrow();
+        long before = server.queries().ledger().balanceOf(company.asActor(), company.currency()).amount();
+
+        assertFalse(plots.buyForCompany(at(bob, 5, 5), "Bau AG").success(), "nur die Leitung kauft für die Firma");
+        assertFalse(plots.buyForCompany(at(alice, 5, 5), "Gibt es nicht").success());
+        assertTrue(plots.buyForCompany(at(alice, 5, 5), "Bau AG").success());
+        assertTrue(server.queries().ledger().balanceOf(company.asActor(), company.currency()).amount() < before,
+                "der Preis kam aus der Firmenkasse");
+        var land = server.queries().land(server.queries().polityNamed("Nordhain").orElseThrow().id());
+        assertEquals(company.asActor(), land.plots().iterator().next().holder());
+        assertFalse(plots.buyForCompany(at(alice, 5, 5), "Bau AG").success(), "gehört ihr schon");
+    }
+
+    @Test
+    @DisplayName("Der Inhaber übergibt ein eigenes Grundstück ohne Preis an seine Firma")
+    void ownerTransfersPlotToCompany() {
+        server.commands().found(at(alice, 8, 8), "Nordhain");
+        server.bank().deposit(at(alice, 8, 8), 600);
+        assertTrue(server.companies().found(at(alice, 8, 8), "100", "Bau AG").success());
+        server.players().record(alice, "Alice");
+        assertTrue(plots.createChunk(at(alice, 5, 5), "gewerbe").success());
+        assertTrue(plots.assign(at(alice, 5, 5), "Alice").success());
+        assertEquals(java.util.List.of("Bau AG"), plots.companiesHeadedBy(alice));
+        assertFalse(plots.transferToCompany(at(bob, 5, 5), "Bau AG").success(), "Bob leitet die Firma nicht");
+        assertFalse(plots.transferToCompany(at(alice, 5, 5), "Gibt es nicht").success());
+        assertTrue(plots.transferToCompany(at(alice, 5, 5), "Bau AG").success());
+        var company = server.queries().companies().stream()
+                .filter(c -> c.name().value().equals("Bau AG")).findFirst().orElseThrow();
+        var land = server.queries().land(server.queries().polityNamed("Nordhain").orElseThrow().id());
+        assertEquals(company.asActor(), land.plots().iterator().next().holder());
+        assertFalse(plots.transferToCompany(at(alice, 5, 5), "Bau AG").success(), "gehört nicht mehr ihr");
+    }
+
+    @Test
     @DisplayName("Ohne Auswahl, mit falscher Art oder als Nicht-Bürger wird abgelehnt")
     void rejectsInvalidCreation() {
         server.commands().found(at(alice, 8, 8), "Nordhain");

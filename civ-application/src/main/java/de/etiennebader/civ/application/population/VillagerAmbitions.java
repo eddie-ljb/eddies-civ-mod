@@ -88,6 +88,15 @@ public final class VillagerAmbitions {
     private final Trading trading;
     private final TakeOverCompany takeOver;
     private final ClaimChunk claimChunk;
+    private volatile java.util.function.Predicate<ChunkCoord> claimable = chunk -> true;
+
+    /**
+     * Welche Chunks Dorfbewohner als Bürgermeister überhaupt beanspruchen (Land statt Wasser); das Spiel in der Welt
+     * setzt das, ohne Angabe ist jeder Chunk recht.
+     */
+    public void claimable(java.util.function.Predicate<ChunkCoord> claimable) {
+        this.claimable = Objects.requireNonNull(claimable, "claimable");
+    }
 
     public VillagerAmbitions(Supplier<WorldQueries> queries, CompanyUseCases companies, FoundParty foundParty,
                              StandForElection standForElection, Trading trading, TakeOverCompany takeOver,
@@ -242,7 +251,7 @@ public final class VillagerAmbitions {
                         .thenComparingInt(ChunkCoord::z)).toList();
         for (ChunkCoord chunk : own) {
             for (ChunkCoord candidate : chunk.neighbours()) {
-                if (territory.claimAt(candidate).isPresent()) {
+                if (territory.claimAt(candidate).isPresent() || !claimable.test(candidate)) {
                     continue;
                 }
                 long foreign = candidate.neighbours().stream()
@@ -365,7 +374,9 @@ public final class VillagerAmbitions {
             return false;
         }
         try {
-            companies.foundCompany(villager, PolityName.of(companyName(villager)),
+            String town = home.get().name().value();
+            companies.foundCompany(villager, PolityName.of(FoundingNames.company(villager, town,
+                            name -> world.polityNamed(name).isPresent())),
                     Money.of(capital, home.get().currency()), day);
             return true;
         } catch (DomainException ignored) {
@@ -379,7 +390,8 @@ public final class VillagerAmbitions {
             return false;
         }
         try {
-            foundParty.execute(new FoundParty.Command(PolityName.of(partyName(villager, personality)), villager,
+            foundParty.execute(new FoundParty.Command(PolityName.of(partyName(villager, personality, home.get().name().value(),
+                    name -> world.polityNamed(name).isPresent())), villager,
                     profileFor(personality), home.get().currency(), day));
             return true;
         } catch (DomainException ignored) {
@@ -387,24 +399,16 @@ public final class VillagerAmbitions {
         }
     }
 
-    static String companyName(PersonRef villager) {
-        return "Handel " + tag(villager);
-    }
-
-    static String partyName(PersonRef villager, Personality personality) {
+    static String partyName(PersonRef villager, Personality personality, String town,
+                            java.util.function.Predicate<String> taken) {
         String stem = switch (profileFor(personality).platform()) {
-            case ORDER -> "Ordnung";
-            case FREEDOM -> "Freiheit";
-            case LOW_TAXES -> "Sparsame";
-            case INVESTMENT -> "Aufbau";
-            default -> "Bürger";
+            case ORDER -> "Ordnungspartei";
+            case FREEDOM -> "Freiheitsbund";
+            case LOW_TAXES -> "Sparsamkeitspartei";
+            case INVESTMENT -> "Aufbaupartei";
+            default -> "Bürgerliste";
         };
-        return stem + " " + tag(villager);
-    }
-
-    /** Kurzes eindeutiges Kennzeichen, damit Namen nicht kollidieren. */
-    private static String tag(PersonRef villager) {
-        return Long.toHexString(villager.uuid().getLeastSignificantBits() & 0xFFFFFL).toUpperCase();
+        return FoundingNames.party(villager, stem, town, taken);
     }
 
     /** Fester Zufall je Dorfbewohner, Tag und Tätigkeit, 0 bis unter 1. */
