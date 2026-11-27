@@ -1542,6 +1542,7 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                         .put("preamble", polity.constitution().preamble())
                         .raw("paragraphs", Json.array(books.paragraphsOf(polity), paragraph -> Json.object()
                                 .put("number", paragraph.number())
+                                .put("id", paragraph.id().value().toString())
                                 .put("law", paragraph.lawName())
                                 .put("part", paragraph.partName())
                                 .put("title", paragraph.title())
@@ -1610,7 +1611,8 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
         return switch (action) {
             case "enact" -> books.enact(caller, polity, body.getOrDefault("law", ""), body.getOrDefault("part", ""),
                     body.getOrDefault("title", ""), body.getOrDefault("text", ""));
-            case "repeal" -> books.repeal(caller, polity, Integer.parseInt(body.getOrDefault("number", "0")));
+            case "repeal" -> books.repeal(caller, polity,
+                    new de.etiennebader.civ.domain.shared.StatuteId(UUID.fromString(body.getOrDefault("id", ""))));
             case "rights" -> {
                 Map<String, String> values = new java.util.LinkedHashMap<>();
                 body.forEach((key, value) -> {

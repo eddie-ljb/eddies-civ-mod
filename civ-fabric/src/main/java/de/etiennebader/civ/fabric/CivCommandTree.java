@@ -755,7 +755,12 @@ public final class CivCommandTree {
                 .then(Commands.literal("zeigen")
                         .then(arg(COUNT, IntegerArgumentType.integer(1))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.lawBooks().show(
-                                        Players.caller(player), IntegerArgumentType.getInteger(context, COUNT))))))
+                                        Players.caller(player), IntegerArgumentType.getInteger(context, COUNT),
+                                        Optional.empty())))
+                                .then(arg(NAME, StringArgumentType.greedyString())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.lawBooks().show(
+                                                Players.caller(player), IntegerArgumentType.getInteger(context, COUNT),
+                                                Optional.of(name(context))))))))
                 .then(Commands.literal("pruefen")
                         .then(arg(TEXT, StringArgumentType.greedyString())
                                 .executes(context -> withCiv(context, (civ, player) -> civ.lawBooks().check(
@@ -767,7 +772,12 @@ public final class CivCommandTree {
                 .then(Commands.literal("aufheben")
                         .then(arg(COUNT, IntegerArgumentType.integer(1))
                                 .executes(context -> withCiv(context, (civ, player) -> civ.lawBooks().repeal(
-                                        Players.caller(player), IntegerArgumentType.getInteger(context, COUNT))))));
+                                        Players.caller(player), IntegerArgumentType.getInteger(context, COUNT),
+                                        Optional.empty())))
+                                .then(arg(NAME, StringArgumentType.greedyString())
+                                        .executes(context -> withCiv(context, (civ, player) -> civ.lawBooks().repeal(
+                                                Players.caller(player), IntegerArgumentType.getInteger(context, COUNT),
+                                                Optional.of(name(context))))))));
     }
 
     /** {@code <Titel> | <Text>}; ohne Trennstrich kommt der Text aus dem Buch mit Feder in der Hand. */

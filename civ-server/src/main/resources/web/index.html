@@ -1903,7 +1903,7 @@ function lawParagraph(g, p, canEdit, msg) {
       g.unrecognized.length ? el("p", { className: "muted small", textContent: "Nicht automatisch durchgesetzt: " + g.unrecognized.join(" / ") }) : null,
       canEdit ? el("button", { className: "btn small", textContent: "Aufheben", onclick: async () => {
         if (!confirm("§" + g.number + " " + g.title + " aufheben?")) return;
-        const r = await api("/api/laws", { action: "repeal", polity: p.id, number: String(g.number) });
+        const r = await api("/api/laws", { action: "repeal", polity: p.id, id: g.id });
         msg.textContent = r.data.message || r.data.error; msg.className = "msg " + (r.ok ? "ok" : "err");
         if (r.ok) loadLaws();
       } }) : null);
