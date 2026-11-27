@@ -9,6 +9,7 @@ import de.etiennebader.civ.domain.civic.CivicRegistry;
 import de.etiennebader.civ.domain.civic.Constituency;
 import de.etiennebader.civ.domain.civic.ConstituencyId;
 import de.etiennebader.civ.domain.civic.CustomImage;
+import de.etiennebader.civ.domain.civic.Emblem;
 import de.etiennebader.civ.domain.civic.Flag;
 import de.etiennebader.civ.domain.civic.HomePort;
 import de.etiennebader.civ.domain.civic.PortAccess;
@@ -212,5 +213,35 @@ public final class CivicUseCases {
     private static Constituency require(CivicRegistry registry, PolityId polity, String name) {
         return registry.constituencyNamed(polity, name)
                 .orElseThrow(() -> new IllegalArgumentException("Unbekannter Wahlkreis: " + name));
+    }
+
+    /**
+     * Stellt eine Flagge oder ein Wappen auf. Es nützt der Polity, in deren Gebiet es steht; außerhalb von Gebieten
+     * ist es reine Deko.
+     *
+     * @return die begünstigte Polity; leer bei Deko oder wenn die Polity schon die Höchstzahl hat
+     */
+    public Optional<PolityId> placeEmblem(BlockPosition position, Emblem.Kind kind, Day day) {
+        Optional<PolityId> town = aggregates.territory().claimAt(position.chunk())
+                .map(de.etiennebader.civ.domain.territory.Claim::polity);
+        if (town.isEmpty()) {
+            return Optional.empty();
+        }
+        CivicRegistry registry = aggregates.civic();
+        if (!registry.placeEmblem(new Emblem(position, town.get(), kind, day))) {
+            return Optional.empty();
+        }
+        aggregates.commit(registry);
+        return town;
+    }
+
+    /** Nimmt das Hoheitszeichen an dieser Stelle aus dem Register. @return ob dort eines stand */
+    public boolean removeEmblem(BlockPosition position) {
+        CivicRegistry registry = aggregates.civic();
+        if (!registry.removeEmblem(position)) {
+            return false;
+        }
+        aggregates.commit(registry);
+        return true;
     }
 }

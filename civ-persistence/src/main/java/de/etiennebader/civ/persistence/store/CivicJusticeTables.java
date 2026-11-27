@@ -8,6 +8,7 @@ import de.etiennebader.civ.domain.civic.CivicView;
 import de.etiennebader.civ.domain.civic.Constituency;
 import de.etiennebader.civ.domain.civic.ConstituencyId;
 import de.etiennebader.civ.domain.civic.CustomImage;
+import de.etiennebader.civ.domain.civic.Emblem;
 import de.etiennebader.civ.domain.civic.Flag;
 import de.etiennebader.civ.domain.civic.HomePort;
 import de.etiennebader.civ.domain.civic.PortAccess;
@@ -51,7 +52,7 @@ final class CivicJusticeTables {
 
     void writeCivic(Connection connection, CivicView civic) throws SQLException {
         clear(connection, "constituency", "constituency_area", "constituency_town", "polity_flag", "polity_anthem",
-                "polity_image", "polity_port_settings", "polity_port");
+                "polity_image", "polity_port_settings", "polity_port", "polity_emblem");
         try (PreparedStatement insert = connection.prepareStatement(
                 "INSERT INTO constituency (id, position, polity_id, name) VALUES (?, ?, ?, ?)");
              PreparedStatement area = connection.prepareStatement("""
@@ -122,6 +123,20 @@ final class CivicJusticeTables {
                 insert.setInt(5, image.width());
                 insert.setInt(6, image.height());
                 insert.setLong(7, image.uploadedAt().value());
+                insert.addBatch();
+            }
+            insert.executeBatch();
+        }
+        try (PreparedStatement insert = connection.prepareStatement(
+                "INSERT INTO polity_emblem (dimension, x, y, z, polity_id, kind, placed) VALUES (?, ?, ?, ?, ?, ?, ?)")) {
+            for (Emblem emblem : civic.emblems()) {
+                insert.setString(1, emblem.position().dimension().value());
+                insert.setInt(2, emblem.position().x());
+                insert.setInt(3, emblem.position().y());
+                insert.setInt(4, emblem.position().z());
+                insert.setString(5, emblem.polity().value().toString());
+                insert.setString(6, emblem.kind().name());
+                insert.setLong(7, emblem.placedOn().value());
                 insert.addBatch();
             }
             insert.executeBatch();
@@ -229,7 +244,16 @@ final class CivicJusticeTables {
                                 rows.getInt("y"), rows.getInt("z"))));
             }
         }
-        return CivicRegistry.restore(constituencies, flags, anthems, images, portSettings, ports);
+        List<Emblem> emblems = new ArrayList<>();
+        try (PreparedStatement select = connection.prepareStatement("SELECT * FROM polity_emblem");
+             ResultSet rows = select.executeQuery()) {
+            while (rows.next()) {
+                emblems.add(new Emblem(new BlockPosition(new DimensionId(rows.getString("dimension")), rows.getInt("x"),
+                        rows.getInt("y"), rows.getInt("z")), polity(rows.getString("polity_id")),
+                        Emblem.Kind.valueOf(rows.getString("kind")), Day.of(rows.getLong("placed"))));
+            }
+        }
+        return CivicRegistry.restore(constituencies, flags, anthems, images, portSettings, ports, emblems);
     }
 
     void writeJustice(Connection connection, JudiciaryView justice) throws SQLException {

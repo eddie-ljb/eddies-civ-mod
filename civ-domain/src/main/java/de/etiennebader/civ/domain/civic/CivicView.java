@@ -55,6 +55,20 @@ public interface CivicView {
     /** Hochgeladene Bilder (Wappen, Wahlplakat, Leuchtreklame), nach Kennung. */
     Map<String, CustomImage> images();
 
+    /** Aufgestellte Flaggen- und Wappen-Blöcke. */
+    default List<Emblem> emblems() {
+        return List.of();
+    }
+
+    default List<Emblem> emblemsOf(PolityId polity) {
+        return emblems().stream().filter(emblem -> emblem.polity().equals(polity)).toList();
+    }
+
+    /** Wie stark Flaggen und Wappen die Treue der Dorfbewohner zu dieser Polity heben (0 bis {@link Emblem#LOYALTY_CAP}). */
+    default int emblemLoyalty(PolityId polity) {
+        return Emblem.loyaltyBonus(emblemsOf(polity));
+    }
+
     default Optional<Flag> flagOf(PolityId polity) {
         return Optional.ofNullable(flags().get(polity));
     }

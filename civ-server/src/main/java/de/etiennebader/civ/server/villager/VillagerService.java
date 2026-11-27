@@ -277,8 +277,7 @@ public final class VillagerService {
                         signed(satisfaction.points(Satisfaction.Factor.VOICE)),
                         signed(satisfaction.points(Satisfaction.Factor.PROSPERITY)),
                         satisfaction.productivityPercent()),
-                Message.of(MessageKey.VILLAGER_LOYALTY, signed(VillagerLoyalty.toPolity(personality, town.get(),
-                        villager, calendar.today(), queries.effectiveLaws(town.get()))))));
+                Message.of(MessageKey.VILLAGER_LOYALTY, signed(loyaltyTo(personality, town.get(), villager, calendar.today())))));
         app.villagerEducation().find(villager).ifPresent(education -> lines.add(Message.of(
                 MessageKey.VILLAGER_EDUCATION, education.points(), education.intelligence())));
         queries.partyOf(villager).ifPresent(party -> lines.add(Message.of(MessageKey.VILLAGER_PARTY_LOYALTY,
@@ -654,12 +653,17 @@ public final class VillagerService {
         return Optional.ofNullable(departures.remove(villager));
     }
 
+    /** Treue zur Polity: aus Dauer und Stimmung, dazu der Bonus ihrer aufgestellten Flaggen und Wappen. */
+    private int loyaltyTo(Personality personality, PolityView town, PersonRef villager, Day day) {
+        int base = VillagerLoyalty.toPolity(personality, town, villager, day, queries.effectiveLaws(town));
+        return Math.max(-100, Math.min(100, base + queries.civic().emblemLoyalty(town.id())));
+    }
+
     private void emigrate(Day day) {
         Map<PolityId, Integer> toWild = new HashMap<>();
         Map<PolityId, Map<PolityId, Integer>> moved = new HashMap<>();
         for (Emigration.Departure departure : Emigration.plan(queries.polities(), day, queries::effectiveLaws,
-                (villager, town) -> VillagerLoyalty.toPolity(Personality.of(villager), town, villager, day,
-                        queries.effectiveLaws(town)))) {
+                (villager, town) -> loyaltyTo(Personality.of(villager), town, villager, day))) {
             try {
                 app.leavePolity().execute(new LeavePolity.Command(departure.from(), departure.villager(), day));
                 Optional<BlockPosition> seat = Optional.empty();
