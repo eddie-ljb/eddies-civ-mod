@@ -114,3 +114,19 @@ Alle Befehle schlagen beim Tippen (Tabulator) passende Werte vor, mit einer kurz
 | `/civ admin sicherung` | sofortige Datenbanksicherung |
 
 Benötigt den Rechte-Knoten `eddies-civ-mod:admin`, siehe [Installation und Konfiguration](Admin-Installation-und-Konfiguration.md#rechte).
+
+## Regierung (Ministerien, Haushalt, Oberhaupt)
+
+| Befehl | Wirkung |
+|---|---|
+| `/civ regierung` | Oberhaupt, Regeln, Ministerien und Haushalt anzeigen |
+| `/civ regierung oberhaupt titel\|form\|modus\|gehalt\|befugnisse ...` | Oberhaupt konfigurieren (nur Bürgermeister) |
+| `/civ regierung regeln <höchstzahl> <tage> <prozent>` | Zahl der Ministerien, Haushaltsrhythmus, nötige Mehrheit |
+| `/civ regierung vorbereiter "<Ministerium>"` | Ministerium, das den Haushalt vorbereitet |
+| `/civ regierung ministerium anlegen "<Name>" <wahl\|ernennung> [Zuständigkeit]` | Ministerium anlegen (auflösen: `aufloesen`) |
+| `/civ regierung ministerium ernennen\|abberufen\|einstellen\|kuendigen "<Name>" [Spieler]` | Minister und Angestellte |
+| `/civ regierung ministerium lohn "<Name>" <Minister> <Angestellte>` | Tageslöhne |
+| `/civ regierung haushalt entwurf "<Name>" <Betrag>` | Etat im Entwurf setzen |
+| `/civ regierung haushalt abstimmen <true\|false>` / `schliessen` | Abstimmung und Beschluss |
+
+Englisch: `/civ government ...`
