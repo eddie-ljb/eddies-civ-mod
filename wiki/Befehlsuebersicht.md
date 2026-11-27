@@ -57,6 +57,7 @@ Alle Befehle schlagen beim Tippen (Tabulator) passende Werte vor, mit einer kurz
 | `/civ bund austreten` / `aufloesen` / `info [Name]` | Bund verlassen, auflösen, Info |
 | `/civ ebenen` | eigene Gemeinde/Land/Nation mit Spitze |
 | `/civ land\|nation <Befehl>` / `/civ ebene <Ebene> <Befehl>` | `info`, `menue`, `aemter`, `wahl …`, `amt …`, `parlament`, `recht [setzen]`, `abstimmungen`, `abstimmen`, `verfassung`, `gesetze`, `umfrage`, `wahlergebnis` für diese Ebene |
+| `/civ <Ebene> hymne [spielen\|noten\|platte\|setzen\|entfernen]` | Hymne abspielen (mit Aufnahme, falls hochgeladen), nur als Notenblock-Melodie, als Schallplatte holen, festlegen, entfernen; die Aufnahme (OGG/MP3) lädt die Spitze auf der Webseite unter Staat hoch |
 | `/civ <Ebene> wahlkreis\|debatte\|flagge\|hymne\|gericht …` | Wahlkreise, Debatten, Hoheitszeichen, Gericht einer Ebene |
 | `/civ heim [Polity] [1-3]` | Zum Heimat-Hafen einer Polity porten (Standard: eigene Gemeinde, Hafen 1 = Gemeindehaus) |
 | `/civ <Ebene> heim liste\|setzen 2\|3\|entfernen 2\|3\|zugang <keiner\|buerger\|verbuendete\|alle>\|preis <Betrag>` | Heimat-Häfen einer Ebene verwalten (Spitze) |

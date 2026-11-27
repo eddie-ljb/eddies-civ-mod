@@ -3,6 +3,7 @@ package de.etiennebader.civ.fabric;
 import de.etiennebader.civ.domain.civic.Anthem;
 import de.etiennebader.civ.domain.territory.ChunkCoord;
 import de.etiennebader.civ.domain.territory.DimensionId;
+import de.etiennebader.civ.fabric.content.AnthemRecords;
 import de.etiennebader.civ.fabric.content.CivContent;
 import de.etiennebader.civ.fabric.content.PosterDisplays;
 import de.etiennebader.civ.server.CivServer;
@@ -10,7 +11,14 @@ import de.etiennebader.civ.server.command.Message;
 import de.etiennebader.civ.server.command.MessageKey;
 import de.etiennebader.civ.server.election.LiveCountService;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.event.player.UseBlockCallback;
+import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.minecraft.core.Holder;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundSoundPacket;
 import net.minecraft.server.MinecraftServer;
@@ -60,11 +68,31 @@ public final class Ambience {
 
     public void register() {
         ServerTickEvents.END_SERVER_TICK.register(this::tick);
+        UseItemCallback.EVENT.register((player, level, hand) -> playRecord(player, hand));
+        // Eine Hymnen-Platte wird nicht in den Plattenspieler gelegt, sondern spielt beim Rechtsklick auf ihn.
+        UseBlockCallback.EVENT.register((player, level, hand, hit) ->
+                level.getBlockState(hit.getBlockPos()).is(Blocks.JUKEBOX) ? playRecord(player, hand)
+                        : InteractionResult.PASS);
     }
 
     /** Spielt eine Hymne für einen Spieler ab; eine laufende Hymne für ihn wird ersetzt. */
     public static void play(ServerPlayer player, Anthem anthem) {
+        play(player, anthem, true);
+    }
+
+    /**
+     * Spielt die Hymne ab. Mit {@code preferAudio} läuft die hochgeladene Aufnahme (sie klingt nur, wenn der Spieler
+     * das Hymnen-Ressourcenpaket geladen hat); sonst, oder ohne Aufnahme, die Notenblock-Melodie.
+     */
+    public static void play(ServerPlayer player, Anthem anthem, boolean preferAudio) {
         if (instance == null) {
+            return;
+        }
+        if (preferAudio && anthem.hasAudio()) {
+            instance.playing.removeIf(playback -> playback.player().equals(player.getUUID()));
+            player.connection.send(new ClientboundSoundPacket(Holder.direct(SoundEvent.createVariableRangeEvent(
+                    Identifier.parse("eddies-civ-mod:" + anthem.soundName()))), SoundSource.RECORDS,
+                    player.getX(), player.getY(), player.getZ(), 1.0F, 1.0F, player.getRandom().nextLong()));
             return;
         }
         instance.playing.removeIf(playback -> playback.player().equals(player.getUUID()));
@@ -76,6 +104,23 @@ public final class Ambience {
         }
         instance.playing.add(new Playback(player.getUUID(), anthem.melody(), instrument.getSoundEvent(), 0,
                 instance.ticks));
+    }
+
+    /** Rechtsklick mit einer Hymnen-Schallplatte spielt die Hymne ihrer Polity (Stand heute) für den Spieler. */
+    private InteractionResult playRecord(Player player, InteractionHand hand) {
+        Optional<de.etiennebader.civ.domain.shared.PolityId> polity = AnthemRecords.polityOf(player.getItemInHand(hand));
+        if (polity.isEmpty()) {
+            return InteractionResult.PASS;
+        }
+        if (player instanceof ServerPlayer serverPlayer) {
+            host.current().ifPresent(civ -> civ.civic().anthemOf(polity.get()).ifPresentOrElse(anthem -> {
+                play(serverPlayer, anthem);
+                Components.showHint(serverPlayer, Message.of(MessageKey.ANTHEM_PLAYING,
+                        civ.texts().polityName(polity.get()), anthem.title()), true);
+            }, () -> Components.showHint(serverPlayer, Message.of(MessageKey.ANTHEM_NONE,
+                    civ.texts().polityName(polity.get())), true)));
+        }
+        return InteractionResult.SUCCESS;
     }
 
     private void tick(MinecraftServer server) {

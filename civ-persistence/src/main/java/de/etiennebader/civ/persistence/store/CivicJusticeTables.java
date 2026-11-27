@@ -102,12 +102,13 @@ final class CivicJusticeTables {
             insert.executeBatch();
         }
         try (PreparedStatement insert = connection.prepareStatement(
-                "INSERT INTO polity_anthem (polity_id, title, instrument, notes) VALUES (?, ?, ?, ?)")) {
+                "INSERT INTO polity_anthem (polity_id, title, instrument, notes, audio) VALUES (?, ?, ?, ?, ?)")) {
             for (Map.Entry<PolityId, Anthem> entry : civic.anthems().entrySet()) {
                 insert.setString(1, entry.getKey().value().toString());
                 insert.setString(2, entry.getValue().title());
                 insert.setString(3, entry.getValue().instrument());
                 insert.setString(4, entry.getValue().notes());
+                insert.setString(5, entry.getValue().audio());
                 insert.addBatch();
             }
             insert.executeBatch();
@@ -214,7 +215,7 @@ final class CivicJusticeTables {
              ResultSet rows = select.executeQuery()) {
             while (rows.next()) {
                 anthems.put(polity(rows.getString("polity_id")), new Anthem(rows.getString("title"),
-                        rows.getString("instrument"), rows.getString("notes")));
+                        rows.getString("instrument"), rows.getString("notes"), rows.getString("audio")));
             }
         }
         Map<String, CustomImage> images = new LinkedHashMap<>();

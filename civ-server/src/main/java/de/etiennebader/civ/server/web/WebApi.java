@@ -5,6 +5,7 @@ import de.etiennebader.civ.application.media.PressUseCases;
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.actor.PersonRef;
 import de.etiennebader.civ.domain.actor.PlayerRef;
+import de.etiennebader.civ.domain.civic.Anthem;
 import de.etiennebader.civ.domain.civic.CustomImage;
 import de.etiennebader.civ.domain.civic.ImageKind;
 import de.etiennebader.civ.domain.exchange.Side;
@@ -339,6 +340,13 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                     Map<String, String> body = Json.parseFlat(request.body());
                     return domain(texts, () -> game.call(() -> imageRemove(login, body.getOrDefault("id", ""))));
                 });
+                case "POST /api/anthem-audio" -> withLogin(request, login -> anthemAudioUpload(request, login, texts));
+                case "POST /api/anthem-audio/remove" -> withLogin(request, login -> {
+                    Map<String, String> body = Json.parseFlat(request.body());
+                    return domain(texts, () -> game.call(() -> anthemAudioRemove(login, body.getOrDefault("polity", ""))));
+                });
+                case "GET /api/anthem-audio" -> anthemAudioGet(request.query().getOrDefault("hash", ""));
+                case "GET /api/anthem-pack.zip" -> anthemPack();
                 case "POST /api/login" -> login(request);
                 case "POST /api/logout" -> logout(request);
                 case "GET /api/me" -> withLogin(request, login -> HttpResponse.json(200, game.call(() -> me(login, texts))));
@@ -1448,6 +1456,209 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                 })));
     }
 
+    // ---- Hymnen-Aufnahmen (OGG/MP3) ----
+
+    /** Version des Ressourcenpaket-Formats für das erzeugte Hymnen-Paket. */
+    private static final int PACK_FORMAT = 84;
+    private static final java.util.regex.Pattern HASH = java.util.regex.Pattern.compile("[0-9a-f]{64}");
+
+    /**
+     * {@code POST /api/anthem-audio}: {@code {"polity": "<Name>", "data": "<OGG oder MP3 als Base64>"}}. Nur die
+     * Spitze der Einheit darf hochladen. MP3 wird mit {@code ffmpeg} nach OGG Vorbis umgewandelt, falls der Server es
+     * findet; sonst bitte eine OGG-Datei hochladen.
+     */
+    private HttpResponse anthemAudioUpload(HttpRequest request, WebSessions.Login login, Translator texts) {
+        Map<String, String> body = Json.parseFlat(request.body());
+        Optional<PolityView> polity = game.call(() -> civ.queries().polityNamed(body.getOrDefault("polity", "")));
+        if (polity.isEmpty()) {
+            return HttpResponse.error(400, "Unbekannte Einheit");
+        }
+        byte[] bytes;
+        try {
+            bytes = Base64.getDecoder().decode(body.getOrDefault("data", ""));
+        } catch (IllegalArgumentException e) {
+            return invalidAudio(texts, "Base64");
+        }
+        if (bytes.length > Anthem.MAX_AUDIO_BYTES) {
+            return invalidAudio(texts, "max. " + Anthem.MAX_AUDIO_BYTES / (1024 * 1024) + " MB");
+        }
+        if (!isOgg(bytes)) {
+            Optional<byte[]> converted = looksLikeMp3(bytes) ? convertToOgg(bytes) : Optional.empty();
+            if (converted.isEmpty()) {
+                return invalidAudio(texts, "OGG Vorbis (oder MP3 mit ffmpeg auf dem Server)");
+            }
+            bytes = converted.get();
+            if (bytes.length > Anthem.MAX_AUDIO_BYTES) {
+                return invalidAudio(texts, "max. " + Anthem.MAX_AUDIO_BYTES / (1024 * 1024) + " MB");
+            }
+        }
+        Optional<java.nio.file.Path> dir = civ.anthemsDirectory();
+        if (dir.isEmpty()) {
+            return HttpResponse.error(503, "Hymnen-Ablage nicht verfügbar");
+        }
+        String hash = sha256Hex(bytes);
+        try {
+            Files.createDirectories(dir.get());
+            java.nio.file.Path file = dir.get().resolve(hash + ".ogg");
+            if (!Files.exists(file)) {
+                Files.write(file, bytes);
+            }
+        } catch (IOException e) {
+            return HttpResponse.error(500, "Aufnahme konnte nicht gespeichert werden");
+        }
+        PolityView target = polity.get();
+        Optional<java.nio.file.Path> directory = dir;
+        Reply reply = game.call(() -> {
+            Reply result = civ.civic().setAnthemAudio(caller(login), target, hash,
+                    old -> deleteUnusedAudio(directory.get(), old));
+            if (!result.success()) {
+                // Die frisch geschriebene Datei gehört niemandem: wieder aufräumen.
+                deleteUnusedAudio(directory.get(), hash);
+            }
+            return result;
+        });
+        return domain(texts, () -> reply);
+    }
+
+    private Reply anthemAudioRemove(WebSessions.Login login, String polityName) {
+        Optional<PolityView> polity = civ.queries().polityNamed(polityName);
+        if (polity.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.ANTHEM_NONE, polityName));
+        }
+        Optional<java.nio.file.Path> dir = civ.anthemsDirectory();
+        return civ.civic().removeAnthemAudio(caller(login), polity.get(),
+                old -> dir.ifPresent(directory -> deleteUnusedAudio(directory, old)));
+    }
+
+    /** Löscht die Datei nur, wenn keine Hymne sie mehr braucht (der Hash ist inhaltsadressiert). */
+    private void deleteUnusedAudio(java.nio.file.Path directory, String hash) {
+        if (HASH.matcher(hash).matches() && !civ.civic().audioInUse(hash)) {
+            try {
+                Files.deleteIfExists(directory.resolve(hash + ".ogg"));
+            } catch (IOException ignored) {
+                // bleibt als verwaiste Datei liegen; harmlos
+            }
+        }
+    }
+
+    private static boolean isOgg(byte[] bytes) {
+        return bytes.length > 64 && bytes[0] == 'O' && bytes[1] == 'g' && bytes[2] == 'g' && bytes[3] == 'S';
+    }
+
+    private static boolean looksLikeMp3(byte[] bytes) {
+        boolean id3 = bytes.length > 64 && bytes[0] == 'I' && bytes[1] == 'D' && bytes[2] == '3';
+        boolean frame = bytes.length > 64 && (bytes[0] & 0xFF) == 0xFF && (bytes[1] & 0xE0) == 0xE0;
+        return id3 || frame;
+    }
+
+    /** Wandelt MP3 mit {@code ffmpeg} in Mono-OGG-Vorbis um (Minecraft spielt nur OGG); leer ohne ffmpeg. */
+    private static Optional<byte[]> convertToOgg(byte[] mp3) {
+        java.nio.file.Path in = null;
+        java.nio.file.Path out = null;
+        try {
+            in = Files.createTempFile("civ-anthem", ".mp3");
+            out = Files.createTempFile("civ-anthem", ".ogg");
+            Files.write(in, mp3);
+            Process process = new ProcessBuilder("ffmpeg", "-y", "-loglevel", "error", "-i", in.toString(), "-vn",
+                    "-ac", "1", "-ar", "44100", "-c:a", "libvorbis", "-q:a", "3", "-f", "ogg", out.toString())
+                    .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+            if (!process.waitFor(60, java.util.concurrent.TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                return Optional.empty();
+            }
+            if (process.exitValue() != 0) {
+                return Optional.empty();
+            }
+            byte[] ogg = Files.readAllBytes(out);
+            return isOgg(ogg) ? Optional.of(ogg) : Optional.empty();
+        } catch (IOException e) {
+            return Optional.empty();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return Optional.empty();
+        } finally {
+            for (java.nio.file.Path temp : new java.nio.file.Path[] {in, out}) {
+                if (temp != null) {
+                    try {
+                        Files.deleteIfExists(temp);
+                    } catch (IOException ignored) {
+                        // Temp-Datei bleibt liegen; harmlos
+                    }
+                }
+            }
+        }
+    }
+
+    private static HttpResponse invalidAudio(Translator texts, String detail) {
+        return HttpResponse.json(422, Json.object().put("ok", false)
+                .put("message", texts.translate(Message.of(MessageKey.ANTHEM_AUDIO_INVALID, detail))).build());
+    }
+
+    /** {@code GET /api/anthem-audio?hash=<SHA-256>}: die OGG-Bytes (nur Hashes, die eine Hymne verwendet). */
+    private HttpResponse anthemAudioGet(String hash) {
+        if (!HASH.matcher(hash).matches() || !game.call(() -> civ.civic().audioInUse(hash))) {
+            return HttpResponse.error(404, "Aufnahme nicht gefunden");
+        }
+        Optional<java.nio.file.Path> dir = civ.anthemsDirectory();
+        if (dir.isEmpty()) {
+            return HttpResponse.error(404, "Hymnen-Ablage nicht verfügbar");
+        }
+        try {
+            byte[] bytes = Files.readAllBytes(dir.get().resolve(hash + ".ogg"));
+            return new HttpResponse(200, "audio/ogg", bytes, Map.of("Cache-Control", "public, max-age=86400"));
+        } catch (IOException e) {
+            return HttpResponse.error(404, "Aufnahme fehlt");
+        }
+    }
+
+    /**
+     * {@code GET /api/anthem-pack.zip}: Ressourcenpaket mit allen Hymnen-Aufnahmen. Der Server (oder jeder Spieler)
+     * lädt es als Ressourcenpaket; die Klänge heißen {@code eddies-civ-mod:anthem.<Kurzhash>}.
+     */
+    private HttpResponse anthemPack() {
+        Optional<java.nio.file.Path> dir = civ.anthemsDirectory();
+        if (dir.isEmpty()) {
+            return HttpResponse.error(404, "Hymnen-Ablage nicht verfügbar");
+        }
+        List<Anthem> anthems = game.call(() -> civ.queries().civic().anthems().values().stream()
+                .filter(Anthem::hasAudio).distinct().toList());
+        java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
+        try (java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(buffer)) {
+            zipEntry(zip, "pack.mcmeta", ("{\"pack\":{\"pack_format\":" + PACK_FORMAT
+                    + ",\"description\":\"Eddies Civ Mod: Hymnen\"}}").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sounds = new StringBuilder("{");
+            String separator = "";
+            java.util.Set<String> written = new java.util.HashSet<>();
+            for (Anthem anthem : anthems) {
+                if (!written.add(anthem.soundName())) {
+                    continue;
+                }
+                byte[] ogg;
+                try {
+                    ogg = Files.readAllBytes(dir.get().resolve(anthem.audio() + ".ogg"));
+                } catch (IOException e) {
+                    continue;
+                }
+                zipEntry(zip, "assets/eddies-civ-mod/sounds/" + anthem.soundName().replace('.', '_') + ".ogg", ogg);
+                sounds.append(separator).append('"').append(anthem.soundName())
+                        .append("\":{\"category\":\"record\",\"sounds\":[{\"name\":\"eddies-civ-mod:")
+                        .append(anthem.soundName().replace('.', '_')).append("\",\"stream\":true}]}");
+                separator = ",";
+            }
+            zipEntry(zip, "assets/eddies-civ-mod/sounds.json",
+                    sounds.append('}').toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            return HttpResponse.error(500, "Paket konnte nicht erstellt werden");
+        }
+        return new HttpResponse(200, "application/zip", buffer.toByteArray(), Map.of("Cache-Control", "no-cache"));
+    }
+
+    private static void zipEntry(java.util.zip.ZipOutputStream zip, String name, byte[] bytes) throws IOException {
+        zip.putNextEntry(new java.util.zip.ZipEntry(name));
+        zip.write(bytes);
+        zip.closeEntry();
+    }
+
     private static HttpResponse invalidImage(Translator texts) {
         return HttpResponse.json(422, Json.object().put("ok", false)
                 .put("message", texts.translate(Message.of(MessageKey.IMAGE_INVALID))).build());
@@ -1749,6 +1960,7 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                                     .put("title", found.title())
                                     .put("instrument", found.instrument())
                                     .put("notes", found.notes())
+                                    .put("audio", found.audio())
                                     .raw("melody", Json.array(found.melody(), note -> Json.object()
                                             .put("s", note.semitones())
                                             .put("t", note.ticks())
