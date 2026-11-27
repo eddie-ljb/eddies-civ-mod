@@ -1,0 +1,57 @@
+name: pages
+
+# Baut und veröffentlicht die CodeXperience-Webseite (site/) auf GitHub Pages.
+# Einmalig nötig: Repository -> Settings -> Pages -> Source: "GitHub Actions".
+# Wiki, Changelog, Versionen und Releases werden bei jedem Lauf neu eingelesen.
+on:
+  push:
+    branches: [master]
+    paths: ['site/**', 'wiki/**', 'CHANGELOG.md', 'gradle.properties', '.github/workflows/pages.yml']
+  workflow_run:
+    workflows: [release]
+    types: [completed]
+  schedule:
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - name: Abhängigkeiten installieren
+        run: npm ci
+        working-directory: site
+      - name: Webseite bauen
+        run: node build.mjs
+        working-directory: site
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
