@@ -28,6 +28,7 @@ final class EnglishCommands {
             Map.entry("vorhaben", "agreement"), Map.entry("bereich", "portfolio"), Map.entry("verordnung", "decree"),
             Map.entry("vorschlag", "proposal"), Map.entry("foerderung", "subsidy"), Map.entry("beenden", "end"),
             Map.entry("waehlen", "ballot"), Map.entry("regelung", "rule"), Map.entry("abstand", "distance"),
+            Map.entry("unterzeichnen", "sign"), Map.entry("vetofrist", "veto-period"), Map.entry("veto", "veto"),
             Map.entry("abheben", "withdraw"), Map.entry("abholen", "collect"), Map.entry("abbrechen", "cancel"), Map.entry("ablehnen", "decline"),
             Map.entry("abmelden", "logout"), Map.entry("abstimmen", "vote"), Map.entry("abstimmungen", "votes"),
             Map.entry("adresse", "address"), Map.entry("adressen", "addresses"), Map.entry("aemter", "offices"),

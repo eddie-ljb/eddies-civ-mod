@@ -136,5 +136,8 @@ Benötigt den Rechte-Knoten `eddies-civ-mod:admin`, siehe [Installation und Konf
 | `/civ regierung ministerium verordnung "<Name>" <true\|false>` | Verordnungsrecht erlauben |
 | `/civ regierung foerderung anlegen "<Name>" "<Ministerium>" <Betrag> <alle\|Name> <Tage> [<voll bis> <Auslauf>]` | Förderung; auch `liste`, `beenden`, `abstimmen` |
 | `/civ regierung wahl ausrufen\|kandidieren\|waehlen "<Ministerium>" [Spieler]` | Volkswahl der Minister |
+| `/civ regierung gesetze` | beschlossene Gesetze, die auf die Unterschrift warten |
+| `/civ regierung gesetze unterzeichnen <Nr>` / `veto <Nr>` | Oberhaupt: sofort in Kraft setzen oder verwerfen |
+| `/civ regierung gesetze vetofrist <Tage>` | Wartezeit (0 = kein Veto) |
 
 Englisch: `/civ government ...`

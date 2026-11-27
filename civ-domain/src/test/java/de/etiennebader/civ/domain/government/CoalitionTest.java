@@ -70,7 +70,9 @@ class CoalitionTest {
                 new Party(c, 3, -60, -40)), 10, 100, false, Day.of(1));
         assertEquals(Outcome.COALITION, result.outcome());
         assertEquals(List.of(a), result.failed());
-        assertEquals(b, result.coalition().orElseThrow().leader());
+        // B und C sind gleich stark; wer zuerst beauftragt wird, hängt nur von der Reihenfolge ab
+        assertTrue(result.coalition().orElseThrow().parties().containsAll(List.of(b, c)));
+        assertFalse(result.coalition().orElseThrow().includes(a));
     }
 
     @Test

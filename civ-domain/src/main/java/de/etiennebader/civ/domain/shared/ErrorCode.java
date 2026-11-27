@@ -254,6 +254,10 @@ public enum ErrorCode {
     NO_DECREE,
     /** Kein Spieler, keine Firma und keine Gemeinde mit diesem Namen. Argumente: Name. */
     UNKNOWN_RECIPIENT,
+    /** Kein wartendes Gesetz mit dieser Nummer. Argumente: Nummer. */
+    UNKNOWN_PENDING_LAW,
+    /** Das Oberhaupt hat kein Veto-Recht. Argumente: keine. */
+    NO_VETO_POWER,
 
     // Krieg
     /** Argumente: Angreifer, Verteidiger. */

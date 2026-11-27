@@ -39,7 +39,8 @@ public final class CastVote {
         Ballots.requireVoter(polity, command.citizen());
         polity.vote(command.proposal(), command.citizen(), command.inFavour(), command.day());
         Proposal proposal = ProposeLawChange.proposalOf(polity, command.proposal());
-        VoteOutcome outcome = Ballots.settle(polity, proposal, Ballots.evaluate(polity, proposal), ids, command.day());
+        VoteOutcome outcome = Ballots.settle(polity, proposal, Ballots.evaluate(polity, proposal), ids, command.day(),
+                aggregates.motionGate());
         aggregates.commit(polity);
         return outcome;
     }

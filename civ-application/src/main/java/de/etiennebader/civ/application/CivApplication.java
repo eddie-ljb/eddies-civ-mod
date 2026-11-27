@@ -116,6 +116,8 @@ public final class CivApplication {
     private final OfferPlot offerPlot;
     private final BuyPlot buyPlot;
     private final ChangeTier changeTier;
+    private final de.etiennebader.civ.application.support.Aggregates aggregates;
+    private final de.etiennebader.civ.application.polity.CarryOutMotion carryOutMotion;
     private final ProposeLawChange proposeLawChange;
     private final ProposeMotion proposeMotion;
     private final EnactParagraph enactParagraph;
@@ -211,6 +213,8 @@ public final class CivApplication {
         this.offerPlot = new OfferPlot(aggregates);
         this.buyPlot = new BuyPlot(aggregates);
         this.changeTier = new ChangeTier(aggregates);
+        this.aggregates = aggregates;
+        this.carryOutMotion = new de.etiennebader.civ.application.polity.CarryOutMotion(aggregates, ids);
         this.proposeLawChange = new ProposeLawChange(aggregates, ids);
         this.proposeMotion = new ProposeMotion(aggregates, ids);
         this.enactParagraph = new EnactParagraph(aggregates, ids, proposeMotion);
@@ -363,6 +367,16 @@ public final class CivApplication {
 
     public RepealParagraph repealParagraph() {
         return repealParagraph;
+    }
+
+    /** Setzt zurückgehaltene Beschlüsse in Kraft. */
+    public de.etiennebader.civ.application.polity.CarryOutMotion carryOutMotion() {
+        return carryOutMotion;
+    }
+
+    /** Legt fest, wer angenommene Anträge zurückhalten darf (Veto des Oberhaupts). */
+    public void motionGate(de.etiennebader.civ.application.support.MotionGate gate) {
+        aggregates.motionGate(gate);
     }
 
     public ProposeLawChange proposeLawChange() {

@@ -30,7 +30,8 @@ public final class Government {
                            int approvalPercent, String preparer, Budget adopted, Optional<Budget> draft,
                            Map<ActorRef, Boolean> votes, Optional<Day> lastBudgetDay, Optional<Coalition> coalition,
                            int coalitionTolerance, boolean allowMinority, List<Subsidy> subsidies,
-                           Map<String, Map<ActorRef, Boolean>> subsidyVotes, List<MinistryElection> elections) {
+                           Map<String, Map<ActorRef, Boolean>> subsidyVotes, List<MinistryElection> elections,
+                           int vetoDays, List<PendingLaw> pendingLaws) {
     }
 
     /** Ein fälliger Lohn. */
@@ -53,6 +54,8 @@ public final class Government {
     private final Map<String, Subsidy> subsidies = new LinkedHashMap<>();
     private final Map<String, Map<ActorRef, Boolean>> subsidyVotes = new LinkedHashMap<>();
     private final Map<String, MinistryElection> elections = new LinkedHashMap<>();
+    private int vetoDays = 3;
+    private final List<PendingLaw> pendingLaws = new ArrayList<>();
 
     public static Government restore(Snapshot s) {
         Government g = new Government();
@@ -72,13 +75,16 @@ public final class Government {
         s.subsidies().forEach(sub -> g.subsidies.put(sub.key(), sub));
         s.subsidyVotes().forEach((key, v) -> g.subsidyVotes.put(key, new LinkedHashMap<>(v)));
         s.elections().forEach(e -> g.elections.put(e.ministry(), e));
+        g.vetoDays = s.vetoDays();
+        g.pendingLaws.addAll(s.pendingLaws());
         return g;
     }
 
     public Snapshot snapshot() {
         return new Snapshot(head, ministries(), maxMinistries, budgetInterval, approvalPercent, preparer, adopted,
                 draft, Map.copyOf(votes), lastBudgetDay, coalition, coalitionTolerance, allowMinority,
-                List.copyOf(subsidies.values()), Map.copyOf(subsidyVotes), List.copyOf(elections.values()));
+                List.copyOf(subsidies.values()), Map.copyOf(subsidyVotes), List.copyOf(elections.values()), vetoDays,
+                List.copyOf(pendingLaws));
     }
 
     // ---------------------------------------------------------------- Oberhaupt
@@ -443,6 +449,40 @@ public final class Government {
             ministries.put(cleaned.key(), cleaned.withMinister(Optional.of(w)));
         });
         return winner;
+    }
+
+    // ---------------------------------------------------------------- Veto
+
+    public int vetoDays() {
+        return vetoDays;
+    }
+
+    public void configureVetoDays(int days) {
+        if (days < 0 || days > 14) {
+            throw new GovernmentException(ErrorCode.INVALID_GOVERNMENT_VALUE, days);
+        }
+        this.vetoDays = days;
+    }
+
+    /** Ob hier schon eine Regierung eingerichtet wurde; erst dann gilt das Veto-Recht des Oberhaupts. */
+    public boolean configured() {
+        return !ministries.isEmpty() || coalition.isPresent() || !head.equals(HeadOfState.DEFAULT);
+    }
+
+    public List<PendingLaw> pendingLaws() {
+        return List.copyOf(pendingLaws);
+    }
+
+    public void hold(PendingLaw law) {
+        pendingLaws.add(law);
+    }
+
+    /** Nimmt das wartende Gesetz Nr. {@code number} (ab 1) heraus. */
+    public PendingLaw takePending(int number) {
+        if (number < 1 || number > pendingLaws.size()) {
+            throw new GovernmentException(ErrorCode.UNKNOWN_PENDING_LAW, number);
+        }
+        return pendingLaws.remove(number - 1);
     }
 
     // ---------------------------------------------------------------- Löhne

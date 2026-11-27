@@ -1942,5 +1942,14 @@
   "eddies-civ-mod.error.parliament_required": "Dafür muss ein Parlament sitzen.",
   "eddies-civ-mod.error.unknown_parameter": "Diese Regelung gibt es nicht: %1$s.",
   "eddies-civ-mod.error.no_decree": "Das darf der Minister nicht per Verordnung ändern: %1$s.",
-  "eddies-civ-mod.error.unknown_recipient": "Weder Spieler noch Firma oder Gemeinde: %1$s."
+  "eddies-civ-mod.error.unknown_recipient": "Weder Spieler noch Firma oder Gemeinde: %1$s.",
+  "eddies-civ-mod.command.gov_veto_pending": "Gesetz „%1$s“ beschlossen; das Oberhaupt kann bis Tag %2$s unterzeichnen oder Veto einlegen, sonst gilt es dann.",
+  "eddies-civ-mod.command.gov_no_pending": "Kein Gesetz wartet auf die Unterschrift des Oberhaupts.",
+  "eddies-civ-mod.command.gov_pending_line": "Nr. %1$s: „%2$s“ (beantragt von %3$s), gilt spätestens an Tag %4$s",
+  "eddies-civ-mod.command.gov_signed": "Gesetz „%1$s“ ist in Kraft.",
+  "eddies-civ-mod.command.gov_vetoed": "Das Oberhaupt hat gegen „%1$s“ Veto eingelegt; das Gesetz verfällt.",
+  "eddies-civ-mod.command.gov_veto_days": "Vetofrist: %1$s Tage.",
+  "eddies-civ-mod.command.gov_demand": "Koalitionsverhandlung: %1$s fordert, dass %2$s auf %3$s gesetzt wird.",
+  "eddies-civ-mod.error.unknown_pending_law": "Ein solches wartendes Gesetz gibt es nicht: %1$s.",
+  "eddies-civ-mod.error.no_veto_power": "Das Oberhaupt hat kein Veto-Recht."
 }

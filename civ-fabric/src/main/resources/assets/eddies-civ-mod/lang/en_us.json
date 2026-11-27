@@ -1942,5 +1942,14 @@
   "eddies-civ-mod.error.parliament_required": "A seated parliament is required.",
   "eddies-civ-mod.error.unknown_parameter": "This rule does not exist: %1$s.",
   "eddies-civ-mod.error.no_decree": "The minister may not change this by decree: %1$s.",
-  "eddies-civ-mod.error.unknown_recipient": "Neither player nor company nor town: %1$s."
+  "eddies-civ-mod.error.unknown_recipient": "Neither player nor company nor town: %1$s.",
+  "eddies-civ-mod.command.gov_veto_pending": "Law \"%1$s\" passed; the head of state may sign or veto it until day %2$s, otherwise it takes effect then.",
+  "eddies-civ-mod.command.gov_no_pending": "No law is waiting for the head of state's signature.",
+  "eddies-civ-mod.command.gov_pending_line": "No. %1$s: \"%2$s\" (proposed by %3$s), takes effect by day %4$s at the latest",
+  "eddies-civ-mod.command.gov_signed": "Law \"%1$s\" is in force.",
+  "eddies-civ-mod.command.gov_vetoed": "The head of state vetoed \"%1$s\"; the law lapses.",
+  "eddies-civ-mod.command.gov_veto_days": "Veto period: %1$s days.",
+  "eddies-civ-mod.command.gov_demand": "Coalition talks: %1$s demands that %2$s be set to %3$s.",
+  "eddies-civ-mod.error.unknown_pending_law": "There is no such waiting law: %1$s.",
+  "eddies-civ-mod.error.no_veto_power": "The head of state has no veto power."
 }

@@ -6,6 +6,10 @@ import de.etiennebader.civ.domain.government.Portfolio;
 import de.etiennebader.civ.domain.government.Selection;
 import de.etiennebader.civ.domain.law.StandardParameters;
 import de.etiennebader.civ.domain.shared.Day;
+import de.etiennebader.civ.domain.law.ParameterValue;
+import de.etiennebader.civ.domain.polity.Motion;
+import de.etiennebader.civ.domain.government.PendingLaw;
+import java.util.List;
 import de.etiennebader.civ.domain.shared.PlayerId;
 import de.etiennebader.civ.domain.shared.SeededIdGenerator;
 import de.etiennebader.civ.domain.territory.BlockPosition;
@@ -146,5 +150,66 @@ class GovernmentServiceTest {
         assertTrue(server.government().politics().setCoalitionRules(a(), 60, false).success());
         assertFalse(server.government().politics().addAgreement(a(), "income_tax_percent", "5").success(),
                 "ohne Regierung kein Koalitionsvertrag");
+    }
+
+    private boolean pvpAllowed() {
+        return server.queries().effectiveLaws(server.queries().polityNamed("Nordhain").orElseThrow())
+                .valueOf(StandardParameters.PVP_ALLOWED);
+    }
+
+    private void passLaw(boolean value) {
+        var town = server.queries().polityNamed("Nordhain").orElseThrow();
+        assertTrue(server.voting().propose(b(), town,
+                ParameterValue.of(StandardParameters.PVP_ALLOWED, value)).success());
+        assertTrue(server.voting().vote(a(), town, 1, true).success());
+    }
+
+    @Test
+    @DisplayName("Veto: beschlossene Gesetze warten; Unterschrift setzt sie in Kraft, Veto verwirft sie")
+    void vetoHoldsLaws() {
+        found();
+        assertTrue(server.commands().join(b(), "Nordhain").success());
+        var government = server.government();
+        assertTrue(government.createMinistry(a(), "Kanzleramt", "", Selection.APPOINTMENT).success());
+        assertTrue(pvpAllowed() || !pvpAllowed());
+        boolean before = pvpAllowed();
+
+        passLaw(!before);
+        assertEquals(before, pvpAllowed(), "wartet auf die Unterschrift");
+        assertTrue(government.veto().list(a()).success());
+        assertFalse(government.veto().sign(b(), 1).success(), "nur das Oberhaupt");
+        assertTrue(government.veto().sign(a(), 1).success());
+        assertEquals(!before, pvpAllowed());
+
+        passLaw(before);
+        assertEquals(!before, pvpAllowed());
+        assertFalse(government.veto().veto(b(), 1).success());
+        assertTrue(government.veto().veto(a(), 1).success());
+        assertEquals(!before, pvpAllowed(), "Veto: Gesetz verfällt");
+
+        passLaw(before);
+        assertTrue(government.setHeadSalary(a(), 0).success());
+        assertTrue(government.veto().setVetoDays(a(), 2).success());
+        government.endOfDay(Day.of(5_000));
+        assertEquals(before, pvpAllowed(), "nach Fristablauf gilt das Gesetz ohne Unterschrift");
+    }
+
+    @Test
+    @DisplayName("Veto gilt nur mit eingerichteter Regierung und Veto-Recht")
+    void vetoNeedsGovernment() {
+        found();
+        assertTrue(server.commands().join(b(), "Nordhain").success());
+        boolean before = pvpAllowed();
+        passLaw(!before);
+        assertEquals(!before, pvpAllowed(), "ohne Regierung kein Veto");
+    }
+
+    @Test
+    @DisplayName("Zurückgehaltene Gesetze überstehen die Umwandlung")
+    void pendingRoundTrip() {
+        Motion change = new Motion.Change(ParameterValue.of(StandardParameters.INCOME_TAX_PERCENT, 9L));
+        PendingLaw law = GovernmentVeto.toPending(change, alice, Day.of(1), Day.of(4));
+        assertEquals(change, GovernmentVeto.toMotion(law));
+        assertEquals(List.of("income_tax_percent=9"), law.values());
     }
 }

@@ -64,6 +64,7 @@ public final class GovernmentService {
     private final GovernmentStore store;
     private final GovernmentRegistry registry;
     private final GovernmentPolitics politics;
+    private final GovernmentVeto veto;
 
     public GovernmentService(CivApplication app, Calendar calendar, PlayerDirectory players, Texts texts,
                              Announcements announcements, boolean villagerPolitics, Optional<Path> file) {
@@ -77,11 +78,22 @@ public final class GovernmentService {
         this.store = new GovernmentStore(file);
         this.registry = store.load();
         this.politics = new GovernmentPolitics(this, app, calendar, players, texts, announcements, villagerPolitics);
+        this.veto = new GovernmentVeto(this, app, announcements, villagerPolitics);
+        app.motionGate(veto);
     }
 
     /** Koalitionen, Gesetzesvorschläge der Minister, Förderungen und Ministerwahlen. */
     public GovernmentPolitics politics() {
         return politics;
+    }
+
+    /** Veto-Recht des Oberhaupts über beschlossene Gesetze. */
+    public GovernmentVeto veto() {
+        return veto;
+    }
+
+    Day today() {
+        return calendar.today();
     }
 
     void store() {
@@ -318,6 +330,7 @@ public final class GovernmentService {
                 continue;
             }
             Government g = registry.of(id);
+            veto.endOfDay(town.get(), g, day);
             politics.beforeWages(town.get(), g, day);
             villagerHead(town.get(), g, day);
             if (g.draft().isPresent() && g.budgetDue(day)) {

@@ -160,6 +160,7 @@ public final class GovernmentPolitics {
         Coalition coalition = result.coalition().get();
         Map<String, ActorRef> ministers = chooseMinisters(town, g, coalition, seats);
         g.install(coalition, ministers);
+        negotiate(town, g, coalition, ministers);
         Message line = Message.of(coalition.minority() ? MessageKey.GOV_FORMED_MINORITY : MessageKey.GOV_FORMED,
                 town.name().toString(), partyNames(coalition));
         announcements.add(Announcement.toTown(town.id(), line));
@@ -188,6 +189,53 @@ public final class GovernmentPolitics {
             });
         });
         return ministers;
+    }
+
+    /**
+     * Koalitionsverhandlung: Nehmen Dorfbewohner für eine Partei teil (als Parteivorsitzende oder als designierte
+     * Minister), bringen sie die Forderungen ihrer Partei ein. Hat schon eine stärkere Partei dieselbe Regelung
+     * gefordert, gilt deren Forderung (Kompromiss zugunsten des Verhandlungsführers).
+     */
+    private void negotiate(PolityView town, Government g, Coalition coalition, Map<String, ActorRef> ministers) {
+        var laws = queries.effectiveLaws(town);
+        Set<String> taken = new LinkedHashSet<>();
+        for (PolityId party : coalition.parties()) {
+            Optional<PolityView> view = queries.polity(party);
+            if (view.isEmpty() || view.get().partyProfile().isEmpty()) {
+                continue;
+            }
+            boolean villagerAtTable = view.get().mayor(villagerPolitics).filter(m -> m instanceof PersonRef).isPresent()
+                    || ministers.values().stream().anyMatch(m -> m instanceof PersonRef
+                    && queries.partyOf(m).map(PolityView::id).filter(party::equals).isPresent());
+            if (!villagerAtTable) {
+                continue;
+            }
+            PartyProfile profile = view.get().partyProfile().get();
+            List<ParameterValue<?>> demands = new ArrayList<>();
+            long tax = laws.valueOf(StandardParameters.INCOME_TAX_PERCENT);
+            if (profile.economy() >= 40 && tax < 40) {
+                demands.add(ParameterValue.of(StandardParameters.INCOME_TAX_PERCENT, tax + 5));
+            } else if (profile.economy() <= -40 && tax > 0) {
+                demands.add(ParameterValue.of(StandardParameters.INCOME_TAX_PERCENT, Math.max(0, tax - 5)));
+            }
+            boolean open = laws.valueOf(StandardParameters.OUTSIDERS_MAY_BUILD);
+            if (profile.order() >= 40 && open) {
+                demands.add(ParameterValue.of(StandardParameters.OUTSIDERS_MAY_BUILD, false));
+            } else if (profile.order() <= -40 && !open) {
+                demands.add(ParameterValue.of(StandardParameters.OUTSIDERS_MAY_BUILD, true));
+            }
+            long stimulus = laws.valueOf(StandardParameters.CONJUNCTURE_STIMULUS_PERCENT);
+            if (profile.economy() >= 40 && stimulus < 50) {
+                demands.add(ParameterValue.of(StandardParameters.CONJUNCTURE_STIMULUS_PERCENT, stimulus + 5));
+            }
+            for (ParameterValue<?> demand : demands) {
+                if (taken.add(demand.key().id())) {
+                    g.addAgreement(demand.key().id(), ParameterCatalog.encode(demand));
+                    announcements.add(Announcement.toTown(town.id(), Message.of(MessageKey.GOV_DEMAND,
+                            view.get().name().toString(), demand.key().id(), texts.lawValue(demand.value()))));
+                }
+            }
+        }
     }
 
     private static int rank(Government g, Ministry m) {

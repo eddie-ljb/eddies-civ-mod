@@ -4,6 +4,7 @@ import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.government.Budget;
 import de.etiennebader.civ.domain.government.Coalition;
 import de.etiennebader.civ.domain.government.MinistryElection;
+import de.etiennebader.civ.domain.government.PendingLaw;
 import de.etiennebader.civ.domain.government.Portfolio;
 import de.etiennebader.civ.domain.government.Subsidy;
 import de.etiennebader.civ.domain.government.Government;
@@ -21,6 +22,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -63,6 +66,8 @@ final class GovernmentStore {
         final Map<String, Day> electionCloses = new LinkedHashMap<>();
         final Map<String, List<ActorRef>> candidates = new LinkedHashMap<>();
         final Map<String, Map<ActorRef, ActorRef>> ballots = new LinkedHashMap<>();
+        int vetoDays = 3;
+        final List<PendingLaw> pending = new ArrayList<>();
     }
 
     GovernmentRegistry load() {
@@ -126,6 +131,10 @@ final class GovernmentStore {
                             .add(ActorCodec.decode(f[3]));
                     case "BALLOT" -> d.ballots.computeIfAbsent(f[2], k -> new LinkedHashMap<>())
                             .put(ActorCodec.decode(f[3]), ActorCodec.decode(f[4]));
+                    case "VETO" -> d.vetoDays = Integer.parseInt(f[2]);
+                    case "PEND" -> d.pending.add(new PendingLaw(f[2], dec(f[3]), dec(f[4]),
+                            f[5].isEmpty() ? List.of() : java.util.Arrays.stream(f[5].split(",")).map(GovernmentStore::dec).toList(),
+                            f[6], ActorCodec.decode(f[7]), Day.of(Long.parseLong(f[8])), Day.of(Long.parseLong(f[9]))));
                     case "VOTE" -> d.votes.put(ActorCodec.decode(f[2]), Boolean.parseBoolean(f[3]));
                     default -> {
                     }
@@ -144,7 +153,8 @@ final class GovernmentStore {
             snapshots.put(id, new Government.Snapshot(d.head, List.copyOf(d.ministries.values()), d.max, d.interval,
                     d.approval, d.preparer, new Budget(d.adopted, d.adoptedOn),
                     d.hasDraft ? Optional.of(new Budget(d.draft, Optional.empty())) : Optional.empty(), d.votes,
-                    d.last, coalition, d.tolerance, d.minority, d.subsidies, d.subsidyVotes, elections));
+                    d.last, coalition, d.tolerance, d.minority, d.subsidies, d.subsidyVotes, elections, d.vetoDays,
+                    d.pending));
         });
         return GovernmentRegistry.restore(snapshots);
     }
@@ -200,6 +210,13 @@ final class GovernmentStore {
                 e.ballots().forEach((voter, c) -> lines.add(String.join("\t", "BALLOT", p, e.ministry(),
                         ActorCodec.encode(voter), ActorCodec.encode(c))));
             }
+            lines.add("VETO\t" + p + "\t" + g.vetoDays());
+            for (PendingLaw law : g.pendingLaws()) {
+                lines.add(String.join("\t", "PEND", p, law.kind(), enc(law.title()), enc(law.text()),
+                        String.join(",", law.values().stream().map(GovernmentStore::enc).toList()), law.statute(),
+                        ActorCodec.encode(law.proposer()), Long.toString(law.acceptedOn().value()),
+                        Long.toString(law.deadline().value())));
+            }
             g.votes().forEach((voter, yes) -> lines.add(String.join("\t", "VOTE", p, ActorCodec.encode(voter),
                     Boolean.toString(yes))));
         });
@@ -212,6 +229,14 @@ final class GovernmentStore {
         } catch (IOException e) {
             // Speichern ist best effort; bei der nächsten Änderung wird erneut versucht.
         }
+    }
+
+    private static String enc(String text) {
+        return URLEncoder.encode(text, StandardCharsets.UTF_8);
+    }
+
+    private static String dec(String text) {
+        return URLDecoder.decode(text, StandardCharsets.UTF_8);
     }
 
     private static String clean(String text) {

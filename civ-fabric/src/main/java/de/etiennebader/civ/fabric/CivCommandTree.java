@@ -1886,7 +1886,23 @@ public final class CivCommandTree {
                 .then(governmentMinistryExtras())
                 .then(governmentCoalition())
                 .then(governmentSubsidies())
-                .then(governmentElections());
+                .then(governmentElections())
+                .then(governmentVeto());
+    }
+
+    /** Veto-Recht: wartende Gesetze ansehen, unterzeichnen, Veto einlegen, Frist setzen. */
+    private LiteralArgumentBuilder<CommandSourceStack> governmentVeto() {
+        return Commands.literal("gesetze")
+                .executes(context -> withCiv(context, (civ, player) -> civ.government().veto().list(Players.caller(player))))
+                .then(Commands.literal("unterzeichnen").then(arg(NUMBER, IntegerArgumentType.integer(1))
+                        .executes(context -> withCiv(context, (civ, player) -> civ.government().veto().sign(
+                                Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))))
+                .then(Commands.literal("veto").then(arg(NUMBER, IntegerArgumentType.integer(1))
+                        .executes(context -> withCiv(context, (civ, player) -> civ.government().veto().veto(
+                                Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))))
+                .then(Commands.literal("vetofrist").then(arg("tage", IntegerArgumentType.integer(0, 14))
+                        .executes(context -> withCiv(context, (civ, player) -> civ.government().veto().setVetoDays(
+                                Players.caller(player), IntegerArgumentType.getInteger(context, "tage"))))));
     }
 
     private static de.etiennebader.civ.domain.government.Portfolio portfolio(String word) {
