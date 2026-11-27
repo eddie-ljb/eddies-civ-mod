@@ -416,7 +416,7 @@ function buildIssues(enriched, wiki) {
     <div class="field"><label for="f-title">Titel <small>(kurz und konkret)</small></label><input id="f-title" data-f="title" type="text" maxlength="120" autocomplete="off" placeholder="z. B. Bauamt legt keine Straße an, wenn …"></div>
     <div class="row">
       <div class="field" data-for="bug feature question"><label for="f-mod">Mod</label><select id="f-mod" data-f="mod">${modOpts}</select></div>
-      <div class="field" data-for="bug feature question"><label for="f-version">Version</label><input id="f-version" data-f="version" type="text" placeholder="z. B. 1.0.9"></div>
+      <div class="field" data-for="bug feature question"><label for="f-version">Version</label><input id="f-version" data-f="version" type="text" placeholder="z. B. 1.1.0"></div>
     </div>
     <div class="field" data-for="docs"><label for="f-page">Wiki-Seite</label><select id="f-page" data-f="page">${pageOpts}</select></div>
     <div class="field" data-for="feature"><label for="f-problem">Welches Problem möchtest du lösen?</label><textarea id="f-problem" data-f="problem" placeholder="Was fehlt dir oder stört dich aktuell?"></textarea></div>
