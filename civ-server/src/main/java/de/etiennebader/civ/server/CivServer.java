@@ -108,6 +108,7 @@ public final class CivServer {
     private final PlotService plots;
     private final de.etiennebader.civ.server.construction.ConstructionService construction;
     private final de.etiennebader.civ.server.war.WarService war;
+    private final de.etiennebader.civ.server.police.PoliceService police;
     private final de.etiennebader.civ.server.family.FamilyService family;
     private final de.etiennebader.civ.server.machine.MachineService machines;
     private final de.etiennebader.civ.server.religion.ReligionService religion;
@@ -191,6 +192,8 @@ public final class CivServer {
                 dataDirectory.map(dir -> dir.resolve("blueprints"))), dataDirectory.map(dir -> dir.resolve("construction.tsv")), announcements);
         this.war = new de.etiennebader.civ.server.war.WarService(app, calendar, texts, announcements, ids,
                 settings, dataDirectory.map(dir -> dir.resolve("war.tsv")));
+        this.police = new de.etiennebader.civ.server.police.PoliceService(app, calendar, players, texts,
+                announcements, settings, dataDirectory.map(dir -> dir.resolve("police.tsv")));
         this.villagerFederations = new VillagerFederations(app, federations, announcements);
         this.conjuncture = new de.etiennebader.civ.server.conjuncture.ConjunctureService(app.queries());
         this.villagers = new VillagerService(app, settings, texts, announcements, conjuncture, calendar);
@@ -305,6 +308,7 @@ public final class CivServer {
         federations.autoDecideInvitations(day, settings.villagerPolitics());
         campaigns.endOfDay(day);
         war.endOfDay(day);
+        police.endOfDay(day);
         civil.endOfDay(day);
         justice.endOfDay(day);
         companies.endOfDay(day);
@@ -449,6 +453,10 @@ public final class CivServer {
 
     public TownService towns() {
         return towns;
+    }
+
+    public de.etiennebader.civ.server.police.PoliceService police() {
+        return police;
     }
 
     public de.etiennebader.civ.server.war.WarService war() {

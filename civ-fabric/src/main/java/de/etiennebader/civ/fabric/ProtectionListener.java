@@ -89,7 +89,20 @@ public final class ProtectionListener {
         this.content = Objects.requireNonNull(content, "content");
     }
 
+    /** Gefesselte und Inhaftierte (Issue #84) können nichts abbauen, setzen, benutzen oder schlagen. */
+    private boolean restrained(Player player) {
+        return player instanceof ServerPlayer serverPlayer
+                && host.current().map(civ -> civ.police().restrained(Players.ref(serverPlayer))).orElse(false);
+    }
+
     public void register() {
+        PlayerBlockBreakEvents.BEFORE.register((level, player, pos, state, blockEntity) -> !restrained(player));
+        UseBlockCallback.EVENT.register((player, level, hand, hit) ->
+                restrained(player) ? InteractionResult.FAIL : InteractionResult.PASS);
+        UseItemCallback.EVENT.register((player, level, hand) ->
+                restrained(player) ? InteractionResult.FAIL : InteractionResult.PASS);
+        AttackEntityCallback.EVENT.register((player, level, hand, entity, hit) ->
+                restrained(player) ? InteractionResult.FAIL : InteractionResult.PASS);
         PlayerBlockBreakEvents.BEFORE.register((level, player, pos, state, blockEntity) ->
                 !(player instanceof ServerPlayer serverPlayer) || allowed(serverPlayer, ProtectedAction.BUILD, level, pos));
         UseBlockCallback.EVENT.register(this::onUseBlock);

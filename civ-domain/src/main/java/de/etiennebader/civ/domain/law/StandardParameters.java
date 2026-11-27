@@ -292,6 +292,17 @@ public final class StandardParameters {
     public static final ParameterKey<Long> OFFICER_WAGE = ParameterKey.constrained("officer_wage", Long.class, 0L,
             wage -> wage >= 0);
 
+    /** Täglicher Sold je Polizist (Kadett einfach, höhere Ränge mehrfach), aus der Gemeindekasse. 0 = unbezahlt. */
+    public static final ParameterKey<Long> POLICE_WAGE = ParameterKey.constrained("police_wage", Long.class, 0L,
+            wage -> wage >= 0);
+
+    /** Ob die Polizei Streife geht und dabei Straftäter von sich aus festnimmt. */
+    public static final ParameterKey<Boolean> POLICE_PATROL = ParameterKey.of("police_patrol", Boolean.class, true);
+
+    /** Ob Polizisten auch ohne vorherige Anzeige festnehmen dürfen (weitreichende Befugnisse). */
+    public static final ParameterKey<Boolean> POLICE_ARREST_WITHOUT_REPORT = ParameterKey.of(
+            "police_arrest_without_report", Boolean.class, false);
+
     /**
      * Standardwährung dieser Polity als Währungscode (siehe {@code CurrencyRegistry}). Leer (Standard) = die
      * Währung, mit der die Polity gegründet wurde. In ihr handeln die Dorfbewohner des Gebiets.
@@ -371,6 +382,9 @@ public final class StandardParameters {
                 WAR_REPARATIONS_PER_STRENGTH_POINT,
                 SOLDIER_WAGE,
                 OFFICER_WAGE,
+                POLICE_WAGE,
+                POLICE_PATROL,
+                POLICE_ARREST_WITHOUT_REPORT,
                 NEUTRALITY_FEE_PER_DAY,
                 HOME_PORT_COOLDOWN_SECONDS,
                 WAR_WILL_THRESHOLD,

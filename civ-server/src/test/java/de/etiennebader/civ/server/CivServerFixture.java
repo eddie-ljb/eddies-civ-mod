@@ -67,6 +67,10 @@ public final class CivServerFixture {
         return server.family();
     }
 
+    public de.etiennebader.civ.server.police.PoliceService police() {
+        return server.police();
+    }
+
     public de.etiennebader.civ.server.war.WarService war() {
         return server.war();
     }
