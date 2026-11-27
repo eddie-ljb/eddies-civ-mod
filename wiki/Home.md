@@ -12,7 +12,8 @@ Dieses Wiki ist nach Zielgruppe sortiert: Spieler finden hier, wie man Gemeinden
 - [Parlament](Parlament.md) – Sitzungen, Anträge, Tagesordnung, Abstimmungsregeln
 - [Karte](Karte.md) – Web- und Ingame-Karte, Farben und Ebenen-Filter
 - [Recht, Verfassung und Bünde](Spieler-Recht-und-Verfassung.md) – Verfassung, Gesetzbuch, Gesetzes-Baukasten, Bünde und Ebenen
-- [Justiz](Spieler-Justiz.md) – Klagen, Gerichtsverfahren, Geschworene, Berufung
+- [Justiz](Spieler-Justiz.md) – Klagen, Gerichtsverfahren, Geschworene, Berufung, Haft per Urteil
+- [Polizei und Militär](Spieler-Polizei-und-Militaer.md) – Dienstgrade, Festnahme, Handschellen, Zellen, Gerichtsbesetzung per Verfassung, Militärränge, Kriegskarte
 - [Bauen und Straßen](Spieler-Bauen-und-Strassen.md) – Bauaufträge, Bauabsperrung, Ausrichtung zur Straße, Straßen und Wegebau, Namen von Dorfbewohner-Gründungen
 - [Religion](Spieler-Religion.md) – Religionen, Heilige Schrift bearbeiten, Klerus-Ämter, Segnen und Taufen
 - [Logos](Spieler-Logos.md) – eigene Wappen, Wahlplakate und Leuchtreklamen hochladen und im Spiel zeigen

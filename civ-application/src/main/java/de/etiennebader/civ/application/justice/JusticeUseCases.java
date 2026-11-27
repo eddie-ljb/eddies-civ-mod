@@ -77,10 +77,39 @@ public final class JusticeUseCases {
     // ---- Personal ----
 
     public void appoint(ActorRef head, PolityId court, Role role, ActorRef person, boolean appointed, Day day) {
-        requireHead(head, aggregates.polity(court));
+        Polity polity = aggregates.polity(court);
+        String mode = polity.laws().valueOf(StandardParameters.COURT_STAFFING);
+        boolean government = mode.equals("government") && holdsAnyOffice(polity, head);
+        if (!government) {
+            requireHead(head, polity);
+        }
+        if (appointed && (mode.equals("automatic") || mode.equals("election"))) {
+            throw new IllegalArgumentException("Dieses Gericht wird laut Verfassung nicht ernannt");
+        }
         Judiciary judiciary = aggregates.justice();
         judiciary.appoint(court, role, person, appointed, day);
         aggregates.commit(judiciary);
+    }
+
+    /** Besetzt einen Platz ohne Ernennungsrecht (Verfassungsautomatik: automatisch oder gewählt). */
+    public void fillSeat(PolityId court, Role role, ActorRef person, Day day) {
+        Judiciary judiciary = aggregates.justice();
+        judiciary.appoint(court, role, person, true, day);
+        aggregates.commit(judiciary);
+    }
+
+    /** Das Personal eines Gerichts. */
+    public CourtStaff staffOf(PolityId court) {
+        return aggregates.justice().staffOf(court);
+    }
+
+    private static boolean holdsAnyOffice(Polity polity, ActorRef actor) {
+        for (Office office : Office.values()) {
+            if (office.single() && polity.holds(actor, office)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // ---- Klage ----
@@ -101,7 +130,7 @@ public final class JusticeUseCases {
             parseAmount(target);
         }
         long fee = polity.laws().valueOf(StandardParameters.COURT_FEE);
-        if (fee > 0) {
+        if (fee > 0 && !plaintiff.equals(polity.asActor())) { // die Anklage der Gemeinde kostet sie nichts
             Ledger ledger = aggregates.ledger();
             ledger.transfer(plaintiff, polity.asActor(), Money.of(fee, polity.currency()), TransferReason.FEE, day);
             aggregates.commit(ledger);

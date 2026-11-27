@@ -109,6 +109,7 @@ public final class CivServer {
     private final PlotService plots;
     private final de.etiennebader.civ.server.construction.ConstructionService construction;
     private final de.etiennebader.civ.server.war.WarService war;
+    private final de.etiennebader.civ.server.police.PoliceService police;
     private final de.etiennebader.civ.server.government.GovernmentService government;
     private final de.etiennebader.civ.server.road.RoadService roads;
     private final de.etiennebader.civ.server.road.StreetAccess streetAccess;
@@ -210,7 +211,9 @@ public final class CivServer {
         this.construction.interimGovernment(settings.villagerPolitics());
         this.construction.playerLookup(players::findByName);
         this.war = new de.etiennebader.civ.server.war.WarService(app, calendar, texts, announcements, ids,
-                settings, dataDirectory.map(dir -> dir.resolve("war.tsv")));
+                settings, dataDirectory.map(dir -> dir.resolve("war.tsv")), players);
+        this.police = new de.etiennebader.civ.server.police.PoliceService(app, calendar, players, texts,
+                announcements, settings, dataDirectory.map(dir -> dir.resolve("police.tsv")));
         this.government = new de.etiennebader.civ.server.government.GovernmentService(app, calendar, players, texts,
                 announcements, settings.villagerPolitics(), dataDirectory.map(dir -> dir.resolve("government.tsv")));
         this.villagerFederations = new VillagerFederations(app, federations, announcements);
@@ -254,7 +257,10 @@ public final class CivServer {
         this.press = new PressService(app, calendar, players, settings.currency(), texts, announcements);
         this.civic = new CivicService(app, calendar, texts, announcements, plots);
         this.homePorts = new HomePortService(app, calendar, texts, war::registry, settings.warPortLock());
-        this.justice = new JusticeService(app, calendar, players, texts, announcements);
+        this.justice = new JusticeService(app, calendar, players, texts, announcements,
+                dataDirectory.map(dir -> dir.resolve("court_candidacies.tsv")));
+        this.justice.addListener(police);
+        this.war.onNews(this::warNews);
         this.liveCount = new LiveCountService(announcements, settings.show().liveCount(),
                 settings.show().liveCountSeconds(), settings.show().projections());
         this.debates = new DebateService(app, calendar, texts, announcements, settings.show().debateMinutes());
@@ -335,6 +341,7 @@ public final class CivServer {
         federations.autoDecideInvitations(day, settings.villagerPolitics());
         campaigns.endOfDay(day);
         war.endOfDay(day);
+        police.endOfDay(day);
         government.endOfDay(day);
         civil.endOfDay(day);
         justice.endOfDay(day);
@@ -480,6 +487,20 @@ public final class CivServer {
 
     public TownService towns() {
         return towns;
+    }
+
+    /** Kriegsberichte erscheinen in jeder Zeitung, die einen Dorfbewohner als Redakteur hat. */
+    private void warNews(String title, String body) {
+        for (de.etiennebader.civ.domain.polity.PolityView paper : app.queries().newspapers()) {
+            paper.members().stream().map(de.etiennebader.civ.domain.polity.Membership::member)
+                    .filter(de.etiennebader.civ.domain.actor.PersonRef.class::isInstance)
+                    .sorted(java.util.Comparator.comparing(de.etiennebader.civ.domain.actor.ActorRef::uuid)).findFirst()
+                    .ifPresent(editor -> press.publish(editor, paper.name().toString(), title, body));
+        }
+    }
+
+    public de.etiennebader.civ.server.police.PoliceService police() {
+        return police;
     }
 
     public de.etiennebader.civ.server.land.LandRules landRules() {

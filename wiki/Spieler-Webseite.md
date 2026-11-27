@@ -23,6 +23,9 @@ Der Server stellt eine Webseite bereit, standardmäßig auf Port 8765, hell und 
 
 Admin-Themen zum Betrieb der Webseite (Reverse-Proxy, HTTPS, Absicherung) stehen unter [Sicherungen und Webseiten-Betrieb](Admin-Sicherungen-und-Webseite.md).
 
+## Krieg
+Der Reiter „Krieg“ zeigt alle Kriege mit Frontbalken, eine Karte der beiden Gebiete mit rot umrandetem Frontabschnitt, das Schlachtenbuch und die Live-Stände geplanter Feldzüge (Aktualisierung alle 10 Sekunden). Angemeldet planen Bürgermeister, Hauptmann und General im **Feldzugplaner** Angriff, Hinterhalt oder Verteidigung. Siehe [Polizei und Militär](Spieler-Polizei-und-Militaer.md).
+
 ## Religion
 Der Reiter „Religion“ zeigt alle Religionen mit Oberhaupt, Klerusmacht, Mitgliedern, Inbrunst und laufender Klerus-Wahl sowie die Glaubensverteilung unter den Dorfbewohnern. Angemeldet kann man beitreten, austreten, eine Religion gründen, für das Klerusamt kandidieren und wählen. Die **Heilige Schrift** jeder Religion steht im Wortlaut dort; wer sie bearbeiten darf (Gründer, Oberhaupt, Amtsträger mit dem Recht `schrift`), bekommt einen Editor mit Speichern und Umbenennen. Gründer und Oberhaupt legen **Klerus-Ämter** fest, vergeben und entziehen sie; Mitglieder mit dem Recht segnen und taufen Spieler. Siehe [Religion](Spieler-Religion.md).
 

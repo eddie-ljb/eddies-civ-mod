@@ -29,6 +29,10 @@ Der Bürgermeister (oder mit Abstimmungen die Bürger) stellt diese Regelungen i
 | Höchste Geldstrafe (`max_fine`) | Hundertstel Smaragd, Standard 5000 |
 | Verbannung erlaubt (`exile_allowed`) | ja/nein, Standard ja |
 | Gerichtsgebühr (`court_fee`) | Hundertstel Smaragd, Standard 100 |
+| Besetzung von Richtern und Staatsanwälten (`court_staffing`) | `head` (Standard), `government`, `automatic`, `election` |
+| Polizei-Sold (`police_wage`) | Hundertstel Smaragd je Rangstufe und Tag, Standard 0 |
+| Streife (`police_patrol`) | ja/nein, Standard ja |
+| Festnahme ohne Anzeige (`police_arrest_without_report`) | ja/nein, Standard nein |
 
 Zusätzliche Spielregeln aus dem Gesetzes-Baukasten:
 

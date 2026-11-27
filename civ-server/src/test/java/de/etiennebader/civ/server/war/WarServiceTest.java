@@ -188,4 +188,18 @@ class WarServiceTest {
         assertFalse(server.war().declare(a(), "Suedhain").success(), "Verbuendete greifen sich nicht an");
         assertTrue(server.war().breakAlliance(a(), "Suedhain").success());
     }
+
+    @Test
+    @DisplayName("Beförderung per Befehlskette: Unterstellte befördern nicht, Vorgesetzte nur unter ihrem Rang, Bürgermeister alles")
+    void promotion() {
+        found();
+        assertTrue(server.commands().join(caller(carol, "Carol", 8), "Nordhain").success());
+        assertTrue(server.war().enlist(caller(carol, "Carol", 8), MilitaryRank.SOLDIER).success());
+        assertFalse(server.war().promote(a(), "Nirgendwer", MilitaryRank.OFFICER).success(), "unbekannter Spieler");
+        assertTrue(server.war().promote(a(), "Carol", MilitaryRank.CAPTAIN).success(), "Bürgermeister befördert frei");
+        assertFalse(server.war().promote(caller(carol, "Carol", 8), "Carol", MilitaryRank.GENERAL).success(),
+                "nicht sich selbst");
+        assertEquals(MilitaryRank.CAPTAIN, server.war().registry().garrisonOf(id("Nordhain")).get(carol));
+        assertFalse(server.war().promote(a(), "Bob", MilitaryRank.SOLDIER).success(), "Bob dient nicht in Nordhain");
+    }
 }

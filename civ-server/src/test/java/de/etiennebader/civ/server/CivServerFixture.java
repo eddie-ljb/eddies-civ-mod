@@ -88,6 +88,14 @@ public final class CivServerFixture {
         return server.family();
     }
 
+    public de.etiennebader.civ.domain.justice.CourtStaff courtStaff(de.etiennebader.civ.domain.shared.PolityId court) {
+        return server.app().justice().staffOf(court);
+    }
+
+    public de.etiennebader.civ.server.police.PoliceService police() {
+        return server.police();
+    }
+
     public de.etiennebader.civ.server.land.LandRules landRules() {
         return server.landRules();
     }

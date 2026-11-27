@@ -76,3 +76,10 @@ abzubrechen. Das Paket `de.etiennebader.civ.api` ist die stabile Oberfläche; al
 - Religion: `ClergyRole` (Ämter mit Rechten) und Schrift-Texte liegen im `ReligionService`/`ReligionStore`, nicht im Domänen-Record.
 - Befehlsvorschläge: `CivCommandTree.arg(...)` hängt je Argumentname passende Vorschläge mit Erklärung an.
 - Menüs: `Canvas.fillRow` füllt nur noch freie Plätze; zuvor überschrieb der Rahmen Knöpfe, die vorher in dieselbe Zeile gesetzt wurden.
+
+## Polizei und Militär (#84)
+- `civ-domain/.../police`: `PoliceRegistry` (Dienstgrade, Anzeigen, Zellen, Haft, Handschellen, `CaseLink`), `Criminality`; reines Java, darf nur `shared` und `actor` nutzen (`PackageDependencyRulesTest`).
+- `civ-server/.../police`: `PoliceService` (Befehle, Tagesablauf, Streife) und `PoliceStore` (`police.tsv`); implementiert `CaseListener` und wird vom `JusticeService` über Eröffnung, Haft, Berufung und Rechtskraft benachrichtigt.
+- `civ-server/.../justice`: `CourtStaffing` (Verfassungsautomatik `court_staffing`) und `CourtCandidacies` (`court_candidacies.tsv`).
+- `civ-domain/.../war`: `MilitaryRank` mit `level()` (Befehlskette), `WarRegistry.promote`; `WarService` führt das Schlachtenbuch (`LOG` in `war.tsv`) und leitet Kriegsberichte an die Zeitungen weiter.
+- `civ-fabric`: Item `handcuffs` (`HandcuffItems`), Durchsetzung in `ProtectionListener`, Stillstand gefesselter Dorfbewohner in `VillagerCensus`.

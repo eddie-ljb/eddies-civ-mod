@@ -268,6 +268,7 @@ public final class CivCommandTree {
                 .then(logoCommands())
                 .then(emblemCommands())
                 .then(warCommands())
+                .then(policeCommands())
                 .then(governmentCommands())
                 .then(familyCommands())
                 .then(religionCommands())
@@ -1220,7 +1221,15 @@ public final class CivCommandTree {
                                                         StringArgumentType.getString(context, TYPE),
                                                         StringArgumentType.getString(context, TEXT))))))))
                 .then(courtStaff("richter", Role.JUDGE, level))
-                .then(courtStaff("staatsanwalt", Role.PROSECUTOR, level));
+                .then(courtStaff("staatsanwalt", Role.PROSECUTOR, level))
+                .then(Commands.literal("kandidieren")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(Players.caller(player),
+                                level.apply(context), polity -> civ.justice().candidacy(Players.caller(player), polity,
+                                        true)))))
+                .then(Commands.literal("zurueckziehen")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(Players.caller(player),
+                                level.apply(context), polity -> civ.justice().candidacy(Players.caller(player), polity,
+                                        false)))));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> courtStaff(
@@ -1810,6 +1819,70 @@ public final class CivCommandTree {
                         .executes(context -> withCiv(context, (civ, player) -> civ.family().kids(Players.caller(player)))));
     }
 
+    private LiteralArgumentBuilder<CommandSourceStack> policeCommands() {
+        return Commands.literal("polizei")
+                .then(Commands.literal("status")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.police().status(Players.caller(player)))))
+                .then(Commands.literal("dienen")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.police().join(Players.caller(player)))))
+                .then(Commands.literal("kuendigen")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.police().leave(Players.caller(player)))))
+                .then(Commands.literal("ernennen")
+                        .then(Commands.argument(COMPANY, StringArgumentType.string())
+                                .then(policeRank("kadett", de.etiennebader.civ.domain.police.PoliceRank.CADET))
+                                .then(policeRank("polizist", de.etiennebader.civ.domain.police.PoliceRank.OFFICER))
+                                .then(policeRank("wachtmeister", de.etiennebader.civ.domain.police.PoliceRank.SERGEANT))
+                                .then(policeRank("kommissar", de.etiennebader.civ.domain.police.PoliceRank.COMMISSIONER))))
+                .then(Commands.literal("entlassen")
+                        .then(Commands.argument(COMPANY, StringArgumentType.string())
+                                .executes(context -> withCiv(context, (civ, player) -> civ.police().dismiss(
+                                        Players.caller(player), StringArgumentType.getString(context, COMPANY))))))
+                .then(Commands.literal("zellen")
+                        .then(Commands.argument(NUMBER, IntegerArgumentType.integer(0))
+                                .executes(context -> withCiv(context, (civ, player) -> civ.police().cells(
+                                        Players.caller(player), IntegerArgumentType.getInteger(context, NUMBER))))))
+                .then(Commands.literal("anzeigen")
+                        .executes(context -> withCiv(context, (civ, player) -> civ.police().reports(Players.caller(player))))
+                        .then(Commands.argument(COMPANY, StringArgumentType.string())
+                                .then(policeCrime("diebstahl", de.etiennebader.civ.domain.police.CrimeKind.THEFT))
+                                .then(policeCrime("hausfriedensbruch", de.etiennebader.civ.domain.police.CrimeKind.TRESPASS))
+                                .then(policeCrime("koerperverletzung", de.etiennebader.civ.domain.police.CrimeKind.ASSAULT))
+                                .then(policeCrime("mord", de.etiennebader.civ.domain.police.CrimeKind.MURDER))))
+                .then(policeTarget("festnehmen", (civ, caller, name) -> civ.police().arrest(caller, name)))
+                .then(policeTarget("fesseln", (civ, caller, name) -> civ.police().cuff(caller, name)))
+                .then(policeTarget("loesen", (civ, caller, name) -> civ.police().uncuff(caller, name)))
+                .then(policeTarget("freilassen", (civ, caller, name) -> civ.police().release(caller, name)));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> policeRank(String literal,
+            de.etiennebader.civ.domain.police.PoliceRank rank) {
+        return Commands.literal(literal).executes(context -> withCiv(context, (civ, player) -> civ.police().appoint(
+                Players.caller(player), StringArgumentType.getString(context, COMPANY), rank)));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> policeCrime(String literal,
+            de.etiennebader.civ.domain.police.CrimeKind kind) {
+        return Commands.literal(literal).executes(context -> withCiv(context, (civ, player) -> civ.police().report(
+                Players.caller(player), StringArgumentType.getString(context, COMPANY), kind)));
+    }
+
+    private interface PoliceAction {
+        de.etiennebader.civ.server.command.Reply run(de.etiennebader.civ.server.CivServer civ,
+                de.etiennebader.civ.server.command.Caller caller, String name);
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> policeTarget(String literal, PoliceAction action) {
+        return Commands.literal(literal).then(Commands.argument(COMPANY, StringArgumentType.string())
+                .executes(context -> withCiv(context, (civ, player) -> action.run(civ, Players.caller(player),
+                        StringArgumentType.getString(context, COMPANY)))));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> warRank(String literal,
+            de.etiennebader.civ.domain.war.MilitaryRank rank) {
+        return Commands.literal(literal).executes(context -> withCiv(context, (civ, player) -> civ.war().promote(
+                Players.caller(player), StringArgumentType.getString(context, COMPANY), rank)));
+    }
+
     private static final String MINISTRY = "ministerium";
     private static final String MODE = "auswahl";
 
@@ -2077,6 +2150,13 @@ public final class CivCommandTree {
                         .then(Commands.literal("ausspaeher")
                                 .executes(context -> withCiv(context, (civ, player) -> civ.war().enlist(
                                         Players.caller(player), de.etiennebader.civ.domain.war.MilitaryRank.SCOUT)))))
+                .then(Commands.literal("befoerdern")
+                        .then(Commands.argument(COMPANY, StringArgumentType.string())
+                                .then(warRank("soldat", de.etiennebader.civ.domain.war.MilitaryRank.SOLDIER))
+                                .then(warRank("unteroffizier", de.etiennebader.civ.domain.war.MilitaryRank.SERGEANT))
+                                .then(warRank("offizier", de.etiennebader.civ.domain.war.MilitaryRank.OFFICER))
+                                .then(warRank("hauptmann", de.etiennebader.civ.domain.war.MilitaryRank.CAPTAIN))
+                                .then(warRank("general", de.etiennebader.civ.domain.war.MilitaryRank.GENERAL))))
                 .then(Commands.literal("entlassen")
                         .executes(context -> withCiv(context, (civ, player) -> civ.war().discharge(Players.caller(player)))))
                 .then(Commands.literal("wille")

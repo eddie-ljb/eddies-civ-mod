@@ -18,6 +18,7 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.npc.villager.Villager;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -59,6 +60,14 @@ final class VillagerCensus {
             return InteractionResult.SUCCESS;
         });
         ServerEntityEvents.ENTITY_LOAD.register((entity, level) -> {
+            if (entity instanceof Mob mob && mob.entityTags().contains(CUFF_TAG)) {
+                // nach einem Neustart: war gefesselt, ist es noch?
+                host.current().ifPresent(civ -> {
+                    if (!civ.police().restrainedVillagers().contains(mob.getUUID())) {
+                        release(mob);
+                    }
+                });
+            }
             if (entity instanceof Villager villager) {
                 host.current().ifPresent(civ -> seen(civ, villager));
             }
@@ -76,8 +85,51 @@ final class VillagerCensus {
     /** Alle 2 Sekunden die Angestellten zu ihren Maschinen schicken. */
     private static final int COMMUTE_INTERVAL = 40;
     private int commuteTicks;
+    private int restrainTicks;
+
+    /**
+     * Gefesselte und inhaftierte Dorfbewohner stehen still ({@code NoAI}); wer frei ist, bewegt sich wieder. Alle 2
+     * Sekunden abgeglichen; die Markierung am Dorfbewohner überlebt Neustarts (siehe ENTITY_LOAD).
+     */
+    private static final String CUFF_TAG = "eddies_civ_cuffed";
+    private final java.util.Set<java.util.UUID> frozen = new java.util.HashSet<>();
+
+    private static void release(Mob mob) {
+        mob.setNoAi(false);
+        mob.removeTag(CUFF_TAG);
+    }
+
+    private void syncRestraints(MinecraftServer server, CivServer civ) {
+        java.util.Set<java.util.UUID> now = civ.police().restrainedVillagers();
+        for (java.util.UUID id : now) {
+            for (net.minecraft.server.level.ServerLevel level : server.getAllLevels()) {
+                if (level.getEntity(id) instanceof Mob mob) {
+                    mob.setNoAi(true);
+                    mob.addTag(CUFF_TAG);
+                    frozen.add(id);
+                    break;
+                }
+            }
+        }
+        frozen.removeIf(id -> {
+            if (now.contains(id)) {
+                return false;
+            }
+            for (net.minecraft.server.level.ServerLevel level : server.getAllLevels()) {
+                if (level.getEntity(id) instanceof Mob mob) {
+                    release(mob);
+                    return true;
+                }
+            }
+            return false; // nicht geladen: ENTITY_LOAD gibt ihn frei
+        });
+    }
 
     void tick(MinecraftServer server, CivServer civ) {
+        if (++restrainTicks >= COMMUTE_INTERVAL) {
+            restrainTicks = 0;
+            syncRestraints(server, civ);
+        }
         if (++commuteTicks >= COMMUTE_INTERVAL) {
             commuteTicks = 0;
             MachineWork.refreshWorkplaces(civ, COMMUTE_INTERVAL);

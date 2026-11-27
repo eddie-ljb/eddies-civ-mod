@@ -319,6 +319,26 @@ public final class StandardParameters {
             wage -> wage >= 0);
 
     /**
+     * Wie Richter und Staatsanwälte bestimmt werden (Verfassung): {@code head} (Oberhaupt ernennt, Standard),
+     * {@code government} (jeder Amtsträger ernennt), {@code automatic} (die Gemeinde besetzt Vakanzen mit Dorfbewohnern)
+     * oder {@code election} (die Dorfbewohner wählen bei Vakanz).
+     */
+    public static final ParameterKey<String> COURT_STAFFING = ParameterKey.constrained("court_staffing", String.class,
+            "head", mode -> mode.equals("head") || mode.equals("government") || mode.equals("automatic")
+                    || mode.equals("election"));
+
+    /** Täglicher Sold je Polizist (Kadett einfach, höhere Ränge mehrfach), aus der Gemeindekasse. 0 = unbezahlt. */
+    public static final ParameterKey<Long> POLICE_WAGE = ParameterKey.constrained("police_wage", Long.class, 0L,
+            wage -> wage >= 0);
+
+    /** Ob die Polizei Streife geht und dabei Straftäter von sich aus festnimmt. */
+    public static final ParameterKey<Boolean> POLICE_PATROL = ParameterKey.of("police_patrol", Boolean.class, true);
+
+    /** Ob Polizisten auch ohne vorherige Anzeige festnehmen dürfen (weitreichende Befugnisse). */
+    public static final ParameterKey<Boolean> POLICE_ARREST_WITHOUT_REPORT = ParameterKey.of(
+            "police_arrest_without_report", Boolean.class, false);
+
+    /**
      * Standardwährung dieser Polity als Währungscode (siehe {@code CurrencyRegistry}). Leer (Standard) = die
      * Währung, mit der die Polity gegründet wurde. In ihr handeln die Dorfbewohner des Gebiets.
      */
@@ -399,6 +419,10 @@ public final class StandardParameters {
                 WAR_REPARATIONS_PER_STRENGTH_POINT,
                 SOLDIER_WAGE,
                 OFFICER_WAGE,
+                COURT_STAFFING,
+                POLICE_WAGE,
+                POLICE_PATROL,
+                POLICE_ARREST_WITHOUT_REPORT,
                 NEUTRALITY_FEE_PER_DAY,
                 HOME_PORT_COOLDOWN_SECONDS,
                 WAR_WILL_THRESHOLD,

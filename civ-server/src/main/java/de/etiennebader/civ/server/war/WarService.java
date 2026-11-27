@@ -85,11 +85,17 @@ public final class WarService {
     private final Announcements announcements;
     private final IdGenerator ids;
     private final ServerSettings settings;
+    private final de.etiennebader.civ.application.directory.PlayerDirectory players;
     private final WarStore store;
+    private final List<LogEntry> log;
+    private java.util.function.BiConsumer<String, String> news = (title, body) -> {
+    };
     private final WarRegistry registry;
 
     public WarService(CivApplication app, de.etiennebader.civ.application.day.Calendar calendar, Texts texts,
-                      Announcements announcements, IdGenerator ids, ServerSettings settings, Optional<Path> file) {
+                      Announcements announcements, IdGenerator ids, ServerSettings settings, Optional<Path> file,
+                      de.etiennebader.civ.application.directory.PlayerDirectory players) {
+        this.players = Objects.requireNonNull(players, "players");
         this.app = Objects.requireNonNull(app, "app");
         this.queries = app.queries();
         this.calendar = Objects.requireNonNull(calendar, "calendar");
@@ -99,6 +105,32 @@ public final class WarService {
         this.settings = Objects.requireNonNull(settings, "settings");
         this.store = new WarStore(file);
         this.registry = store.load();
+        this.log = new ArrayList<>(store.loadLog());
+    }
+
+    /** Ein Eintrag im Schlachtenbuch (Web: Live-Stände und Verlauf). */
+    public record LogEntry(de.etiennebader.civ.domain.war.WarId war, long day, BattleKind kind, int front, int shift,
+                           int woundedAggressor, int woundedDefender) {
+    }
+
+    public static final int LOG_SIZE = 200;
+
+    /** Das Schlachtenbuch, älteste zuerst. */
+    public synchronized List<LogEntry> battleLog() {
+        return List.copyOf(log);
+    }
+
+    /** Wohin Kriegsberichte gehen (Titel, Text): in die Zeitungen der Dorfbewohner-Redakteure. */
+    public synchronized void onNews(java.util.function.BiConsumer<String, String> news) {
+        this.news = Objects.requireNonNull(news, "news");
+    }
+
+    private void report(String title, String body) {
+        try {
+            news.accept(title, body);
+        } catch (RuntimeException e) {
+            // Berichterstattung darf den Krieg nie stören
+        }
     }
 
     public WarRegistry registry() {
@@ -179,6 +211,8 @@ public final class WarService {
         save();
         Message line = Message.of(MessageKey.WAR_DECLARED, aggressor.name().toString(), defender.name().toString());
         announcements.add(Announcement.toAll(line));
+        report("Krieg: " + aggressor.name() + " gegen " + defender.name(), aggressor.name() + " hat " + defender.name()
+                + " den Krieg erklärt. Die Garnisonen sammeln sich; die Dorfbewohner fürchten um Felder und Höfe.");
         return Reply.success(line);
     }
 
@@ -240,7 +274,7 @@ public final class WarService {
 
     /** Der Bürgermeister plant einen Feldzug für {@code inDays} Tage ab heute. */
     public synchronized Reply campaign(Caller caller, int number, BattleKind kind, int inDays) {
-        Optional<War> war = partyWar(caller, number);
+        Optional<War> war = partyWar(caller, number, true);
         if (war.isEmpty()) {
             return Reply.failure(Message.of(MessageKey.WAR_NOT_PARTY, number));
         }
@@ -339,6 +373,8 @@ public final class WarService {
         Message line = Message.of(MessageKey.WAR_VICTORY, nameOf(terms.winner()), nameOf(terms.loser()),
                 terms.points());
         announcements.add(Announcement.toAll(line));
+        report("Sieg für " + nameOf(terms.winner()), nameOf(terms.winner()) + " hat " + nameOf(terms.loser())
+                + " geschlagen und erhält " + terms.points() + " Siegpunkte.");
         if (villagerRuled(terms.winner())) {
             return settleByDefault(war);
         }
@@ -424,6 +460,8 @@ public final class WarService {
         save();
         Message line = Message.of(MessageKey.WAR_PEACE, nameOf(war.aggressor()), nameOf(war.defender()));
         announcements.add(Announcement.toAll(line));
+        report("Frieden zwischen " + nameOf(war.aggressor()) + " und " + nameOf(war.defender()),
+                "Der Krieg ist ohne Sieger beendet; die Waffen schweigen.");
         return Reply.success(line);
     }
 
@@ -475,6 +513,36 @@ public final class WarService {
         }
         save();
         return Reply.success(Message.of(MessageKey.WAR_ENLISTED, own.get().name().toString(), rankName(rank)));
+    }
+
+    /**
+     * Befördert oder degradiert einen dienenden Spieler. Der Bürgermeister darf jeden Rang vergeben; sonst nur ein
+     * Vorgesetzter, und zwar nur Ränge unter dem eigenen und nur für Untergebene (Befehlskette).
+     */
+    public synchronized Reply promote(Caller caller, String name, MilitaryRank rank) {
+        Optional<PolityView> own = ownTown(caller);
+        if (own.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.WAR_NO_TOWN));
+        }
+        Optional<de.etiennebader.civ.domain.actor.PlayerRef> target = players.findByName(name.strip());
+        if (target.isEmpty()) {
+            return Reply.failure(Message.of(MessageKey.WAR_UNKNOWN_POLITY));
+        }
+        PolityId town = own.get().id();
+        Map<ActorRef, MilitaryRank> garrison = registry.garrisonOf(town);
+        MilitaryRank current = garrison.get(target.get());
+        MilitaryRank mine = garrison.get(caller.player());
+        boolean mayor = isMayor(caller, own.get());
+        if (current == null) {
+            return Reply.failure(Message.of(MessageKey.WAR_TARGET_NOT_SERVING));
+        }
+        if (!mayor && (mine == null || !mine.outranks(rank) || !mine.outranks(current)
+                || target.get().equals(caller.player()))) {
+            return Reply.failure(Message.of(MessageKey.WAR_NOT_COMMANDER));
+        }
+        registry.promote(town, target.get(), rank);
+        save();
+        return Reply.success(Message.of(MessageKey.WAR_PROMOTED, texts.actor(target.get()), rankName(rank)));
     }
 
     public synchronized Reply discharge(Caller caller) {
@@ -661,6 +729,14 @@ public final class WarService {
                             + nameOf(fought.defender()), kindName(report.kind()), report.front(), report.frontShift(), report.woundedAggressor(),
                     report.woundedDefender());
             announcements.add(Announcement.toAll(line));
+            log.add(new LogEntry(report.war(), day.value(), report.kind(), report.front(), report.frontShift(),
+                    report.woundedAggressor(), report.woundedDefender()));
+            while (log.size() > LOG_SIZE) {
+                log.remove(0);
+            }
+            report("Schlacht: " + nameOf(fought.aggressor()) + " gegen " + nameOf(fought.defender()),
+                    "Die Front liegt nun bei " + report.front() + " (Verschiebung " + report.frontShift() + "). Verwundet: "
+                            + report.woundedAggressor() + " Angreifer, " + report.woundedDefender() + " Verteidiger.");
             if (report.decided().isPresent()) {
                 announceDecision(war(report));
             }
@@ -704,6 +780,43 @@ public final class WarService {
                 registry.enlist(townId, person, MilitaryRank.SCOUT, day);
             } else if (peace <= VILLAGER_SOLDIER_PEACE) {
                 registry.enlist(townId, person, MilitaryRank.SOLDIER, day);
+            }
+        }
+        villagersPromote(townId);
+    }
+
+    /**
+     * Befehlskette auffüllen: ab 10 Mann ein General, je 8 ein Hauptmann, je 6 ein Offizier, je 4 ein Unteroffizier.
+     * Befördert werden nur Dorfbewohner (der dienstälteste der Vorstufe); Spieler befördern ihre Untergebenen selbst.
+     */
+    private void villagersPromote(PolityId townId) {
+        int size = registry.garrisonOf(townId).size();
+        if (size >= 10 && count(townId, MilitaryRank.GENERAL) == 0) {
+            promoteVillager(townId, MilitaryRank.GENERAL, MilitaryRank.CAPTAIN, MilitaryRank.OFFICER);
+        }
+        if (size >= 8 && count(townId, MilitaryRank.CAPTAIN) < size / 8) {
+            promoteVillager(townId, MilitaryRank.CAPTAIN, MilitaryRank.OFFICER, MilitaryRank.SERGEANT);
+        }
+        if (size >= 6 && count(townId, MilitaryRank.OFFICER) < size / 6) {
+            promoteVillager(townId, MilitaryRank.OFFICER, MilitaryRank.SERGEANT);
+        }
+        if (size >= 4 && count(townId, MilitaryRank.SERGEANT) < size / 4) {
+            promoteVillager(townId, MilitaryRank.SERGEANT, MilitaryRank.SOLDIER);
+        }
+    }
+
+    private int count(PolityId townId, MilitaryRank rank) {
+        return (int) registry.garrisonOf(townId).values().stream().filter(r -> r == rank).count();
+    }
+
+    private void promoteVillager(PolityId townId, MilitaryRank to, MilitaryRank... from) {
+        for (MilitaryRank source : from) {
+            Optional<ActorRef> pick = registry.garrisonOf(townId).entrySet().stream()
+                    .filter(e -> e.getValue() == source && e.getKey() instanceof PersonRef)
+                    .map(Map.Entry::getKey).min(Comparator.comparing(a -> a.uuid().toString()));
+            if (pick.isPresent()) {
+                registry.promote(townId, pick.get(), to);
+                return;
             }
         }
     }
@@ -796,7 +909,7 @@ public final class WarService {
             long soldier = queries.effectiveLaws(town.get()).valueOf(StandardParameters.SOLDIER_WAGE);
             long officer = queries.effectiveLaws(town.get()).valueOf(StandardParameters.OFFICER_WAGE);
             for (Map.Entry<ActorRef, MilitaryRank> member : entry.getValue().entrySet()) {
-                long wage = member.getValue() == MilitaryRank.OFFICER ? officer : soldier;
+                long wage = member.getValue().level() >= MilitaryRank.OFFICER.level() ? officer : soldier;
                 if (wage == 0) {
                     continue;
                 }
@@ -813,9 +926,17 @@ public final class WarService {
     // ------------------------------------------------------------------ Hilfen
 
     private Optional<War> partyWar(Caller caller, int number) {
+        return partyWar(caller, number, false);
+    }
+
+    /** Mit {@code highCommand} dürfen auch Hauptmann und General (Befehlskette) für ihre Gemeinde handeln. */
+    private Optional<War> partyWar(Caller caller, int number, boolean highCommand) {
         Optional<PolityView> own = ownTown(caller);
         List<War> wars = registry.wars();
-        if (own.isEmpty() || !isMayor(caller, own.get()) || number < 1 || number > wars.size()) {
+        boolean allowed = own.isPresent() && (isMayor(caller, own.get())
+                || highCommand && registry.garrisonOf(own.get().id()).get(caller.player()) != null
+                && registry.garrisonOf(own.get().id()).get(caller.player()).commandsCampaigns());
+        if (!allowed || number < 1 || number > wars.size()) {
             return Optional.empty();
         }
         return Optional.of(wars.get(number - 1)).filter(war -> war.involves(own.get().id()));
@@ -838,7 +959,7 @@ public final class WarService {
     }
 
     private void save() {
-        store.save(registry);
+        store.save(registry, log);
     }
 
     private static int clamp(int value, int min, int max) {
@@ -854,6 +975,9 @@ public final class WarService {
             case OFFICER -> MessageKey.WAR_RANK_OFFICER;
             case SCOUT -> MessageKey.WAR_RANK_SCOUT;
             case SOLDIER -> MessageKey.WAR_RANK_SOLDIER;
+            case SERGEANT -> MessageKey.WAR_RANK_SERGEANT;
+            case CAPTAIN -> MessageKey.WAR_RANK_CAPTAIN;
+            case GENERAL -> MessageKey.WAR_RANK_GENERAL;
         });
     }
 

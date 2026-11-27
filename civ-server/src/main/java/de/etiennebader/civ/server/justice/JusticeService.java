@@ -36,6 +36,9 @@ import java.util.function.Supplier;
  */
 public final class JusticeService {
 
+    /** Längste Haftstrafe, die ein Richter verhängen darf. */
+    public static final int MAX_JAIL_DAYS = 60;
+
     private final CivApplication app;
     private final WorldQueries queries;
     private final Calendar calendar;
@@ -43,8 +46,23 @@ public final class JusticeService {
     private final Texts texts;
     private final Announcements announcements;
 
+    private final java.util.List<CaseListener> listeners = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    private CourtStaffing staffing;
+    private final CourtCandidacies candidacies;
+
+    public void addListener(CaseListener listener) {
+        listeners.add(listener);
+    }
+
     public JusticeService(CivApplication app, Calendar calendar, PlayerDirectory players, Texts texts,
                           Announcements announcements) {
+        this(app, calendar, players, texts, announcements, java.util.Optional.empty());
+    }
+
+    public JusticeService(CivApplication app, Calendar calendar, PlayerDirectory players, Texts texts,
+                          Announcements announcements, java.util.Optional<java.nio.file.Path> candidacyFile) {
+        this.candidacies = new CourtCandidacies(candidacyFile);
         this.app = Objects.requireNonNull(app, "app");
         this.queries = app.queries();
         this.calendar = Objects.requireNonNull(calendar, "calendar");
@@ -223,6 +241,21 @@ public final class JusticeService {
         String head = (bar < 0 ? input : input.substring(0, bar)).strip().toLowerCase(Locale.ROOT);
         String reasoning = bar < 0 ? "" : input.substring(bar + 1).strip();
         String[] words = head.split("\\s+");
+        int jail = 0;
+        List<String> kept = new java.util.ArrayList<>();
+        for (int index = 0; index < words.length; index++) {
+            if ((words[index].equals("haft") || words[index].equals("jail")) && index + 1 < words.length) {
+                try {
+                    jail = Math.max(0, Math.min(MAX_JAIL_DAYS, Integer.parseInt(words[++index])));
+                } catch (NumberFormatException e) {
+                    return Reply.failure(Message.of(MessageKey.CASE_VERDICT_FORMAT));
+                }
+            } else {
+                kept.add(words[index]);
+            }
+        }
+        words = kept.toArray(new String[0]);
+        int jailDays = jail;
         if (words.length == 0 || words[0].isEmpty()) {
             return Reply.failure(Message.of(MessageKey.CASE_VERDICT_FORMAT));
         }
@@ -261,6 +294,9 @@ public final class JusticeService {
                     reasoning.isEmpty() ? "-" : reasoning, calendar.today());
             Message line = verdictMessage(decided);
             announcements.add(Announcement.toTown(decided.court(), line));
+            if (jailDays > 0 && decided.verdict().filter(Verdict::upheld).isPresent()) {
+                listeners.forEach(listener -> listener.sentenced(decided, jailDays));
+            }
             return Reply.success(line);
         });
     }
@@ -268,11 +304,28 @@ public final class JusticeService {
     public Reply appeal(Caller caller, int number) {
         return withCase(number, found -> {
             CourtCase appeal = justice().appeal(caller.player(), found.id(), calendar.today());
+            listeners.forEach(listener -> listener.appealed(found, appeal));
             notifyParties(appeal, Message.of(MessageKey.CASE_APPEALED, number, appeal.number(),
                     texts.polityName(appeal.court())));
             return Reply.success(Message.of(MessageKey.CASE_APPEALED, number, appeal.number(),
                     texts.polityName(appeal.court())));
         });
+    }
+
+    /** {@code kandidieren|zurueckziehen}: ein Spieler bewirbt sich bei {@code court_staffing = election} um Richter-/Staatsanwaltsämter. */
+    public Reply candidacy(Caller caller, PolityView court, boolean run) {
+        if (!court.isMember(caller.player())) {
+            return Reply.failure(Message.of(MessageKey.COURT_CANDIDACY_NOT_MEMBER));
+        }
+        String mode = queries.effectiveLaws(court).valueOf(de.etiennebader.civ.domain.law.StandardParameters.COURT_STAFFING);
+        if (run && !mode.equals("election")) {
+            return Reply.failure(Message.of(MessageKey.COURT_CANDIDACY_NOT_ELECTION));
+        }
+        boolean changed = run ? candidacies.run(court.id(), caller.player())
+                : candidacies.withdraw(court.id(), caller.player());
+        return changed ? Reply.success(Message.of(run ? MessageKey.COURT_CANDIDACY_ON : MessageKey.COURT_CANDIDACY_OFF,
+                court.name().value()))
+                : Reply.failure(Message.of(MessageKey.COURT_CANDIDACY_UNCHANGED));
     }
 
     /** {@code richter|staatsanwalt ernennen|entlassen <Spieler|dorfbewohner>} (nur die Spitze). */
@@ -370,6 +423,10 @@ public final class JusticeService {
     // ---- Tagesende ----
 
     public void endOfDay(de.etiennebader.civ.domain.shared.Day day) {
+        if (staffing == null) {
+            staffing = new CourtStaffing(app, texts, announcements, candidacies);
+        }
+        staffing.endOfDay(day);
         for (JusticeUseCases.Outcome outcome : justice().endOfDay(day)) {
             CourtCase found = outcome.courtCase();
             Message line = switch (outcome.event()) {
@@ -381,6 +438,13 @@ public final class JusticeService {
                         found.stageUntil().value());
             };
             notifyParties(found, line);
+            for (CaseListener listener : listeners) {
+                if (outcome.event().equals("opened")) {
+                    listener.opened(found);
+                } else if (outcome.event().equals("final")) {
+                    listener.finalised(found);
+                }
+            }
             if (outcome.event().equals("decided") || outcome.event().equals("final")) {
                 announcements.add(Announcement.toTown(found.court(), line));
             }

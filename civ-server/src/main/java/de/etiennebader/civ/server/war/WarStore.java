@@ -83,7 +83,27 @@ final class WarStore {
                 proposals, claims, neutral));
     }
 
-    void save(WarRegistry registry) {
+    List<WarService.LogEntry> loadLog() {
+        List<WarService.LogEntry> entries = new ArrayList<>();
+        if (file.isEmpty() || !Files.isRegularFile(file.get())) {
+            return entries;
+        }
+        try {
+            for (String line : Files.readAllLines(file.get(), StandardCharsets.UTF_8)) {
+                String[] f = line.split("\t", -1);
+                if (f[0].equals("LOG")) {
+                    entries.add(new WarService.LogEntry(wid(f[1]), Long.parseLong(f[2]), BattleKind.valueOf(f[3]),
+                            Integer.parseInt(f[4]), Integer.parseInt(f[5]), Integer.parseInt(f[6]),
+                            Integer.parseInt(f[7])));
+                }
+            }
+        } catch (IOException | RuntimeException e) {
+            return new ArrayList<>();
+        }
+        return entries;
+    }
+
+    void save(WarRegistry registry, List<WarService.LogEntry> log) {
         if (file.isEmpty()) {
             return;
         }
@@ -111,6 +131,11 @@ final class WarStore {
         for (Campaign c : s.campaigns()) {
             lines.add(String.join("\t", "CAMP", c.war().value().toString(), c.initiator().value().toString(),
                     c.kind().name(), Long.toString(c.on().value())));
+        }
+        for (WarService.LogEntry e : log) {
+            lines.add(String.join("\t", "LOG", e.war().value().toString(), Long.toString(e.day()), e.kind().name(),
+                    Integer.toString(e.front()), Integer.toString(e.shift()), Integer.toString(e.woundedAggressor()),
+                    Integer.toString(e.woundedDefender())));
         }
         pairs(lines, "ALLY", s.alliances());
         pairs(lines, "PROP", s.proposals());

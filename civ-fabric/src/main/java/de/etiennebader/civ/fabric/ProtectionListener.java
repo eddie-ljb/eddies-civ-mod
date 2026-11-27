@@ -8,6 +8,7 @@ import de.etiennebader.civ.fabric.content.CivContent;
 import de.etiennebader.civ.fabric.content.EmblemBlock;
 import de.etiennebader.civ.fabric.content.PosterDisplays;
 import de.etiennebader.civ.fabric.content.ConstitutionCopies;
+import de.etiennebader.civ.fabric.content.HandcuffItems;
 import de.etiennebader.civ.fabric.content.LawBooks;
 import de.etiennebader.civ.fabric.gui.Screens;
 import de.etiennebader.civ.fabric.screen.BallotBoxScreen;
@@ -90,7 +91,40 @@ public final class ProtectionListener {
         this.content = Objects.requireNonNull(content, "content");
     }
 
+    /** Gefesselte und Inhaftierte (Issue #84) können nichts abbauen, setzen, benutzen oder schlagen. */
+    private boolean restrained(Player player) {
+        return player instanceof ServerPlayer serverPlayer
+                && host.current().map(civ -> civ.police().restrained(Players.ref(serverPlayer))).orElse(false);
+    }
+
+    /** Rechtsklick mit Handschellen auf Spieler oder Dorfbewohner: fesselt oder löst (nur mit Polizeirang). */
+    private InteractionResult onHandcuffs(Player player, InteractionHand hand, Entity entity) {
+        if (!(player instanceof ServerPlayer officer) || !HandcuffItems.isHandcuffs(player.getItemInHand(hand))) {
+            return InteractionResult.PASS;
+        }
+        de.etiennebader.civ.domain.actor.ActorRef target;
+        if (entity instanceof ServerPlayer other) {
+            target = Players.ref(other);
+        } else if (entity instanceof AbstractVillager villager) {
+            target = new de.etiennebader.civ.domain.actor.PersonRef(
+                    new de.etiennebader.civ.domain.shared.PersonId(villager.getUUID()));
+        } else {
+            return InteractionResult.PASS;
+        }
+        host.current().ifPresent(civ -> Feedback.reply(officer,
+                civ.police().handcuff(Players.caller(officer), target)));
+        return InteractionResult.SUCCESS;
+    }
+
     public void register() {
+        UseEntityCallback.EVENT.register((player, level, hand, entity, hit) -> onHandcuffs(player, hand, entity));
+        PlayerBlockBreakEvents.BEFORE.register((level, player, pos, state, blockEntity) -> !restrained(player));
+        UseBlockCallback.EVENT.register((player, level, hand, hit) ->
+                restrained(player) ? InteractionResult.FAIL : InteractionResult.PASS);
+        UseItemCallback.EVENT.register((player, level, hand) ->
+                restrained(player) ? InteractionResult.FAIL : InteractionResult.PASS);
+        AttackEntityCallback.EVENT.register((player, level, hand, entity, hit) ->
+                restrained(player) ? InteractionResult.FAIL : InteractionResult.PASS);
         PlayerBlockBreakEvents.BEFORE.register((level, player, pos, state, blockEntity) ->
                 !(player instanceof ServerPlayer serverPlayer) || allowed(serverPlayer, ProtectedAction.BUILD, level, pos));
         UseBlockCallback.EVENT.register(this::onUseBlock);

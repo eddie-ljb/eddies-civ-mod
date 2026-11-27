@@ -23,7 +23,11 @@ Strafprozesse bekommen eine Staatsanwaltschaft und Geschworene (`jury_size`, aus
 - `/civ gericht aussage <Nr> <Text>`, `plaedoyer <Nr> <Text>` – der Ton (be-/entlastend) wird erkannt. Aussagen/Beweise laufen vom Einreichen bis Ende der Plädoyers, auch von Zeugen; Plädoyers ab der Eröffnung.
 
 ## Richter und Urteil
-`eroeffnen <Nr>`, `weiter <Nr>`, `einstellen <Nr> [Grund]`, `urteil <Nr> schuldig|freispruch [Smaragde] [verbannen] [absetzen] | Begründung`. Strafen: Geldstrafe bis `max_fine`, Schadensersatz bis zur Klagesumme, Verbannung für 30 Tage (`exile_allowed`), Amtsenthebung. Eine erfolgreiche Verfassungsklage hebt die Regel bzw. den Paragraphen auf.
+`eroeffnen <Nr>`, `weiter <Nr>`, `einstellen <Nr> [Grund]`, `urteil <Nr> schuldig|freispruch [Smaragde] [verbannen] [absetzen] [haft <Tage>] | Begründung`. Strafen: Geldstrafe bis `max_fine`, Schadensersatz bis zur Klagesumme, Verbannung für 30 Tage (`exile_allowed`), Amtsenthebung. Eine erfolgreiche Verfassungsklage hebt die Regel bzw. den Paragraphen auf.
+
+## Haft und Besetzung
+- `haft <Tage>` (bis 60) gilt bei Verfahren, die aus einer Polizei-Festnahme stammen: nach Rechtskraft sitzt der Täter in einer Zelle ab, sonst gilt die Regelhaft der Tat. Siehe [Polizei und Militär](Spieler-Polizei-und-Militaer.md).
+- Wer Richter und Staatsanwälte stellt, regelt das Gesetz `court_staffing` (`head`, `government`, `automatic`, `election`); bei Wahlen kandidieren Spieler mit `/civ gericht kandidieren`.
 
 ## Geschworene und Berufung
 - `/civ gericht stimme <Nr> schuldig|unschuldig` während Plädoyers und Beratung; bei frühem Urteil stimmen Dorfbewohner-Geschworene vorher ab.

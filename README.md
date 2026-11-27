@@ -189,6 +189,13 @@ Jede Gemeinde und jeder Bund hat ein Gericht; Richter ist, wen die Spitze ernenn
 - **Menüs:** `/civ gericht` (Gericht der eigenen Gemeinde), `/civ gericht fall <Nr>` (Akte mit allen Beteiligten, Beweisen, Protokoll und den Knöpfen, die dir offenstehen), `/civ gericht faelle`, `/civ gericht akte <Nr>` (in den Chat). Im Rathaus oben (Glocke) und im Ebenenmenü.
 - **Richterbank (Block):** Rezept Gold, Buch, Gold über drei Bretter über Brett-leer-Brett. Rechtsklick öffnet das Gericht der Gemeinde, in der sie steht.
 
+### Polizei und Militär
+- **Polizei:** Dienstgrade Kadett → Polizist → Wachtmeister → Kommissar mit Befehlskette; `/civ polizei dienen|ernennen <Spieler> <Rang>|entlassen|zellen <n>|anzeigen|festnehmen|fesseln|loesen|freilassen|status`. Dorfbewohner besetzen die Polizei selbst, haben einen Kriminalitätswert und begehen selten Straftaten; Mitbewohner zeigen sie an und sagen als Zeugen aus.
+- **Handschellen** (Item): Rechtsklick mit Polizeirang fesselt oder löst Spieler und Dorfbewohner; Gefesselte und Inhaftierte können nichts abbauen, setzen, benutzen oder schlagen.
+- **Gericht:** Festnahmen eröffnen ein Strafverfahren; der Richter setzt die Haft mit `urteil <Nr> schuldig haft <Tage> | …`. `court_staffing` (`head`, `government`, `automatic`, `election`) regelt die Besetzung von Richtern und Staatsanwälten; Spieler kandidieren mit `/civ gericht kandidieren`.
+- **Militär:** Ränge Soldat/Ausspäher → Unteroffizier → Offizier → Hauptmann → General (`/civ krieg befoerdern`). Hauptmann und General planen Feldzüge.
+- **Web:** Seite „Krieg“ mit Karte, Frontabschnitt, Feldzugplaner, Live-Ständen und Schlachtenbuch; Kriegsberichte erscheinen in den Zeitungen. Mehr im Wiki „Polizei und Militär“.
+
 ### Flaggen und Hymnen
 - **Flagge:** Banner gestalten (Webstuhl), in die Hand nehmen und `/civ <Ebene> flagge setzen`. `flagge holen` gibt ein Banner mit der Flagge, `flagge entfernen`. Im Ebenenmenü (Banner): Klick holt die Flagge. Die Webseite zeichnet die Flaggen nach.
 - **Hymne:** `/civ <Ebene> hymne setzen <Titel> | [Instrument |] <Noten>`. Noten von F#3 bis F#5 (`C4 D4 E4 F#4 …`), `*2` verdoppelt, `/2` halbiert die Länge, `-` ist eine Pause. Instrumente: `harp`, `bell`, `flute`, `chime`, `guitar`, `xylophone` und alle anderen Notenblock-Instrumente. `hymne spielen`, `hymne entfernen`; Rechtsklick aufs Banner im Ebenenmenü spielt sie. Mit `anthem_on_enter` hört man sie beim Betreten des Gebiets.
@@ -388,6 +395,8 @@ Anmelden: Mit `/civ web` holst du dir im Spiel einen Code und gibst ihn auf der 
 | `/civ post [lesen <Nr> \| menue]` / `/civ brief <Spieler> <Betreff> \| <Text>` | Post |
 | `/civ freund [entfernen] <Spieler>` / `/civ freunde [menue]` | Freunde |
 | `/civ nachricht <Freund> <Text>` | Direktnachricht |
+| `/civ polizei status\|dienen\|kuendigen\|ernennen\|entlassen\|zellen\|anzeigen\|festnehmen\|fesseln\|loesen\|freilassen …` | Polizei (Dienstgrade, Festnahme, Handschellen, Zellen), siehe Wiki „Polizei und Militär“ |
+| `/civ krieg befoerdern <Spieler> soldat\|unteroffizier\|offizier\|hauptmann\|general` | Militärrang vergeben |
 | `/civ gericht [faelle\|fall\|akte\|klage\|beweis\|aussage\|plaedoyer\|stimme\|urteil\|berufung …]` | Justiz, siehe oben |
 | `/civ <Ebene> wahlkreis\|debatte\|flagge\|hymne\|gericht …` | Wahlkreise, Debatten, Hoheitszeichen und Gericht einer Ebene |
 | `/civ firma gruenden\|info\|liste\|aufnehmen\|entlassen\|einstellen\|dividende\|ausgeben\|aufloesen` | Firmen, siehe oben |
@@ -431,6 +440,10 @@ Der Bürgermeister (oder mit Abstimmungen die Bürger) stellt diese Regelungen i
 | Höchste Geldstrafe (`max_fine`) | Hundertstel Smaragd, Standard 5000 |
 | Verbannung erlaubt (`exile_allowed`) | ja/nein, Standard ja |
 | Gerichtsgebühr (`court_fee`) | Hundertstel Smaragd, Standard 100 |
+| Besetzung von Richtern und Staatsanwälten (`court_staffing`) | `head` (Standard), `government`, `automatic`, `election` |
+| Polizei-Sold (`police_wage`) | Hundertstel Smaragd je Rangstufe und Tag, Standard 0 |
+| Streife (`police_patrol`) | ja/nein, Standard ja |
+| Festnahme ohne Anzeige (`police_arrest_without_report`) | ja/nein, Standard nein |
 
 ## Für Server-Admins
 `config/eddies-civ-mod.properties` wird beim ersten Start angelegt:
