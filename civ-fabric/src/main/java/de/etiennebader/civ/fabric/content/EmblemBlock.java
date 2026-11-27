@@ -8,6 +8,9 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.EntityBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
@@ -25,7 +28,7 @@ import java.util.Map;
  * meldet {@link #setPlacedBy} an den {@link PlacementHook}; das ist zuverlässiger, als nach dem Rechtsklick zu raten,
  * ob der Block schon steht.
  */
-public final class EmblemBlock extends Block {
+public final class EmblemBlock extends Block implements EntityBlock {
 
     /** Welche Art Hoheitszeichen bzw. Werbung dieser Block ist; {@code COLUMN} ist die Litfaßsäule ohne Bild. */
     public enum Kind {
@@ -44,6 +47,8 @@ public final class EmblemBlock extends Block {
     /** Die Vorderseite zeigt zum Spieler, der den Block gesetzt hat; das Modell ist nach Süden gezeichnet. */
     public static final EnumProperty<Direction> FACING = BlockStateProperties.HORIZONTAL_FACING;
 
+    private static volatile BlockEntityType<EmblemBlockEntity> entityType;
+
     private final Kind kind;
     private final Map<Direction, VoxelShape> shapes;
 
@@ -57,6 +62,17 @@ public final class EmblemBlock extends Block {
     /** Legt fest, wer von gesetzten Blöcken erfährt; ersetzt den bisherigen Hook. */
     public static void onPlaced(PlacementHook placementHook) {
         hook = placementHook;
+    }
+
+    /** Der Typ des Block-Entitys, sobald er registriert ist; Flagge, Wappen und Plakat tragen ihr Bild darin. */
+    static void entityType(BlockEntityType<EmblemBlockEntity> type) {
+        entityType = type;
+    }
+
+    @Override
+    public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
+        // Die Litfaßsäule trägt kein Bild und braucht keins.
+        return kind == Kind.COLUMN ? null : new EmblemBlockEntity(entityType, pos, state);
     }
 
     public Kind kind() {

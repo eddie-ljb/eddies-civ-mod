@@ -108,7 +108,7 @@ public final class ProtectionListener {
                 host.current().ifPresent(civ -> civ.shops().removeAt(Players.position(level, pos))));
         PlayerBlockBreakEvents.AFTER.register((level, player, pos, state, blockEntity) -> {
             if (level instanceof ServerLevel serverLevel && state.getBlock() instanceof EmblemBlock) {
-                Emblems.instance().broken(serverLevel, pos, state.getBlock(), !player.getAbilities().instabuild
+                Emblems.instance().broken(serverLevel, pos, state.getBlock(), blockEntity, !player.getAbilities().instabuild
                         && state.getBlock() != content.electionPoster());
             }
         });
