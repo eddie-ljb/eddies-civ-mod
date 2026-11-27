@@ -210,6 +210,26 @@ public enum ErrorCode {
     OUT_OF_STOCK,
     WORTHLESS_GOODS,
 
+    // Regierung (#79)
+    /** Argumente: Name oder Schlüssel. */
+    UNKNOWN_MINISTRY,
+    /** Argumente: Name. */
+    MINISTRY_EXISTS,
+    /** Argumente: Höchstzahl. */
+    TOO_MANY_MINISTRIES,
+    /** Der Akteur arbeitet schon im Ministerium. Argumente: Ministerium. */
+    ALREADY_EMPLOYED,
+    /** Der Akteur arbeitet nicht im Ministerium bzw. es gibt keinen Minister. Argumente: Ministerium. */
+    NOT_EMPLOYED,
+    /** Ungültiger Wert (Name, Betrag, Prozent ...). Argumente: der Wert. */
+    INVALID_GOVERNMENT_VALUE,
+    /** Es gibt keinen Haushaltsentwurf. Argumente: keine. */
+    NO_BUDGET_DRAFT,
+    /** Der Haushalt übersteigt die Kasse. Argumente: Summe, verfügbar. */
+    BUDGET_EXCEEDS_FUNDS,
+    /** Der Etat reicht nicht. Argumente: Ministerium. */
+    ETAT_EXHAUSTED,
+
     // Krieg
     /** Argumente: Angreifer, Verteidiger. */
     WAR_ALREADY_ONGOING,
