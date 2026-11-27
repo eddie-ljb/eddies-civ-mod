@@ -1,6 +1,6 @@
 # Polizei und Militär
 
-Seit Version 1.0.9 (Issue #84) haben Gemeinden eine Polizei mit Dienstgraden, Festnahmen, Handschellen und Zellen. Das Militär hat eine Befehlskette bis zum General, und die Webseite zeigt Kriege auf einer Karte.
+Seit Version 1.1.0 (Issue #84) haben Gemeinden eine Polizei mit Dienstgraden, Festnahmen, Handschellen und Zellen. Das Militär hat eine Befehlskette bis zum General, und die Webseite zeigt Kriege auf einer Karte.
 
 ## Polizei
 **Dienstgrade:** Kadett → Polizist → Wachtmeister → Kommissar. Höhere Ränge befehligen niedrigere.
