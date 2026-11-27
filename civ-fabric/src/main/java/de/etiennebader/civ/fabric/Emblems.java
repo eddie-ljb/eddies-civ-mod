@@ -25,6 +25,9 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
 import de.etiennebader.civ.fabric.content.EmblemBlockEntity;
+import de.etiennebader.civ.fabric.content.EmblemSize;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.level.block.state.BlockState;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -69,11 +72,14 @@ public final class Emblems {
     // ---- Items ----
 
     /** Ein Item dieser Art mit dieser Kennung (leer, {@code color:<farbe>} oder {@code image:<hash>}). */
-    ItemStack stack(EmblemBlock.Kind kind, String style) {
+    ItemStack stack(EmblemBlock.Kind kind, String style, EmblemSize size) {
         ItemStack stack = new ItemStack(itemOf(kind));
         CompoundTag tag = new CompoundTag();
         tag.putString(KEY, style);
+        tag.putString("size", size.getSerializedName());
         stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
+        stack.set(DataComponents.LORE, new net.minecraft.world.item.component.ItemLore(java.util.List.of(
+                Component.translatable("eddies-civ-mod.emblem.size", size.name()))));
         return stack;
     }
 
@@ -158,7 +164,8 @@ public final class Emblems {
     // ---- Abbauen und Aufräumen ----
 
     /** Ein Spieler hat den Block abgebaut: Anzeige weg, Register bereinigen, das Item mit dem Bild fallen lassen. */
-    void broken(ServerLevel level, BlockPos pos, Block block, BlockEntity blockEntity, boolean dropItem) {
+    void broken(ServerLevel level, BlockPos pos, BlockState state, BlockEntity blockEntity, boolean dropItem) {
+        Block block = state.getBlock();
         EmblemBlock.Kind kind = block instanceof EmblemBlock emblem ? emblem.kind() : null;
         if (kind == null) {
             return;
@@ -176,7 +183,7 @@ public final class Emblems {
         }
         String style = blockEntity instanceof EmblemBlockEntity entity ? entity.style() : "blank";
         if (dropItem) {
-            Block.popResource(level, pos, stack(kind, style));
+            Block.popResource(level, pos, stack(kind, style, state.getValue(EmblemBlock.SIZE)));
         }
     }
 

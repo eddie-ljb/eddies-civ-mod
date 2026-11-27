@@ -42,6 +42,7 @@ final class EmblemRenderer implements BlockEntityRenderer<EmblemBlockEntity, Emb
     static final class State extends BlockEntityRenderState {
         EmblemBlock.Kind kind = EmblemBlock.Kind.FLAG;
         float yaw;
+        float scale = 1F;
         String style = "blank";
         byte[] png = new byte[0];
     }
@@ -58,6 +59,12 @@ final class EmblemRenderer implements BlockEntityRenderer<EmblemBlockEntity, Emb
         };
     }
 
+    /** Große Zeichen ragen über ihren Block hinaus, sie dürfen nicht mit ihm verschwinden. */
+    @Override
+    public boolean shouldRenderOffScreen() {
+        return true;
+    }
+
     @Override
     public State createRenderState() {
         return new State();
@@ -70,6 +77,7 @@ final class EmblemRenderer implements BlockEntityRenderer<EmblemBlockEntity, Emb
         var blockState = entity.getBlockState();
         target.kind = ((EmblemBlock) blockState.getBlock()).kind();
         target.yaw = -blockState.getValue(EmblemBlock.FACING).toYRot();
+        target.scale = blockState.getValue(EmblemBlock.SIZE).factor();
         target.style = entity.style();
         target.png = entity.png();
     }
@@ -89,13 +97,15 @@ final class EmblemRenderer implements BlockEntityRenderer<EmblemBlockEntity, Emb
         ensureWhite();
         final int argb = color;
         final int light = state.lightCoords;
-        final float halfWidth = layout.width() / 2;
-        final float halfHeight = layout.height() / 2;
+        final float halfWidth = layout.width() * state.scale / 2;
+        final float halfHeight = layout.height() * state.scale / 2;
 
         pose.pushPose();
         pose.translate(0.5F, 0F, 0.5F);
         pose.rotateDegrees(Axis.YP, state.yaw);
-        pose.translate((layout.x() - 8) / 16F, layout.y() / 16F, (layout.z() - 8) / 16F);
+        // Von der Mitte des Blockfußes aus um den Größenfaktor vergrößern, wie das Modell.
+        pose.translate((layout.x() - 8) * state.scale / 16F, layout.y() * state.scale / 16F,
+                (layout.z() - 8) * state.scale / 16F);
         collector.submitCustomGeometry(pose, RenderTypes.entityCutout(texture), (entry, consumer) -> {
             float[][] corners = {{-halfWidth, -halfHeight, 0, 1}, {halfWidth, -halfHeight, 1, 1},
                     {halfWidth, halfHeight, 1, 0}, {-halfWidth, halfHeight, 0, 0}};

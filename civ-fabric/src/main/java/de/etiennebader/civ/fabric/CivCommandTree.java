@@ -2257,45 +2257,70 @@ public final class CivCommandTree {
                 "wappen", de.etiennebader.civ.fabric.content.EmblemBlock.Kind.COAT_OF_ARMS,
                 "plakat", de.etiennebader.civ.fabric.content.EmblemBlock.Kind.POSTER).entrySet()) {
             var kind = entry.getValue();
-            root.then(Commands.literal(entry.getKey())
-                    .executes(context -> withCiv(context, (civ, player) -> giveEmblem(player, kind, "blank", "")))
-                    .then(Commands.literal("leer").executes(context -> withCiv(context,
-                            (civ, player) -> giveEmblem(player, kind, "blank", ""))))
-                    .then(Commands.literal("farbe").then(arg("farbe", StringArgumentType.word())
-                            .suggests((context, builder) -> net.minecraft.commands.SharedSuggestionProvider.suggest(
-                                    java.util.Arrays.stream(net.minecraft.world.item.DyeColor.values())
-                                            .map(net.minecraft.world.item.DyeColor::getSerializedName), builder))
-                            .executes(context -> withCiv(context, (civ, player) -> {
-                                String color = StringArgumentType.getString(context, "farbe");
-                                if (net.minecraft.world.item.DyeColor.byName(color, null) == null) {
-                                    return Reply.failure(Message.of(MessageKey.EMBLEM_NO_IMAGE, color));
-                                }
-                                return giveEmblem(player, kind, "color:" + color, "");
-                            }))))
-                    .then(Commands.literal("bild").then(arg(NAME, StringArgumentType.string())
-                            .suggests(this::suggestPolityNames)
-                            .executes(context -> withCiv(context, (civ, player) -> {
-                                String name = StringArgumentType.getString(context, NAME);
-                                Optional<PolityView> polity = civ.queries().polityNamed(name);
-                                if (polity.isEmpty()) {
-                                    return Reply.failure(Message.of(MessageKey.LOGO_UNKNOWN_POLITY, name));
-                                }
-                                Optional<de.etiennebader.civ.domain.civic.CustomImage> image = civ.civic()
-                                        .imagesOf(polity.get().id(), Emblems.imageKind(kind)).stream().findFirst();
-                                if (image.isEmpty()) {
-                                    return Reply.failure(Message.of(MessageKey.EMBLEM_NO_IMAGE,
-                                            polity.get().name().value()));
-                                }
-                                return giveEmblem(player, kind, "image:" + image.get().hash(),
-                                        polity.get().name().value());
-                            })))));
+            var kindNode = Commands.literal(entry.getKey());
+            emblemStyles(kindNode, kind);
+            // Mit Größe: /civ zeichen flagge groesse <S|M|L|XL> [leer | farbe ... | bild ...]
+            var sizeNode = arg("groesse", StringArgumentType.word())
+                    .suggests((context, builder) -> net.minecraft.commands.SharedSuggestionProvider.suggest(
+                            java.util.Arrays.stream(de.etiennebader.civ.fabric.content.EmblemSize.values())
+                                    .map(Enum::name), builder));
+            emblemStyles(sizeNode, kind);
+            kindNode.then(Commands.literal("groesse").then(sizeNode));
+            root.then(kindNode);
         }
         return root;
     }
 
+    /** Hängt leer, farbe und bild an einen Knoten; ohne Größenangabe ist es S. */
+    private void emblemStyles(com.mojang.brigadier.builder.ArgumentBuilder<CommandSourceStack, ?> node,
+                              de.etiennebader.civ.fabric.content.EmblemBlock.Kind kind) {
+        node.executes(context -> withCiv(context, (civ, player) -> giveEmblem(player, kind, "blank", "",
+                emblemSize(context))))
+                .then(Commands.literal("leer").executes(context -> withCiv(context,
+                        (civ, player) -> giveEmblem(player, kind, "blank", "", emblemSize(context)))))
+                .then(Commands.literal("farbe").then(arg("farbe", StringArgumentType.word())
+                        .suggests((context, builder) -> net.minecraft.commands.SharedSuggestionProvider.suggest(
+                                java.util.Arrays.stream(net.minecraft.world.item.DyeColor.values())
+                                        .map(net.minecraft.world.item.DyeColor::getSerializedName), builder))
+                        .executes(context -> withCiv(context, (civ, player) -> {
+                            String color = StringArgumentType.getString(context, "farbe");
+                            if (net.minecraft.world.item.DyeColor.byName(color, null) == null) {
+                                return Reply.failure(Message.of(MessageKey.EMBLEM_NO_IMAGE, color));
+                            }
+                            return giveEmblem(player, kind, "color:" + color, "", emblemSize(context));
+                        }))))
+                .then(Commands.literal("bild").then(arg(NAME, StringArgumentType.string())
+                        .suggests(this::suggestPolityNames)
+                        .executes(context -> withCiv(context, (civ, player) -> {
+                            String name = StringArgumentType.getString(context, NAME);
+                            Optional<PolityView> polity = civ.queries().polityNamed(name);
+                            if (polity.isEmpty()) {
+                                return Reply.failure(Message.of(MessageKey.LOGO_UNKNOWN_POLITY, name));
+                            }
+                            Optional<de.etiennebader.civ.domain.civic.CustomImage> image = civ.civic()
+                                    .imagesOf(polity.get().id(), Emblems.imageKind(kind)).stream().findFirst();
+                            if (image.isEmpty()) {
+                                return Reply.failure(Message.of(MessageKey.EMBLEM_NO_IMAGE,
+                                        polity.get().name().value()));
+                            }
+                            return giveEmblem(player, kind, "image:" + image.get().hash(),
+                                    polity.get().name().value(), emblemSize(context));
+                        }))));
+    }
+
+    private static de.etiennebader.civ.fabric.content.EmblemSize emblemSize(
+            com.mojang.brigadier.context.CommandContext<CommandSourceStack> context) {
+        try {
+            return de.etiennebader.civ.fabric.content.EmblemSize.parse(
+                    StringArgumentType.getString(context, "groesse"));
+        } catch (IllegalArgumentException e) {
+            return de.etiennebader.civ.fabric.content.EmblemSize.S;
+        }
+    }
+
     private Reply giveEmblem(ServerPlayer player, de.etiennebader.civ.fabric.content.EmblemBlock.Kind kind,
-                             String style, String label) {
-        net.minecraft.world.item.ItemStack stack = Emblems.instance().stack(kind, style);
+                             String style, String label, de.etiennebader.civ.fabric.content.EmblemSize size) {
+        net.minecraft.world.item.ItemStack stack = Emblems.instance().stack(kind, style, size);
         if (!label.isEmpty()) {
             stack.set(DataComponents.CUSTOM_NAME, Component.literal(label));
         }

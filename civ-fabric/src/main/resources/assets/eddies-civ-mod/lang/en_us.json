@@ -2039,5 +2039,6 @@
   "eddies-civ-mod.gui.flag_editor_color": "Pattern colour",
   "eddies-civ-mod.gui.flag_editor_page": "Page %s",
   "eddies-civ-mod.gui.flag_editor_layers": "Layers: %s of %s",
-  "eddies-civ-mod.gui.flag_editor_full": "More than %s layers do not fit on the flag."
+  "eddies-civ-mod.gui.flag_editor_full": "More than %s layers do not fit on the flag.",
+  "eddies-civ-mod.emblem.size": "Size: %s"
 }

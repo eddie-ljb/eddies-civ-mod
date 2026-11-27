@@ -1,0 +1,139 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "pole": "eddies-civ-mod:block/emblem_pole",
+    "base": "eddies-civ-mod:block/emblem_base",
+    "gold": "eddies-civ-mod:block/emblem_gold",
+    "particle": "eddies-civ-mod:block/emblem_pole"
+  },
+  "elements": [
+    {
+      "from": [
+        1.36,
+        0.0,
+        -5.28
+      ],
+      "to": [
+        14.64,
+        1.66,
+        3.02
+      ],
+      "faces": {
+        "north": {
+          "texture": "#base"
+        },
+        "south": {
+          "texture": "#base"
+        },
+        "east": {
+          "texture": "#base"
+        },
+        "west": {
+          "texture": "#base"
+        },
+        "up": {
+          "texture": "#base"
+        },
+        "down": {
+          "texture": "#base"
+        }
+      }
+    },
+    {
+      "from": [
+        6.34,
+        1.66,
+        -5.28
+      ],
+      "to": [
+        9.66,
+        23.24,
+        -1.96
+      ],
+      "faces": {
+        "north": {
+          "texture": "#pole"
+        },
+        "south": {
+          "texture": "#pole"
+        },
+        "east": {
+          "texture": "#pole"
+        },
+        "west": {
+          "texture": "#pole"
+        },
+        "up": {
+          "texture": "#pole"
+        },
+        "down": {
+          "texture": "#pole"
+        }
+      }
+    },
+    {
+      "from": [
+        -0.3,
+        23.24,
+        -4.45
+      ],
+      "to": [
+        16.3,
+        26.56,
+        -0.3
+      ],
+      "faces": {
+        "north": {
+          "texture": "#pole"
+        },
+        "south": {
+          "texture": "#pole"
+        },
+        "east": {
+          "texture": "#pole"
+        },
+        "west": {
+          "texture": "#pole"
+        },
+        "up": {
+          "texture": "#pole"
+        },
+        "down": {
+          "texture": "#pole"
+        }
+      }
+    },
+    {
+      "from": [
+        5.51,
+        23.24,
+        -0.466
+      ],
+      "to": [
+        10.49,
+        23.904,
+        -0.134
+      ],
+      "faces": {
+        "north": {
+          "texture": "#gold"
+        },
+        "south": {
+          "texture": "#gold"
+        },
+        "east": {
+          "texture": "#gold"
+        },
+        "west": {
+          "texture": "#gold"
+        },
+        "up": {
+          "texture": "#gold"
+        },
+        "down": {
+          "texture": "#gold"
+        }
+      }
+    }
+  ]
+}

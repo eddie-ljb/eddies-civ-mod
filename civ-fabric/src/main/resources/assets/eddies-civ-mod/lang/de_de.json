@@ -2039,5 +2039,6 @@
   "eddies-civ-mod.gui.flag_editor_color": "Farbe des Musters",
   "eddies-civ-mod.gui.flag_editor_page": "Seite %s",
   "eddies-civ-mod.gui.flag_editor_layers": "Schichten: %s von %s",
-  "eddies-civ-mod.gui.flag_editor_full": "Mehr als %s Schichten passen nicht auf die Flagge."
+  "eddies-civ-mod.gui.flag_editor_full": "Mehr als %s Schichten passen nicht auf die Flagge.",
+  "eddies-civ-mod.emblem.size": "Größe: %s"
 }
