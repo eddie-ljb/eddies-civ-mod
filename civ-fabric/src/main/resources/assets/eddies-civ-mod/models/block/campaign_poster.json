@@ -1,21 +1,22 @@
 {
+  "parent": "minecraft:block/block",
   "textures": {
+    "frame": "eddies-civ-mod:block/emblem_frame",
     "pole": "eddies-civ-mod:block/emblem_pole",
-    "board": "eddies-civ-mod:block/emblem_board",
     "base": "eddies-civ-mod:block/emblem_base",
-    "particle": "eddies-civ-mod:block/emblem_pole"
+    "particle": "eddies-civ-mod:block/emblem_frame"
   },
   "elements": [
     {
       "from": [
         4,
         0,
-        6
+        5
       ],
       "to": [
         12,
-        2,
-        10
+        1,
+        11
       ],
       "faces": {
         "north": {
@@ -40,46 +41,14 @@
     },
     {
       "from": [
-        5,
-        2,
-        7
-      ],
-      "to": [
         7,
-        12,
-        9
+        1,
+        7.5
       ],
-      "faces": {
-        "north": {
-          "texture": "#pole"
-        },
-        "south": {
-          "texture": "#pole"
-        },
-        "east": {
-          "texture": "#pole"
-        },
-        "west": {
-          "texture": "#pole"
-        },
-        "up": {
-          "texture": "#pole"
-        },
-        "down": {
-          "texture": "#pole"
-        }
-      }
-    },
-    {
-      "from": [
+      "to": [
         9,
-        2,
-        7
-      ],
-      "to": [
-        11,
-        12,
-        9
+        3,
+        8.5
       ],
       "faces": {
         "north": {
@@ -104,33 +73,33 @@
     },
     {
       "from": [
-        2,
-        8,
+        3,
+        3,
         7
       ],
       "to": [
-        14,
+        13,
         16,
         9
       ],
       "faces": {
         "north": {
-          "texture": "#board"
+          "texture": "#frame"
         },
         "south": {
-          "texture": "#board"
+          "texture": "#frame"
         },
         "east": {
-          "texture": "#board"
+          "texture": "#frame"
         },
         "west": {
-          "texture": "#board"
+          "texture": "#frame"
         },
         "up": {
-          "texture": "#board"
+          "texture": "#frame"
         },
         "down": {
-          "texture": "#board"
+          "texture": "#frame"
         }
       }
     }

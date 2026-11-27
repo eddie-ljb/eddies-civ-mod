@@ -1,7 +1,19 @@
 {
   "variants": {
-    "": {
+    "facing=south": {
       "model": "eddies-civ-mod:block/coat_of_arms"
+    },
+    "facing=west": {
+      "model": "eddies-civ-mod:block/coat_of_arms",
+      "y": 90
+    },
+    "facing=north": {
+      "model": "eddies-civ-mod:block/coat_of_arms",
+      "y": 180
+    },
+    "facing=east": {
+      "model": "eddies-civ-mod:block/coat_of_arms",
+      "y": 270
     }
   }
 }

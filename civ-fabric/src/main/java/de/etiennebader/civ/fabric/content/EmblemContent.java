@@ -28,9 +28,9 @@ public record EmblemContent(Block flag, Item flagItem, Block coatOfArms, Item co
     public static final Identifier COAT_OF_ARMS_ID = EddiesCivMod.id("coat_of_arms");
     public static final Identifier POSTER_ID = EddiesCivMod.id("campaign_poster");
 
-    private static final VoxelShape POLE = Block.box(4, 0, 4, 12, 16, 12);
-    private static final VoxelShape PEDESTAL = Block.box(2, 0, 2, 14, 10, 14);
-    private static final VoxelShape POSTER_STAND = Block.box(2, 0, 6, 14, 16, 10);
+    private static final VoxelShape POLE = Block.box(0, 0, 6, 16, 16, 10);
+    private static final VoxelShape PEDESTAL = Block.box(3, 0, 0, 13, 16, 5);
+    private static final VoxelShape POSTER_STAND = Block.box(3, 0, 5, 13, 16, 11);
 
     static EmblemContent register() {
         Block flag = block(FLAG_ID, EmblemBlock.Kind.FLAG, POLE, MapColor.WOOD, SoundType.WOOD);

@@ -1,15 +1,23 @@
 package de.etiennebader.civ.fabric.content;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
+
+import java.util.Map;
 
 /**
  * Flagge, Wappen oder Wahlplakat als Block. Das Bild bzw. die Farbe steckt im Item und wird nach dem Setzen als
@@ -33,13 +41,17 @@ public final class EmblemBlock extends Block {
     private static volatile PlacementHook hook = (level, pos, kind, placer, stack) -> {
     };
 
+    /** Die Vorderseite zeigt zum Spieler, der den Block gesetzt hat; das Modell ist nach Süden gezeichnet. */
+    public static final EnumProperty<Direction> FACING = BlockStateProperties.HORIZONTAL_FACING;
+
     private final Kind kind;
-    private final VoxelShape shape;
+    private final Map<Direction, VoxelShape> shapes;
 
     public EmblemBlock(Properties properties, Kind kind, VoxelShape shape) {
         super(properties);
         this.kind = kind;
-        this.shape = shape;
+        this.shapes = Shapes.rotateHorizontal(shape);
+        registerDefaultState(stateDefinition.any().setValue(FACING, Direction.SOUTH));
     }
 
     /** Legt fest, wer von gesetzten Blöcken erfährt; ersetzt den bisherigen Hook. */
@@ -60,7 +72,17 @@ public final class EmblemBlock extends Block {
     }
 
     @Override
+    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
+        builder.add(FACING);
+    }
+
+    @Override
+    public BlockState getStateForPlacement(BlockPlaceContext context) {
+        return defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
+    }
+
+    @Override
     protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
-        return shape;
+        return shapes.get(state.getValue(FACING));
     }
 }

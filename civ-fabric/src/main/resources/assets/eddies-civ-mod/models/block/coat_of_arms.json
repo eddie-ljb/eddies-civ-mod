@@ -1,85 +1,118 @@
 {
+  "parent": "minecraft:block/block",
   "textures": {
-    "stone": "eddies-civ-mod:block/emblem_stone",
+    "pole": "eddies-civ-mod:block/emblem_pole",
     "base": "eddies-civ-mod:block/emblem_base",
     "gold": "eddies-civ-mod:block/emblem_gold",
-    "particle": "eddies-civ-mod:block/emblem_stone"
+    "particle": "eddies-civ-mod:block/emblem_pole"
   },
   "elements": [
     {
       "from": [
-        2,
-        0,
-        2
-      ],
-      "to": [
-        14,
-        3,
-        14
-      ],
-      "faces": {
-        "north": {
-          "texture": "#base"
-        },
-        "south": {
-          "texture": "#base"
-        },
-        "east": {
-          "texture": "#base"
-        },
-        "west": {
-          "texture": "#base"
-        },
-        "up": {
-          "texture": "#base"
-        },
-        "down": {
-          "texture": "#base"
-        }
-      }
-    },
-    {
-      "from": [
         4,
-        3,
-        4
+        0,
+        0
       ],
       "to": [
         12,
-        8,
-        12
+        1,
+        5
       ],
       "faces": {
         "north": {
-          "texture": "#stone"
+          "texture": "#base"
         },
         "south": {
-          "texture": "#stone"
+          "texture": "#base"
         },
         "east": {
-          "texture": "#stone"
+          "texture": "#base"
         },
         "west": {
-          "texture": "#stone"
+          "texture": "#base"
         },
         "up": {
-          "texture": "#stone"
+          "texture": "#base"
         },
         "down": {
-          "texture": "#stone"
+          "texture": "#base"
+        }
+      }
+    },
+    {
+      "from": [
+        7,
+        1,
+        0
+      ],
+      "to": [
+        9,
+        14,
+        2
+      ],
+      "faces": {
+        "north": {
+          "texture": "#pole"
+        },
+        "south": {
+          "texture": "#pole"
+        },
+        "east": {
+          "texture": "#pole"
+        },
+        "west": {
+          "texture": "#pole"
+        },
+        "up": {
+          "texture": "#pole"
+        },
+        "down": {
+          "texture": "#pole"
         }
       }
     },
     {
       "from": [
         3,
-        8,
-        3
+        14,
+        0.5
       ],
       "to": [
         13,
-        10,
-        13
+        16,
+        3
+      ],
+      "faces": {
+        "north": {
+          "texture": "#pole"
+        },
+        "south": {
+          "texture": "#pole"
+        },
+        "east": {
+          "texture": "#pole"
+        },
+        "west": {
+          "texture": "#pole"
+        },
+        "up": {
+          "texture": "#pole"
+        },
+        "down": {
+          "texture": "#pole"
+        }
+      }
+    },
+    {
+      "from": [
+        6.5,
+        14,
+        2.9
+      ],
+      "to": [
+        9.5,
+        14.4,
+        3.1
       ],
       "faces": {
         "north": {
