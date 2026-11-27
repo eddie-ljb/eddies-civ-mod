@@ -2,6 +2,10 @@ package de.etiennebader.civ.server.government;
 
 import de.etiennebader.civ.domain.actor.ActorRef;
 import de.etiennebader.civ.domain.government.Budget;
+import de.etiennebader.civ.domain.government.Coalition;
+import de.etiennebader.civ.domain.government.MinistryElection;
+import de.etiennebader.civ.domain.government.Portfolio;
+import de.etiennebader.civ.domain.government.Subsidy;
 import de.etiennebader.civ.domain.government.Government;
 import de.etiennebader.civ.domain.government.GovernmentRegistry;
 import de.etiennebader.civ.domain.government.HeadOfState;
@@ -47,6 +51,18 @@ final class GovernmentStore {
         boolean hasDraft;
         final Map<String, Long> draft = new LinkedHashMap<>();
         final Map<ActorRef, Boolean> votes = new LinkedHashMap<>();
+        int tolerance = 100;
+        boolean minority = true;
+        Optional<Coalition> coalition = Optional.empty();
+        List<PolityId> coalitionParties = new ArrayList<>();
+        boolean coalitionMinority;
+        Day coalitionDay = Day.of(0);
+        final List<Coalition.Item> agreement = new ArrayList<>();
+        final List<Subsidy> subsidies = new ArrayList<>();
+        final Map<String, Map<ActorRef, Boolean>> subsidyVotes = new LinkedHashMap<>();
+        final Map<String, Day> electionCloses = new LinkedHashMap<>();
+        final Map<String, List<ActorRef>> candidates = new LinkedHashMap<>();
+        final Map<String, Map<ActorRef, ActorRef>> ballots = new LinkedHashMap<>();
     }
 
     GovernmentRegistry load() {
@@ -69,10 +85,16 @@ final class GovernmentStore {
                         d.preparer = f[12];
                         d.last = f[13].isEmpty() ? Optional.empty() : Optional.of(Day.of(Long.parseLong(f[13])));
                         d.adoptedOn = f[14].isEmpty() ? Optional.empty() : Optional.of(Day.of(Long.parseLong(f[14])));
+                        if (f.length > 16) {
+                            d.tolerance = Integer.parseInt(f[15]);
+                            d.minority = Boolean.parseBoolean(f[16]);
+                        }
                     }
                     case "MIN" -> d.ministries.put(f[2], new Ministry(f[2], f[3], f[4], Selection.valueOf(f[5]),
                             f[6].isEmpty() ? Optional.empty() : Optional.of(ActorCodec.decode(f[6])), List.of(),
-                            Long.parseLong(f[7]), Long.parseLong(f[8]), Long.parseLong(f[9])));
+                            Long.parseLong(f[7]), Long.parseLong(f[8]), Long.parseLong(f[9]),
+                            f.length > 11 ? Portfolio.valueOf(f[10]) : Portfolio.guess(f[3]),
+                            f.length > 11 && Boolean.parseBoolean(f[11])));
                     case "STAFF" -> d.ministries.computeIfPresent(f[2], (k, m) -> m.hire(ActorCodec.decode(f[3])));
                     case "ADOPT" -> d.adopted.put(f[2], Long.parseLong(f[3]));
                     case "DRAFT" -> {
@@ -81,6 +103,29 @@ final class GovernmentStore {
                             d.draft.put(f[2], Long.parseLong(f[3]));
                         }
                     }
+                    case "COAL" -> {
+                        d.coalitionParties = new ArrayList<>();
+                        for (String party : f[2].split(",")) {
+                            if (!party.isEmpty()) {
+                                d.coalitionParties.add(pid(party));
+                            }
+                        }
+                        d.coalitionMinority = Boolean.parseBoolean(f[3]);
+                        d.coalitionDay = Day.of(Long.parseLong(f[4]));
+                    }
+                    case "AGR" -> d.agreement.add(new Coalition.Item(f[2], f[3], Boolean.parseBoolean(f[4])));
+                    case "SUB" -> d.subsidies.add(new Subsidy(f[2], f[3],
+                            f[4].isEmpty() ? Optional.empty() : Optional.of(ActorCodec.decode(f[4])), f[5],
+                            Long.parseLong(f[6]),
+                            f[7].isEmpty() ? Optional.empty() : Optional.of(Day.of(Long.parseLong(f[7]))),
+                            Long.parseLong(f[8]), Long.parseLong(f[9]), Boolean.parseBoolean(f[10])));
+                    case "SUBVOTE" -> d.subsidyVotes.computeIfAbsent(f[2], k -> new LinkedHashMap<>())
+                            .put(ActorCodec.decode(f[3]), Boolean.parseBoolean(f[4]));
+                    case "ELEC" -> d.electionCloses.put(f[2], Day.of(Long.parseLong(f[3])));
+                    case "CAND" -> d.candidates.computeIfAbsent(f[2], k -> new ArrayList<>())
+                            .add(ActorCodec.decode(f[3]));
+                    case "BALLOT" -> d.ballots.computeIfAbsent(f[2], k -> new LinkedHashMap<>())
+                            .put(ActorCodec.decode(f[3]), ActorCodec.decode(f[4]));
                     case "VOTE" -> d.votes.put(ActorCodec.decode(f[2]), Boolean.parseBoolean(f[3]));
                     default -> {
                     }
@@ -90,10 +135,17 @@ final class GovernmentStore {
             return GovernmentRegistry.empty();
         }
         Map<PolityId, Government.Snapshot> snapshots = new LinkedHashMap<>();
-        drafts.forEach((id, d) -> snapshots.put(id, new Government.Snapshot(d.head,
-                List.copyOf(d.ministries.values()), d.max, d.interval, d.approval, d.preparer,
-                new Budget(d.adopted, d.adoptedOn), d.hasDraft ? Optional.of(new Budget(d.draft, Optional.empty()))
-                : Optional.empty(), d.votes, d.last)));
+        drafts.forEach((id, d) -> {
+            Optional<Coalition> coalition = d.coalitionParties.isEmpty() ? Optional.empty()
+                    : Optional.of(new Coalition(d.coalitionParties, d.coalitionMinority, d.coalitionDay, d.agreement));
+            List<MinistryElection> elections = new ArrayList<>();
+            d.electionCloses.forEach((key, closes) -> elections.add(new MinistryElection(key, closes,
+                    d.candidates.getOrDefault(key, List.of()), d.ballots.getOrDefault(key, Map.of()))));
+            snapshots.put(id, new Government.Snapshot(d.head, List.copyOf(d.ministries.values()), d.max, d.interval,
+                    d.approval, d.preparer, new Budget(d.adopted, d.adoptedOn),
+                    d.hasDraft ? Optional.of(new Budget(d.draft, Optional.empty())) : Optional.empty(), d.votes,
+                    d.last, coalition, d.tolerance, d.minority, d.subsidies, d.subsidyVotes, elections));
+        });
         return GovernmentRegistry.restore(snapshots);
     }
 
@@ -110,11 +162,13 @@ final class GovernmentStore {
                     Boolean.toString(h.callsElections()), Integer.toString(g.maxMinistries()),
                     Integer.toString(g.budgetInterval()), Integer.toString(g.approvalPercent()), g.preparer(),
                     g.lastBudgetDay().map(d -> Long.toString(d.value())).orElse(""),
-                    g.adopted().adoptedOn().map(d -> Long.toString(d.value())).orElse("")));
+                    g.adopted().adoptedOn().map(d -> Long.toString(d.value())).orElse(""),
+                    Integer.toString(g.coalitionTolerance()), Boolean.toString(g.allowMinority())));
             for (Ministry m : g.ministries()) {
                 lines.add(String.join("\t", "MIN", p, m.key(), clean(m.name()), clean(m.mandate()),
                         m.selection().name(), m.minister().map(ActorCodec::encode).orElse(""),
-                        Long.toString(m.ministerWage()), Long.toString(m.staffWage()), Long.toString(m.etat())));
+                        Long.toString(m.ministerWage()), Long.toString(m.staffWage()), Long.toString(m.etat()),
+                        m.portfolio().name(), Boolean.toString(m.decrees())));
                 for (ActorRef employee : m.staff()) {
                     lines.add(String.join("\t", "STAFF", p, m.key(), ActorCodec.encode(employee)));
                 }
@@ -124,6 +178,28 @@ final class GovernmentStore {
                 lines.add("DRAFT\t" + p + "\t\t0");
                 draft.allocations().forEach((key, amount) -> lines.add("DRAFT\t" + p + "\t" + key + "\t" + amount));
             });
+            g.coalition().ifPresent(c -> {
+                lines.add(String.join("\t", "COAL", p, String.join(",", c.parties().stream()
+                        .map(party -> party.value().toString()).toList()), Boolean.toString(c.minority()),
+                        Long.toString(c.formedOn().value())));
+                c.agreement().forEach(item -> lines.add(String.join("\t", "AGR", p, clean(item.parameter()),
+                        clean(item.encodedValue()), Boolean.toString(item.done()))));
+            });
+            for (Subsidy sub : g.subsidies()) {
+                lines.add(String.join("\t", "SUB", p, sub.key(), clean(sub.name()),
+                        sub.recipient().map(ActorCodec::encode).orElse(""), sub.ministry(),
+                        Long.toString(sub.amount()), sub.until().map(d -> Long.toString(d.value())).orElse(""),
+                        Long.toString(sub.fullUpTo()), Long.toString(sub.taperUntil()),
+                        Boolean.toString(sub.active())));
+            }
+            g.subsidyVotes().forEach((key, votes) -> votes.forEach((voter, yes) -> lines.add(String.join("\t",
+                    "SUBVOTE", p, key, ActorCodec.encode(voter), Boolean.toString(yes)))));
+            for (MinistryElection e : g.elections()) {
+                lines.add(String.join("\t", "ELEC", p, e.ministry(), Long.toString(e.closesOn().value())));
+                e.candidates().forEach(c -> lines.add(String.join("\t", "CAND", p, e.ministry(), ActorCodec.encode(c))));
+                e.ballots().forEach((voter, c) -> lines.add(String.join("\t", "BALLOT", p, e.ministry(),
+                        ActorCodec.encode(voter), ActorCodec.encode(c))));
+            }
             g.votes().forEach((voter, yes) -> lines.add(String.join("\t", "VOTE", p, ActorCodec.encode(voter),
                     Boolean.toString(yes))));
         });

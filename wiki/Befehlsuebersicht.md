@@ -128,5 +128,13 @@ Benötigt den Rechte-Knoten `eddies-civ-mod:admin`, siehe [Installation und Konf
 | `/civ regierung ministerium lohn "<Name>" <Minister> <Angestellte>` | Tageslöhne |
 | `/civ regierung haushalt entwurf "<Name>" <Betrag>` | Etat im Entwurf setzen |
 | `/civ regierung haushalt abstimmen <true\|false>` / `schliessen` | Abstimmung und Beschluss |
+| `/civ regierung koalition bilden` / `entlassen` / `neuwahl` | Regierung bilden, entlassen, Neuwahlen anordnen (Oberhaupt) |
+| `/civ regierung koalition regeln <abstand> <minderheit>` | wie weit Koalitionspartner auseinanderliegen dürfen, Minderheitsregierung erlaubt |
+| `/civ regierung koalition vorhaben <Regelung> <Wert>` | Vorhaben im Koalitionsvertrag |
+| `/civ regierung ministerium bereich "<Name>" <finanzen\|inneres\|verteidigung\|wirtschaft\|kanzleramt\|frei>` | Handlungsbereich |
+| `/civ regierung ministerium vorschlag "<Name>" <Regelung> <Wert>` | Gesetzesvorschlag bzw. Verordnung des Ministers |
+| `/civ regierung ministerium verordnung "<Name>" <true\|false>` | Verordnungsrecht erlauben |
+| `/civ regierung foerderung anlegen "<Name>" "<Ministerium>" <Betrag> <alle\|Name> <Tage> [<voll bis> <Auslauf>]` | Förderung; auch `liste`, `beenden`, `abstimmen` |
+| `/civ regierung wahl ausrufen\|kandidieren\|waehlen "<Ministerium>" [Spieler]` | Volkswahl der Minister |
 
 Englisch: `/civ government ...`

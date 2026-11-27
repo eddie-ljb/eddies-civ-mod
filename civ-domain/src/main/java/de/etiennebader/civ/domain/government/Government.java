@@ -28,7 +28,9 @@ public final class Government {
     /** Gesamter Zustand zum Speichern und Wiederherstellen. */
     public record Snapshot(HeadOfState head, List<Ministry> ministries, int maxMinistries, int budgetInterval,
                            int approvalPercent, String preparer, Budget adopted, Optional<Budget> draft,
-                           Map<ActorRef, Boolean> votes, Optional<Day> lastBudgetDay) {
+                           Map<ActorRef, Boolean> votes, Optional<Day> lastBudgetDay, Optional<Coalition> coalition,
+                           int coalitionTolerance, boolean allowMinority, List<Subsidy> subsidies,
+                           Map<String, Map<ActorRef, Boolean>> subsidyVotes, List<MinistryElection> elections) {
     }
 
     /** Ein fälliger Lohn. */
@@ -45,6 +47,12 @@ public final class Government {
     private Optional<Budget> draft = Optional.empty();
     private final Map<ActorRef, Boolean> votes = new LinkedHashMap<>();
     private Optional<Day> lastBudgetDay = Optional.empty();
+    private Optional<Coalition> coalition = Optional.empty();
+    private int coalitionTolerance = 100;
+    private boolean allowMinority = true;
+    private final Map<String, Subsidy> subsidies = new LinkedHashMap<>();
+    private final Map<String, Map<ActorRef, Boolean>> subsidyVotes = new LinkedHashMap<>();
+    private final Map<String, MinistryElection> elections = new LinkedHashMap<>();
 
     public static Government restore(Snapshot s) {
         Government g = new Government();
@@ -58,12 +66,19 @@ public final class Government {
         g.draft = s.draft();
         g.votes.putAll(s.votes());
         g.lastBudgetDay = s.lastBudgetDay();
+        g.coalition = s.coalition();
+        g.coalitionTolerance = s.coalitionTolerance();
+        g.allowMinority = s.allowMinority();
+        s.subsidies().forEach(sub -> g.subsidies.put(sub.key(), sub));
+        s.subsidyVotes().forEach((key, v) -> g.subsidyVotes.put(key, new LinkedHashMap<>(v)));
+        s.elections().forEach(e -> g.elections.put(e.ministry(), e));
         return g;
     }
 
     public Snapshot snapshot() {
         return new Snapshot(head, ministries(), maxMinistries, budgetInterval, approvalPercent, preparer, adopted,
-                draft, Map.copyOf(votes), lastBudgetDay);
+                draft, Map.copyOf(votes), lastBudgetDay, coalition, coalitionTolerance, allowMinority,
+                List.copyOf(subsidies.values()), Map.copyOf(subsidyVotes), List.copyOf(elections.values()));
     }
 
     // ---------------------------------------------------------------- Oberhaupt
@@ -105,6 +120,8 @@ public final class Government {
     public void dissolve(String keyOrName) {
         Ministry ministry = require(keyOrName);
         ministries.remove(ministry.key());
+        elections.remove(ministry.key());
+        subsidies.values().removeIf(sub -> sub.ministry().equals(ministry.key()));
         if (preparer.equals(ministry.key())) {
             preparer = DEFAULT_PREPARER;
         }
@@ -244,6 +261,188 @@ public final class Government {
             }
         }
         return accepted;
+    }
+
+    // ---------------------------------------------------------------- Koalition
+
+    public Optional<Coalition> coalition() {
+        return coalition;
+    }
+
+    public int coalitionTolerance() {
+        return coalitionTolerance;
+    }
+
+    public boolean allowMinority() {
+        return allowMinority;
+    }
+
+    public void configureCoalitionRules(int tolerance, boolean minorityAllowed) {
+        if (tolerance < 0 || tolerance > 200) {
+            throw new GovernmentException(ErrorCode.INVALID_GOVERNMENT_VALUE, tolerance);
+        }
+        this.coalitionTolerance = tolerance;
+        this.allowMinority = minorityAllowed;
+    }
+
+    /** Setzt die Regierung ein: Koalition, und die Minister der Ministerien mit Ernennung laut Zuteilung. */
+    public void install(Coalition newCoalition, Map<String, ActorRef> ministers) {
+        this.coalition = Optional.of(newCoalition);
+        ministers.forEach((key, minister) -> {
+            Ministry ministry = ministries.get(key);
+            if (ministry != null && ministry.selection() == Selection.APPOINTMENT && !ministry.employs(minister)) {
+                ministries.put(key, ministry.withMinister(Optional.of(minister)));
+            }
+        });
+    }
+
+    /** Entlässt die Regierung: Koalition und alle ernannten Minister (gewählte bleiben im Amt). */
+    public void dismissGovernment() {
+        if (coalition.isEmpty()) {
+            throw new GovernmentException(ErrorCode.NO_COALITION);
+        }
+        coalition = Optional.empty();
+        for (Ministry ministry : ministries()) {
+            if (ministry.selection() == Selection.APPOINTMENT) {
+                ministries.put(ministry.key(), ministry.withMinister(Optional.empty()));
+            }
+        }
+    }
+
+    public void addAgreement(String parameter, String encodedValue) {
+        coalition = Optional.of(coalition.orElseThrow(() -> new GovernmentException(ErrorCode.NO_COALITION))
+                .withItem(parameter, encodedValue));
+    }
+
+    public void markAgreementDone(int index) {
+        coalition = Optional.of(coalition.orElseThrow(() -> new GovernmentException(ErrorCode.NO_COALITION))
+                .withDone(index));
+    }
+
+    // ---------------------------------------------------------------- Förderungen
+
+    public List<Subsidy> subsidies() {
+        return List.copyOf(subsidies.values());
+    }
+
+    public Optional<Subsidy> subsidy(String keyOrName) {
+        return Optional.ofNullable(subsidies.get(Ministry.keyOf(keyOrName)));
+    }
+
+    public Map<ActorRef, Boolean> subsidyVotes(String key) {
+        return Map.copyOf(subsidyVotes.getOrDefault(key, Map.of()));
+    }
+
+    public Subsidy addSubsidy(Subsidy subsidy) {
+        require(subsidy.ministry());
+        if (subsidies.containsKey(subsidy.key())) {
+            throw new GovernmentException(ErrorCode.SUBSIDY_EXISTS, subsidy.name());
+        }
+        subsidies.put(subsidy.key(), subsidy);
+        return subsidy;
+    }
+
+    public Subsidy requireSubsidy(String keyOrName) {
+        return subsidy(keyOrName).orElseThrow(() -> new GovernmentException(ErrorCode.UNKNOWN_SUBSIDY, keyOrName));
+    }
+
+    public void cancelSubsidy(String keyOrName) {
+        Subsidy subsidy = requireSubsidy(keyOrName);
+        subsidies.remove(subsidy.key());
+        subsidyVotes.remove(subsidy.key());
+    }
+
+    /**
+     * Stimme zu einer noch nicht beschlossenen Förderung; hat sie mehr als {@code approvalPercent} Prozent der
+     * {@code eligible} Stimmberechtigten, gilt sie ab sofort.
+     *
+     * @return ob die Förderung dadurch in Kraft getreten ist
+     */
+    public boolean voteSubsidy(String keyOrName, ActorRef voter, boolean inFavour, int eligible) {
+        Subsidy subsidy = requireSubsidy(keyOrName);
+        if (subsidy.active()) {
+            throw new GovernmentException(ErrorCode.SUBSIDY_ALREADY_ACTIVE, subsidy.name());
+        }
+        Map<ActorRef, Boolean> v = subsidyVotes.computeIfAbsent(subsidy.key(), k -> new LinkedHashMap<>());
+        v.put(voter, inFavour);
+        long yes = v.values().stream().filter(Boolean::booleanValue).count();
+        if (eligible > 0 && yes * 100 > (long) approvalPercent * eligible) {
+            subsidies.put(subsidy.key(), subsidy.activated());
+            subsidyVotes.remove(subsidy.key());
+            return true;
+        }
+        return false;
+    }
+
+    /** Entfernt abgelaufene Förderungen und unbeschlossene, die älter sind (ohne Mehrheit). */
+    public List<Subsidy> expireSubsidies(Day day, boolean dropPending) {
+        List<Subsidy> removed = new ArrayList<>();
+        for (Subsidy subsidy : subsidies()) {
+            boolean over = subsidy.active() ? subsidy.until().map(day::isAfter).orElse(false) : dropPending;
+            if (over) {
+                subsidies.remove(subsidy.key());
+                subsidyVotes.remove(subsidy.key());
+                removed.add(subsidy);
+            }
+        }
+        return removed;
+    }
+
+    /** Bucht einen gezahlten Förderbetrag vom Etat des zahlenden Ministeriums ab (höchstens dessen Rest). */
+    public long etatLeft(String ministryKey) {
+        return require(ministryKey).etat();
+    }
+
+    // ---------------------------------------------------------------- Ministerwahlen
+
+    public Optional<MinistryElection> election(String ministryKey) {
+        return Optional.ofNullable(elections.get(ministryKey));
+    }
+
+    public List<MinistryElection> elections() {
+        return List.copyOf(elections.values());
+    }
+
+    public MinistryElection callElection(String keyOrName, Day closesOn) {
+        Ministry ministry = require(keyOrName);
+        if (ministry.selection() != Selection.ELECTION) {
+            throw new GovernmentException(ErrorCode.NOT_ELECTED_OFFICE, ministry.name());
+        }
+        if (elections.containsKey(ministry.key())) {
+            throw new GovernmentException(ErrorCode.ELECTION_OPEN, ministry.name());
+        }
+        MinistryElection election = MinistryElection.call(ministry.key(), closesOn);
+        elections.put(ministry.key(), election);
+        return election;
+    }
+
+    private MinistryElection requireElection(String keyOrName) {
+        Ministry ministry = require(keyOrName);
+        return election(ministry.key()).orElseThrow(() -> new GovernmentException(ErrorCode.NO_MINISTRY_ELECTION,
+                ministry.name()));
+    }
+
+    public void stand(String keyOrName, ActorRef candidate) {
+        MinistryElection election = requireElection(keyOrName);
+        elections.put(election.ministry(), election.stand(candidate));
+    }
+
+    public void castBallot(String keyOrName, ActorRef voter, ActorRef candidate) {
+        MinistryElection election = requireElection(keyOrName);
+        elections.put(election.ministry(), election.cast(voter, candidate));
+    }
+
+    /** Schließt die Wahl; der Gewinner wird Minister (ohne Kandidaten bleibt das Amt, wie es ist). */
+    public Optional<ActorRef> closeElection(String keyOrName) {
+        MinistryElection election = requireElection(keyOrName);
+        elections.remove(election.ministry());
+        Optional<ActorRef> winner = election.winner();
+        winner.ifPresent(w -> {
+            Ministry ministry = require(election.ministry());
+            Ministry cleaned = ministry.staff().contains(w) ? ministry.fire(w) : ministry;
+            ministries.put(cleaned.key(), cleaned.withMinister(Optional.of(w)));
+        });
+        return winner;
     }
 
     // ---------------------------------------------------------------- Löhne

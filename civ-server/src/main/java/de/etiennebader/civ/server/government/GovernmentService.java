@@ -63,6 +63,7 @@ public final class GovernmentService {
     private final boolean villagerPolitics;
     private final GovernmentStore store;
     private final GovernmentRegistry registry;
+    private final GovernmentPolitics politics;
 
     public GovernmentService(CivApplication app, Calendar calendar, PlayerDirectory players, Texts texts,
                              Announcements announcements, boolean villagerPolitics, Optional<Path> file) {
@@ -75,6 +76,20 @@ public final class GovernmentService {
         this.villagerPolitics = villagerPolitics;
         this.store = new GovernmentStore(file);
         this.registry = store.load();
+        this.politics = new GovernmentPolitics(this, app, calendar, players, texts, announcements, villagerPolitics);
+    }
+
+    /** Koalitionen, Gesetzesvorschläge der Minister, Förderungen und Ministerwahlen. */
+    public GovernmentPolitics politics() {
+        return politics;
+    }
+
+    void store() {
+        store.save(registry);
+    }
+
+    boolean villagerPolitics() {
+        return villagerPolitics;
     }
 
     public GovernmentRegistry registry() {
@@ -105,6 +120,7 @@ public final class GovernmentService {
                     m.minister().map(this::nameOf).orElse("-"), m.staff().size(), m.etat(),
                     g.adopted().allocationOf(m.key())));
         }
+        lines.addAll(politics.overviewLines(town.get(), g));
         lines.add(g.draft().map(draft -> Message.of(MessageKey.GOV_DRAFT_LINE, draft.total(),
                         g.votes().values().stream().filter(Boolean::booleanValue).count(), g.votes().size()))
                 .orElseGet(() -> Message.of(MessageKey.GOV_BUDGET_LINE, g.adopted().total(),
@@ -281,6 +297,7 @@ public final class GovernmentService {
         boolean accepted = g.closeBudget(voters(town).size(), available, day);
         Message result = Message.of(accepted ? MessageKey.GOV_BUDGET_ADOPTED : MessageKey.GOV_BUDGET_REJECTED,
                 town.name().toString(), g.adopted().total());
+        g.expireSubsidies(day, true);
         announcements.add(Announcement.toTown(town.id(), result));
         return result;
     }
@@ -301,6 +318,7 @@ public final class GovernmentService {
                 continue;
             }
             Government g = registry.of(id);
+            politics.beforeWages(town.get(), g, day);
             villagerHead(town.get(), g, day);
             if (g.draft().isPresent() && g.budgetDue(day)) {
                 try {
@@ -315,6 +333,7 @@ public final class GovernmentService {
                     g.spend(wage.ministry(), wage.amount());
                 }
             }
+            politics.paySubsidies(town.get(), g, day);
             changed = true;
         }
         if (changed) {
@@ -347,10 +366,14 @@ public final class GovernmentService {
         }
     }
 
-    private boolean pay(PolityView town, ActorRef to, long amount, Day day) {
+    boolean pay(PolityView town, ActorRef to, long amount, Day day) {
+        return pay(town, to, amount, TransferReason.SALARY, day);
+    }
+
+    boolean pay(PolityView town, ActorRef to, long amount, TransferReason reason, Day day) {
         try {
             app.transferFunds().execute(new TransferFunds.Command(town.asActor(), to,
-                    Money.of(amount, town.currency()), TransferReason.WAGE, day));
+                    Money.of(amount, town.currency()), reason, day));
             return true;
         } catch (DomainException e) {
             return false;
@@ -359,24 +382,24 @@ public final class GovernmentService {
 
     // ------------------------------------------------------------------ Hilfen
 
-    private interface Action {
+    interface Action {
         Message run(PolityView town, Government government);
     }
 
-    private interface Permission {
+    interface Permission {
         boolean allows(PolityView town, Government government);
     }
 
-    private Reply asHead(Caller caller, Action action) {
+    Reply asHead(Caller caller, Action action) {
         return as(caller, (town, g) -> town.holds(caller.player(), Office.MAYOR), action);
     }
 
-    private Reply asHeadOrMinister(Caller caller, String ministry, Action action) {
+    Reply asHeadOrMinister(Caller caller, String ministry, Action action) {
         return as(caller, (town, g) -> town.holds(caller.player(), Office.MAYOR)
                 || g.isMinister(caller.player(), ministry), action);
     }
 
-    private Reply as(Caller caller, Permission permission, Action action) {
+    Reply as(Caller caller, Permission permission, Action action) {
         Optional<PolityView> town = townOf(caller);
         if (town.isEmpty()) {
             return Reply.failure(Message.of(MessageKey.GOV_NO_TOWN));
@@ -394,12 +417,12 @@ public final class GovernmentService {
         }
     }
 
-    private boolean canPrepare(Caller caller, PolityView town, Government g) {
+    boolean canPrepare(Caller caller, PolityView town, Government g) {
         return town.holds(caller.player(), Office.MAYOR) || g.isMinister(caller.player(), g.preparer());
     }
 
     /** Stimmberechtigt: die Mitglieder des Parlaments; gibt es keines, das Oberhaupt. */
-    private Set<ActorRef> voters(PolityView town) {
+    Set<ActorRef> voters(PolityView town) {
         Set<ActorRef> voters = new LinkedHashSet<>();
         Parliament parliament = town.parliament();
         if (parliament.seated()) {
@@ -410,22 +433,25 @@ public final class GovernmentService {
         return voters;
     }
 
-    private long balance(PolityView town) {
+    long balance(PolityView town) {
         return queries.ledger().balanceOf(town.asActor(), town.currency()).amount();
     }
 
-    private Optional<PolityView> townOf(Caller caller) {
+    Optional<PolityView> townOf(Caller caller) {
         return queries.municipalityOf(caller.player());
     }
 
-    private String nameOf(ActorRef actor) {
+    String nameOf(ActorRef actor) {
         if (actor instanceof PlayerRef player) {
             return players.nameOf(player).orElse("?");
+        }
+        if (actor instanceof de.etiennebader.civ.domain.actor.PolityRef polity) {
+            return queries.polity(polity.id()).map(found -> found.name().toString()).orElse("?");
         }
         return "Dorfbewohner";
     }
 
-    private static Message yesNo(boolean value) {
+    static Message yesNo(boolean value) {
         return Message.of(value ? MessageKey.GOV_YES : MessageKey.GOV_NO);
     }
 }

@@ -2,7 +2,10 @@ package de.etiennebader.civ.server.government;
 
 import de.etiennebader.civ.domain.actor.PlayerRef;
 import de.etiennebader.civ.domain.government.Government;
+import de.etiennebader.civ.domain.government.Portfolio;
 import de.etiennebader.civ.domain.government.Selection;
+import de.etiennebader.civ.domain.law.StandardParameters;
+import de.etiennebader.civ.domain.shared.Day;
 import de.etiennebader.civ.domain.shared.PlayerId;
 import de.etiennebader.civ.domain.shared.SeededIdGenerator;
 import de.etiennebader.civ.domain.territory.BlockPosition;
@@ -71,5 +74,77 @@ class GovernmentServiceTest {
         assertTrue(g.lastBudgetDay().isPresent());
         assertFalse(government.draft(a(), "Finanzministerium", 1_000_000).success() && government.closeBudget(a()).success(),
                 "Haushalt über der Kasse wird nicht beschlossen");
+    }
+
+    @Test
+    @DisplayName("Minister: Vorschlag nur im Bereich, Verordnung nur mit Erlaubnis")
+    void ministerDecrees() {
+        found();
+        var politics = server.government().politics();
+        var government = server.government();
+        assertTrue(government.createMinistry(a(), "Finanzministerium", "", Selection.APPOINTMENT).success());
+        assertTrue(government.appoint(a(), "Finanzministerium", "Alice").success());
+        var town = server.queries().polityNamed("Nordhain").orElseThrow();
+        long before = server.queries().effectiveLaws(town).valueOf(StandardParameters.INCOME_TAX_PERCENT);
+        assertFalse(politics.propose(a(), "Finanzministerium", "pvp_allowed", "false").success(), "falscher Bereich");
+        assertFalse(politics.propose(a(), "Finanzministerium", "gibts_nicht", "1").success());
+        assertFalse(politics.setDecrees(b(), "Finanzministerium", true).success());
+        assertTrue(politics.setDecrees(a(), "Finanzministerium", true).success());
+        assertTrue(politics.propose(a(), "Finanzministerium", "income_tax_percent", "7").success());
+        long after = server.queries().effectiveLaws(server.queries().polityNamed("Nordhain").orElseThrow())
+                .valueOf(StandardParameters.INCOME_TAX_PERCENT);
+        assertEquals(7, after);
+        assertTrue(before != 7);
+        assertTrue(politics.setPortfolio(a(), "Finanzministerium", Portfolio.FREE).success());
+        assertFalse(politics.propose(a(), "Finanzministerium", "income_tax_percent", "9").success());
+    }
+
+    @Test
+    @DisplayName("Förderungen anlegen, auflisten und beenden; Empfänger müssen existieren")
+    void subsidies() {
+        found();
+        var politics = server.government().politics();
+        assertTrue(server.government().createMinistry(a(), "Soziales", "", Selection.APPOINTMENT).success());
+        assertFalse(politics.createSubsidy(b(), "Kindergeld", "Soziales", 5, "alle", 0, 0, 0).success());
+        assertFalse(politics.createSubsidy(a(), "Kindergeld", "Soziales", 5, "Niemand", 0, 0, 0).success());
+        assertFalse(politics.createSubsidy(a(), "Kindergeld", "Soziales", 0, "alle", 0, 0, 0).success());
+        assertTrue(politics.createSubsidy(a(), "Kindergeld", "Soziales", 5, "alle", 10, 100, 300).success());
+        assertFalse(politics.createSubsidy(a(), "Kindergeld", "Soziales", 5, "alle", 0, 0, 0).success(), "doppelt");
+        assertTrue(politics.createSubsidy(a(), "Hilfe fuer Bob", "Soziales", 5, "Bob", 0, 0, 0).success());
+        assertTrue(politics.listSubsidies(a()).success());
+        assertFalse(politics.cancelSubsidy(b(), "Kindergeld").success());
+        assertTrue(politics.cancelSubsidy(a(), "Kindergeld").success());
+        server.government().endOfDay(Day.of(1));
+    }
+
+    @Test
+    @DisplayName("Ministerwahl: Kandidatur, Stimme, Auszählung am Ende")
+    void ministerElection() {
+        found();
+        var politics = server.government().politics();
+        assertTrue(server.government().createMinistry(a(), "Bildung", "Schulen", Selection.ELECTION).success());
+        assertTrue(server.government().createMinistry(a(), "Finanzen", "", Selection.APPOINTMENT).success());
+        assertFalse(politics.callElection(a(), "Finanzen").success(), "ernannt, nicht gewählt");
+        assertFalse(politics.callElection(b(), "Bildung").success());
+        assertTrue(politics.callElection(a(), "Bildung").success());
+        assertFalse(politics.callElection(a(), "Bildung").success(), "läuft schon");
+        assertFalse(politics.castBallot(a(), "Bildung", "Alice").success(), "noch kein Kandidat");
+        assertTrue(politics.stand(a(), "Bildung").success());
+        assertTrue(politics.castBallot(a(), "Bildung", "Alice").success());
+        server.government().endOfDay(Day.of(1_000));
+        var government = server.government().registry().of(server.queries().polityNamed("Nordhain").orElseThrow().id());
+        assertTrue(government.isMinister(alice, "Bildung"));
+        assertTrue(government.election("bildung").isEmpty());
+    }
+
+    @Test
+    @DisplayName("Regierungsbildung braucht ein Parlament")
+    void formationNeedsParliament() {
+        found();
+        assertFalse(server.government().politics().form(a()).success());
+        assertFalse(server.government().politics().form(b()).success());
+        assertTrue(server.government().politics().setCoalitionRules(a(), 60, false).success());
+        assertFalse(server.government().politics().addAgreement(a(), "income_tax_percent", "5").success(),
+                "ohne Regierung kein Koalitionsvertrag");
     }
 }

@@ -230,6 +230,31 @@ public enum ErrorCode {
     /** Der Etat reicht nicht. Argumente: Ministerium. */
     ETAT_EXHAUSTED,
 
+    /** Das Ministerium hat dafür keinen Handlungsbereich. Argumente: Ministerium. */
+    NOT_IN_PORTFOLIO,
+    /** Es gibt keine Regierung. Argumente: keine. */
+    NO_COALITION,
+    /** Argumente: Name. */
+    UNKNOWN_SUBSIDY,
+    /** Argumente: Name. */
+    SUBSIDY_EXISTS,
+    /** Die Förderung gilt schon. Argumente: Name. */
+    SUBSIDY_ALREADY_ACTIVE,
+    /** Das Amt wird nicht gewählt. Argumente: Ministerium. */
+    NOT_ELECTED_OFFICE,
+    /** Es läuft schon eine Wahl. Argumente: Ministerium. */
+    ELECTION_OPEN,
+    /** Es läuft keine Wahl. Argumente: Ministerium. */
+    NO_MINISTRY_ELECTION,
+    /** Ein Parlament ist nötig. Argumente: keine. */
+    PARLIAMENT_REQUIRED,
+    /** Unbekannte Regelung. Argumente: Schlüssel. */
+    UNKNOWN_PARAMETER,
+    /** Der Minister darf das nicht per Verordnung ändern. Argumente: Schlüssel. */
+    NO_DECREE,
+    /** Kein Spieler, keine Firma und keine Gemeinde mit diesem Namen. Argumente: Name. */
+    UNKNOWN_RECIPIENT,
+
     // Krieg
     /** Argumente: Angreifer, Verteidiger. */
     WAR_ALREADY_ONGOING,

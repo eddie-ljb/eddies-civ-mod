@@ -21,9 +21,12 @@ import java.util.Optional;
  * @param ministerWage Tagesgehalt des Ministers
  * @param staffWage    Tagesgehalt je Angestelltem
  * @param etat         noch verfügbarer Etat dieser Haushaltsperiode
+ * @param portfolio    Handlungsbereich für Gesetzesvorschläge
+ * @param decrees      ob der Minister in seinem Bereich per Verordnung entscheiden darf
  */
 public record Ministry(String key, String name, String mandate, Selection selection, Optional<ActorRef> minister,
-                       List<ActorRef> staff, long ministerWage, long staffWage, long etat) {
+                       List<ActorRef> staff, long ministerWage, long staffWage, long etat, Portfolio portfolio,
+                       boolean decrees) {
 
     public static final int MAX_NAME = 40;
     public static final int MAX_MANDATE = 200;
@@ -35,6 +38,7 @@ public record Ministry(String key, String name, String mandate, Selection select
         Objects.requireNonNull(mandate, "mandate");
         Objects.requireNonNull(selection, "selection");
         Objects.requireNonNull(minister, "minister");
+        Objects.requireNonNull(portfolio, "portfolio");
         name = name.strip();
         mandate = mandate.strip();
         if (!key.equals(keyOf(key)) || key.isEmpty() || name.isEmpty() || name.length() > MAX_NAME
@@ -50,7 +54,8 @@ public record Ministry(String key, String name, String mandate, Selection select
     }
 
     public static Ministry create(String name, String mandate, Selection selection) {
-        return new Ministry(keyOf(name), name, mandate, selection, Optional.empty(), List.of(), 0, 0, 0);
+        return new Ministry(keyOf(name), name, mandate, selection, Optional.empty(), List.of(), 0, 0, 0,
+                Portfolio.guess(name), false);
     }
 
     public boolean employs(ActorRef actor) {
@@ -58,23 +63,36 @@ public record Ministry(String key, String name, String mandate, Selection select
     }
 
     public Ministry withMandate(String newMandate) {
-        return new Ministry(key, name, newMandate, selection, minister, staff, ministerWage, staffWage, etat);
+        return new Ministry(key, name, newMandate, selection, minister, staff, ministerWage, staffWage, etat, portfolio, decrees);
     }
 
     public Ministry withSelection(Selection newSelection) {
-        return new Ministry(key, name, mandate, newSelection, minister, staff, ministerWage, staffWage, etat);
+        return new Ministry(key, name, mandate, newSelection, minister, staff, ministerWage, staffWage, etat, portfolio, decrees);
     }
 
     public Ministry withMinister(Optional<ActorRef> newMinister) {
-        return new Ministry(key, name, mandate, selection, newMinister, staff, ministerWage, staffWage, etat);
+        return new Ministry(key, name, mandate, selection, newMinister, staff, ministerWage, staffWage, etat, portfolio, decrees);
     }
 
     public Ministry withWages(long newMinisterWage, long newStaffWage) {
-        return new Ministry(key, name, mandate, selection, minister, staff, newMinisterWage, newStaffWage, etat);
+        return new Ministry(key, name, mandate, selection, minister, staff, newMinisterWage, newStaffWage, etat, portfolio, decrees);
     }
 
     public Ministry withEtat(long newEtat) {
-        return new Ministry(key, name, mandate, selection, minister, staff, ministerWage, staffWage, newEtat);
+        return new Ministry(key, name, mandate, selection, minister, staff, ministerWage, staffWage, newEtat, portfolio, decrees);
+    }
+
+    public Ministry withPortfolio(Portfolio newPortfolio) {
+        return new Ministry(key, name, mandate, selection, minister, staff, ministerWage, staffWage, etat, newPortfolio,
+                newPortfolio.decreeable() && decrees);
+    }
+
+    public Ministry withDecrees(boolean allowed) {
+        if (allowed && !portfolio.decreeable()) {
+            throw new GovernmentException(ErrorCode.NOT_IN_PORTFOLIO, name);
+        }
+        return new Ministry(key, name, mandate, selection, minister, staff, ministerWage, staffWage, etat, portfolio,
+                allowed);
     }
 
     public Ministry hire(ActorRef employee) {
@@ -86,7 +104,7 @@ public record Ministry(String key, String name, String mandate, Selection select
         }
         List<ActorRef> next = new ArrayList<>(staff);
         next.add(employee);
-        return new Ministry(key, name, mandate, selection, minister, next, ministerWage, staffWage, etat);
+        return new Ministry(key, name, mandate, selection, minister, next, ministerWage, staffWage, etat, portfolio, decrees);
     }
 
     public Ministry fire(ActorRef employee) {
@@ -95,6 +113,6 @@ public record Ministry(String key, String name, String mandate, Selection select
         }
         List<ActorRef> next = new ArrayList<>(staff);
         next.remove(employee);
-        return new Ministry(key, name, mandate, selection, minister, next, ministerWage, staffWage, etat);
+        return new Ministry(key, name, mandate, selection, minister, next, ministerWage, staffWage, etat, portfolio, decrees);
     }
 }
