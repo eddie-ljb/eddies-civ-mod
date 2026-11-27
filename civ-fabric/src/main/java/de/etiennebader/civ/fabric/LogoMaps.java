@@ -72,6 +72,70 @@ final class LogoMaps {
         return Optional.of(stack(id.id()));
     }
 
+    /**
+     * Die Karte mit dem Bild, auf die ganze Fläche gestreckt (ohne Ränder), damit es als Flaggentuch, Wappenschild oder
+     * Plakat ein Bauteil ganz ausfüllt.
+     */
+    Optional<ItemStack> filled(ServerLevel level, Path imagesDirectory, String hash) {
+        return cached(level, Optional.of(imagesDirectory), hash + "#fill", () -> {
+            try {
+                BufferedImage image = ImageIO.read(imagesDirectory.resolve(hash + ".png").toFile());
+                return image == null ? null : stretch(image);
+            } catch (IOException | RuntimeException e) {
+                return null;
+            }
+        });
+    }
+
+    /** Eine einfarbige Karte, z. B. für leere oder einfarbige Flaggen. */
+    ItemStack solid(ServerLevel level, Optional<Path> imagesDirectory, int rgb) {
+        return cached(level, imagesDirectory, String.format("solid#%06x", rgb & 0xFFFFFF), () -> {
+            byte[] colors = new byte[SIZE * SIZE];
+            java.util.Arrays.fill(colors, nearest(rgb & 0xFFFFFF));
+            return colors;
+        }).orElseThrow();
+    }
+
+    private Optional<ItemStack> cached(ServerLevel level, Optional<Path> directory, String key,
+                                       java.util.function.Supplier<byte[]> colors) {
+        directory.ifPresent(this::loadIndex);
+        Integer known = mapIds.get(key);
+        if (known != null && level.getMapData(new MapId(known)) != null) {
+            return Optional.of(stack(known));
+        }
+        byte[] data = colors.get();
+        if (data == null) {
+            return Optional.empty();
+        }
+        MapId id = level.getFreeMapId();
+        MapItemSavedData saved = MapItemSavedData.createFresh(0, 0, (byte) 0, false, false, level.dimension()).locked();
+        saved.colors = data;
+        level.setMapData(id, saved);
+        if (directory.isPresent()) {
+            mapIds.put(key, id.id());
+            saveIndex();
+        }
+        return Optional.of(stack(id.id()));
+    }
+
+    private static byte[] stretch(BufferedImage source) {
+        BufferedImage scaled = new BufferedImage(SIZE, SIZE, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D graphics = scaled.createGraphics();
+        graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        graphics.drawImage(source, 0, 0, SIZE, SIZE, null);
+        graphics.dispose();
+        byte[] colors = new byte[SIZE * SIZE];
+        Map<Integer, Byte> cache = new HashMap<>();
+        for (int y = 0; y < SIZE; y++) {
+            for (int x = 0; x < SIZE; x++) {
+                int argb = scaled.getRGB(x, y);
+                colors[y * SIZE + x] = (argb >>> 24) < 128 ? nearest(0xFFFFFF)
+                        : cache.computeIfAbsent(argb & 0xFFFFFF, LogoMaps::nearest);
+            }
+        }
+        return colors;
+    }
+
     private static ItemStack stack(int id) {
         ItemStack stack = new ItemStack(Items.FILLED_MAP);
         stack.set(DataComponents.MAP_ID, new MapId(id));

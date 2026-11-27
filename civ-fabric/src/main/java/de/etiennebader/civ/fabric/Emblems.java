@@ -9,6 +9,7 @@ import de.etiennebader.civ.fabric.content.EmblemBlock;
 import de.etiennebader.civ.fabric.content.PosterDisplays;
 import de.etiennebader.civ.server.CivServer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
@@ -20,13 +21,13 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Display;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.item.BannerItem;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import org.joml.Vector3f;
 
@@ -105,7 +106,7 @@ public final class Emblems {
         }
         BlockPosition position = Players.position(level, pos);
         if (kind != EmblemBlock.Kind.COLUMN) {
-            show(level, pos, kind, styleOf(stack), civ.get());
+            show(level, pos, level.getBlockState(pos), kind, styleOf(stack), civ.get());
         }
         ServerPlayer player = placer instanceof ServerPlayer found ? found : null;
         switch (kind) {
@@ -133,22 +134,50 @@ public final class Emblems {
 
     // ---- Anzeige ----
 
-    private void show(ServerLevel level, BlockPos pos, EmblemBlock.Kind kind, String style, CivServer civ) {
-        remove(level, pos, kind);
-        Optional<ItemStack> shown = displayStack(level, kind, style, civ);
-        if (shown.isEmpty()) {
-            return;
+    /**
+     * Wo das Bild am Block hängt, im Modell nach Süden (Vorderseite +z) in Pixeln vom Blockursprung, und wie groß es
+     * ist (in Blöcken): Flaggentuch am Mast, Wappenschild vor dem Pfosten, Plakat im Rahmen.
+     */
+    private record Layout(double x, double y, double z, float width, float height) {
+    }
+
+    private static Layout layout(EmblemBlock.Kind kind) {
+        return switch (kind) {
+            case FLAG -> new Layout(9, 10, 8, 0.75F, 0.5F);
+            case COAT_OF_ARMS -> new Layout(8, 7.5, 3.2, 0.625F, 0.8125F);
+            default -> new Layout(8, 9.5, 9.05, 0.5F, 0.6875F);
+        };
+    }
+
+    private void show(ServerLevel level, BlockPos pos, BlockState state, EmblemBlock.Kind kind, String style,
+                      CivServer civ) {
+        remove(level, pos);
+        Direction facing = state.getValue(EmblemBlock.FACING);
+        Layout layout = layout(kind);
+        // Vom Modell (nach Süden) in die Blickrichtung drehen: je Vierteldrehung im Uhrzeigersinn (dx, dz) -> (-dz, dx).
+        double dx = layout.x() - 8;
+        double dz = layout.z() - 8;
+        for (int turns = Direction.SOUTH.get2DDataValue(); turns != facing.get2DDataValue(); turns = (turns + 1) % 4) {
+            double rotated = -dz;
+            dz = dx;
+            dx = rotated;
         }
         Display.ItemDisplay display = new Display.ItemDisplay(EntityTypes.ITEM_DISPLAY, level);
-        display.setPos(pos.getX() + 0.5, pos.getY() + height(kind), pos.getZ() + 0.5);
-        shown.get().set(DataComponents.CUSTOM_DATA, CustomData.of(tagOf(style)));
-        display.getSlot(0).set(shown.get());
-        display.setBillboardConstraints(Display.BillboardConstraints.VERTICAL);
-        float scale = scale(kind);
-        display.setTransformation(new Transformation(null, null, new Vector3f(scale, scale, scale), null));
+        display.setPos(pos.getX() + 0.5 + dx / 16, pos.getY() + layout.y() / 16, pos.getZ() + 0.5 + dz / 16);
+        display.setYRot(facing.toYRot());
+        ItemStack shown = displayStack(level, kind, style, civ);
+        shown.set(DataComponents.CUSTOM_DATA, CustomData.of(tagOf(style)));
+        display.getSlot(0).set(shown);
+        display.setTransformation(new Transformation(null, null,
+                new Vector3f(layout.width(), layout.height(), 1.0F), null));
         display.setViewRange(1.5F);
         display.addTag(TAG);
+        display.addTag(tagAt(pos));
         level.addFreshEntity(display);
+    }
+
+    private static String tagAt(BlockPos pos) {
+        return TAG + "_" + pos.getX() + "_" + pos.getY() + "_" + pos.getZ();
     }
 
     private static CompoundTag tagOf(String style) {
@@ -157,55 +186,38 @@ public final class Emblems {
         return tag;
     }
 
-    /** Das, was über dem Block schwebt: Bildkarte, Banner in der Farbe oder das leere Muster der Art. */
-    private Optional<ItemStack> displayStack(ServerLevel level, EmblemBlock.Kind kind, String style, CivServer civ) {
-        if (style.startsWith("image:")) {
-            Optional<Path> images = civ.imagesDirectory();
-            if (images.isPresent()) {
-                Optional<ItemStack> map = host.logoMaps().map(level, images.get(), style.substring("image:".length()));
-                if (map.isPresent()) {
-                    return map;
-                }
+    /**
+     * Das Bild des Zeichens als Karte, die ihre Fläche ganz ausfüllt: das hochgeladene PNG (gestreckt) oder eine
+     * einfarbige Fläche in der gewählten Farbe bzw. dem Weiß der leeren Art.
+     */
+    private ItemStack displayStack(ServerLevel level, EmblemBlock.Kind kind, String style, CivServer civ) {
+        Optional<Path> images = civ.imagesDirectory();
+        if (style.startsWith("image:") && images.isPresent()) {
+            Optional<ItemStack> map = host.logoMaps().filled(level, images.get(), style.substring("image:".length()));
+            if (map.isPresent()) {
+                return map.get();
             }
             // Die Bilddatei ist fort (Upload ersetzt): wie ein leeres Zeichen zeigen statt nichts.
         }
-        if (style.startsWith("color:")) {
-            return Optional.of(new ItemStack(banner(DyeColor.byName(style.substring("color:".length()), DyeColor.WHITE))));
-        }
-        return Optional.of(new ItemStack(switch (kind) {
-            case COAT_OF_ARMS -> Items.SHIELD;
-            case POSTER -> Items.PAPER;
-            default -> banner(DyeColor.WHITE);
-        }));
-    }
-
-    private static Item banner(DyeColor color) {
-        return Items.BANNER.asList().stream()
-                .filter(candidate -> candidate instanceof BannerItem item && item.getColor() == color)
-                .findFirst().orElse(Items.BANNER.white());
-    }
-
-    private static double height(EmblemBlock.Kind kind) {
-        return switch (kind) {
-            case FLAG -> 1.4;
-            case COAT_OF_ARMS -> 1.1;
-            default -> 2.4;
+        int rgb = switch (kind) {
+            case COAT_OF_ARMS -> 0xC8C8D0;
+            case POSTER -> 0xF0EBD8;
+            default -> 0xF5F5F5;
         };
+        if (style.startsWith("color:")) {
+            rgb = DyeColor.byName(style.substring("color:".length()), DyeColor.WHITE).getMapColor().col;
+        }
+        return host.logoMaps().solid(level, images, rgb);
     }
 
-    private static float scale(EmblemBlock.Kind kind) {
-        return kind == EmblemBlock.Kind.POSTER ? 1.5F : 1.0F;
+    private List<Display.ItemDisplay> displaysAt(ServerLevel level, BlockPos pos) {
+        String tag = tagAt(pos);
+        return level.getEntitiesOfClass(Display.ItemDisplay.class, new AABB(pos).inflate(1.0),
+                display -> display.entityTags().contains(tag));
     }
 
-    private List<Display.ItemDisplay> displaysAt(ServerLevel level, BlockPos pos, EmblemBlock.Kind kind) {
-        double y = pos.getY() + height(kind);
-        return level.getEntitiesOfClass(Display.ItemDisplay.class, new AABB(pos.getX() + 0.4, y - 0.2,
-                        pos.getZ() + 0.4, pos.getX() + 0.6, y + 0.2, pos.getZ() + 0.6),
-                display -> display.entityTags().contains(TAG));
-    }
-
-    private void remove(ServerLevel level, BlockPos pos, EmblemBlock.Kind kind) {
-        displaysAt(level, pos, kind).forEach(Display.ItemDisplay::discard);
+    private void remove(ServerLevel level, BlockPos pos) {
+        displaysAt(level, pos).forEach(Display.ItemDisplay::discard);
     }
 
     // ---- Abbauen und Aufräumen ----
@@ -227,7 +239,7 @@ public final class Emblems {
         if (kind == EmblemBlock.Kind.COLUMN) {
             return;
         }
-        List<Display.ItemDisplay> shown = displaysAt(level, pos, kind);
+        List<Display.ItemDisplay> shown = displaysAt(level, pos);
         String style = shown.isEmpty() ? "blank" : styleOf(shown.getFirst().getSlot(0).get() == null
                 ? ItemStack.EMPTY : shown.getFirst().getSlot(0).get());
         shown.forEach(Display.ItemDisplay::discard);
@@ -253,8 +265,7 @@ public final class Emblems {
             Block expected = emblem.kind() == Emblem.Kind.FLAG ? content.emblems().flag() : content.emblems().coatOfArms();
             if (!level.getBlockState(pos).is(expected)) {
                 civ.civic().emblemRemoved(position);
-                displaysAt(level, pos, emblem.kind() == Emblem.Kind.FLAG
-                        ? EmblemBlock.Kind.FLAG : EmblemBlock.Kind.COAT_OF_ARMS).forEach(Display.ItemDisplay::discard);
+                remove(level, pos);
             }
         }
     }
