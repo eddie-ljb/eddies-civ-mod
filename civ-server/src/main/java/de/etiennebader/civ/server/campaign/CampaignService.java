@@ -253,6 +253,41 @@ public final class CampaignService {
         return new PosterLabel(poster.position(), lines, active);
     }
 
+    /**
+     * Dorfbewohner kommen an einem Plakat vorbei und lesen es (höchstens einmal am Tag je Dorfbewohner). Nur Plakate, die
+     * schon werben, wirken.
+     *
+     * @return wie viele es heute zum ersten Mal gelesen haben
+     */
+    public int villagersRead(java.util.Collection<PersonRef> villagers, BlockPosition position) {
+        Optional<Poster> found = queries.polities().stream().flatMap(polity -> polity.posters().stream())
+                .filter(poster -> poster.position().equals(position)).findFirst();
+        if (found.isEmpty() || !label(found.get()).active()) {
+            return 0;
+        }
+        ActorRef subject = found.get().subject();
+        Platform topic = Platform.NONE;
+        if (subject instanceof PolityRef party) {
+            topic = queries.polity(party.id()).flatMap(PolityView::partyProfile).map(profile -> profile.platform())
+                    .orElse(Platform.NONE);
+        } else {
+            for (PolityView electing : electingFor(subject)) {
+                for (Election election : electing.elections()) {
+                    if (election.isCandidate(subject) && election.platformOf(subject) != Platform.NONE) {
+                        topic = election.platformOf(subject);
+                    }
+                }
+            }
+        }
+        int read = 0;
+        for (PersonRef villager : villagers) {
+            if (app.campaign().readPoster(villager, subject, topic, calendar.today())) {
+                read++;
+            }
+        }
+        return read;
+    }
+
     /** Ein Plakat wurde abgebaut. */
     public void posterRemoved(BlockPosition position) {
         app.putUpPoster().takeDown(position);

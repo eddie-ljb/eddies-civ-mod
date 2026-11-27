@@ -1882,5 +1882,19 @@
   "eddies-civ-mod.command.emblem_placed": "The emblem stands in %s and strengthens villager loyalty (total +%s).",
   "eddies-civ-mod.command.emblem_decoration": "The emblem is up but only works inside a town (or the limit is reached).",
   "eddies-civ-mod.command.emblem_given": "You receive an emblem (%s). Place it inside a town.",
-  "eddies-civ-mod.command.emblem_no_image": "No uploaded image or no such colour: %s"
+  "eddies-civ-mod.command.emblem_no_image": "No uploaded image or no such colour: %s",
+  "eddies-civ-mod.gui.flag_editor_title": "Flag editor: %s",
+  "eddies-civ-mod.gui.flag_editor_preview": "Preview (%s layers)",
+  "eddies-civ-mod.gui.flag_editor_base": "Base colour: click to choose",
+  "eddies-civ-mod.gui.flag_editor_add": "Add pattern",
+  "eddies-civ-mod.gui.flag_editor_add_hint": "Pick a pattern, then its colour.",
+  "eddies-civ-mod.gui.flag_editor_undo": "Remove last layer",
+  "eddies-civ-mod.gui.flag_editor_save": "Save as flag",
+  "eddies-civ-mod.gui.flag_editor_save_hint": "Sets this flag for %s (leaders only).",
+  "eddies-civ-mod.gui.flag_editor_take": "Take banner",
+  "eddies-civ-mod.gui.flag_editor_patterns": "Choose a pattern",
+  "eddies-civ-mod.gui.flag_editor_color": "Pattern colour",
+  "eddies-civ-mod.gui.flag_editor_page": "Page %s",
+  "eddies-civ-mod.gui.flag_editor_layers": "Layers: %s of %s",
+  "eddies-civ-mod.gui.flag_editor_full": "More than %s layers do not fit on the flag."
 }

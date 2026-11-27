@@ -91,6 +91,7 @@ public final class Ambience {
                         (level, pos) -> level.getBlockState(pos).is(content.electionPoster())
                                 || level.getBlockState(pos).is(content.emblems().poster()));
                 Emblems.instance().refresh(server, civ.get());
+                PosterDisplays.villagersRead(server, civ.get());
             }
             if (ticks % BAR_INTERVAL == 0) {
                 showLiveCounts(server, civ.get());

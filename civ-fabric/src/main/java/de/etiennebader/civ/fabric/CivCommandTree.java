@@ -1107,6 +1107,15 @@ public final class CivCommandTree {
                 .then(Commands.literal("flagge")
                         .executes(context -> withCiv(context, (civ, player) -> giveFlag(civ, player,
                                 level.apply(context))))
+                        .then(Commands.literal("editor")
+                                .executes(context -> withCiv(context, (civ, player) -> civ.levels().with(
+                                        Players.caller(player), level.apply(context), polity -> {
+                                            de.etiennebader.civ.fabric.screen.FlagEditorScreen.open(civ, player,
+                                                    polity, Optional.empty());
+                                            return Reply.success(Message.of(
+                                                    de.etiennebader.civ.server.command.GuiKeys.FLAG_EDITOR_TITLE.key(),
+                                                    polity.name().value()));
+                                        }))))
                         .then(Commands.literal("setzen")
                                 .executes(context -> withCiv(context, (civ, player) -> {
                                     Optional<de.etiennebader.civ.domain.civic.Flag> flag = Flags.of(player.getMainHandItem());

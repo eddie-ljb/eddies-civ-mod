@@ -1882,5 +1882,19 @@
   "eddies-civ-mod.command.emblem_placed": "Das Zeichen steht in %s und stärkt die Treue der Dorfbewohner (insgesamt +%s).",
   "eddies-civ-mod.command.emblem_decoration": "Das Zeichen steht, wirkt aber nur im Gebiet einer Gemeinde (oder ist schon in der Höchstzahl).",
   "eddies-civ-mod.command.emblem_given": "Du erhältst ein Zeichen (%s). Stelle es im Gebiet einer Gemeinde auf.",
-  "eddies-civ-mod.command.emblem_no_image": "Dafür gibt es kein hochgeladenes Bild bzw. keine solche Farbe: %s"
+  "eddies-civ-mod.command.emblem_no_image": "Dafür gibt es kein hochgeladenes Bild bzw. keine solche Farbe: %s",
+  "eddies-civ-mod.gui.flag_editor_title": "Flaggen-Editor: %s",
+  "eddies-civ-mod.gui.flag_editor_preview": "Vorschau (%s Schichten)",
+  "eddies-civ-mod.gui.flag_editor_base": "Grundfarbe: Klick wählt sie",
+  "eddies-civ-mod.gui.flag_editor_add": "Muster hinzufügen",
+  "eddies-civ-mod.gui.flag_editor_add_hint": "Wähle ein Muster, dann seine Farbe.",
+  "eddies-civ-mod.gui.flag_editor_undo": "Letzte Schicht entfernen",
+  "eddies-civ-mod.gui.flag_editor_save": "Als Flagge speichern",
+  "eddies-civ-mod.gui.flag_editor_save_hint": "Setzt diese Flagge für %s (nur die Spitze darf das).",
+  "eddies-civ-mod.gui.flag_editor_take": "Banner holen",
+  "eddies-civ-mod.gui.flag_editor_patterns": "Muster wählen",
+  "eddies-civ-mod.gui.flag_editor_color": "Farbe des Musters",
+  "eddies-civ-mod.gui.flag_editor_page": "Seite %s",
+  "eddies-civ-mod.gui.flag_editor_layers": "Schichten: %s von %s",
+  "eddies-civ-mod.gui.flag_editor_full": "Mehr als %s Schichten passen nicht auf die Flagge."
 }
