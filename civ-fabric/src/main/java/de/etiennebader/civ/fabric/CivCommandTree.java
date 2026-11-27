@@ -1158,6 +1158,12 @@ public final class CivCommandTree {
                         .then(Commands.literal("spielen")
                                 .executes(context -> withCiv(context, (civ, player) -> playAnthem(civ, player,
                                         level.apply(context)))))
+                        .then(Commands.literal("noten")
+                                .executes(context -> withCiv(context, (civ, player) -> playAnthemNotes(civ, player,
+                                        level.apply(context)))))
+                        .then(Commands.literal("platte")
+                                .executes(context -> withCiv(context, (civ, player) -> giveAnthemRecord(civ, player,
+                                        level.apply(context)))))
                         .then(Commands.literal("setzen")
                                 .then(arg(TEXT, StringArgumentType.greedyString())
                                         .executes(context -> withCiv(context, (civ, player) -> civ.levels().setAnthem(
@@ -1477,6 +1483,28 @@ public final class CivCommandTree {
                 .map(anthem -> {
                     Ambience.play(player, anthem);
                     return Reply.success(Message.of(MessageKey.ANTHEM_PLAYING, polity.name().value(), anthem.title()));
+                })
+                .orElseGet(() -> Reply.failure(Message.of(MessageKey.ANTHEM_NONE, polity.name().value()))));
+    }
+
+    /** Spielt nur die Notenblock-Melodie, auch wenn eine Aufnahme hochgeladen ist (Spieler ohne Ressourcenpaket). */
+    private static Reply playAnthemNotes(CivServer civ, ServerPlayer player, String levelId) {
+        return civ.levels().with(Players.caller(player), levelId, polity -> civ.civic().anthemOf(polity.id())
+                .map(anthem -> {
+                    Ambience.play(player, anthem, false);
+                    return Reply.success(Message.of(MessageKey.ANTHEM_PLAYING, polity.name().value(), anthem.title()));
+                })
+                .orElseGet(() -> Reply.failure(Message.of(MessageKey.ANTHEM_NONE, polity.name().value()))));
+    }
+
+    /** Gibt dem Spieler eine Hymnen-Schallplatte der Ebene. */
+    private static Reply giveAnthemRecord(CivServer civ, ServerPlayer player, String levelId) {
+        return civ.levels().with(Players.caller(player), levelId, polity -> civ.civic().anthemOf(polity.id())
+                .map(anthem -> {
+                    player.getInventory().placeItemBackInInventory(
+                            de.etiennebader.civ.fabric.content.AnthemRecords.create(polity.id(),
+                                    polity.name().value(), anthem), Prediction.SERVER_ONLY);
+                    return Reply.success(Message.of(MessageKey.ANTHEM_RECORD_GIVEN, polity.name().value()));
                 })
                 .orElseGet(() -> Reply.failure(Message.of(MessageKey.ANTHEM_NONE, polity.name().value()))));
     }

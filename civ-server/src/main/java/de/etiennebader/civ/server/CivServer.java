@@ -614,6 +614,11 @@ public final class CivServer {
         return imagesDirectory;
     }
 
+    /** Ordner für hochgeladene Hymnen-Aufnahmen ({@code <hash>.ogg}), neben dem Bilder-Ordner. */
+    public Optional<java.nio.file.Path> anthemsDirectory() {
+        return imagesDirectory.map(directory -> directory.resolveSibling("anthems"));
+    }
+
     /**
      * Schreibt sofort eine Sicherung der Datenbank ({@code backups/civ-manual-…sqlite}).
      *
