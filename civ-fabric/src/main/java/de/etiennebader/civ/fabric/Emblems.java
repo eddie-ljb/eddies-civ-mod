@@ -259,8 +259,12 @@ public final class Emblems {
         }
     }
 
-    /** Welches Bild für diese Art hochgeladen werden darf: Wappen und Flagge teilen sich das Wappen-Bild. */
+    /** Welches hochgeladene Bild zu dieser Art gehört: Flagge, Wappen und Wahlplakat haben je eine eigene Art. */
     static ImageKind imageKind(EmblemBlock.Kind kind) {
-        return kind == EmblemBlock.Kind.POSTER ? ImageKind.WAHLPLAKAT : ImageKind.WAPPEN;
+        return switch (kind) {
+            case FLAG -> ImageKind.FLAGGE;
+            case COAT_OF_ARMS -> ImageKind.WAPPEN;
+            default -> ImageKind.WAHLPLAKAT;
+        };
     }
 }

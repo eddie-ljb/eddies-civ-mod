@@ -24,7 +24,7 @@ public record CustomImage(String id, PolityId polity, ImageKind kind, String has
     /** Größte erlaubte Kantenlänge; größere Bilder würden ohnehin nur verkleinert als Karte dargestellt. */
     public static final int MAX_DIMENSION = 128;
 
-    /** Höchstens so viele Bilder derselben Art je Polity (Wahlplakate, Leuchtreklamen; ein Wappen ersetzt sich selbst). */
+    /** Höchstens so viele Bilder derselben Art je Polity (Wahlplakate, Leuchtreklamen; Wappen und Flagge ersetzen sich selbst). */
     public static final int MAX_PER_KIND = 10;
 
     public CustomImage {

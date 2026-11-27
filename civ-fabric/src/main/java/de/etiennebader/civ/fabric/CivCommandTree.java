@@ -1896,6 +1896,9 @@ public final class CivCommandTree {
                         .then(Commands.literal("wappen").executes(context -> withCiv(context, (civ, player) -> giveLogo(
                                 civ, player, StringArgumentType.getString(context, NAME),
                                 de.etiennebader.civ.domain.civic.ImageKind.WAPPEN))))
+                        .then(Commands.literal("flagge").executes(context -> withCiv(context, (civ, player) -> giveLogo(
+                                civ, player, StringArgumentType.getString(context, NAME),
+                                de.etiennebader.civ.domain.civic.ImageKind.FLAGGE))))
                         .then(Commands.literal("plakat").executes(context -> withCiv(context, (civ, player) -> giveLogo(
                                 civ, player, StringArgumentType.getString(context, NAME),
                                 de.etiennebader.civ.domain.civic.ImageKind.WAHLPLAKAT))))

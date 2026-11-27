@@ -1394,10 +1394,10 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
         }
     }
 
-    // ---- Eigene Bilder (Wappen, Wahlplakat, Leuchtreklame) ----
+    // ---- Eigene Bilder (Wappen, Flagge, Wahlplakat, Leuchtreklame) ----
 
     /**
-     * {@code POST /api/image}: {@code {"polity": "<Name>", "kind": "WAPPEN|WAHLPLAKAT|LEUCHTREKLAME",
+     * {@code POST /api/image}: {@code {"polity": "<Name>", "kind": "WAPPEN|FLAGGE|WAHLPLAKAT|LEUCHTREKLAME",
      * "data": "<PNG als Base64>"}}. Nur die Spitze der Einheit darf hochladen.
      */
     private HttpResponse imageUpload(HttpRequest request, WebSessions.Login login, Translator texts) {

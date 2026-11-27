@@ -199,7 +199,7 @@ public final class CivicRegistry extends AggregateRoot<CivicEvent> implements Ci
                                       Day day) {
         Objects.requireNonNull(day, "day");
         List<CustomImage> displaced;
-        if (kind == ImageKind.WAPPEN) {
+        if (kind == ImageKind.WAPPEN || kind == ImageKind.FLAGGE) {
             displaced = imagesOf(polity, kind);
             displaced.forEach(image -> images.remove(image.id()));
         } else {

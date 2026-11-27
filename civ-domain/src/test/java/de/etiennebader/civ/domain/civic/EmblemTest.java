@@ -56,4 +56,16 @@ class EmblemTest {
         assertFalse(registry.removeEmblem(at(0)));
         assertEquals(0, registry.emblemLoyalty(town));
     }
+
+    @Test
+    void flagAndCoatOfArmsImagesAreSeparateAndEachReplacesItself() {
+        CivicRegistry registry = CivicRegistry.empty();
+        registry.addImage("w1", town, ImageKind.WAPPEN, "hash-w1", 16, 16, DAY);
+        registry.addImage("f1", town, ImageKind.FLAGGE, "hash-f1", 16, 16, DAY);
+        assertEquals(1, registry.imagesOf(town, ImageKind.WAPPEN).size());
+        assertEquals(1, registry.imagesOf(town, ImageKind.FLAGGE).size());
+        registry.addImage("f2", town, ImageKind.FLAGGE, "hash-f2", 16, 16, DAY);
+        assertEquals("f2", registry.imagesOf(town, ImageKind.FLAGGE).getFirst().id());
+        assertEquals("w1", registry.imagesOf(town, ImageKind.WAPPEN).getFirst().id());
+    }
 }
