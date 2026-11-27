@@ -88,7 +88,9 @@ public final class Ambience {
         try {
             if (ticks % POSTER_INTERVAL == 0) {
                 PosterDisplays.refresh(server, civ.get(), level -> true,
-                        (level, pos) -> level.getBlockState(pos).is(content.electionPoster()));
+                        (level, pos) -> level.getBlockState(pos).is(content.electionPoster())
+                                || level.getBlockState(pos).is(content.emblems().poster()));
+                Emblems.instance().refresh(server, civ.get());
             }
             if (ticks % BAR_INTERVAL == 0) {
                 showLiveCounts(server, civ.get());

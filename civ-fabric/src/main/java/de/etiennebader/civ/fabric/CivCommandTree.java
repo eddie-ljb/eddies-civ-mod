@@ -266,6 +266,7 @@ public final class CivCommandTree {
                 .then(plotCommands())
                 .then(constructionCommands())
                 .then(logoCommands())
+                .then(emblemCommands())
                 .then(warCommands())
                 .then(familyCommands())
                 .then(religionCommands())
@@ -1864,6 +1865,62 @@ public final class CivCommandTree {
                         .then(Commands.literal("reklame").executes(context -> withCiv(context, (civ, player) -> giveLogo(
                                 civ, player, StringArgumentType.getString(context, NAME),
                                 de.etiennebader.civ.domain.civic.ImageKind.LEUCHTREKLAME)))));
+    }
+
+    /**
+     * {@code /civ zeichen <flagge|wappen|plakat> [leer | farbe <Farbe> | bild <Einheit>]}: gibt eine Flagge, ein Wappen
+     * oder ein Wahlplakat als Block-Item (Issue #82): leer, einfarbig oder mit dem hochgeladenen Bild der Einheit.
+     */
+    private LiteralArgumentBuilder<CommandSourceStack> emblemCommands() {
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("zeichen");
+        for (var entry : java.util.Map.of("flagge", de.etiennebader.civ.fabric.content.EmblemBlock.Kind.FLAG,
+                "wappen", de.etiennebader.civ.fabric.content.EmblemBlock.Kind.COAT_OF_ARMS,
+                "plakat", de.etiennebader.civ.fabric.content.EmblemBlock.Kind.POSTER).entrySet()) {
+            var kind = entry.getValue();
+            root.then(Commands.literal(entry.getKey())
+                    .executes(context -> withCiv(context, (civ, player) -> giveEmblem(player, kind, "blank", "")))
+                    .then(Commands.literal("leer").executes(context -> withCiv(context,
+                            (civ, player) -> giveEmblem(player, kind, "blank", ""))))
+                    .then(Commands.literal("farbe").then(arg("farbe", StringArgumentType.word())
+                            .suggests((context, builder) -> net.minecraft.commands.SharedSuggestionProvider.suggest(
+                                    java.util.Arrays.stream(net.minecraft.world.item.DyeColor.values())
+                                            .map(net.minecraft.world.item.DyeColor::getSerializedName), builder))
+                            .executes(context -> withCiv(context, (civ, player) -> {
+                                String color = StringArgumentType.getString(context, "farbe");
+                                if (net.minecraft.world.item.DyeColor.byName(color, null) == null) {
+                                    return Reply.failure(Message.of(MessageKey.EMBLEM_NO_IMAGE, color));
+                                }
+                                return giveEmblem(player, kind, "color:" + color, "");
+                            }))))
+                    .then(Commands.literal("bild").then(arg(NAME, StringArgumentType.string())
+                            .suggests(this::suggestPolityNames)
+                            .executes(context -> withCiv(context, (civ, player) -> {
+                                String name = StringArgumentType.getString(context, NAME);
+                                Optional<PolityView> polity = civ.queries().polityNamed(name);
+                                if (polity.isEmpty()) {
+                                    return Reply.failure(Message.of(MessageKey.LOGO_UNKNOWN_POLITY, name));
+                                }
+                                Optional<de.etiennebader.civ.domain.civic.CustomImage> image = civ.civic()
+                                        .imagesOf(polity.get().id(), Emblems.imageKind(kind)).stream().findFirst();
+                                if (image.isEmpty()) {
+                                    return Reply.failure(Message.of(MessageKey.EMBLEM_NO_IMAGE,
+                                            polity.get().name().value()));
+                                }
+                                return giveEmblem(player, kind, "image:" + image.get().hash(),
+                                        polity.get().name().value());
+                            })))));
+        }
+        return root;
+    }
+
+    private Reply giveEmblem(ServerPlayer player, de.etiennebader.civ.fabric.content.EmblemBlock.Kind kind,
+                             String style, String label) {
+        net.minecraft.world.item.ItemStack stack = Emblems.instance().stack(kind, style);
+        if (!label.isEmpty()) {
+            stack.set(DataComponents.CUSTOM_NAME, Component.literal(label));
+        }
+        player.getInventory().placeItemBackInInventory(stack, Prediction.SERVER_ONLY);
+        return Reply.success(Message.of(MessageKey.EMBLEM_GIVEN, style));
     }
 
     private Reply giveLogo(CivServer civ, ServerPlayer player, String polityName,

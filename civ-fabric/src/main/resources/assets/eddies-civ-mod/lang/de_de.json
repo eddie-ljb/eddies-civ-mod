@@ -900,7 +900,7 @@
   "eddies-civ-mod.command.poster_info": "Wahlplakat für %1$s (%2$s)",
   "eddies-civ-mod.command.poster_programme": "  Programm: %1$s",
   "eddies-civ-mod.command.poster_promise": "  „%1$s“",
-  "eddies-civ-mod.command.poster_empty": "Eine leere Litfaßsäule.",
+  "eddies-civ-mod.command.poster_empty": "Dieses Plakat ist noch nicht angemeldet; Rechtsklick meldet es an.",
   "eddies-civ-mod.command.poll_none": "In %1$s läuft gerade keine Wahl.",
   "eddies-civ-mod.command.poll_header": "Umfrage %1$s, %2$s: %3$s Dorfbewohner befragt, %4$s unentschlossen",
   "eddies-civ-mod.command.poll_no_villagers": "  Keine Dorfbewohner zum Befragen.",
@@ -1874,5 +1874,13 @@
   "eddies-civ-mod.command.religion_needs_villager": "Kein Dorfbewohner in Reichweite.",
   "eddies-civ-mod.command.logo_unknown_polity": "Unbekannte Einheit „%s“.",
   "eddies-civ-mod.command.logo_none": "%s hat noch kein Bild dieser Art. Die Spitze lädt es auf der Webseite hoch (Reiter „Logos“).",
-  "eddies-civ-mod.command.logo_given": "Du hältst das Logo von %s als Karte in der Hand."
+  "eddies-civ-mod.command.logo_given": "Du hältst das Logo von %s als Karte in der Hand.",
+  "block.eddies-civ-mod.flag": "Flagge",
+  "block.eddies-civ-mod.coat_of_arms": "Wappen",
+  "block.eddies-civ-mod.campaign_poster": "Wahlplakat",
+  "eddies-civ-mod.command.poster_registered": "Das Wahlplakat wurde angemeldet.",
+  "eddies-civ-mod.command.emblem_placed": "Das Zeichen steht in %s und stärkt die Treue der Dorfbewohner (insgesamt +%s).",
+  "eddies-civ-mod.command.emblem_decoration": "Das Zeichen steht, wirkt aber nur im Gebiet einer Gemeinde (oder ist schon in der Höchstzahl).",
+  "eddies-civ-mod.command.emblem_given": "Du erhältst ein Zeichen (%s). Stelle es im Gebiet einer Gemeinde auf.",
+  "eddies-civ-mod.command.emblem_no_image": "Dafür gibt es kein hochgeladenes Bild bzw. keine solche Farbe: %s"
 }

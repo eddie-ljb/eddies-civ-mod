@@ -17,6 +17,7 @@ import de.etiennebader.civ.domain.shared.PolityId;
 import de.etiennebader.civ.server.Announcement;
 import de.etiennebader.civ.server.Announcements;
 import de.etiennebader.civ.server.command.Caller;
+import de.etiennebader.civ.domain.territory.BlockPosition;
 import de.etiennebader.civ.server.command.Message;
 import de.etiennebader.civ.server.command.MessageKey;
 import de.etiennebader.civ.server.command.Reply;
@@ -270,5 +271,23 @@ public final class CivicService {
         } catch (IllegalArgumentException | IllegalStateException e) {
             return Reply.failure(Message.of(MessageKey.CIVIC_REFUSED, e.getMessage()));
         }
+    }
+
+    /** Eine Flagge oder ein Wappen wurde aufgestellt: stärkt die Treue zur Polity, in deren Gebiet es steht. */
+    public Reply emblemPlaced(BlockPosition position, de.etiennebader.civ.domain.civic.Emblem.Kind kind) {
+        return attempt(() -> app.civic().placeEmblem(position, kind, calendar.today())
+                .map(town -> Reply.success(Message.of(MessageKey.EMBLEM_PLACED,
+                        texts.polityName(town), queries.civic().emblemLoyalty(town))))
+                .orElseGet(() -> Reply.success(Message.of(MessageKey.EMBLEM_DECORATION))));
+    }
+
+    /** Alle aufgestellten Flaggen und Wappen, z. B. um verwaiste aufzuräumen. */
+    public List<de.etiennebader.civ.domain.civic.Emblem> emblems() {
+        return queries.civic().emblems();
+    }
+
+    /** Eine Flagge oder ein Wappen wurde abgebaut. */
+    public void emblemRemoved(BlockPosition position) {
+        app.civic().removeEmblem(position);
     }
 }

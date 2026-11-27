@@ -1,0 +1,10 @@
+{
+  "textures": { "pole": "minecraft:block/stone_bricks", "particle": "minecraft:block/stone_bricks" },
+  "elements": [
+    { "from": [3, 0, 3], "to": [13, 10, 13],
+      "faces": {
+        "north": {"texture": "#pole"}, "south": {"texture": "#pole"}, "east": {"texture": "#pole"},
+        "west": {"texture": "#pole"}, "up": {"texture": "#pole"}, "down": {"texture": "#pole"}
+      } }
+  ]
+}

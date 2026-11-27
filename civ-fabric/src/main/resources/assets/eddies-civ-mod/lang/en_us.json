@@ -900,7 +900,7 @@
   "eddies-civ-mod.command.poster_info": "Election poster for %1$s (%2$s)",
   "eddies-civ-mod.command.poster_programme": "  Programme: %1$s",
   "eddies-civ-mod.command.poster_promise": "  \"%1$s\"",
-  "eddies-civ-mod.command.poster_empty": "An empty poster column.",
+  "eddies-civ-mod.command.poster_empty": "This poster is not registered yet; right-click to register it.",
   "eddies-civ-mod.command.poll_none": "No election is running in %1$s.",
   "eddies-civ-mod.command.poll_header": "Poll %1$s, %2$s: %3$s villagers asked, %4$s undecided",
   "eddies-civ-mod.command.poll_no_villagers": "  No villagers to ask.",
@@ -1874,5 +1874,13 @@
   "eddies-civ-mod.command.religion_needs_villager": "No villager within reach.",
   "eddies-civ-mod.command.logo_unknown_polity": "Unknown entity \"%s\".",
   "eddies-civ-mod.command.logo_none": "%s has no image of this kind yet. The head uploads it on the website (tab \"Logos\").",
-  "eddies-civ-mod.command.logo_given": "You are holding the logo of %s as a map."
+  "eddies-civ-mod.command.logo_given": "You are holding the logo of %s as a map.",
+  "block.eddies-civ-mod.flag": "Flag",
+  "block.eddies-civ-mod.coat_of_arms": "Coat of Arms",
+  "block.eddies-civ-mod.campaign_poster": "Election Poster",
+  "eddies-civ-mod.command.poster_registered": "The election poster has been registered.",
+  "eddies-civ-mod.command.emblem_placed": "The emblem stands in %s and strengthens villager loyalty (total +%s).",
+  "eddies-civ-mod.command.emblem_decoration": "The emblem is up but only works inside a town (or the limit is reached).",
+  "eddies-civ-mod.command.emblem_given": "You receive an emblem (%s). Place it inside a town.",
+  "eddies-civ-mod.command.emblem_no_image": "No uploaded image or no such colour: %s"
 }
