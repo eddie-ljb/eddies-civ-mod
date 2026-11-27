@@ -53,6 +53,10 @@ public final class MunicipalGovernment {
     private static final int EMBASSY_SIZE = 4;
     private static final int MAX_PLOTS_PER_DAY = 3;
     private static final int SURPLUS_TOLERANCE = 2;
+    /** Beschlüsse der Dorfbewohner stehen in der Gemeindeordnung, nach Teilen geordnet. */
+    private static final String VILLAGE_LAW_NAME = "Gemeindeordnung";
+    private static final String TAX_PART_NAME = "Steuern";
+    private static final String OUTPOST_PART_NAME = "Gebiet";
     private static final String TAX_LAW_TITLE = "Grundsteuerordnung";
     private static final String OUTPOST_LAW_TITLE = "Außenpostengesetz";
 
@@ -181,7 +185,8 @@ public final class MunicipalGovernment {
                 || view.memberCount() < scenario.territory().outpostMemberThreshold()) {
             return;
         }
-        outpostsAllowed = attempt(() -> app.enactStatute().execute(new EnactStatute.Command(polity, OUTPOST_LAW_TITLE,
+        outpostsAllowed = attempt(() -> app.enactStatute().execute(new EnactStatute.Command(polity, VILLAGE_LAW_NAME,
+                OUTPOST_PART_NAME, OUTPOST_LAW_TITLE,
                 List.of(ParameterValue.of(StandardParameters.MAX_OUTPOSTS, scenario.territory().maxOutposts())), day)));
         if (outpostsAllowed) {
             claimOutpost(day);
@@ -240,7 +245,8 @@ public final class MunicipalGovernment {
         }
         if (newRate > 0) {
             try {
-                taxStatute = app.enactStatute().execute(new EnactStatute.Command(polity, TAX_LAW_TITLE,
+                taxStatute = app.enactStatute().execute(new EnactStatute.Command(polity, VILLAGE_LAW_NAME,
+                        TAX_PART_NAME, TAX_LAW_TITLE,
                         List.of(ParameterValue.of(StandardParameters.LAND_TAX_PER_BLOCK, newRate)), day));
                 taxRate = newRate;
             } catch (DomainException rejected) {

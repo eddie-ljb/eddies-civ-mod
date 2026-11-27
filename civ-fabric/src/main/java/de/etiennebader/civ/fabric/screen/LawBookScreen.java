@@ -82,7 +82,7 @@ public final class LawBookScreen extends MenuScreen {
                     Feedback.click(click.player());
                     return;
                 }
-                report(click, civ.lawBooks().repeal(caller(), polity, paragraph.number()));
+                report(click, civ.lawBooks().repeal(caller(), polity, paragraph.id()));
             });
         }
 
@@ -94,7 +94,8 @@ public final class LawBookScreen extends MenuScreen {
                 report(click, Reply.failure(Message.of(MessageKey.PARAGRAPH_NEEDS_TEXT)));
                 return;
             }
-            report(click, civ.lawBooks().enact(caller(), polity, draft.get().title(), draft.get().text()));
+            report(click, civ.lawBooks().enact(caller(), polity, draft.get().lawName(),
+                    draft.get().partName(), draft.get().title(), draft.get().text()));
         });
 
         int open = view.proposals().size();
@@ -126,7 +127,7 @@ public final class LawBookScreen extends MenuScreen {
 
     private ItemStack icon(ParagraphView paragraph) {
         Icon icon = Icon.of(paragraph.effects().isEmpty() ? Items.BOOK : Items.WRITTEN_BOOK)
-                .name(GuiKeys.PARAGRAPH_NAME.text(paragraph.number(), paragraph.title()), Icon.TITLE)
+                .name(GuiKeys.PARAGRAPH_NAME.text(paragraph.number(), paragraph.qualifiedTitle()), Icon.TITLE)
                 .line(GuiKeys.PARAGRAPH_ENACTED_ON.text(paragraph.enactedOn()), Icon.HINT);
         for (LawSetting effect : paragraph.effects()) {
             icon.line(GuiKeys.PARAGRAPH_EFFECT.text(effect.name(), civ.texts().lawValue(effect.value())), Icon.GOOD);

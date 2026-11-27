@@ -34,7 +34,8 @@ public final class SchemaMigrations {
             "V026__currencies_and_credit.sql",
             "V027__loan_offers.sql",
             "V028__anthem_audio.sql",
-            "V029__polity_emblem.sql");
+            "V029__polity_emblem.sql",
+            "V030__law_structure.sql");
 
     private SchemaMigrations() {
     }

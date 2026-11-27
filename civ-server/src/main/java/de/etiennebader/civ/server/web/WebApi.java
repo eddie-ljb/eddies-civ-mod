@@ -1753,8 +1753,16 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
                         .put("preamble", polity.constitution().preamble())
                         .raw("paragraphs", Json.array(books.paragraphsOf(polity), paragraph -> Json.object()
                                 .put("number", paragraph.number())
+                                .put("id", paragraph.id().value().toString())
+                                .put("law", paragraph.lawName())
+                                .put("part", paragraph.partName())
                                 .put("title", paragraph.title())
                                 .put("text", paragraph.text())
+                                .raw("sections", Json.array(paragraph.sections(), section -> Json.object()
+                                        .put("number", section.number())
+                                        .raw("sentences", Json.array(section.sentences(), Json::string))
+                                        .raw("enumeration", Json.array(section.enumeration(), Json::string))
+                                        .build()))
                                 .put("enactedOn", paragraph.enactedOn())
                                 .raw("effects", Json.array(paragraph.effects(), effect -> Json.object()
                                         .put("id", effect.id())
@@ -1812,8 +1820,10 @@ public final class WebApi implements Function<HttpRequest, HttpResponse> {
             return Reply.failure(Message.of(MessageKey.NOT_IN_MUNICIPALITY));
         }
         return switch (action) {
-            case "enact" -> books.enact(caller, polity, body.getOrDefault("title", ""), body.getOrDefault("text", ""));
-            case "repeal" -> books.repeal(caller, polity, Integer.parseInt(body.getOrDefault("number", "0")));
+            case "enact" -> books.enact(caller, polity, body.getOrDefault("law", ""), body.getOrDefault("part", ""),
+                    body.getOrDefault("title", ""), body.getOrDefault("text", ""));
+            case "repeal" -> books.repeal(caller, polity,
+                    new de.etiennebader.civ.domain.shared.StatuteId(UUID.fromString(body.getOrDefault("id", ""))));
             case "rights" -> {
                 Map<String, String> values = new java.util.LinkedHashMap<>();
                 body.forEach((key, value) -> {

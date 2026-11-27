@@ -288,7 +288,8 @@ public final class StateDump {
     private static String motion(Motion motion) {
         return switch (motion) {
             case Motion.Change change -> change.change().key().id() + "=" + ParameterCatalog.encode(change.change());
-            case Motion.Enact enact -> "enact:" + enact.title() + ":" + enact.text() + ":" + enact.values().stream()
+            case Motion.Enact enact -> "enact:" + (enact.lawName().isEmpty() ? "" : enact.lawName() + ">" + enact.partName() + ">")
+                    + enact.title() + ":" + enact.text() + ":" + enact.values().stream()
                     .map(value -> value.key().id() + "=" + ParameterCatalog.encode(value))
                     .collect(Collectors.joining(","));
             case Motion.Repeal repeal -> "repeal:" + repeal.statute().value() + ":" + repeal.title();
